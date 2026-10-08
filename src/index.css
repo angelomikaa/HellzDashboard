@@ -1,1 +1,24 @@
 @import "tailwindcss";
+
+@theme {
+  /* surfaces (60/30/10) */
+  --color-dominant: #0D1117;   /* page background — 60% */
+  --color-surface: #161B22;    /* cards, login panel — 30% */
+  --color-line: #30363D;       /* borders, dividers */
+  --color-accent: #E3B341;     /* interactive gold — 10% */
+  --color-accent-foreground: #0D1117;
+
+  /* text */
+  --color-content: #E6EDF3;
+  --color-muted: #8B949E;
+
+  /* semantic */
+  --color-destructive: #F85149;
+  --color-success: #3FB950;    /* reserved: Phase 6+ */
+
+  /* tier tokens (FOUNDATIONAL — consumed in Phase 4+, unused in Phase 1) */
+  --color-tier-bronze: #B87333;
+  --color-tier-silver: #B8C0CC;
+  --color-tier-gold: #E9B44C;
+  --color-tier-platinum: #D7E3F0;
+}
