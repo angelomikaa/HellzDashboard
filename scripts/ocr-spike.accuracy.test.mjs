@@ -6,7 +6,7 @@
 //   Test 4: parseValue handles `1.234.567` thousand separators (-> 1234567),
 //           `12.34%` (-> 12.34), and plain digits
 import { describe, expect, it } from 'vitest';
-import { computeAccuracy, parseValue, verdict } from './ocr-spike.mjs';
+import { compareField, computeAccuracy, parseValue, verdict } from './ocr-spike.mjs';
 
 // Helper: build a results array where `correctCount` fields match expected.
 function results(correctCount, total = 10) {
@@ -108,5 +108,82 @@ describe('parseValue (plan behavior 4 — Portuguese locale separators)', () => 
     expect(parseValue('abc').ok).toBe(false);
     expect(parseValue('%').ok).toBe(false);
     expect(parseValue(null).ok).toBe(false);
+  });
+
+  it('fails on a lone minus or minus without digits', () => {
+    expect(parseValue('-').ok).toBe(false);
+    expect(parseValue('-%').ok).toBe(false);
+    expect(parseValue('-abc').ok).toBe(false);
+  });
+});
+
+describe('parseValue — negative values (real screenshots: Variable CT, Fixed CT, Global CD are negative)', () => {
+  it('parses `-33.38%` -> -33.38 percentual', () => {
+    const r = parseValue('-33.38%');
+    expect(r.ok).toBe(true);
+    expect(r.value).toBe(-33.38);
+    expect(r.isPercentual).toBe(true);
+  });
+
+  it('parses `-60.00%` -> -60 percentual', () => {
+    const r = parseValue('-60.00%');
+    expect(r.ok).toBe(true);
+    expect(r.value).toBe(-60);
+    expect(r.isPercentual).toBe(true);
+  });
+
+  it('parses `-10.00%` -> -10 percentual', () => {
+    const r = parseValue('-10.00%');
+    expect(r.ok).toBe(true);
+    expect(r.value).toBe(-10);
+    expect(r.isPercentual).toBe(true);
+  });
+
+  it('parses plain negative `-5` -> -5 (not percentual)', () => {
+    const r = parseValue('-5');
+    expect(r.ok).toBe(true);
+    expect(r.value).toBe(-5);
+    expect(r.isPercentual).toBe(false);
+  });
+});
+
+describe('compareField — field comparison by type (numeric stats vs text header fields)', () => {
+  it('numeric: OCR read matches expected written in pt-BR display form (`1.234` == `1234`)', () => {
+    const r = compareField('1234', '1.234');
+    expect(r.ok).toBe(true);
+    expect(r.parsed).toBe(1234);
+    expect(r.expected).toBe(1234);
+  });
+
+  it('numeric: percentual flag must match (`12,34` vs `12,34%` is a miss)', () => {
+    expect(compareField('12,34', '12,34%').ok).toBe(false);
+    expect(compareField('12,34%', '12,34%').ok).toBe(true);
+  });
+
+  it('numeric: different values are a miss; unparseable OCR read is a miss', () => {
+    expect(compareField('123', '456').ok).toBe(false);
+    expect(compareField('123', '').ok).toBe(false);
+    expect(compareField('123', 'garbage').ok).toBe(false);
+  });
+
+  it('numeric: negative values compare correctly (`-33.38%` == `-33.38%`)', () => {
+    expect(compareField('-33.38%', '-33.38%').ok).toBe(true);
+    expect(compareField('-33.38%', '33.38%').ok).toBe(false);
+  });
+
+  it('text: case-insensitive, whitespace-normalized string equality (job/nickname)', () => {
+    expect(compareField('Gypsy', ' GYPSY ').ok).toBe(true);
+    expect(compareField('Ahrya', 'ahrya').ok).toBe(true);
+  });
+
+  it('text: different strings are a miss; empty OCR read is a miss', () => {
+    expect(compareField('Gypsy', 'Dancer', 'text').ok).toBe(false);
+    expect(compareField('Ahrya', '', 'text').ok).toBe(false);
+  });
+
+  it('text: expected/arsed carried as trimmed strings', () => {
+    const r = compareField('Gypsy', ' gypsy ', 'text');
+    expect(r.expected).toBe('Gypsy');
+    expect(r.parsed).toBe('gypsy');
   });
 });
