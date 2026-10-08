@@ -46,3 +46,13 @@ create table pin_login_attempts (
 
 create index idx_submissions_member on submissions(member_id);
 create index idx_submission_stats_submission on submission_stats(submission_id);
+
+-- RLS enabled from day one (AGENTS.md: non-whitelisted access blocked at the server).
+-- No policies yet => deny-all for anon/authenticated until 0002_rls.sql adds them.
+-- service_role bypasses RLS; table owner (postgres) bypasses RLS for seeding.
+alter table members enable row level security;
+alter table stat_catalog enable row level security;
+alter table submissions enable row level security;
+alter table submission_stats enable row level security;
+alter table class_key_stats enable row level security;
+alter table pin_login_attempts enable row level security;
