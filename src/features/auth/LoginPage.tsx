@@ -93,8 +93,9 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
     <main className="flex min-h-screen items-center justify-center bg-dominant px-4 py-16">
       <div className="w-full max-w-96 rounded-lg border border-line bg-surface p-6">
         <h1 className="text-center text-[28px] font-semibold leading-[1.2] text-content">
-          NeoFoot
+          Hellz
         </h1>
+        <p className="mt-1 text-center text-sm font-medium text-muted">Painel Geral</p>
         <div aria-hidden="true" className="mx-auto mb-6 mt-4 h-px w-16 bg-line" />
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
