@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
 
   // Lockout gate (D-07): server-side, per handle, DB-backed. LOCKOUT_MINUTES (15) lives in
   // _shared/lockout.ts — the window is enforced here, never client-side.
-  const attemptsRow = await admin
+  const { data: attemptsRow } = await admin
     .from('pin_login_attempts')
     .select('failed_count, locked_until')
     .eq('discord_handle', discordHandle)
@@ -96,7 +96,7 @@ Deno.serve(async (req: Request) => {
   const invalidCredentials = async () =>
     json({ error: 'invalid_credentials', attempts_remaining: await recordFailure() }, 401)
 
-  const member = await admin
+  const { data: member } = await admin
     .from('members')
     .select('id, display_name, role, pin_hash, active')
     .eq('discord_handle', discordHandle)
@@ -117,14 +117,18 @@ Deno.serve(async (req: Request) => {
 
   // Mint the 7-day custom-claim JWT (D-06). `role: 'authenticated'` drives the PostgREST
   // role switch; RLS reads identity from the member_id/member_role custom claims.
+  // Signed HS256 with NEFOOT_JWT_SECRET — a project JWT signing key registered via the
+  // Management API (the legacy project secret is no longer exposed by the platform).
+  // The kid header lets PostgREST select the right key; both are function env secrets.
   const nowSec = Math.floor(Date.now() / 1000)
-  const secret = new TextEncoder().encode(Deno.env.get('SUPABASE_JWT_SECRET')!)
+  const secret = new TextEncoder().encode(Deno.env.get('NEFOOT_JWT_SECRET')!)
+  const kid = Deno.env.get('NEFOOT_JWT_KEY_ID')!
   const token = await new SignJWT({
     role: 'authenticated',
     member_id: member.id,
     member_role: member.role,
   })
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT', kid })
     .setSubject(member.id)
     .setIssuedAt(nowSec)
     .setIssuer('nefoot-verify-pin')
