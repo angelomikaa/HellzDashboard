@@ -9,30 +9,38 @@
  * GO/NO-GO verdict against the ~70% field-accuracy threshold (D-08).
  *
  * Usage:
- *   node scripts/ocr-spike.mjs              run the spike on .secrets/ocr-samples/
- *   node scripts/ocr-spike.mjs --info       print sample resolutions (region calibration aid)
- *   node scripts/ocr-spike.mjs --self-test  synthetic-image pipeline proof (no real data used)
+ *   node scripts/ocr-spike.mjs                   run the spike on .secrets/ocr-samples/
+ *   node scripts/ocr-spike.mjs --dump-candidates  OCR every region, write candidate values
+ *                                                 to .secrets/ocr-samples/candidates.json
+ *                                                 (ground-truth building aid — no expected.json needed)
+ *   node scripts/ocr-spike.mjs --info             print sample resolutions (region calibration aid)
+ *   node scripts/ocr-spike.mjs --self-test        synthetic-image pipeline proof (no real data used)
  *
- * Real-data inputs (both gitignored):
- *   .secrets/ocr-samples/<general|quasi|special>.png   the 10 real screenshots
- *   .secrets/ocr-samples/expected.json                true values per screenshot
- *                                                      (template: scripts/ocr-samples-expected.example.json)
- * Region rects: scripts/ocr-regions.json (pixel rects per screenshot group).
+ * Real-data inputs (all gitignored, D-10):
+ *   .secrets/ocr-samples/samp*.png               the real screenshots (one group per file)
+ *   .secrets/ocr-samples/expected.json           true values per screenshot
+ *                                                (template: scripts/ocr-samples-expected.example.json)
+ *   .secrets/ocr-samples/candidates.json         --dump-candidates output (raw OCR reads per field)
+ * Region rects: scripts/ocr-regions.json (pixel rects per screenshot, with category tags).
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const SAMPLES_DIR = path.resolve(__dirname, '..', '.secrets', 'ocr-samples');
 const EXPECTED_PATH = path.join(SAMPLES_DIR, 'expected.json');
+const CANDIDATES_PATH = path.join(SAMPLES_DIR, 'candidates.json');
 const REGIONS_PATH = fileURLToPath(new URL('./ocr-regions.json', import.meta.url));
 const EXPECTED_TEMPLATE_PATH = fileURLToPath(new URL('./ocr-samples-expected.example.json', import.meta.url));
 
 /** D-08 pivot threshold: ~70% field accuracy. */
 export const ACCURACY_THRESHOLD = 0.7;
-/** OCR whitelist: stat values are digits, pt-BR separators, and % only. */
-const WHITELIST = '0123456789.,%';
+/** OCR whitelist: stat values are digits, pt-BR separators, %, and minus (Variable/Fixed CT, Global CD are negative). */
+const WHITELIST = '0123456789.,%-';
+/** Whitelist for `type: "text"` regions (sampbasic header: job, nickname). */
+const TEXT_WHITELIST =
+  'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ#0123456789 ';
 const IMAGE_RE = /\.(png|jpe?g|webp)$/i;
 
 // ---------------------------------------------------------------------------
@@ -216,15 +224,16 @@ function guardSamples() {
   const images = listSampleImages();
   if (!images || images.length === 0) {
     console.error('[ocr-spike] No real screenshots found in .secrets/ocr-samples/.');
-    console.error('[ocr-spike] D-09/D-10: the spike must run on the 10 REAL guild screenshots');
+    console.error('[ocr-spike] D-09/D-10: the spike must run on the REAL guild screenshots');
     console.error('[ocr-spike] (Portuguese locale, "1.234.567" separators) — no synthetic stand-ins.');
     console.error('[ocr-spike] To proceed:');
-    console.error('[ocr-spike]   1. Place the screenshots in .secrets/ocr-samples/ (gitignored), named');
-    console.error('[ocr-spike]      per scripts/ocr-regions.json (or update the region maps to match).');
-    console.error('[ocr-spike]   2. Share one screenshot\'s pixel resolution so region rects can be');
-    console.error('[ocr-spike]      calibrated (run "node scripts/ocr-spike.mjs --info" for the dimensions).');
-    console.error('[ocr-spike]   3. Fill .secrets/ocr-samples/expected.json with the true stat values');
-    console.error('[ocr-spike]      (template: scripts/ocr-samples-expected.example.json).');
+    console.error('[ocr-spike]   1. Place the real screenshots in .secrets/ocr-samples/ (gitignored),');
+    console.error('[ocr-spike]      named per scripts/ocr-regions.json groups (samp* naming).');
+    console.error('[ocr-spike]   2. Calibrate region rects against each sample (run');
+    console.error('[ocr-spike]      "node scripts/ocr-spike.mjs --info" for the dimensions).');
+    console.error('[ocr-spike]   3. Run --dump-candidates to build a candidate values table, validate it');
+    console.error('[ocr-spike]      by eye, then fill .secrets/ocr-samples/expected.json with the true');
+    console.error('[ocr-spike]      values (template: scripts/ocr-samples-expected.example.json).');
     process.exit(1);
   }
   return images;
@@ -274,6 +283,44 @@ async function createOcrWorker() {
 }
 
 /**
+ * Whitelist for one region: explicit `whitelist` override wins, then the
+ * `type: "text"` default (header-screen fields), then the numeric default.
+ */
+function whitelistFor(region) {
+  if (region && typeof region.whitelist === 'string') return region.whitelist;
+  if (region && region.type === 'text') return TEXT_WHITELIST;
+  return WHITELIST;
+}
+
+/**
+ * Shared OCR pass: iterate every calibrated region of every group (region-based
+ * — never whole-image), switching the whitelist as regions require, and invoke
+ * `onField(group, file, fieldName, region, rawText)` per field.
+ */
+async function ocrAllGroups(sharp, worker, regions, warnings, onField) {
+  let currentWhitelist = WHITELIST; // set by createOcrWorker
+  for (const [groupName, group] of Object.entries(regions.groups || {})) {
+    const file = group.screenshot;
+    const filePath = path.join(SAMPLES_DIR, file);
+    if (!existsSync(filePath)) {
+      warnings.push(`group "${groupName}": screenshot ${file} not found in .secrets/ocr-samples/ — skipped`);
+      continue;
+    }
+    const image = readFileSync(filePath);
+    for (const [fieldName, region] of Object.entries(group.regions || {})) {
+      const wl = whitelistFor(region);
+      if (wl !== currentWhitelist) {
+        await worker.setParameters({ tessedit_char_whitelist: wl });
+        currentWhitelist = wl;
+      }
+      const buf = await preprocessRegion(sharp, image, region);
+      const { data } = await worker.recognize(buf);
+      onField(group, file, fieldName, region, data.text || '');
+    }
+  }
+}
+
+/**
  * Build one report row by comparing an expected value against a raw OCR read.
  * `type` comes from the region map (`text` for header-screen fields like
  * job/nickname; anything else is a locale-parsed numeric stat).
@@ -290,7 +337,7 @@ function buildRow(file, field, expectedRaw, ocrText, type = 'numeric') {
   };
 }
 
-/** Print the per-field accuracy table, overall field accuracy %, and verdict. */
+/** Print the per-field accuracy table, per-category breakdown, overall accuracy %, and verdict. */
 function printReport(rows, accuracy, label) {
   console.log(`\n=== NeoFoot OCR spike — per-field accuracy report (${label}) ===`);
   console.log('field                       expected      parsed        ok      raw OCR');
@@ -308,6 +355,26 @@ function printReport(rows, accuracy, label) {
     `Fields: ${rows.length}   Correct: ${rows.filter((r) => r.ok).length}   ` +
       `Field accuracy: ${pct}%   Threshold: ${(ACCURACY_THRESHOLD * 100).toFixed(0)}%`,
   );
+
+  // Per-category breakdown (basic / ideal / common) — real-world input quality
+  // differs per category, so the verdict table reports each separately.
+  const byCategory = new Map();
+  for (const r of rows) {
+    const cat = r.category || 'uncategorized';
+    if (!byCategory.has(cat)) byCategory.set(cat, []);
+    byCategory.get(cat).push(r);
+  }
+  if (byCategory.size > 0 && !byCategory.has('uncategorized')) {
+    console.log('Per category:');
+    for (const [cat, catRows] of byCategory) {
+      const a = computeAccuracy(catRows);
+      const correct = catRows.filter((r) => r.ok).length;
+      console.log(
+        `  ${cat.padEnd(14)} fields ${String(catRows.length).padEnd(4)} correct ${String(correct).padEnd(4)} accuracy ${(a * 100).toFixed(1)}%`,
+      );
+    }
+  }
+
   console.log(`VERDICT: ${verdict(accuracy)}`);
 }
 
@@ -315,13 +382,15 @@ function printReport(rows, accuracy, label) {
 // Modes
 // ---------------------------------------------------------------------------
 
-/** Default mode: run the spike on the real screenshots. */
+/** Default mode: run the spike on the real screenshots against expected.json. */
 async function runSpike() {
   guardSamples();
   const regions = loadJson(REGIONS_PATH, 'region map (scripts/ocr-regions.json)');
   if (!existsSync(EXPECTED_PATH)) {
     console.error('[ocr-spike] Missing expected values: .secrets/ocr-samples/expected.json');
     console.error(`[ocr-spike] Copy the template ${EXPECTED_TEMPLATE_PATH} there and fill in the true values.`);
+    console.error('[ocr-spike] Tip: run "node scripts/ocr-spike.mjs --dump-candidates" to get a candidate');
+    console.error('[ocr-spike] values table to validate by eye before freezing the ground truth.');
     process.exit(1);
   }
   const expected = loadJson(EXPECTED_PATH, 'expected values (.secrets/ocr-samples/expected.json)');
@@ -330,32 +399,27 @@ async function runSpike() {
   const worker = await createOcrWorker();
   const rows = [];
   const warnings = [];
+  await ocrAllGroups(sharp, worker, regions, warnings, (group, file, fieldName, region, text) => {
+    const expectedForFile = expected[file];
+    if (!expectedForFile || typeof expectedForFile !== 'object') return; // warned below
+    const expectedRaw = expectedForFile[fieldName];
+    if (expectedRaw === undefined) {
+      warnings.push(`${file}: no expected value for field "${fieldName}" — skipped`);
+      return;
+    }
+    const row = buildRow(file, fieldName, expectedRaw, text, region.type);
+    row.category = group.category || 'uncategorized';
+    rows.push(row);
+  });
+  await worker.terminate();
 
   for (const [groupName, group] of Object.entries(regions.groups || {})) {
     const file = group.screenshot;
-    const filePath = path.join(SAMPLES_DIR, file);
-    if (!existsSync(filePath)) {
-      warnings.push(`group "${groupName}": screenshot ${file} not found in .secrets/ocr-samples/ — skipped`);
-      continue;
-    }
-    const expectedForFile = expected[file];
-    if (!expectedForFile || typeof expectedForFile !== 'object') {
+    if (!existsSync(path.join(SAMPLES_DIR, file))) continue; // already warned by ocrAllGroups
+    if (!expected[file] || typeof expected[file] !== 'object') {
       warnings.push(`group "${groupName}": no expected values for ${file} in expected.json — skipped`);
-      continue;
-    }
-    const image = readFileSync(filePath);
-    for (const [fieldName, rect] of Object.entries(group.regions || {})) {
-      const expectedRaw = expectedForFile[fieldName];
-      if (expectedRaw === undefined) {
-        warnings.push(`${file}: no expected value for field "${fieldName}" — skipped`);
-        continue;
-      }
-      const buf = await preprocessRegion(sharp, image, rect);
-      const { data } = await worker.recognize(buf);
-      rows.push(buildRow(file, fieldName, expectedRaw, data.text || ''));
     }
   }
-  await worker.terminate();
 
   for (const w of warnings) console.warn(`[ocr-spike] WARN: ${w}`);
   if (rows.length === 0) {
@@ -367,6 +431,48 @@ async function runSpike() {
   printReport(rows, accuracy, 'REAL DATA');
   console.log('[ocr-spike] Record these numbers in the decision document:');
   console.log('[ocr-spike]   .planning/phases/01-foundation-secure-access-data-model/OCR-SPIKE-RESULTS.md');
+}
+
+/**
+ * Candidate-values mode: OCR every calibrated region WITHOUT ground truth and
+ * dump the raw reads to .secrets/ocr-samples/candidates.json plus a readable
+ * per-screenshot table. The owner validates the table by eye; the corrected
+ * values become expected.json (the spike's ground truth).
+ */
+async function runDumpCandidates() {
+  guardSamples();
+  const regions = loadJson(REGIONS_PATH, 'region map (scripts/ocr-regions.json)');
+
+  const sharp = (await import('sharp')).default;
+  const worker = await createOcrWorker();
+  const candidates = {};
+  const warnings = [];
+  await ocrAllGroups(sharp, worker, regions, warnings, (group, file, fieldName, region, text) => {
+    if (!candidates[file]) candidates[file] = {};
+    candidates[file][fieldName] = text.trim();
+  });
+  await worker.terminate();
+
+  for (const w of warnings) console.warn(`[ocr-spike] WARN: ${w}`);
+  const fieldCount = Object.values(candidates).reduce((n, f) => n + Object.keys(f).length, 0);
+  if (fieldCount === 0) {
+    console.error('[ocr-spike] Nothing was read — check the warnings above.');
+    process.exit(1);
+  }
+
+  for (const [file, fields] of Object.entries(candidates)) {
+    console.log(`\n--- ${file} ---`);
+    for (const [field, raw] of Object.entries(fields)) {
+      console.log(`  ${field.padEnd(28)} "${raw}"`);
+    }
+  }
+
+  writeFileSync(CANDIDATES_PATH, JSON.stringify(candidates, null, 2) + '\n');
+  console.log(`\n[ocr-spike] ${fieldCount} candidate values across ${Object.keys(candidates).length} screenshots`);
+  console.log(`[ocr-spike] Written to ${CANDIDATES_PATH} (gitignored, D-10).`);
+  console.log('[ocr-spike] NEXT: validate these reads by eye against the screenshots, then save the');
+  console.log('[ocr-spike] corrected values as .secrets/ocr-samples/expected.json (same structure) and');
+  console.log('[ocr-spike] re-run "node scripts/ocr-spike.mjs" for the accuracy report + GO/NO-GO verdict.');
 }
 
 /** Calibration aid: print each sample image's resolution. */
@@ -444,9 +550,10 @@ if (invokedDirectly) {
   const mode = process.argv[2] || '';
   try {
     if (mode === '--self-test') await runSelfTest();
+    else if (mode === '--dump-candidates') await runDumpCandidates();
     else if (mode === '--info') await runInfo();
     else if (mode === '--help' || mode === '-h') {
-      console.log('Usage: node scripts/ocr-spike.mjs [--self-test | --info]');
+      console.log('Usage: node scripts/ocr-spike.mjs [--dump-candidates | --self-test | --info]');
     } else await runSpike();
   } catch (err) {
     console.error('[ocr-spike] FAILED:', err?.message || err);
