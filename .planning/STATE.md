@@ -87,9 +87,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-08T03:35:32.982Z
-Stopped at: Phase 1 UI-SPEC approved
-Resume file: .planning/phases/01-foundation-secure-access-data-model/01-UI-SPEC.md
+Last session: 2026-10-08T17:54:21Z
+Stopped at: Phase 01 Plan 01 task 3 — auth gate: Supabase credentials needed (SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF, or SQL editor fallback)
+Resume file: .planning/phases/01-foundation-secure-access-data-model/01-01-PLAN.md
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*
