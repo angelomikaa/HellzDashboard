@@ -9,8 +9,8 @@ Requirements for initial release (MVP — will be escalated later). Each maps to
 
 ### Access & Auth
 
-- [ ] **AUTH-01**: Player can access the panel with their personal 4-digit PIN (stored hashed)
-- [ ] **AUTH-02**: Only whitelisted guild members can access; players from other guilds are blocked
+- [x] **AUTH-01**: Player can access the panel with their personal 4-digit PIN (stored hashed)
+- [x] **AUTH-02**: Only whitelisted guild members can access; players from other guilds are blocked
 - [ ] **AUTH-03**: Owner can grant or revoke the officer (admin) role manually
 - [ ] **AUTH-04**: Officers can remove players, revoking their panel access
 - [ ] **AUTH-05**: Officers can validate or reject submitted registers before they count toward ranks
@@ -91,8 +91,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 1 | Pending |
-| AUTH-02 | Phase 1 | Pending |
+| AUTH-01 | Phase 1 | Complete |
+| AUTH-02 | Phase 1 | Complete |
 | AUTH-03 | Phase 6 | Pending |
 | AUTH-04 | Phase 6 | Pending |
 | AUTH-05 | Phase 6 | Pending |

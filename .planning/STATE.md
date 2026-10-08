@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "01-03 task 2 checkpoint:human-verify — login flow awaiting browser verification (task 1 committed)"
-last_updated: "2026-10-08T23:42:37.598Z"
+stopped_at: "Phase 01 execution complete — all 4 plans executed (01-03 closed with owner browser approval + Hellz rebrand). Next: /gsd-verify-work 01, then /gsd-transition"
+last_updated: "2026-10-08T23:55:28.766Z"
 last_activity: 2026-10-08
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -25,20 +25,20 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 
 ## Current Position
 
-Phase: 01 (foundation-secure-access-data-model) — EXECUTING
-Plan: 3 of 4 (01-04 executed out of order — depends only on 01-01; real data was available)
-Status: 01-03 task 1 complete (session helpers TDD + LoginPage + RequireAuth + logout, commits 2bd1ac1/30d7505/5befbe4); PAUSED at task 2 checkpoint:human-verify — user must verify login flow in browser (dev server running at http://localhost:5173)
+Phase: 01 (foundation-secure-access-data-model) — EXECUTION COMPLETE
+Plan: 4 of 4 — all plans executed (01-04 ran out of order before 01-03; both now have SUMMARYs)
+Status: Phase 01 execution complete. 01-03 closed: owner approved the login flow in a real browser (login persists, logout clears, lockout after 5 wrong PINs) and the UI was rebranded to Hellz / Painel Geral. Next: /gsd-verify-work 01, then /gsd-transition
 Last activity: 2026-10-08
 
-Progress: [████████░░] 75%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 3
-- Average duration: 79min
-- Total execution time: 237min (3h57m)
+- Total plans completed: 4
+- Average duration: 69min
+- Total execution time: 275min (4h35m)
 
 **By Phase:**
 
@@ -46,11 +46,12 @@ Progress: [████████░░] 75%
 |-------|-------|-------|----------|
 | 01 P01 | 1 | 19min | 19min |
 | 01 P02 | 1 | 47min | 47min |
+| 01 P03 | 1 | 38min | 38min |
 | 01 P04 | 1 | 2h51min | 2h51min |
 
 **Recent Trend:**
 
-- Last 5 plans: 01-01 (19min), 01-02 (47min), 01-04 (2h51min)
+- Last 4 plans: 01-01 (19min), 01-02 (47min), 01-04 (2h51min), 01-03 (38min)
 - Trend: —
 
 ## Accumulated Context
@@ -73,6 +74,8 @@ Recent decisions affecting current work:
 - [Phase 01-02]: /functions/v1 gateway requires BOTH apikey and Authorization: Bearer <anon> headers (supabase-js functions.invoke sends both)
 - [Phase 01-02]: 5th wrong PIN returns 401 with attempts_remaining 0; the lock (429) engages on the NEXT attempt — including for the correct PIN
 - [Phase 01-04]: OCR verdict: GO — 222/222 fields correct (100.0%) on 11 real guild screenshots vs ~70% pivot threshold; owner eye-validated all candidates; Phase 5 proceeds as planned (manual-entry fallback not triggered) — ROADMAP Phase 1 success criterion 4 decided with real data (D-08/D-09/D-10); caveats for Phase 5: device fragmentation not covered, region maps are UI-versioned, dual-polarity read required, manual fix-up stays mandatory
+- [Phase 01-03]: AUTH-01 complete and owner-verified end-to-end — whitelisted member logs in with handle + 4-digit PIN, session persists across reloads, logout clears it; AUTH-02 closed retrospectively (proven live in 01-02: anon → [], no-auth → 401, own-row-only via JWT)
+- [Phase 01-03]: UI rebranded to "Hellz" (subtitle "Painel Geral") per owner correction — NeoFoot was an abandoned folder name; internal identifiers (nefoot_session key, NEFOOT_JWT_SECRET, JWT issuer) deliberately kept to avoid breaking live deployed auth; full internal rename, if ever wanted, should be a dedicated maintenance pass
 
 ### Pending Todos
 
@@ -97,8 +100,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-08T23:42:37.598Z
-Stopped at: 01-03 task 2 checkpoint:human-verify — browser verification of login flow (login persists, logout clears, 5 wrong PINs → lockout). Dev server running at http://localhost:5173; local .env created (gitignored). Resume file: .planning/phases/01-foundation-secure-access-data-model/01-03-PLAN.md (task 2)
+Last session: 2026-10-08 (01-03 continuation)
+Stopped at: Completed 01-03-PLAN.md — Phase 01 execution complete (all 4 plans). Owner approved the login flow in a real browser at localhost:5173; UI rebranded to Hellz / Painel Geral. Resume file: None — run /gsd-verify-work 01, then /gsd-transition
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*

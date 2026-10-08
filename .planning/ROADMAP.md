@@ -40,7 +40,7 @@ Plans:
 - [x] 01-04-PLAN.md — OCR feasibility spike — committed Node script on 10 real screenshots from gitignored `.secrets/ocr-samples/` (D-08–D-10), go/no-go decision documented vs ~70% threshold
 
 **Wave 3** *(blocked on Wave 2 — login UI verifies against the deployed verify-pin function)*
-- [ ] 01-03-PLAN.md — PIN login UI (Discord handle + 4-digit PIN, D-01) + 7-day localStorage session with silent expiry + logout (D-06), verified in a real browser
+- [x] 01-03-PLAN.md — PIN login UI (Discord handle + 4-digit PIN, D-01) + 7-day localStorage session with silent expiry + logout (D-06), verified in a real browser
 
 Cross-cutting constraints: "PINs stored hashed, never plaintext" (D-03, in 01-01 seed + 01-02 verify-pin); "screenshots/member data never enter git or Supabase Storage" (D-10, in 01-01 gitignore + 01-04); "guards are UX only — enforcement is RLS" (01-02 + 01-03)
 
