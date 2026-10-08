@@ -37,7 +37,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 01-02-PLAN.md — RLS policies on every table (members own-rows-only, class_key_stats deny-all, append-only submissions) + `verify-pin` Edge Function with custom-claim JWT (7-day, D-06) + server-side lockout 5→15 min (D-07) + end-to-end auth smoke test (the day-one spike)
-- [ ] 01-04-PLAN.md — OCR feasibility spike — committed Node script on 10 real screenshots from gitignored `.secrets/ocr-samples/` (D-08–D-10), go/no-go decision documented vs ~70% threshold
+- [x] 01-04-PLAN.md — OCR feasibility spike — committed Node script on 10 real screenshots from gitignored `.secrets/ocr-samples/` (D-08–D-10), go/no-go decision documented vs ~70% threshold
 
 **Wave 3** *(blocked on Wave 2 — login UI verifies against the deployed verify-pin function)*
 - [ ] 01-03-PLAN.md — PIN login UI (Discord handle + 4-digit PIN, D-01) + 7-day localStorage session with silent expiry + logout (D-06), verified in a real browser
@@ -112,7 +112,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation — Secure Access & Data Model | 0/4 | Planned (ready to execute) | - |
+| 1. Foundation — Secure Access & Data Model | 3/4 | In Progress | - |
 | 2. Registry, Catalog & Manual Data Ingestion | 0/2 | Not started | - |
 | 3. Rank Engine | 0/2 | Not started | - |
 | 4. Member Dashboard & Improvement Screen | 0/2 | Not started | - |

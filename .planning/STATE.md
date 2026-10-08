@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: 01-04 task 2 checkpoint (human-verify) — OCR candidate values table (222 reads, all 11 screenshots) awaiting owner validation; corrections become expected.json
-last_updated: "2026-10-08T22:28:20Z"
+stopped_at: Completed 01-04-PLAN.md (OCR spike GO) — 01-03 (LoginPage) is the last plan of Phase 01
+last_updated: "2026-10-08T23:06:46.282Z"
 last_activity: 2026-10-08
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -26,19 +26,19 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 01 (foundation-secure-access-data-model) — EXECUTING
-Plan: 3 of 4
-Status: Ready to execute 01-03 (LoginPage — consumes verify-pin contract)
+Plan: 3 of 4 (01-04 executed out of order — depends only on 01-01; real data was available)
+Status: 01-04 complete (OCR spike GO, see OCR-SPIKE-RESULTS.md); ready to execute 01-03 (LoginPage — consumes verify-pin contract), the last plan of Phase 01
 Last activity: 2026-10-08
 
-Progress: [█████░░░░] 50%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 2
-- Average duration: 33min
-- Total execution time: 66min
+- Total plans completed: 3
+- Average duration: 79min
+- Total execution time: 237min (3h57m)
 
 **By Phase:**
 
@@ -46,13 +46,12 @@ Progress: [█████░░░░] 50%
 |-------|-------|-------|----------|
 | 01 P01 | 1 | 19min | 19min |
 | 01 P02 | 1 | 47min | 47min |
+| 01 P04 | 1 | 2h51min | 2h51min |
 
 **Recent Trend:**
 
-- Last 5 plans: 01-01 (19min), 01-02 (47min)
+- Last 5 plans: 01-01 (19min), 01-02 (47min), 01-04 (2h51min)
 - Trend: —
-
-*Updated after each plan completion*
 
 ## Accumulated Context
 
@@ -73,6 +72,7 @@ Recent decisions affecting current work:
 - [Phase 01-02]: Day-one auth spike PROVEN live: PostgREST accepts the custom-claim JWT, RLS returns only the caller's own row, class_key_stats deny-all holds
 - [Phase 01-02]: /functions/v1 gateway requires BOTH apikey and Authorization: Bearer <anon> headers (supabase-js functions.invoke sends both)
 - [Phase 01-02]: 5th wrong PIN returns 401 with attempts_remaining 0; the lock (429) engages on the NEXT attempt — including for the correct PIN
+- [Phase 01-04]: OCR verdict: GO — 222/222 fields correct (100.0%) on 11 real guild screenshots vs ~70% pivot threshold; owner eye-validated all candidates; Phase 5 proceeds as planned (manual-entry fallback not triggered) — ROADMAP Phase 1 success criterion 4 decided with real data (D-08/D-09/D-10); caveats for Phase 5: device fragmentation not covered, region maps are UI-versioned, dual-polarity read required, manual fix-up stays mandatory
 
 ### Pending Todos
 
@@ -81,11 +81,11 @@ None yet.
 ### Blockers/Concerns
 
 - ~~[Phase 1]: Custom JWT + PostgREST/RLS-claims wiring is MEDIUM confidence~~ PROVEN 01-02 (see Decisions); operational caution: do NOT revoke signing key 6f7657c3 (standby) — revoking it kills every member session instantly
-- [Phase 1]: OCR feasibility spike must run on 10 real guild screenshots (Portuguese locale, `1.234.567` separators) → go/no-go pivot threshold ~70% field accuracy
+- ~~[Phase 1]: OCR feasibility spike must run on 10 real guild screenshots (Portuguese locale, `1.234.567` separators) → go/no-go pivot threshold ~70% field accuracy~~ RESOLVED 01-04: GO — 222/222 fields, 100.0% vs ~70% threshold (see OCR-SPIKE-RESULTS.md and Decisions)
 - [Phase 1]: Owner should rotate the Supabase access token used for deploys, and rotate placeholder whitelist rows/PINs before inviting real members (see 01-USER-SETUP.md)
 - [Phase 2]: Storage policy nuance (compressed thumbnail ~30–80 KB WebP latest-only vs full originals) — decide during Phase 2 planning
 - [Phase 3]: Percentile formula spec (rank-based, tie handling, insufficient-data states) must be written and unit-tested before UI shows points
-- [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need real-data calibration; inherits Phase 1 spike results
+- [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need production-data calibration — spike delivered GO (100.0% on 11 owner-device samples) but device fragmentation is NOT covered; region maps are game-UI-versioned (re-run spike to recalibrate); dual-polarity read and manual fix-up are mandatory
 
 ## Deferred Items
 
@@ -97,9 +97,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-08T22:28:20Z
-Stopped at: 01-04 task 2 checkpoint (human-verify) — regions calibrated for all 11 real screenshots (commits 2d02352, 6972b0d, 8250146, bf85768); OCR candidate values dumped to .secrets/ocr-samples/candidates.json (222 fields, 0 empty, deterministic across re-runs); awaiting owner eye-validation of the candidate table
-Resume file: scripts/ocr-spike.mjs (after owner corrections: build .secrets/ocr-samples/expected.json from candidates.json + corrections, run `node scripts/ocr-spike.mjs` for accuracy + GO/NO-GO, write OCR-SPIKE-RESULTS.md, then 01-04-SUMMARY.md)
+Last session: 2026-10-08T23:06:46.148Z
+Stopped at: Completed 01-04-PLAN.md (OCR spike GO) — 01-03 (LoginPage) is the last plan of Phase 01
+Resume file: None
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*
