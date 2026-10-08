@@ -65,6 +65,14 @@ export function parseValue(raw) {
     s = s.slice(0, -1).trim();
   }
   if (s === '') return fail;
+
+  // Negative values exist in real data (Variable CT, Fixed CT, Global CD).
+  let isNegative = false;
+  if (s.startsWith('-')) {
+    isNegative = true;
+    s = s.slice(1);
+  }
+  if (s === '') return fail;
   if (!/^[\d.,]+$/.test(s)) return fail;
 
   const hasDot = s.includes('.');
@@ -95,7 +103,7 @@ export function parseValue(raw) {
   if (!/^\d+(\.\d+)?$/.test(s)) return fail;
   const value = Number(s);
   if (!Number.isFinite(value)) return fail;
-  return { ok: true, value, isPercentual };
+  return { ok: true, value: isNegative ? -value : value, isPercentual };
 }
 
 /**
@@ -125,6 +133,47 @@ export function computeAccuracy(results) {
  */
 export function verdict(accuracy, threshold = ACCURACY_THRESHOLD) {
   return accuracy >= threshold ? 'GO' : 'NO-GO';
+}
+
+/**
+ * Compare one expected value against one raw OCR read, by field type.
+ *
+ *  - `numeric` (default): both sides go through parseValue (same locale rules),
+ *    so expected.json may carry values exactly as displayed in-game
+ *    (`1.234.567`, `12,34%`, `-33.38%`). Percentual flag must match.
+ *  - `text` (header-screen fields — job, nickname): case-insensitive,
+ *    whitespace-normalized string equality.
+ *
+ * @param {string} expectedRaw
+ * @param {string} ocrText
+ * @param {'numeric'|'text'} [type]
+ * @returns {{ ok: boolean, expected: number|string|null, parsed: number|string|null, isPercentual: boolean }}
+ */
+export function compareField(expectedRaw, ocrText, type = 'numeric') {
+  if (type === 'text') {
+    const norm = (s) =>
+      String(s ?? '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLowerCase();
+    const expected = String(expectedRaw ?? '').trim();
+    const parsed = String(ocrText ?? '').trim();
+    const ok = parsed !== '' && norm(expected) === norm(parsed);
+    return { ok, expected, parsed, isPercentual: false };
+  }
+  const expected = parseValue(String(expectedRaw));
+  const parsed = parseValue(ocrText);
+  const ok =
+    parsed.ok &&
+    expected.ok &&
+    parsed.value === expected.value &&
+    parsed.isPercentual === expected.isPercentual;
+  return {
+    ok,
+    expected: expected.ok ? expected.value : null,
+    parsed: parsed.ok ? parsed.value : null,
+    isPercentual: parsed.ok ? parsed.isPercentual : false,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -225,23 +274,17 @@ async function createOcrWorker() {
 }
 
 /**
- * Compare one expected value against one raw OCR read. The expected entry is
- * parsed with the same locale rules, so the template may carry values exactly
- * as displayed in-game (e.g. "1.234.567" or "12,34%").
+ * Build one report row by comparing an expected value against a raw OCR read.
+ * `type` comes from the region map (`text` for header-screen fields like
+ * job/nickname; anything else is a locale-parsed numeric stat).
  */
-function buildRow(file, field, expectedRaw, ocrText) {
-  const expected = parseValue(String(expectedRaw));
-  const parsed = parseValue(ocrText);
-  const ok =
-    parsed.ok &&
-    expected.ok &&
-    parsed.value === expected.value &&
-    parsed.isPercentual === expected.isPercentual;
+function buildRow(file, field, expectedRaw, ocrText, type = 'numeric') {
+  const cmp = compareField(expectedRaw, ocrText, type);
   return {
     field: `${file}:${field}`,
-    expected: expected.ok ? expected.value : null,
-    parsed: parsed.ok ? parsed.value : null,
-    ok,
+    expected: cmp.expected,
+    parsed: cmp.parsed,
+    ok: cmp.ok,
     raw: ocrText.trim(),
     expectedRaw: String(expectedRaw),
   };

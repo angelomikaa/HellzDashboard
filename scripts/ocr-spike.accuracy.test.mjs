@@ -172,8 +172,8 @@ describe('compareField — field comparison by type (numeric stats vs text heade
   });
 
   it('text: case-insensitive, whitespace-normalized string equality (job/nickname)', () => {
-    expect(compareField('Gypsy', ' GYPSY ').ok).toBe(true);
-    expect(compareField('Ahrya', 'ahrya').ok).toBe(true);
+    expect(compareField('Gypsy', ' GYPSY ', 'text').ok).toBe(true);
+    expect(compareField('Ahrya', 'ahrya', 'text').ok).toBe(true);
   });
 
   it('text: different strings are a miss; empty OCR read is a miss', () => {
