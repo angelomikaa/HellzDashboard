@@ -28,12 +28,21 @@ NeoFoot delivers the core loop — register → submit → see standing → impr
   2. A player not on the guild whitelist cannot access any panel data — blocked at the server (RLS), not just hidden in the UI; crafted API/DevTools requests fail too
   3. Repeated wrong PIN attempts trigger server-side rate limiting/lockout (4-digit PINs are brute-forceable without it)
   4. OCR feasibility spike completed: round-trip test on 10 real guild screenshots with a documented go/no-go accuracy decision (pivot threshold ~70% field accuracy)
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 01-01: Project scaffolding (React 19 + Vite + TypeScript + Tailwind v4 + Supabase client) and schema migrations (members, submissions, submission_stats, stat_catalog, class_key_stats — append-only, EAV-style)
-- [ ] 01-02: RLS policies on every table + `verify-pin` Edge Function with custom-claim JWT + rate limiting (day-one spike on the wiring)
-- [ ] 01-03: OCR feasibility spike — round-trip test on 10 real screenshots, go/no-go decision documented
+
+**Wave 1** *(blocked on nothing — first phase)*
+- [ ] 01-01-PLAN.md — Project scaffolding (React 19 + Vite + TypeScript + Tailwind v4 + Supabase client, env-driven per D-11) + schema migrations (members, stat_catalog, submissions, submission_stats, class_key_stats, pin_login_attempts — append-only, EAV) + whitelist seed with bcrypt-hashed PINs (D-01–D-05, D-10–D-13)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 01-02-PLAN.md — RLS policies on every table (members own-rows-only, class_key_stats deny-all, append-only submissions) + `verify-pin` Edge Function with custom-claim JWT (7-day, D-06) + server-side lockout 5→15 min (D-07) + end-to-end auth smoke test (the day-one spike)
+- [ ] 01-04-PLAN.md — OCR feasibility spike — committed Node script on 10 real screenshots from gitignored `.secrets/ocr-samples/` (D-08–D-10), go/no-go decision documented vs ~70% threshold
+
+**Wave 3** *(blocked on Wave 2 — login UI verifies against the deployed verify-pin function)*
+- [ ] 01-03-PLAN.md — PIN login UI (Discord handle + 4-digit PIN, D-01) + 7-day localStorage session with silent expiry + logout (D-06), verified in a real browser
+
+Cross-cutting constraints: "PINs stored hashed, never plaintext" (D-03, in 01-01 seed + 01-02 verify-pin); "screenshots/member data never enter git or Supabase Storage" (D-10, in 01-01 gitignore + 01-04); "guards are UX only — enforcement is RLS" (01-02 + 01-03)
 
 ### Phase 2: Registry, Catalog & Manual Data Ingestion
 **Goal**: Players can register and submit their stat data through a guided flow that works end-to-end even when OCR is unavailable — the ingestion data model and fix-up gate must be correct before OCR is layered on.
@@ -103,7 +112,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation — Secure Access & Data Model | 0/3 | Not started | - |
+| 1. Foundation — Secure Access & Data Model | 0/4 | Planned (ready to execute) | - |
 | 2. Registry, Catalog & Manual Data Ingestion | 0/2 | Not started | - |
 | 3. Rank Engine | 0/2 | Not started | - |
 | 4. Member Dashboard & Improvement Screen | 0/2 | Not started | - |
