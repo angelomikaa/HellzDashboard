@@ -33,7 +33,7 @@ NeoFoot delivers the core loop — register → submit → see standing → impr
 Plans:
 
 **Wave 1** *(blocked on nothing — first phase)*
-- [ ] 01-01-PLAN.md — Project scaffolding (React 19 + Vite + TypeScript + Tailwind v4 + Supabase client, env-driven per D-11) + schema migrations (members, stat_catalog, submissions, submission_stats, class_key_stats, pin_login_attempts — append-only, EAV) + whitelist seed with bcrypt-hashed PINs (D-01–D-05, D-10–D-13)
+- [x] 01-01-PLAN.md — Project scaffolding (React 19 + Vite + TypeScript + Tailwind v4 + Supabase client, env-driven per D-11) + schema migrations (members, stat_catalog, submissions, submission_stats, class_key_stats, pin_login_attempts — append-only, EAV) + whitelist seed with bcrypt-hashed PINs (D-01–D-05, D-10–D-13)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — RLS policies on every table (members own-rows-only, class_key_stats deny-all, append-only submissions) + `verify-pin` Edge Function with custom-claim JWT (7-day, D-06) + server-side lockout 5→15 min (D-07) + end-to-end auth smoke test (the day-one spike)
