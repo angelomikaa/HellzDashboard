@@ -1,0 +1,78 @@
+{
+  "_calibration_note": "PLACEHOLDER rects — must be calibrated against the REAL screenshots before the spike run (D-09). Rects are pixel rectangles (top-left origin): x, y, w, h. Run `node scripts/ocr-spike.mjs --info` to print each sample's resolution, then set each group's `resolution` and adjust every rect to the stat row's VALUE area (values are right-aligned in Ragnarok Origin stat screens; crop the value column only — never the whole image). Field keys match the expected-values file and the Phase 5 production region map.",
+  "threshold": 0.7,
+  "groups": {
+    "general": {
+      "screenshot": "general.png",
+      "resolution": { "width": null, "height": null },
+      "regions": {
+        "hp":           { "x": 560, "y": 160,  "w": 240, "h": 36 },
+        "sp":           { "x": 560, "y": 204,  "w": 240, "h": 36 },
+        "patk":         { "x": 560, "y": 248,  "w": 240, "h": 36 },
+        "pdef":         { "x": 560, "y": 292,  "w": 240, "h": 36 },
+        "matk":         { "x": 560, "y": 336,  "w": 240, "h": 36 },
+        "mdef":         { "x": 560, "y": 380,  "w": 240, "h": 36 },
+        "refine_patk":  { "x": 560, "y": 424,  "w": 240, "h": 36 },
+        "refine_pdef":  { "x": 560, "y": 468,  "w": 240, "h": 36 },
+        "refine_matk":  { "x": 560, "y": 512,  "w": 240, "h": 36 },
+        "refine_mdef":  { "x": 560, "y": 556,  "w": 240, "h": 36 },
+        "hp_recover":   { "x": 560, "y": 600,  "w": 240, "h": 36 },
+        "sp_recover":   { "x": 560, "y": 644,  "w": 240, "h": 36 },
+        "hit":          { "x": 560, "y": 688,  "w": 240, "h": 36 },
+        "flee":         { "x": 560, "y": 732,  "w": 240, "h": 36 }
+      }
+    },
+    "quasi": {
+      "screenshot": "quasi.png",
+      "resolution": { "width": null, "height": null },
+      "regions": {
+        "aspd":              { "x": 560, "y": 160,  "w": 240, "h": 36 },
+        "mspd":              { "x": 560, "y": 204,  "w": 240, "h": 36 },
+        "variable_ct":       { "x": 560, "y": 248,  "w": 240, "h": 36 },
+        "variable_ct_pct":   { "x": 560, "y": 292,  "w": 240, "h": 36 },
+        "fixed_ct":          { "x": 560, "y": 336,  "w": 240, "h": 36 },
+        "fixed_ct_pct":      { "x": 560, "y": 380,  "w": 240, "h": 36 },
+        "healing_done":      { "x": 560, "y": 424,  "w": 240, "h": 36 },
+        "healing_taken":     { "x": 560, "y": 468,  "w": 240, "h": 36 },
+        "crit":              { "x": 560, "y": 512,  "w": 240, "h": 36 },
+        "crit_res":          { "x": 560, "y": 556,  "w": 240, "h": 36 },
+        "crit_dmg":          { "x": 560, "y": 600,  "w": 240, "h": 36 },
+        "crit_dmg_res":      { "x": 560, "y": 644,  "w": 240, "h": 36 },
+        "pdmg":              { "x": 560, "y": 688,  "w": 240, "h": 36 },
+        "pdmg_r":            { "x": 560, "y": 732,  "w": 240, "h": 36 },
+        "mdmg":              { "x": 560, "y": 776,  "w": 240, "h": 36 },
+        "mdmg_r":            { "x": 560, "y": 820,  "w": 240, "h": 36 },
+        "ignore_pdef":       { "x": 560, "y": 864,  "w": 240, "h": 36 },
+        "ignore_pdef_pct":   { "x": 560, "y": 908,  "w": 240, "h": 36 },
+        "ignore_mdef":       { "x": 560, "y": 952,  "w": 240, "h": 36 },
+        "ignore_mdef_pct":   { "x": 560, "y": 996,  "w": 240, "h": 36 },
+        "pdmg_bonus":        { "x": 560, "y": 1040, "w": 240, "h": 36 },
+        "mdmg_bonus":        { "x": 560, "y": 1084, "w": 240, "h": 36 },
+        "pve_dmg_reduction": { "x": 560, "y": 1128, "w": 240, "h": 36 },
+        "pve_dmg_bonus":     { "x": 560, "y": 1172, "w": 240, "h": 36 },
+        "pvp_dmg_reduction": { "x": 560, "y": 1216, "w": 240, "h": 36 },
+        "pvp_dmg_bonus":     { "x": 560, "y": 1260, "w": 240, "h": 36 }
+      }
+    },
+    "special": {
+      "screenshot": "special.png",
+      "resolution": { "width": null, "height": null },
+      "regions": {
+        "max_sp_pct":               { "x": 560, "y": 160,  "w": 240, "h": 36 },
+        "equip_patk_pct":           { "x": 560, "y": 204,  "w": 240, "h": 36 },
+        "equip_matk_pct":           { "x": 560, "y": 248,  "w": 240, "h": 36 },
+        "equip_pdef_pct":           { "x": 560, "y": 292,  "w": 240, "h": 36 },
+        "equip_mdef_pct":           { "x": 560, "y": 336,  "w": 240, "h": 36 },
+        "global_cd_pct":            { "x": 560, "y": 380,  "w": 240, "h": 36 },
+        "dmg_vs_small":              { "x": 560, "y": 424,  "w": 240, "h": 36 },
+        "dmg_vs_medium":             { "x": 560, "y": 468,  "w": 240, "h": 36 },
+        "dmg_vs_large":              { "x": 560, "y": 512,  "w": 240, "h": 36 },
+        "dmg_reduction_vs_small":    { "x": 560, "y": 556,  "w": 240, "h": 36 },
+        "dmg_reduction_vs_medium":  { "x": 560, "y": 600,  "w": 240, "h": 36 },
+        "dmg_reduction_vs_large":   { "x": 560, "y": 644,  "w": 240, "h": 36 },
+        "dmg_vs_brute":              { "x": 560, "y": 688,  "w": 240, "h": 36 },
+        "dmg_vs_demi_human":         { "x": 560, "y": 732,  "w": 240, "h": 36 }
+      }
+    }
+  }
+}

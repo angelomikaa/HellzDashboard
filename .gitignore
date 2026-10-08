@@ -26,3 +26,6 @@ dist-ssr
 # Env & secrets (D-10/D-11): real screenshots live in .secrets/ocr-samples/
 .env
 .secrets/
+
+# OCR runtime artifacts (tesseract.js language data)
+*.traineddata

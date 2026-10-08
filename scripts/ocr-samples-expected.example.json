@@ -1,0 +1,13 @@
+{
+  "_comment": "TEMPLATE ONLY — copy to .secrets/ocr-samples/expected.json (gitignored, D-10) and fill with the TRUE values read by eye from each of the 10 real screenshots. Keys are the screenshot filenames named in scripts/ocr-regions.json; field keys are the region names from that file. Write values exactly as displayed in-game (Portuguese locale: 1.234.567 thousand separators, 12,34% decimals) — the spike parses expected and OCR values with the same locale rules. You only need entries for the fields you calibrated rects for.",
+  "general.png": {
+    "hp": "123.456",
+    "hit": "678"
+  },
+  "quasi.png": {
+    "crit": "12,34%"
+  },
+  "special.png": {
+    "max_sp_pct": "5,67%"
+  }
+}

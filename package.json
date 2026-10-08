@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "ocr:spike": "node scripts/ocr-spike.mjs",
+    "ocr:spike:self-test": "node scripts/ocr-spike.mjs --self-test",
+    "ocr:spike:info": "node scripts/ocr-spike.mjs --info"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
@@ -24,6 +27,8 @@
     "@vitejs/plugin-react": "^6.1.1",
     "bcryptjs": "^3.0.3",
     "oxlint": "^1.81.0",
+    "sharp": "^0.35.5",
+    "tesseract.js": "^7.0.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.3"
