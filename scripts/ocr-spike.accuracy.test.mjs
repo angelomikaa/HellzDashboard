@@ -54,6 +54,21 @@ describe('computeAccuracy + verdict (plan behaviors 1-3)', () => {
     expect(verdict(computeAccuracy([]))).toBe('NO-GO');
   });
 
+  it('text rows (header-screen fields) count via their ok flag, not Number() coercion', () => {
+    // compareField carries text results as trimmed STRINGS ('Gypsy', 'Ahrya #').
+    // Number('Gypsy') is NaN, so a Number()-based comparison would wrongly miss
+    // every text field even when compareField said ok. Text correctness is
+    // decided by compareField (case/whitespace-normalized equality) — the ok
+    // flag IS the verdict for text rows.
+    const rows = [
+      { field: 'job', expected: 'Gypsy', parsed: 'Gypsy', ok: true },
+      { field: 'nickname', expected: 'Ahrya #', parsed: 'Ahrya #', ok: true },
+      { field: 'job_bad', expected: 'Gypsy', parsed: 'Dancer', ok: false },
+      { field: 'hp', expected: 123, parsed: 123, ok: true },
+    ];
+    expect(computeAccuracy(rows)).toBe(0.75);
+  });
+
   it('verdict honors a custom threshold', () => {
     expect(verdict(0.5, 0.5)).toBe('GO');
     expect(verdict(0.49, 0.5)).toBe('NO-GO');
