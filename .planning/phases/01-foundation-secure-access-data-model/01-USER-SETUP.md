@@ -46,13 +46,29 @@ npm run dev          # app should serve at http://localhost:5173
 #    GET https://thdxyxsjafimxgxpmpqs.supabase.co/rest/v1/members?select=id&limit=1
 #    with headers apikey + Authorization: Bearer <service_role key> -> HTTP 200
 
-# 3. Anon key CANNOT list members (RLS deny-all until Plan 01-02 policies):
+# 3. Anon key CANNOT list members (RLS policies now live — Plan 01-02):
 #    same GET with the anon key -> HTTP 200 with []
+#    With a member JWT from verify-pin -> only the caller's own row
 ```
 
 Expected results:
 - Dev server starts without the "Missing VITE_SUPABASE_URL" error
 - service-role GET returns 200; anon GET returns an empty array
+
+## Plan 01-02 Additions (2026-10-08)
+
+- [x] **RLS policies applied** — `0002_rls.sql` is live (members see own rows only;
+      submissions append-only; key-stat config unreachable by any client credential).
+- [x] **verify-pin Edge Function deployed** — `POST /functions/v1/verify-pin`
+      `{ discord_handle, pin }` returns `{ session }` with a 7-day JWT.
+- [x] **Function env secrets live in the Supabase secret store (never in git):**
+      `NEFOOT_JWT_SECRET`, `NEFOOT_JWT_KEY_ID` — HS256 signing key registered via the
+      Management API (id `6f7657c3-ec31-493e-a09f-f22dd7ea7cfc`, standby status).
+- [ ] **Do NOT revoke signing key `6f7657c3…`** — revoking it instantly invalidates every
+      member session. If you ever rotate keys via the dashboard, move this key to
+      **in_use** (not revoked) before creating a new standby key.
+- [ ] **Rotate the access token** used for plan 01-01/01-02 deploys (Dashboard → Account →
+      Access Tokens) now that pushes are done.
 
 ---
 

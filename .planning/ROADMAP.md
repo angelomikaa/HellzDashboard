@@ -36,7 +36,7 @@ Plans:
 - [x] 01-01-PLAN.md — Project scaffolding (React 19 + Vite + TypeScript + Tailwind v4 + Supabase client, env-driven per D-11) + schema migrations (members, stat_catalog, submissions, submission_stats, class_key_stats, pin_login_attempts — append-only, EAV) + whitelist seed with bcrypt-hashed PINs (D-01–D-05, D-10–D-13)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 01-02-PLAN.md — RLS policies on every table (members own-rows-only, class_key_stats deny-all, append-only submissions) + `verify-pin` Edge Function with custom-claim JWT (7-day, D-06) + server-side lockout 5→15 min (D-07) + end-to-end auth smoke test (the day-one spike)
+- [x] 01-02-PLAN.md — RLS policies on every table (members own-rows-only, class_key_stats deny-all, append-only submissions) + `verify-pin` Edge Function with custom-claim JWT (7-day, D-06) + server-side lockout 5→15 min (D-07) + end-to-end auth smoke test (the day-one spike)
 - [ ] 01-04-PLAN.md — OCR feasibility spike — committed Node script on 10 real screenshots from gitignored `.secrets/ocr-samples/` (D-08–D-10), go/no-go decision documented vs ~70% threshold
 
 **Wave 3** *(blocked on Wave 2 — login UI verifies against the deployed verify-pin function)*
