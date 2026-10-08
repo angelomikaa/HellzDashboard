@@ -119,15 +119,25 @@ export function parseValue(raw) {
  * `{ field, expected, parsed, ok }`; parse failures (`ok: false`) and value
  * mismatches both count as misses. An empty result set scores 0 (never NaN).
  *
- * @param {Array<{field: string, expected: number|null, parsed: number|null, ok: boolean}>} results
+ * Row semantics:
+ *  - numeric rows carry `parsed`/`expected` as NUMBERS — correct means
+ *    `ok === true && parsed === expected` (ok alone means "OCR produced a
+ *    value"; the value must also match).
+ *  - text rows (header-screen fields via compareField) carry STRINGS, where
+ *    `Number()` coercion is NaN — for those, compareField's ok flag IS the
+ *    correctness verdict (case/whitespace-normalized equality).
+ *
+ * @param {Array<{field: string, expected: number|string|null, parsed: number|string|null, ok: boolean}>} results
  * @returns {number} accuracy in [0, 1]
  */
 export function computeAccuracy(results) {
   const rows = Array.isArray(results) ? results : [];
   if (rows.length === 0) return 0;
-  const correct = rows.filter(
-    (r) => r && r.ok === true && Number(r.parsed) === Number(r.expected),
-  ).length;
+  const correct = rows.filter((r) => {
+    if (!r || r.ok !== true) return false;
+    const numericRow = typeof r.parsed === 'number' && typeof r.expected === 'number';
+    return !numericRow || r.parsed === r.expected;
+  }).length;
   return correct / rows.length;
 }
 
