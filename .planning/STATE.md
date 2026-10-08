@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-02-PLAN.md (RLS policies live + verify-pin deployed + spike proven)
-last_updated: "2026-10-08T16:52:04Z"
+stopped_at: 01-04 task 2 checkpoint (human-action) — awaiting 10 real screenshots in .secrets/ocr-samples/ + expected.json
+last_updated: "2026-10-08T20:15:00Z"
 last_activity: 2026-10-08
 progress:
   total_phases: 6
@@ -97,9 +97,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-08T16:52:04Z
-Stopped at: Completed 01-02-PLAN.md (RLS policies live + verify-pin deployed + spike proven)
-Resume file: None
+Last session: 2026-10-08T20:15:00Z
+Stopped at: 01-04 task 2 checkpoint (human-action) — spike script built+self-tested (commits 38a0710, 42c269a); awaiting the 10 real screenshots in .secrets/ocr-samples/, one screenshot's resolution, and expected.json (template: scripts/ocr-samples-expected.example.json)
+Resume file: scripts/ocr-spike.mjs (run `node scripts/ocr-spike.mjs --info` once samples are placed; then calibrate scripts/ocr-regions.json, run the spike, write OCR-SPIKE-RESULTS.md)
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*
