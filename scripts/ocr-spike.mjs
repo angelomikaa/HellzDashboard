@@ -241,9 +241,14 @@ function guardSamples() {
 
 /**
  * Crop one region rect and preprocess it per .planning/research/STACK.md:
- * grayscale -> 3x upscale (cubic) -> contrast boost (normalize) -> binarize,
- * with automatic polarity (stat UIs are usually light text on a dark panel,
- * Tesseract wants dark text on white).
+ * grayscale -> 3x upscale (cubic) -> contrast boost (normalize) -> binarize.
+ * Stat UIs are usually light text on a dark panel while Tesseract prefers
+ * dark text on white, so when the binarized crop is mostly dark the polarity
+ * is ambiguous — return BOTH polarities and let the caller pick the better
+ * read (a hard negate made some regions, e.g. sampbasic combat_power,
+ * unreadable).
+ *
+ * @returns {Promise<Buffer[]>} one or two candidate buffers
  */
 async function preprocessRegion(sharp, image, region) {
   const meta = await sharp(image).metadata();
@@ -259,12 +264,37 @@ async function preprocessRegion(sharp, image, region) {
     .normalize()
     .png()
     .toBuffer();
-  let bin = await sharp(pre).threshold(140).png().toBuffer();
+  const bin = await sharp(pre).threshold(140).png().toBuffer();
   const stats = await sharp(bin).stats();
   if (stats.channels[0].mean < 128) {
-    bin = await sharp(bin).negate().png().toBuffer();
+    const negated = await sharp(bin).negate().png().toBuffer();
+    return [bin, negated];
   }
-  return bin;
+  return [bin];
+}
+
+/**
+ * OCR one region's prepared buffer(s), picking the best read when both
+ * polarities were prepared. Score: a locale-parseable read wins, then a
+ * non-empty read, then the higher Tesseract confidence.
+ */
+async function recognizeBest(worker, regionType, buffers) {
+  let best = null;
+  let bestScore = -Infinity;
+  for (const buf of buffers) {
+    const { data } = await worker.recognize(buf);
+    const text = data.text || '';
+    const conf = Number(data.confidence ?? 0);
+    const score =
+      (regionType === 'text' || parseValue(text).ok ? 1000 : 0) +
+      (text.trim() !== '' ? 100 : 0) +
+      conf;
+    if (score > bestScore) {
+      bestScore = score;
+      best = text;
+    }
+  }
+  return best ?? '';
 }
 
 /** Create the whitelisted Tesseract worker (parameters per STACK.md OCR tuning). */
@@ -313,9 +343,9 @@ async function ocrAllGroups(sharp, worker, regions, warnings, onField) {
         await worker.setParameters({ tessedit_char_whitelist: wl });
         currentWhitelist = wl;
       }
-      const buf = await preprocessRegion(sharp, image, region);
-      const { data } = await worker.recognize(buf);
-      onField(group, file, fieldName, region, data.text || '');
+      const buffers = await preprocessRegion(sharp, image, region);
+      const text = await recognizeBest(worker, region.type, buffers);
+      onField(group, file, fieldName, region, text);
     }
   }
 }
@@ -527,9 +557,9 @@ async function runSelfTest() {
     for (const [fieldName, expectedRaw] of entries) {
       const i = entries.findIndex(([n]) => n === fieldName);
       const rect = { x: 480, y: 120 + i * 120 - 60, w: 300, h: 80 };
-      const buf = await preprocessRegion(sharp, image, rect);
-      const { data } = await worker.recognize(buf);
-      rows.push(buildRow(fx.file, fieldName, expectedRaw, data.text || ''));
+      const buffers = await preprocessRegion(sharp, image, rect);
+      const text = await recognizeBest(worker, 'numeric', buffers);
+      rows.push(buildRow(fx.file, fieldName, expectedRaw, text));
     }
   }
   await worker.terminate();
