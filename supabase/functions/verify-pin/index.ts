@@ -64,9 +64,19 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'invalid_request' }, 400)
   }
 
+  // WR-05: fail fast on missing function env secrets — a missing secret must
+  // never mint HS256 tokens signed with the literal string "undefined".
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const jwtSecret = Deno.env.get('NEFOOT_JWT_SECRET')
+  const jwtKid = Deno.env.get('NEFOOT_JWT_KEY_ID')
+  if (!supabaseUrl || !serviceRoleKey || !jwtSecret || !jwtKid) {
+    return json({ error: 'server_misconfigured' }, 500)
+  }
+
   const admin = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    supabaseUrl,
+    serviceRoleKey,
   )
 
   const now = new Date()
@@ -154,8 +164,8 @@ Deno.serve(async (req: Request) => {
   // Management API (the legacy project secret is no longer exposed by the platform).
   // The kid header lets PostgREST select the right key; both are function env secrets.
   const nowSec = Math.floor(Date.now() / 1000)
-  const secret = new TextEncoder().encode(Deno.env.get('NEFOOT_JWT_SECRET')!)
-  const kid = Deno.env.get('NEFOOT_JWT_KEY_ID')!
+  const secret = new TextEncoder().encode(jwtSecret)
+  const kid = jwtKid
   const token = await new SignJWT({
     role: 'authenticated',
     member_id: member.id,
