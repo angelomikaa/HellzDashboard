@@ -131,8 +131,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 1 | Pending |
-| AUTH-02 | Phase 1 | Pending |
+| AUTH-01 | Phase 1 | Complete (hardened via 01-REVIEW-FIX) |
+| AUTH-02 | Phase 1 | Complete (hardened via 01-REVIEW-FIX) |
 | AUTH-03 | Phase 6 | Pending |
 | AUTH-04 | Phase 6 | Pending |
 | AUTH-05 | Phase 6 | Pending |

@@ -29,7 +29,6 @@ Each player can see, through their stat cards, exactly where they stand compared
 - [ ] Delta badges: track changes since the player's last submission (e.g. ▲ 5,00%)
 - [ ] Separate promotion page showing key stats as "EAFC cards" to promote the best players in the guild
 - [ ] Members see aggregates only on their own improvement screen (never individual players' values)
-- [ ] 4-digit PIN set and used to access the panel
 - [ ] Officers have elevated role: validate and remove players and registers, blocking access to players from other guilds
 - [ ] Officer role granted manually by the owner
 - [ ] Fully functional dashboard for all members
@@ -75,7 +74,7 @@ Each player can see, through their stat cards, exactly where they stand compared
 | Key stats hidden from members | Avoid stat skewing for artificial rank gains | — Pending |
 | Card tiers: bronze/silver/gold/platinum | Own improved pattern instead of reference's orange/green borders | — Pending |
 | Members see aggregates only; promotion page shows top players as EAFC cards | Promote best players; protect individual data | — Pending |
-| 4-digit PIN auth with officer elevation by owner | Simple access; officers validate/remove players and registers | — Phase 1: live (verify-pin + lockout + 7-day custom-claim JWT); follow-up hardening tracked in 01-REVIEW.md |
+| 4-digit PIN auth with officer elevation by owner | Simple access; officers validate/remove players and registers | — Phase 1: live (verify-pin + lockout + 7-day custom-claim JWT); follow-up hardening applied 2026-10-09 via code-review-fix (CR-01 atomic lockout RPC, CR-02 session hardening, WR-01..09) — see 01-REVIEW-FIX.md |
 | Dedicated HS256 signing key for custom-claim JWTs (NEFOOT_JWT_SECRET) | Platform redacts the legacy JWT secret; key 6f7657c3 must never be revoked | — Phase 1 |
 | Panel branded "Hellz" (subtitle "Painel Geral") | "NeoFoot" was an abandoned folder name reused for the repo; UI shows Hellz — internal identifiers (repo, storage key, JWT issuer) unchanged | — Phase 1 |
 | Delta badges track changes since last submission | Show progress over time | — Pending |
@@ -100,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-08 — Phase 1 (Foundation — Secure Access & Data Model) complete: live Supabase schema with RLS, verify-pin auth with lockout and 7-day custom-claim JWT, PIN Gate UI, OCR spike GO.*
+*Last updated: 2026-10-09 — Phase 1 closed out (UAT complete; 01-REVIEW-FIX hardened all critical+warning findings: atomic lockout RPC, session hardening, RLS active check, WR fixes). Phase 2 planned (3 plans, waves 1→2→3).*

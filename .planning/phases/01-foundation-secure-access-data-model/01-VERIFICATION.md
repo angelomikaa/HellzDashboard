@@ -1,13 +1,14 @@
 ---
 phase: 01-foundation-secure-access-data-model
-verified: 2026-10-08T21:41:13Z
-status: human_needed
+verified: 2026-10-09T03:15:00.000Z
+status: verified
 score: 4/4 must-haves verified
 overrides_applied: 0
 human_verification:
   - test: "Disposition of the 2 BLOCKER findings from 01-REVIEW.md (CR-01 lockout race condition, CR-02 session parse crash)"
     expected: "Human decides: accept as follow-up fixes (recommended: schedule via gsd-code-review-fix BEFORE real members are invited / before Phase 5) or reject and require fixes inside Phase 1"
     why_human: "Both findings sit outside the phase success criteria as literally stated (all 4 SCs are verified, including live and owner-browser evidence), but the code review classified them as critical/blocker. Accepting known-security-hardening debt vs. blocking the phase transition is a risk decision only the owner can make."
+    resolved: "2026-10-09 — owner scheduled the fix pass immediately; /gsd-code-review-fix 01 fixed all 11 critical+warning findings (commits d926dfd..a9782cd, report 01-REVIEW-FIX.md @ 8cfc47a). 41/41 tests green. Pending live actions: push migrations 0003/0004, redeploy verify-pin, rotate seeded credentials (see 01-REVIEW-FIX.md)."
 ---
 
 # Phase 1: Foundation — Secure Access & Data Model Verification Report
