@@ -17,8 +17,8 @@ Requirements for initial release (MVP — will be escalated later). Each maps to
 
 ### Registry & Catalog
 
-- [ ] **REG-01**: Admin can register a character with name, class, and function/role (e.g. tank vs DPS)
-- [ ] **REG-02**: Class list is extensible by an admin (Ragnarok Origin adds classes over time) *(server-side foundation live in 02-01 — staff-only insert proven via RLS; completes with the 02-02 admin UI)*
+- [x] **REG-01**: Admin can register a character with name, class, and function/role (e.g. tank vs DPS) *(02-02: Personagens page — inline registration via updateCharacter on the safe projection; officer write path live-proven by 02-01 smoke matrix)*
+- [x] **REG-02**: Class list is extensible by an admin (Ragnarok Origin adds classes over time) *(02-01: staff-only insert live via RLS; 02-02: add-class UI inserts and immediately refreshes the dropdown)*
 - [x] **REG-03**: Stat catalog covers all 3 groups (General Stats, Quasi-Stats, Special) with flat and percent value types (~50+ stats, labeled FLAT/PERCENTUAL) *(02-01: 57 stats live, owner-validated OCR keys, pt-BR labels)*
 
 ### Data Input
@@ -96,8 +96,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-03 | Phase 6 | Pending |
 | AUTH-04 | Phase 6 | Pending |
 | AUTH-05 | Phase 6 | Pending |
-| REG-01 | Phase 2 | Pending |
-| REG-02 | Phase 2 | Pending (foundation live in 02-01; completes with 02-02 admin UI) |
+| REG-01 | Phase 2 | Complete (02-02) |
+| REG-02 | Phase 2 | Complete (02-01 + 02-02) |
 | REG-03 | Phase 2 | Complete (02-01) |
 | INPT-01 | Phase 2 | Pending |
 | INPT-02 | Phase 5 | Pending |
@@ -121,4 +121,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-10-07*
-*Last updated: 2026-10-09 after 02-01 execution (REG-03, INPT-04 complete; REG-02 foundation live)*
+*Last updated: 2026-10-09 after 02-02 execution (REG-01, REG-02 complete — owner browser sign-off folds into the 02-03 UAT checkpoint)*

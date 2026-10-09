@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "02-01 complete and committed (registry/catalog/data layer LIVE in thdxyxsjafimxgxpmpqs; RLS SMOKE PASSED; 62/62 tests green). Next: 02-02 (admin Personagens page). ⚠ Owner actions pending: redeploy verify-pin (BLOCKED on latent bug — see deferred-items.md), rotate seeded credentials, rotate deploy token"
-last_updated: "2026-10-09T15:05:00.000Z"
-last_activity: "2026-10-09 -- 02-01 executed (live deploy + smoke + data layer)"
+stopped_at: "02-02 complete and committed (app tab shell + admin Personagens page: REG-01/REG-02 UI). Next: 02-03 (member submit wizard + owner UAT checkpoint). ⚠ Owner actions pending: redeploy verify-pin (BLOCKED on latent bug — see deferred-items.md), rotate seeded credentials, rotate deploy token"
+last_updated: "2026-10-09T15:45:00.000Z"
+last_activity: "2026-10-09 -- 02-02 executed (tab shell + admin Personagens page)"
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 7
-  completed_plans: 5
-  percent: 71
+  completed_plans: 6
+  percent: 86
 ---
 
 # Project State
@@ -26,19 +26,19 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 02 (registry-catalog-manual-data-ingestion) — EXECUTING
-Plan: 2 of 3
-Status: 02-01 complete (registry/catalog/data layer LIVE, RLS smoke passed); next: 02-02 admin Personagens page
-Last activity: 2026-10-09 -- 02-01 executed (live deploy + smoke + data layer)
+Plan: 3 of 3
+Status: 02-02 complete (tab shell + admin Personagens page: REG-01/REG-02 UI); next: 02-03 member submit wizard
+Last activity: 2026-10-09 -- 02-02 executed (tab shell + admin Personagens page)
 
-Progress: [███████---] 71%
+Progress: [████████--] 86%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 9
-- Average duration: 38min
-- Total execution time: 308min (5h8m)
+- Total plans completed: 10
+- Average duration: 33min
+- Total execution time: 328min (5h28m)
 
 **By Phase:**
 
@@ -49,12 +49,13 @@ Progress: [███████---] 71%
 | 01 P03 | 1 | 38min | 38min |
 | 01 P04 | 1 | 2h51min | 2h51min |
 | 02 P01 | 1 | 33min | 33min |
+| 02 P02 | 1 | 20min | 20min |
 | 1 | 4 | - | - |
 
 **Recent Trend:**
 
-- Last 4 plans: 01-01 (19min), 01-02 (47min), 01-04 (2h51min), 01-03 (38min)
-- Trend: —
+- Last 4 plans: 01-04 (2h51min), 01-03 (38min), 02-01 (33min), 02-02 (20min)
+- Trend: accelerating (02-02 shipped in 20min — UI-only plans on the proven data layer are fast)
 
 ## Accumulated Context
 
@@ -84,6 +85,8 @@ Recent decisions affecting current work:
 - [Phase 02 planning]: 5 planner-discretion calls await owner ratification (02-RESEARCH §6, re-checked at 02-03 UAT checkpoint): no server-side screenshot storage · char_function limited to tank/dps · General+Quasi required / Special optional in wizard · catalog labels as pt-BR short forms · combat_power as manual intro-step input
 - [Phase 02-01]: Deployed verify-pin JWT carries the guild role in the `member_role` claim (`role` = 'authenticated' is the PostgREST role-switch) — ALL role-based RLS policies must read `auth.jwt()->>'member_role'`; 0005's role-claim staff policies silently matched nothing until 0006 fixed them (caught live by the smoke matrix)
 - [Phase 02-01]: Registry/catalog migration is 0005 + corrective 0006 (plan drafted 0003, taken by Phase 1 review fixes); 0003/0004/0005/0006 all pushed live 2026-10-09 — column grants + RLS compose: `select=*` on members fails BY DESIGN, clients must use explicit projections
+- [Phase 02-02]: Personagens tab = UX-only gate on member_role (officer/owner) with the content render re-checking the role too — App stays mounted across logout/login, so a lingering staff tab can never leak the admin page to a member session; enforcement unchanged (staff RLS from 0005/0006)
+- [Phase 02-02]: A character must have a class — the '—' select option is display-only and Salvar disables while it is selected (client-side block before updateCharacter); the edit form sends ONLY {display_name, char_class, char_function} and column grants remain the server-side backstop (T-02-10)
 
 ### Pending Todos
 
@@ -109,8 +112,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-09 (Phase 2 execution: 02-01 complete — live deploy, RLS smoke matrix, shared data layer)
-Stopped at: 02-01 complete and committed. Next: 02-02-PLAN.md (admin Personagens page: character registration REG-01 + add-class UI REG-02). ⚠ Owner actions pending: redeploy verify-pin (BLOCKED on latent bug — see deferred-items.md), rotate seeded credentials, rotate deploy token
+Last session: 2026-10-09 (Phase 2 execution: 02-02 complete — app tab shell + admin Personagens page, REG-01/REG-02 UI)
+Stopped at: 02-02 complete and committed. Next: 02-03-PLAN.md (member submit wizard: INPT-01/INPT-03 + visible append-only history; ends with owner browser UAT checkpoint that also spot-checks the 02-02 Personagens flows). ⚠ Owner actions pending: redeploy verify-pin (BLOCKED on latent bug — see deferred-items.md), rotate seeded credentials, rotate deploy token
 Resume file: None
 
 ---
