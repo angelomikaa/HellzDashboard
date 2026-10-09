@@ -10,7 +10,7 @@ NeoFoot delivers the core loop — register → submit → see standing → impr
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Foundation — Secure Access & Data Model** - Supabase schema + RLS, per-player PIN auth, project scaffolding, OCR feasibility spike
+- [x] **Phase 1: Foundation — Secure Access & Data Model** - Supabase schema + RLS, per-player PIN auth, project scaffolding, OCR feasibility spike (completed 2026-10-09)
 - [ ] **Phase 2: Registry, Catalog & Manual Data Ingestion** - Character registry, stat catalog, guided 3-screenshot upload with manual entry + fix-up gate
 - [ ] **Phase 3: Rank Engine** - Postgres RPCs: per-stat percentile (top 1% = 99 pts) + OVR from 6 hidden key stats, floor 51
 - [ ] **Phase 4: Member Dashboard & Improvement Screen** - Mobile-first stat cards (bronze→platinum), per-stat comparison, aggregates-only privacy
@@ -112,7 +112,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation — Secure Access & Data Model | 3/4 | In Progress | - |
+| 1. Foundation — Secure Access & Data Model | 4/4 | Complete    | 2026-10-09 |
 | 2. Registry, Catalog & Manual Data Ingestion | 0/2 | Not started | - |
 | 3. Rank Engine | 0/2 | Not started | - |
 | 4. Member Dashboard & Improvement Screen | 0/2 | Not started | - |
