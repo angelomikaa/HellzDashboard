@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { clearSession } from './features/auth/session'
 import { RequireAuth } from './features/auth/RequireAuth'
+import { CharactersPage } from './features/admin/CharactersPage'
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   member: 'Membro',
@@ -7,7 +9,11 @@ const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   owner: 'Proprietário',
 }
 
+type Tab = 'painel' | 'characters'
+
 function App() {
+  const [tab, setTab] = useState<Tab>('painel')
+
   // D-06: logout is one click, no confirmation — clearSession() wipes the stored
   // session and invalidate() drops RequireAuth back to LoginPage.
   function handleLogout(invalidate: () => void) {
@@ -17,30 +23,73 @@ function App() {
 
   return (
     <RequireAuth>
-      {({ session, invalidate }) => (
-        <div className="flex min-h-screen flex-col bg-dominant text-content">
-          <header className="flex items-center justify-between border-b border-line px-4 py-3">
-            <div className="flex items-center gap-2">
-              <span className="text-base text-content">Olá, {session.display_name}</span>
-              <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
-                {ROLE_LABELS[session.member_role]}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleLogout(invalidate)}
-              className="h-11 rounded-md border border-line px-4 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Sair
-            </button>
-          </header>
-          <main className="flex flex-1 items-center justify-center px-4">
-            <p className="text-center text-base text-muted">
-              O painel de status está em construção — as próximas telas chegam em breve.
-            </p>
-          </main>
-        </div>
-      )}
+      {({ session, invalidate }) => {
+        // Tab visibility is UX-ONLY gating (T-02-09): members never see the
+        // Personagens button, but enforcement is the staff RLS policies from
+        // 02-01 — a tampered client is refused server-side. The showCharacters
+        // fallback also covers a staff tab lingering after a logout/login
+        // switch on the same browser (App stays mounted across sessions).
+        const isStaff =
+          session.member_role === 'officer' || session.member_role === 'owner'
+        const showCharacters = tab === 'characters' && isStaff
+
+        return (
+          <div className="flex min-h-screen flex-col bg-dominant text-content">
+            <header className="flex items-center justify-between border-b border-line px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base text-content">Olá, {session.display_name}</span>
+                <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
+                  {ROLE_LABELS[session.member_role]}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleLogout(invalidate)}
+                className="h-11 rounded-md border border-line px-4 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Sair
+              </button>
+            </header>
+            <nav aria-label="Seções" className="border-b border-line">
+              <div className="mx-auto flex w-full max-w-3xl gap-1 overflow-x-auto px-4">
+                <button
+                  type="button"
+                  onClick={() => setTab('painel')}
+                  aria-current={tab === 'painel' ? 'page' : undefined}
+                  className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    tab === 'painel' ? 'border-accent text-content' : 'border-transparent text-muted'
+                  }`}
+                >
+                  Painel
+                </button>
+                {isStaff && (
+                  <button
+                    type="button"
+                    onClick={() => setTab('characters')}
+                    aria-current={showCharacters ? 'page' : undefined}
+                    className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      showCharacters ? 'border-accent text-content' : 'border-transparent text-muted'
+                    }`}
+                  >
+                    Personagens
+                  </button>
+                )}
+              </div>
+            </nav>
+            <main className="flex-1">
+              <div className="mx-auto w-full max-w-3xl px-4 py-6">
+                {showCharacters ? (
+                  <CharactersPage session={session} />
+                ) : (
+                  <p className="pt-16 text-center text-base text-muted">
+                    O painel de status está em construção — as próximas telas chegam em breve.
+                  </p>
+                )}
+              </div>
+            </main>
+          </div>
+        )
+      }}
     </RequireAuth>
   )
 }
