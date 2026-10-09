@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { clearSession } from './features/auth/session'
 import { RequireAuth } from './features/auth/RequireAuth'
 import { CharactersPage } from './features/admin/CharactersPage'
+import { SubmitPage } from './features/submit/SubmitPage'
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   member: 'Membro',
@@ -9,7 +10,7 @@ const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   owner: 'Proprietário',
 }
 
-type Tab = 'painel' | 'characters'
+type Tab = 'painel' | 'submit' | 'characters'
 
 function App() {
   const [tab, setTab] = useState<Tab>('painel')
@@ -32,6 +33,8 @@ function App() {
         const isStaff =
           session.member_role === 'officer' || session.member_role === 'owner'
         const showCharacters = tab === 'characters' && isStaff
+        // Enviar Status is for EVERY role (members submit their own stats).
+        const showSubmit = tab === 'submit'
 
         return (
           <div className="flex min-h-screen flex-col bg-dominant text-content">
@@ -62,6 +65,16 @@ function App() {
                 >
                   Painel
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('submit')}
+                  aria-current={showSubmit ? 'page' : undefined}
+                  className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    showSubmit ? 'border-accent text-content' : 'border-transparent text-muted'
+                  }`}
+                >
+                  Enviar Status
+                </button>
                 {isStaff && (
                   <button
                     type="button"
@@ -80,6 +93,8 @@ function App() {
               <div className="mx-auto w-full max-w-3xl px-4 py-6">
                 {showCharacters ? (
                   <CharactersPage session={session} />
+                ) : showSubmit ? (
+                  <SubmitPage session={session} />
                 ) : (
                   <p className="pt-16 text-center text-base text-muted">
                     O painel de status está em construção — as próximas telas chegam em breve.
