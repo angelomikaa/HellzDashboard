@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "02-02 complete and committed (app tab shell + admin Personagens page: REG-01/REG-02 UI). Next: 02-03 (member submit wizard + owner UAT checkpoint). ⚠ Owner actions pending: redeploy verify-pin (BLOCKED on latent bug — see deferred-items.md), rotate seeded credentials, rotate deploy token"
-last_updated: "2026-10-09T15:45:00.000Z"
-last_activity: "2026-10-09 -- 02-02 executed (tab shell + admin Personagens page)"
+stopped_at: "02-03 complete and committed (member submit wizard, owner UAT approved — Phase 2 COMPLETE, 3/3 plans). Next: /gsd-verify-work 2, then /gsd-discuss-phase 3 + /gsd-plan-phase 3 (Rank Engine). ⚠ Owner actions pending: redeploy verify-pin (BLOCKED on latent bug — see deferred-items.md), rotate seeded credentials, rotate deploy token; pre-launch: replace public/examples/*.svg placeholders with real screenshots"
+last_updated: "2026-10-09T18:10:00.000Z"
+last_activity: "2026-10-09 -- 02-03 executed (member submit wizard + owner UAT; Phase 2 complete)"
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 6
-  percent: 86
+  completed_plans: 7
+  percent: 100
 ---
 
 # Project State
@@ -25,20 +25,20 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 
 ## Current Position
 
-Phase: 02 (registry-catalog-manual-data-ingestion) — EXECUTING
+Phase: 02 (registry-catalog-manual-data-ingestion) — COMPLETE (3/3 plans)
 Plan: 3 of 3
-Status: 02-02 complete (tab shell + admin Personagens page: REG-01/REG-02 UI); next: 02-03 member submit wizard
-Last activity: 2026-10-09 -- 02-02 executed (tab shell + admin Personagens page)
+Status: 02-03 complete (member submit wizard: INPT-01/INPT-03/INPT-04 UI, owner UAT approved); Phase 2 execution done — next: /gsd-verify-work 2, then plan Phase 3
+Last activity: 2026-10-09 -- 02-03 executed (member submit wizard + owner UAT; Phase 2 complete)
 
-Progress: [████████--] 86%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 10
-- Average duration: 33min
-- Total execution time: 328min (5h28m)
+- Total plans completed: 11
+- Average duration: 41min
+- Total execution time: 455min (7h35m)
 
 **By Phase:**
 
@@ -50,12 +50,13 @@ Progress: [████████--] 86%
 | 01 P04 | 1 | 2h51min | 2h51min |
 | 02 P01 | 1 | 33min | 33min |
 | 02 P02 | 1 | 20min | 20min |
+| 02 P03 | 1 | 2h07min | 2h07min |
 | 1 | 4 | - | - |
 
 **Recent Trend:**
 
-- Last 4 plans: 01-04 (2h51min), 01-03 (38min), 02-01 (33min), 02-02 (20min)
-- Trend: accelerating (02-02 shipped in 20min — UI-only plans on the proven data layer are fast)
+- Last 4 plans: 01-03 (38min), 02-01 (33min), 02-02 (20min), 02-03 (2h07min wall — active execution ~30min; remainder was the owner UAT checkpoint wait)
+- Trend: execution remains fast (02-03 active work ≈30min); plan-level wall time inflated only by the deliberate owner-verification checkpoint
 
 ## Accumulated Context
 
@@ -87,6 +88,9 @@ Recent decisions affecting current work:
 - [Phase 02-01]: Registry/catalog migration is 0005 + corrective 0006 (plan drafted 0003, taken by Phase 1 review fixes); 0003/0004/0005/0006 all pushed live 2026-10-09 — column grants + RLS compose: `select=*` on members fails BY DESIGN, clients must use explicit projections
 - [Phase 02-02]: Personagens tab = UX-only gate on member_role (officer/owner) with the content render re-checking the role too — App stays mounted across logout/login, so a lingering staff tab can never leak the admin page to a member session; enforcement unchanged (staff RLS from 0005/0006)
 - [Phase 02-02]: A character must have a class — the '—' select option is display-only and Salvar disables while it is selected (client-side block before updateCharacter); the edit form sends ONLY {display_name, char_class, char_function} and column grants remain the server-side backstop (T-02-10)
+- [Phase 02-03]: Owner UAT APPROVED — steps 1–5 and 8 walked in a real browser; steps 6–7 (DevTools leak-check, direct-abuse select=*) were NOT manually performed (owner didn't know how) and are dispositioned as covered-by-automated-evidence: 02-01 live smoke matrix (select=* fails permission-denied, pin_hash ungranted, no client-visible pin_hash) + 02-03 no-upload grep gate
+- [Phase 02-03]: The 5 planner-discretion calls (02-RESEARCH §6) are RATIFIED by the owner's UAT approval: no server-side screenshot storage (D-10), char_function tank/dps only, General+Quasi required / Especial optional, pt-BR short-form catalog labels, combat_power as a manual intro-step input
+- [Phase 02-03]: Example shots ship as placeholder SVGs in git (public/examples/*.svg); owner acknowledged and replaces them with real screenshots pre-launch (own call whether the real files enter git)
 
 ### Pending Todos
 
@@ -98,7 +102,8 @@ None yet.
 - ~~[Phase 1]: OCR feasibility spike must run on 10 real guild screenshots (Portuguese locale, `1.234.567` separators) → go/no-go pivot threshold ~70% field accuracy~~ RESOLVED 01-04: GO — 222/222 fields, 100.0% vs ~70% threshold (see OCR-SPIKE-RESULTS.md and Decisions)
 - [Phase 1]: Owner should rotate the Supabase access token used for deploys, and rotate placeholder whitelist rows/PINs before inviting real members (see 01-USER-SETUP.md) — credentials/hashes remain recoverable from git history (WR-06)
 - ~~[Phase 1 → live deploy]: Push migrations 0003 (lockout RPC + handle length constraints) and 0004 (RLS active checks) to the live project~~ CLEARED 02-01 (2026-10-09): 0003/0004 pushed live together with 0005/0006 via `db push`. REMAINING: redeploy verify-pin — ⚠ BLOCKED: local `verify-pin/index.ts` line 58 references undefined `discordHandle` (would 500 every login once deployed — fix first, see 02 deferred-items.md); then confirm CR-01 atomicity live (parallel wrong-PIN requests → monotonic counter, lock at 5) — see 01-REVIEW-FIX.md
-- [Phase 2]: Storage policy nuance resolved in planning (02-RESEARCH §3.1): no server-side screenshot storage at all (D-10) — awaiting owner ratification with the other discretion calls
+- ~~[Phase 2]: Storage policy nuance resolved in planning (02-RESEARCH §3.1): no server-side screenshot storage at all (D-10) — awaiting owner ratification with the other discretion calls~~ RATIFIED 02-03 (2026-10-09): owner approved the walked flow with zero upload paths; all 5 discretion calls ratified (see Decisions)
+- [Pre-launch]: Owner must replace public/examples/*.svg placeholder example shots with real game screenshots (acknowledged at 02-03 UAT step 8) before inviting real members
 - [Phase 3]: Percentile formula spec (rank-based, tie handling, insufficient-data states) must be written and unit-tested before UI shows points
 - [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need production-data calibration — spike delivered GO (100.0% on 11 owner-device samples) but device fragmentation is NOT covered; region maps are game-UI-versioned (re-run spike to recalibrate); dual-polarity read and manual fix-up are mandatory
 
@@ -112,8 +117,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-09 (Phase 2 execution: 02-02 complete — app tab shell + admin Personagens page, REG-01/REG-02 UI)
-Stopped at: 02-02 complete and committed. Next: 02-03-PLAN.md (member submit wizard: INPT-01/INPT-03 + visible append-only history; ends with owner browser UAT checkpoint that also spot-checks the 02-02 Personagens flows). ⚠ Owner actions pending: redeploy verify-pin (BLOCKED on latent bug — see deferred-items.md), rotate seeded credentials, rotate deploy token
+Last session: 2026-10-09 (Phase 2 execution complete: 02-03 member submit wizard — INPT-01/INPT-03/INPT-04 UI, owner UAT approved)
+Stopped at: 02-03 complete and committed. Phase 2 COMPLETE (3/3 plans). Next: /gsd-verify-work 2, then /gsd-discuss-phase 3 + /gsd-plan-phase 3 (Rank Engine). ⚠ Owner actions pending: redeploy verify-pin (BLOCKED on latent bug — see deferred-items.md), rotate seeded credentials, rotate deploy token; pre-launch: replace public/examples/*.svg placeholders
 Resume file: None
 
 ---

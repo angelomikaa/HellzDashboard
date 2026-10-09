@@ -11,7 +11,7 @@ NeoFoot delivers the core loop — register → submit → see standing → impr
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: Foundation — Secure Access & Data Model** - Supabase schema + RLS, per-player PIN auth, project scaffolding, OCR feasibility spike (completed 2026-10-09)
-- [ ] **Phase 2: Registry, Catalog & Manual Data Ingestion** - Character registry, stat catalog, guided 3-screenshot upload with manual entry + fix-up gate
+- [x] **Phase 2: Registry, Catalog & Manual Data Ingestion** - Character registry, stat catalog, guided 3-screenshot upload with manual entry + fix-up gate (completed 2026-10-09)
 - [ ] **Phase 3: Rank Engine** - Postgres RPCs: per-stat percentile (top 1% = 99 pts) + OVR from 6 hidden key stats, floor 51
 - [ ] **Phase 4: Member Dashboard & Improvement Screen** - Mobile-first stat cards (bronze→platinum), per-stat comparison, aggregates-only privacy
 - [ ] **Phase 5: OCR Auto-Read Layer** - Tesseract.js client-side pre-fill bolted onto the working submit wizard, mandatory review retained
@@ -58,7 +58,7 @@ Cross-cutting constraints: "PINs stored hashed, never plaintext" (D-03, in 01-01
 Plans:
 - [x] 02-01-PLAN.md — Migration 0003: classes table + members char columns + column-level security (pin_hash unreachable, closes Phase 1 gap) + staff RLS + atomic append-only `create_submission` RPC; 57-stat catalog seed (REG-03) + classes seed; live deploy + RLS smoke matrix; shared data layer (pt-BR parse/format + REST client, REG-02/INPT-04 foundation) *(executed as 0005 + corrective 0006 — 0003/0004 taken by Phase 1 review fixes; completed 2026-10-09)*
 - [x] 02-02-PLAN.md — App tab shell + admin Personagens page: inline character registration (name/class/function, REG-01) + add-class UI (REG-02) *(completed 2026-10-09)*
-- [ ] 02-03-PLAN.md — Member submit wizard: guided 5-step flow with example shots beside inputs (INPT-01), mandatory review gate (INPT-03), visible append-only history (INPT-04); ends with owner browser UAT checkpoint
+- [x] 02-03-PLAN.md — Member submit wizard: guided 5-step flow with example shots beside inputs (INPT-01), mandatory review gate (INPT-03), visible append-only history (INPT-04); ends with owner browser UAT checkpoint *(completed 2026-10-09 — owner UAT approved; steps 6–7 covered by 02-01 automated smoke evidence)*
 
 Cross-cutting constraints honored: screenshots never leave the player's device (D-10 — no uploads, no Storage bucket; STATE.md storage blocker resolved in 02-RESEARCH §3.1); class_key_stats untouched (deny-all until Phase 3, RNK-02); submissions start `pending` — no update path added (Phase 6 validates).
 
@@ -121,7 +121,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation — Secure Access & Data Model | 4/4 | Complete    | 2026-10-09 |
-| 2. Registry, Catalog & Manual Data Ingestion | 2/3 | In Progress | - |
+| 2. Registry, Catalog & Manual Data Ingestion | 3/3 | Complete    | 2026-10-09 |
 | 3. Rank Engine | 0/2 | Not started | - |
 | 4. Member Dashboard & Improvement Screen | 0/2 | Not started | - |
 | 5. OCR Auto-Read Layer | 0/2 | Not started | - |
@@ -139,10 +139,10 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | REG-01 | Phase 2 | Complete (02-02: Personagens inline registration UI on the safe projection; officer char PATCH live-proven by 02-01 smoke, owner browser sign-off at 02-03 UAT) |
 | REG-02 | Phase 2 | Complete (02-01 live staff-only insert + 02-02 add-class UI with immediate dropdown refresh; owner browser sign-off at 02-03 UAT) |
 | REG-03 | Phase 2 | Complete (02-01: 57 stats live, all 3 groups, FLAT/PERCENTUAL labeled) |
-| INPT-01 | Phase 2 | Pending |
+| INPT-01 | Phase 2 | Complete (02-03: guided 5-step wizard, example shots beside inputs, zero OCR required — owner browser-verified) |
 | INPT-02 | Phase 5 | Pending |
-| INPT-03 | Phase 2 | Pending |
-| INPT-04 | Phase 2 | Complete (02-01: append-only storage + atomic create_submission RPC live-proven) |
+| INPT-03 | Phase 2 | Complete (02-03: 3-checkbox review gate, Enviar disabled until confirmed, server re-validates via create_submission RPC — owner browser-verified) |
+| INPT-04 | Phase 2 | Complete (02-01: append-only storage + atomic create_submission RPC live-proven; 02-03: owner browser-verified two-row history, both Aguarda validação) |
 | RNK-01 | Phase 3 | Pending |
 | RNK-02 | Phase 3 | Pending |
 | RNK-03 | Phase 3 | Pending |

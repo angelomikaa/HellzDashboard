@@ -23,10 +23,10 @@ Requirements for initial release (MVP — will be escalated later). Each maps to
 
 ### Data Input
 
-- [ ] **INPT-01**: Player can submit stats via guided 3-screenshot upload (General, Quasi, Special) with example shots shown beside input boxes
+- [x] **INPT-01**: Player can submit stats via guided 3-screenshot upload (General, Quasi, Special) with example shots shown beside input boxes *(02-03: guided 5-step wizard with example images beside every group's inputs, works with zero OCR — owner browser-verified)*
 - [ ] **INPT-02**: OCR auto-reads screenshots (client-side, region-based) and pre-fills values
-- [ ] **INPT-03**: Player must review and fix OCR results before submission is accepted (mandatory fix-up gate)
-- [x] **INPT-04**: Submissions are stored immutably (append-only) as the source of truth for ranks and future deltas *(02-01: no update/delete paths exist; atomic create_submission RPC live-proven — valid → uuid, unknown key → rejected)*
+- [x] **INPT-03**: Player must review and fix OCR results before submission is accepted (mandatory fix-up gate) *(02-03: 3-checkbox review gate — Enviar disabled until all groups confirmed; server re-validates via create_submission RPC — owner browser-verified)*
+- [x] **INPT-04**: Submissions are stored immutably (append-only) as the source of truth for ranks and future deltas *(02-01: no update/delete paths exist; atomic create_submission RPC live-proven — valid → uuid, unknown key → rejected; 02-03: owner browser-verified append-only history — resubmission created a new row, oldest untouched)*
 
 ### Ranking & Rating
 
@@ -99,10 +99,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REG-01 | Phase 2 | Complete (02-02) |
 | REG-02 | Phase 2 | Complete (02-01 + 02-02) |
 | REG-03 | Phase 2 | Complete (02-01) |
-| INPT-01 | Phase 2 | Pending |
+| INPT-01 | Phase 2 | Complete (02-03) |
 | INPT-02 | Phase 5 | Pending |
-| INPT-03 | Phase 2 | Pending |
-| INPT-04 | Phase 2 | Complete (02-01) |
+| INPT-03 | Phase 2 | Complete (02-03) |
+| INPT-04 | Phase 2 | Complete (02-01 + 02-03) |
 | RNK-01 | Phase 3 | Pending |
 | RNK-02 | Phase 3 | Pending |
 | RNK-03 | Phase 3 | Pending |
@@ -121,4 +121,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-10-07*
-*Last updated: 2026-10-09 after 02-02 execution (REG-01, REG-02 complete — owner browser sign-off folds into the 02-03 UAT checkpoint)*
+*Last updated: 2026-10-09 after 02-03 execution (INPT-01, INPT-03 complete; INPT-04 UI-proofed — Phase 2 requirements all done)*
