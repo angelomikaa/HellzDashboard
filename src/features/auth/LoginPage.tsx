@@ -67,15 +67,21 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
 
       if (res.status === 401) {
         // Enumeration-safe copy (T-01-03 / UI-SPEC): never reveals whether the
-        // handle or the PIN was wrong. attempts_remaining comes from the server (D-07).
+        // handle or the PIN was wrong. WR-07: attempts_remaining comes from the
+        // function (D-07), but the gateway can 401 before the function runs —
+        // never render "undefined tentativas restantes".
         const remaining = body.attempts_remaining
-        setStatus({
-          kind: 'error',
-          message:
-            remaining === 1
-              ? 'Discord ou PIN incorreto — 1 tentativa restante.'
-              : `Discord ou PIN incorreto — ${remaining} tentativas restantes.`,
-        })
+        if (typeof remaining !== 'number' || remaining <= 0) {
+          setStatus({ kind: 'error', message: 'Discord ou PIN incorreto.' })
+        } else {
+          setStatus({
+            kind: 'error',
+            message:
+              remaining === 1
+                ? 'Discord ou PIN incorreto — 1 tentativa restante.'
+                : `Discord ou PIN incorreto — ${remaining} tentativas restantes.`,
+          })
+        }
         setPin('')
         pinInputRef.current?.focus()
         return
