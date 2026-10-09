@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Phase 1 closed out: UAT complete, /gsd-code-review-fix 01 fixed all 11 critical+warning findings (d926dfd..a9782cd). Phase 2 planned (3 plans, waves 1→2→3, commit 502cebf) — ready to execute. ⚠ Owner actions pending: push migrations 0003/0004 live, redeploy verify-pin, rotate seeded credentials"
-last_updated: "2026-10-09T03:15:00.000Z"
-last_activity: 2026-10-09
+stopped_at: "02-01 complete and committed (registry/catalog/data layer LIVE in thdxyxsjafimxgxpmpqs; RLS SMOKE PASSED; 62/62 tests green). Next: 02-02 (admin Personagens page). ⚠ Owner actions pending: redeploy verify-pin (BLOCKED on latent bug — see deferred-items.md), rotate seeded credentials, rotate deploy token"
+last_updated: "2026-10-09T15:05:00.000Z"
+last_activity: "2026-10-09 -- 02-01 executed (live deploy + smoke + data layer)"
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 7
-  completed_plans: 4
-  percent: 57
+  completed_plans: 5
+  percent: 71
 ---
 
 # Project State
@@ -25,20 +25,20 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
-Status: Phase 1 closed out — UAT complete (blocker disposition resolved via code-review-fix pass: 11/11 findings fixed, 41/41 tests green). Phase 2 planned (3 plans: 02-01 schema/catalog/data layer → 02-02 admin UI → 02-03 submit wizard). Next: /gsd-execute-phase 2. ⚠ Owner actions pending: push migrations 0003/0004 live, redeploy verify-pin, rotate seeded credentials before real members
-Last activity: 2026-10-09
+Phase: 02 (registry-catalog-manual-data-ingestion) — EXECUTING
+Plan: 2 of 3
+Status: 02-01 complete (registry/catalog/data layer LIVE, RLS smoke passed); next: 02-02 admin Personagens page
+Last activity: 2026-10-09 -- 02-01 executed (live deploy + smoke + data layer)
 
-Progress: [█████▌----] 57%
+Progress: [███████---] 71%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 8
-- Average duration: 69min
-- Total execution time: 275min (4h35m)
+- Total plans completed: 9
+- Average duration: 38min
+- Total execution time: 308min (5h8m)
 
 **By Phase:**
 
@@ -48,6 +48,7 @@ Progress: [█████▌----] 57%
 | 01 P02 | 1 | 47min | 47min |
 | 01 P03 | 1 | 38min | 38min |
 | 01 P04 | 1 | 2h51min | 2h51min |
+| 02 P01 | 1 | 33min | 33min |
 | 1 | 4 | - | - |
 
 **Recent Trend:**
@@ -81,6 +82,8 @@ Recent decisions affecting current work:
 - [Phase 01-REVIEW-FIX]: WR-02 fixed via migration 0004_rls_active.sql — RLS policies now check `active`, so deactivation revokes already-minted tokens (early AUTH-04 groundwork)
 - [Phase 01-REVIEW-FIX]: CR-02 fixed via `isValidSession()` shape-validation + self-healing `loadSession()` — session API unchanged, 6 new hardening tests (41 total green)
 - [Phase 02 planning]: 5 planner-discretion calls await owner ratification (02-RESEARCH §6, re-checked at 02-03 UAT checkpoint): no server-side screenshot storage · char_function limited to tank/dps · General+Quasi required / Special optional in wizard · catalog labels as pt-BR short forms · combat_power as manual intro-step input
+- [Phase 02-01]: Deployed verify-pin JWT carries the guild role in the `member_role` claim (`role` = 'authenticated' is the PostgREST role-switch) — ALL role-based RLS policies must read `auth.jwt()->>'member_role'`; 0005's role-claim staff policies silently matched nothing until 0006 fixed them (caught live by the smoke matrix)
+- [Phase 02-01]: Registry/catalog migration is 0005 + corrective 0006 (plan drafted 0003, taken by Phase 1 review fixes); 0003/0004/0005/0006 all pushed live 2026-10-09 — column grants + RLS compose: `select=*` on members fails BY DESIGN, clients must use explicit projections
 
 ### Pending Todos
 
@@ -91,7 +94,7 @@ None yet.
 - ~~[Phase 1]: Custom JWT + PostgREST/RLS-claims wiring is MEDIUM confidence~~ PROVEN 01-02 (see Decisions); operational caution: do NOT revoke signing key 6f7657c3 (standby) — revoking it kills every member session instantly
 - ~~[Phase 1]: OCR feasibility spike must run on 10 real guild screenshots (Portuguese locale, `1.234.567` separators) → go/no-go pivot threshold ~70% field accuracy~~ RESOLVED 01-04: GO — 222/222 fields, 100.0% vs ~70% threshold (see OCR-SPIKE-RESULTS.md and Decisions)
 - [Phase 1]: Owner should rotate the Supabase access token used for deploys, and rotate placeholder whitelist rows/PINs before inviting real members (see 01-USER-SETUP.md) — credentials/hashes remain recoverable from git history (WR-06)
-- [Phase 1 → live deploy]: Push migrations 0003 (lockout RPC + handle length constraints) and 0004 (RLS active checks) to the live project; 0003 MUST be pushed before the next verify-pin deploy (function will 500 on failed logins until the RPC exists); then redeploy verify-pin; then confirm CR-01 atomicity live (parallel wrong-PIN requests → monotonic counter, lock at 5) — see 01-REVIEW-FIX.md
+- ~~[Phase 1 → live deploy]: Push migrations 0003 (lockout RPC + handle length constraints) and 0004 (RLS active checks) to the live project~~ CLEARED 02-01 (2026-10-09): 0003/0004 pushed live together with 0005/0006 via `db push`. REMAINING: redeploy verify-pin — ⚠ BLOCKED: local `verify-pin/index.ts` line 58 references undefined `discordHandle` (would 500 every login once deployed — fix first, see 02 deferred-items.md); then confirm CR-01 atomicity live (parallel wrong-PIN requests → monotonic counter, lock at 5) — see 01-REVIEW-FIX.md
 - [Phase 2]: Storage policy nuance resolved in planning (02-RESEARCH §3.1): no server-side screenshot storage at all (D-10) — awaiting owner ratification with the other discretion calls
 - [Phase 3]: Percentile formula spec (rank-based, tie handling, insufficient-data states) must be written and unit-tested before UI shows points
 - [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need production-data calibration — spike delivered GO (100.0% on 11 owner-device samples) but device fragmentation is NOT covered; region maps are game-UI-versioned (re-run spike to recalibrate); dual-polarity read and manual fix-up are mandatory
@@ -106,8 +109,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-09 (Phase 1 close-out: verify-work + code-review-fix + transition)
-Stopped at: Phase 1 complete and closed out (UAT 1/1 passed — blocker disposition resolved via code-review-fix; VERIFICATION verified). Phase 2 planned (3 plans, waves 1→2→3, commit 502cebf). Next: /gsd-execute-phase 2. ⚠ Owner actions pending: push migrations 0003/0004 live, redeploy verify-pin, rotate seeded credentials
+Last session: 2026-10-09 (Phase 2 execution: 02-01 complete — live deploy, RLS smoke matrix, shared data layer)
+Stopped at: 02-01 complete and committed. Next: 02-02-PLAN.md (admin Personagens page: character registration REG-01 + add-class UI REG-02). ⚠ Owner actions pending: redeploy verify-pin (BLOCKED on latent bug — see deferred-items.md), rotate seeded credentials, rotate deploy token
 Resume file: None
 
 ---

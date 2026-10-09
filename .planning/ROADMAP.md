@@ -56,7 +56,7 @@ Cross-cutting constraints: "PINs stored hashed, never plaintext" (D-03, in 01-01
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Migration 0003: classes table + members char columns + column-level security (pin_hash unreachable, closes Phase 1 gap) + staff RLS + atomic append-only `create_submission` RPC; 57-stat catalog seed (REG-03) + classes seed; live deploy + RLS smoke matrix; shared data layer (pt-BR parse/format + REST client, REG-02/INPT-04 foundation)
+- [x] 02-01-PLAN.md — Migration 0003: classes table + members char columns + column-level security (pin_hash unreachable, closes Phase 1 gap) + staff RLS + atomic append-only `create_submission` RPC; 57-stat catalog seed (REG-03) + classes seed; live deploy + RLS smoke matrix; shared data layer (pt-BR parse/format + REST client, REG-02/INPT-04 foundation) *(executed as 0005 + corrective 0006 — 0003/0004 taken by Phase 1 review fixes; completed 2026-10-09)*
 - [ ] 02-02-PLAN.md — App tab shell + admin Personagens page: inline character registration (name/class/function, REG-01) + add-class UI (REG-02)
 - [ ] 02-03-PLAN.md — Member submit wizard: guided 5-step flow with example shots beside inputs (INPT-01), mandatory review gate (INPT-03), visible append-only history (INPT-04); ends with owner browser UAT checkpoint
 
@@ -121,7 +121,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation — Secure Access & Data Model | 4/4 | Complete    | 2026-10-09 |
-| 2. Registry, Catalog & Manual Data Ingestion | 0/3 | Not started | - |
+| 2. Registry, Catalog & Manual Data Ingestion | 1/3 | In Progress | - |
 | 3. Rank Engine | 0/2 | Not started | - |
 | 4. Member Dashboard & Improvement Screen | 0/2 | Not started | - |
 | 5. OCR Auto-Read Layer | 0/2 | Not started | - |
@@ -137,12 +137,12 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | AUTH-04 | Phase 6 | Pending |
 | AUTH-05 | Phase 6 | Pending |
 | REG-01 | Phase 2 | Pending |
-| REG-02 | Phase 2 | Pending |
-| REG-03 | Phase 2 | Pending |
+| REG-02 | Phase 2 | Pending (foundation live in 02-01 — staff-only class insert proven; completes with 02-02 admin UI) |
+| REG-03 | Phase 2 | Complete (02-01: 57 stats live, all 3 groups, FLAT/PERCENTUAL labeled) |
 | INPT-01 | Phase 2 | Pending |
 | INPT-02 | Phase 5 | Pending |
 | INPT-03 | Phase 2 | Pending |
-| INPT-04 | Phase 2 | Pending |
+| INPT-04 | Phase 2 | Complete (02-01: append-only storage + atomic create_submission RPC live-proven) |
 | RNK-01 | Phase 3 | Pending |
 | RNK-02 | Phase 3 | Pending |
 | RNK-03 | Phase 3 | Pending |

@@ -18,15 +18,15 @@ Requirements for initial release (MVP — will be escalated later). Each maps to
 ### Registry & Catalog
 
 - [ ] **REG-01**: Admin can register a character with name, class, and function/role (e.g. tank vs DPS)
-- [ ] **REG-02**: Class list is extensible by an admin (Ragnarok Origin adds classes over time)
-- [ ] **REG-03**: Stat catalog covers all 3 groups (General Stats, Quasi-Stats, Special) with flat and percent value types (~50+ stats, labeled FLAT/PERCENTUAL)
+- [ ] **REG-02**: Class list is extensible by an admin (Ragnarok Origin adds classes over time) *(server-side foundation live in 02-01 — staff-only insert proven via RLS; completes with the 02-02 admin UI)*
+- [x] **REG-03**: Stat catalog covers all 3 groups (General Stats, Quasi-Stats, Special) with flat and percent value types (~50+ stats, labeled FLAT/PERCENTUAL) *(02-01: 57 stats live, owner-validated OCR keys, pt-BR labels)*
 
 ### Data Input
 
 - [ ] **INPT-01**: Player can submit stats via guided 3-screenshot upload (General, Quasi, Special) with example shots shown beside input boxes
 - [ ] **INPT-02**: OCR auto-reads screenshots (client-side, region-based) and pre-fills values
 - [ ] **INPT-03**: Player must review and fix OCR results before submission is accepted (mandatory fix-up gate)
-- [ ] **INPT-04**: Submissions are stored immutably (append-only) as the source of truth for ranks and future deltas
+- [x] **INPT-04**: Submissions are stored immutably (append-only) as the source of truth for ranks and future deltas *(02-01: no update/delete paths exist; atomic create_submission RPC live-proven — valid → uuid, unknown key → rejected)*
 
 ### Ranking & Rating
 
@@ -97,12 +97,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-04 | Phase 6 | Pending |
 | AUTH-05 | Phase 6 | Pending |
 | REG-01 | Phase 2 | Pending |
-| REG-02 | Phase 2 | Pending |
-| REG-03 | Phase 2 | Pending |
+| REG-02 | Phase 2 | Pending (foundation live in 02-01; completes with 02-02 admin UI) |
+| REG-03 | Phase 2 | Complete (02-01) |
 | INPT-01 | Phase 2 | Pending |
 | INPT-02 | Phase 5 | Pending |
 | INPT-03 | Phase 2 | Pending |
-| INPT-04 | Phase 2 | Pending |
+| INPT-04 | Phase 2 | Complete (02-01) |
 | RNK-01 | Phase 3 | Pending |
 | RNK-02 | Phase 3 | Pending |
 | RNK-03 | Phase 3 | Pending |
@@ -121,4 +121,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-10-07*
-*Last updated: 2026-10-07 after roadmap creation (traceability mapped to Phases 1-6)*
+*Last updated: 2026-10-09 after 02-01 execution (REG-03, INPT-04 complete; REG-02 foundation live)*
