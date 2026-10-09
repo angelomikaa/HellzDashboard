@@ -40,8 +40,8 @@ export function StatGroupStep({ group, entries, inputs, onChange }: StatGroupSte
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
       {/* Example shot: tappable thumbnail above the list on mobile, side
           panel (>=128px) on sm: and up. Tapping opens the full-size asset in
-          a new tab — it is a static panel-provided reference image, never a
-          member upload. */}
+          a new tab — it is a static panel-provided reference image, never
+          member screenshot data. */}
       <a
         href={`/examples/${group}.svg`}
         target="_blank"
