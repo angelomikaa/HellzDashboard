@@ -71,11 +71,14 @@ Deno.serve(async (req: Request) => {
 
   // Lockout gate (D-07): server-side, per handle, DB-backed. LOCKOUT_MINUTES (15) lives in
   // _shared/lockout.ts — the window is enforced here, never client-side.
-  const { data: attemptsRow } = await admin
+  // WR-03: every Supabase query error fails loudly as a 500 — and infra-side
+  // failures never count as login failures (a DB hiccup must not lock out users).
+  const { data: attemptsRow, error: readErr } = await admin
     .from('pin_login_attempts')
     .select('failed_count, locked_until')
     .eq('discord_handle', discordHandle)
     .maybeSingle()
+  if (readErr) return json({ error: 'server_error' }, 500)
   const lockState = rowToState(attemptsRow)
   if (isLocked(lockState, now)) {
     return json(
@@ -114,11 +117,14 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  const { data: member } = await admin
+  const { data: member, error: memberErr } = await admin
     .from('members')
     .select('id, display_name, role, pin_hash, active')
     .eq('discord_handle', discordHandle)
     .maybeSingle()
+  // WR-03: a failed member lookup is NOT "wrong credentials" — return 500
+  // without recording a failure (recordFailure is never reached).
+  if (memberErr) return json({ error: 'server_error' }, 500)
 
   // WR-01: equalize the timing of the missing/inactive path with the wrong-PIN
   // path (dummy compare) so latency cannot enumerate handles (T-01-07).
@@ -129,14 +135,16 @@ Deno.serve(async (req: Request) => {
 
   if (!bcrypt.compareSync(pin, member.pin_hash)) return await invalidCredentials()
 
-  // Success: reset the attempt counter (D-07: reset only on success)
+  // WR-03: the success-path reset must not silently fail — the correct-PIN user
+  // would get a 200 while the counter stays incremented.
   const cleared = resetState()
-  await admin.from('pin_login_attempts').upsert({
+  const { error: clearErr } = await admin.from('pin_login_attempts').upsert({
     discord_handle: discordHandle,
     failed_count: cleared.failedCount,
     locked_until: null,
     updated_at: now.toISOString(),
   })
+  if (clearErr) return json({ error: 'server_error' }, 500)
 
   // Mint the 7-day custom-claim JWT (D-06). `role: 'authenticated'` drives the PostgREST
   // role switch; RLS reads identity from the member_id/member_role custom claims.
