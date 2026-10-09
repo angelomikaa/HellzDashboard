@@ -53,7 +53,15 @@ Cross-cutting constraints: "PINs stored hashed, never plaintext" (D-03, in 01-01
   2. Stat catalog covers all 3 groups (General Stats, Quasi-Stats, Special) with ~50+ stats labeled FLAT or PERCENTUAL
   3. Player can complete a guided 3-screenshot upload (General, Quasi, Special) with example shots shown beside input boxes, manually enter/fix all values, and the submission is rejected until the mandatory review confirms the values
   4. Submissions are stored append-only — a resubmission creates a new record rather than overwriting (source of truth for ranks and future deltas)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Migration 0003: classes table + members char columns + column-level security (pin_hash unreachable, closes Phase 1 gap) + staff RLS + atomic append-only `create_submission` RPC; 57-stat catalog seed (REG-03) + classes seed; live deploy + RLS smoke matrix; shared data layer (pt-BR parse/format + REST client, REG-02/INPT-04 foundation)
+- [ ] 02-02-PLAN.md — App tab shell + admin Personagens page: inline character registration (name/class/function, REG-01) + add-class UI (REG-02)
+- [ ] 02-03-PLAN.md — Member submit wizard: guided 5-step flow with example shots beside inputs (INPT-01), mandatory review gate (INPT-03), visible append-only history (INPT-04); ends with owner browser UAT checkpoint
+
+Cross-cutting constraints honored: screenshots never leave the player's device (D-10 — no uploads, no Storage bucket; STATE.md storage blocker resolved in 02-RESEARCH §3.1); class_key_stats untouched (deny-all until Phase 3, RNK-02); submissions start `pending` — no update path added (Phase 6 validates).
+
 **UI hint**: yes
 
 ### Phase 3: Rank Engine
@@ -113,7 +121,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation — Secure Access & Data Model | 4/4 | Complete    | 2026-10-09 |
-| 2. Registry, Catalog & Manual Data Ingestion | 0/2 | Not started | - |
+| 2. Registry, Catalog & Manual Data Ingestion | 0/3 | Not started | - |
 | 3. Rank Engine | 0/2 | Not started | - |
 | 4. Member Dashboard & Improvement Screen | 0/2 | Not started | - |
 | 5. OCR Auto-Read Layer | 0/2 | Not started | - |
