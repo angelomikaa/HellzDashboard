@@ -1,4 +1,4 @@
-# NeoFoot — Guild Stats Panel
+# Hellz — Guild Stats Panel (Painel Geral)
 
 ## What This Is
 
@@ -12,11 +12,12 @@ Each player can see, through their stat cards, exactly where they stand compared
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] 4-digit PIN set and used to access the panel — Validated in Phase 1: hashed bcrypt PINs, login/reload/logout owner-verified, server-side lockout, RLS blocking proven live (AUTH-01, AUTH-02)
+- [x] Backend connection to a free-tier storage like Supabase or a superior alternative — Validated in Phase 1: live Supabase project with 6-table append-only schema and RLS on every table
 
 ### Active
 
-- [ ] Stat data input: 3 screenshots per character (General Stats, Quasi-Stats, Special) with example shots shown beside input boxes
+- [ ] Stat data input: screenshots per character (Basic header + General Stats + Quasi-Stats + Special) with example shots shown beside input boxes — Phase 1 OCR spike added the "basic" character header screen (job, nickname, combat power) as the first capture; reconcile capture count in Phase 2 planning
 - [ ] OCR auto-reads screenshots; failed OCR captures are manually fixed before a successful registration
 - [ ] Store all player status data (flat and percentage values across General, Quasi, and Special stat groups)
 - [ ] Per-stat percentile ranking within the guild (top 1% = 99 points)
@@ -66,15 +67,17 @@ Each player can see, through their stat cards, exactly where they stand compared
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| OCR auto-read + manual fix-up (not pure manual typing) | Reduces input friction; screenshots are the source of truth | — Pending |
-| 3 screenshots per character (General, Quasi, Special) | Example shots beside input boxes; repeat 3x + fix failed OCR | — Pending |
+| OCR auto-read + manual fix-up (not pure manual typing) | Reduces input friction; screenshots are the source of truth | — Phase 1 spike: GO (222/222 fields, 100.0% on 11 real samples; device-fragmentation caveats documented) |
+| 3 screenshots per character (General, Quasi, Special) | Example shots beside input boxes; repeat 3x + fix failed OCR | — Phase 1: header "basic" screen added as 4th capture (job, nickname, combat power); reconcile in Phase 2 |
 | Per-stat percentile points (top 1% = 99 pts) | EAFC Ultimate Team feel based on tops | — Pending |
 | Overall from 6 key stats, floor of 51 OVR | Normalization; overall never below 51 | — Pending |
 | Key stats admin-tweakable, exactly 6 per class | Flexibility; independent set per class | — Pending |
 | Key stats hidden from members | Avoid stat skewing for artificial rank gains | — Pending |
 | Card tiers: bronze/silver/gold/platinum | Own improved pattern instead of reference's orange/green borders | — Pending |
 | Members see aggregates only; promotion page shows top players as EAFC cards | Promote best players; protect individual data | — Pending |
-| 4-digit PIN auth with officer elevation by owner | Simple access; officers validate/remove players and registers | — Pending |
+| 4-digit PIN auth with officer elevation by owner | Simple access; officers validate/remove players and registers | — Phase 1: live (verify-pin + lockout + 7-day custom-claim JWT); follow-up hardening tracked in 01-REVIEW.md |
+| Dedicated HS256 signing key for custom-claim JWTs (NEFOOT_JWT_SECRET) | Platform redacts the legacy JWT secret; key 6f7657c3 must never be revoked | — Phase 1 |
+| Panel branded "Hellz" (subtitle "Painel Geral") | "NeoFoot" was an abandoned folder name reused for the repo; UI shows Hellz — internal identifiers (repo, storage key, JWT issuer) unchanged | — Phase 1 |
 | Delta badges track changes since last submission | Show progress over time | — Pending |
 | TypeScript + React frontend | User requirement | — Pending |
 | Free-tier backend (Supabase or superior) | User requirement | — Pending |
@@ -97,4 +100,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-07 after initialization*
+*Last updated: 2026-10-08 — Phase 1 (Foundation — Secure Access & Data Model) complete: live Supabase schema with RLS, verify-pin auth with lockout and 7-day custom-claim JWT, PIN Gate UI, OCR spike GO.*
