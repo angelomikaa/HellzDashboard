@@ -6,7 +6,6 @@ import { SignJWT } from 'npm:jose@4'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
   isLocked,
-  nextFailureState,
   retryAfterSeconds,
   resetState,
   MAX_ATTEMPTS,
@@ -82,19 +81,33 @@ Deno.serve(async (req: Request) => {
 
   // Shared failure path: missing handle, inactive member, and wrong PIN return the
   // IDENTICAL 401 shape (T-01-07: no user enumeration) and all count toward the lockout.
+  // CR-01: count-and-lock is a single atomic statement — the SECURITY DEFINER RPC
+  // record_pin_failure (migration 0003_lockout_rpc.sql) — so concurrent requests
+  // cannot collapse the counter. We trust only the RPC's RETURNED count, never the
+  // pre-read state above. The RPC's 5-attempts/15-minutes constants mirror
+  // MAX_ATTEMPTS/LOCKOUT_MINUTES in _shared/lockout.ts (the validated source).
   async function recordFailure(): Promise<number> {
-    const next = nextFailureState(lockState, now)
-    await admin.from('pin_login_attempts').upsert({
-      discord_handle: discordHandle,
-      failed_count: next.failedCount,
-      locked_until: next.lockedUntil ? next.lockedUntil.toISOString() : null,
-      updated_at: now.toISOString(),
+    const { data: rpcRow, error: rpcErr } = await admin.rpc('record_pin_failure', {
+      p_handle: discordHandle,
     })
-    return Math.max(0, MAX_ATTEMPTS - next.failedCount)
+    if (rpcErr) throw new Error('record_pin_failure RPC failed')
+    const row = (Array.isArray(rpcRow) ? rpcRow[0] : rpcRow) as
+      | { o_failed_count: number | null; o_locked_until: string | null }
+      | null
+    if (!row) throw new Error('record_pin_failure RPC returned no row')
+    const failedCount = Number(row.o_failed_count ?? 0)
+    return Math.max(0, MAX_ATTEMPTS - failedCount)
   }
 
-  const invalidCredentials = async () =>
-    json({ error: 'invalid_credentials', attempts_remaining: await recordFailure() }, 401)
+  const invalidCredentials = async () => {
+    try {
+      const attemptsRemaining = await recordFailure()
+      return json({ error: 'invalid_credentials', attempts_remaining: attemptsRemaining }, 401)
+    } catch {
+      // Infra-side failure (RPC unavailable/failed): never burn the user's attempts.
+      return json({ error: 'server_error' }, 500)
+    }
+  }
 
   const { data: member } = await admin
     .from('members')
