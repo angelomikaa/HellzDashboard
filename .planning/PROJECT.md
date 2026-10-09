@@ -67,7 +67,7 @@ Each player can see, through their stat cards, exactly where they stand compared
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | OCR auto-read + manual fix-up (not pure manual typing) | Reduces input friction; screenshots are the source of truth | — Phase 1 spike: GO (222/222 fields, 100.0% on 11 real samples; device-fragmentation caveats documented) |
-| 3 screenshots per character (General, Quasi, Special) | Example shots beside input boxes; repeat 3x + fix failed OCR | — Phase 1: header "basic" screen added as 4th capture (job, nickname, combat power); reconcile in Phase 2 |
+| 3 screenshots per character (General, Quasi, Special) | Example shots beside input boxes; repeat 3x + fix failed OCR | — Phase 2: reconciled — combat_power entered manually on the wizard intro step (catalog stat), example shots rendered beside inputs, no screenshot storage at all (D-10 ratified); Phase 5 will OCR-fill on top |
 | Per-stat percentile points (top 1% = 99 pts) | EAFC Ultimate Team feel based on tops | — Pending |
 | Overall from 6 key stats, floor of 51 OVR | Normalization; overall never below 51 | — Pending |
 | Key stats admin-tweakable, exactly 6 per class | Flexibility; independent set per class | — Pending |
@@ -99,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-09 — Phase 1 closed out (UAT complete; 01-REVIEW-FIX hardened all critical+warning findings: atomic lockout RPC, session hardening, RLS active check, WR fixes). Phase 2 planned (3 plans, waves 1→2→3).*
+*Last updated: 2026-10-09 — Phase 2 complete (registry/catalog/data foundation live in thdxyxsjafimxgxpqs incl. column-level security + append-only create_submission RPC, admin Personagens UI, member submit wizard with mandatory review gate; owner UAT approved, verification 12/12 passed). Phase 3 (Rank Engine) next; advisory code-review findings in 02-REVIEW.md (2 criticals = hardening debt).*
