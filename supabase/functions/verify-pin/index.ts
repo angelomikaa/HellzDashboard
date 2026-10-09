@@ -21,6 +21,11 @@ const corsHeaders = {
 
 const SESSION_SECONDS = 7 * 24 * 60 * 60 // D-06: 7-day session
 
+// WR-01: bcrypt only runs on the wrong-PIN path, so the ~100ms latency gap is a
+// timing oracle for whether a handle exists in the whitelist. Missing/inactive
+// handles burn equal time with a dummy compare; the result is discarded.
+const DUMMY_HASH = '$2b$10$do3wEW4Kw.b6.cPViR4gful21a5LL997L3/TZ61hX.B0g/.7haOUO'
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -115,7 +120,12 @@ Deno.serve(async (req: Request) => {
     .eq('discord_handle', discordHandle)
     .maybeSingle()
 
-  if (!member || member.active === false) return await invalidCredentials()
+  // WR-01: equalize the timing of the missing/inactive path with the wrong-PIN
+  // path (dummy compare) so latency cannot enumerate handles (T-01-07).
+  if (!member || member.active === false) {
+    bcrypt.compareSync(pin, DUMMY_HASH) // burn equal time; discard result
+    return await invalidCredentials()
+  }
 
   if (!bcrypt.compareSync(pin, member.pin_hash)) return await invalidCredentials()
 
