@@ -38,3 +38,10 @@ $$;
 
 comment on function public.record_pin_failure(text) is
   'Atomic PIN failure counter (CR-01). Increments failed_count and locks after 5 failures for 15 minutes (D-07). Constants mirror supabase/functions/_shared/lockout.ts — keep in sync.';
+
+-- WR-04: bound the handle length at the DB level too (defense in depth — the
+-- function trims and bounds it, but the constraint covers any other writer).
+alter table members
+  add constraint members_discord_handle_len check (char_length(discord_handle) <= 64);
+alter table pin_login_attempts
+  add constraint pin_login_attempts_handle_len check (char_length(discord_handle) <= 64);

@@ -53,10 +53,12 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'invalid_request' }, 400)
   }
 
-  const discordHandle = body.discord_handle
+  // WR-04: trim + bound the handle server-side so whitespace variants and
+  // unbounded junk handles cannot fill the DB or desync the lockout key.
+  const handle = typeof discordHandle === 'string' ? discordHandle.trim() : ''
   const pin = body.pin
   if (
-    typeof discordHandle !== 'string' || discordHandle.length === 0 ||
+    handle.length === 0 || handle.length > 64 ||
     typeof pin !== 'string' || !/^\d{4}$/.test(pin)
   ) {
     return json({ error: 'invalid_request' }, 400)
@@ -76,7 +78,7 @@ Deno.serve(async (req: Request) => {
   const { data: attemptsRow, error: readErr } = await admin
     .from('pin_login_attempts')
     .select('failed_count, locked_until')
-    .eq('discord_handle', discordHandle)
+    .eq('discord_handle', handle)
     .maybeSingle()
   if (readErr) return json({ error: 'server_error' }, 500)
   const lockState = rowToState(attemptsRow)
@@ -96,7 +98,7 @@ Deno.serve(async (req: Request) => {
   // MAX_ATTEMPTS/LOCKOUT_MINUTES in _shared/lockout.ts (the validated source).
   async function recordFailure(): Promise<number> {
     const { data: rpcRow, error: rpcErr } = await admin.rpc('record_pin_failure', {
-      p_handle: discordHandle,
+      p_handle: handle,
     })
     if (rpcErr) throw new Error('record_pin_failure RPC failed')
     const row = (Array.isArray(rpcRow) ? rpcRow[0] : rpcRow) as
@@ -120,7 +122,7 @@ Deno.serve(async (req: Request) => {
   const { data: member, error: memberErr } = await admin
     .from('members')
     .select('id, display_name, role, pin_hash, active')
-    .eq('discord_handle', discordHandle)
+    .eq('discord_handle', handle)
     .maybeSingle()
   // WR-03: a failed member lookup is NOT "wrong credentials" — return 500
   // without recording a failure (recordFailure is never reached).
@@ -139,7 +141,7 @@ Deno.serve(async (req: Request) => {
   // would get a 200 while the counter stays incremented.
   const cleared = resetState()
   const { error: clearErr } = await admin.from('pin_login_attempts').upsert({
-    discord_handle: discordHandle,
+    discord_handle: handle,
     failed_count: cleared.failedCount,
     locked_until: null,
     updated_at: now.toISOString(),
