@@ -93,7 +93,7 @@ describe('session hardening against malformed input (CR-02)', () => {
   })
 
   it('test 8: loadSession rejects wrong member_role, empty access_token, and non-number expires_at', () => {
-    const badSessions: Record<string, unknown>[] = [
+    const badSessions: unknown[] = [
       { ...futureSession, member_role: 'admin' },
       { ...futureSession, access_token: '' },
       { ...futureSession, expires_at: 'soon' },
