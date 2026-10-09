@@ -11,13 +11,44 @@ export interface NeoFootSession {
 
 const STORAGE_KEY = 'nefoot_session'
 
+// CR-02: shape validation for anything that crosses the localStorage boundary.
+// A malformed 200 response or corrupted storage value must never poison the
+// session key or crash the app (loadSession runs during RequireAuth's render).
+export function isValidSession(s: unknown): s is NeoFootSession {
+  if (typeof s !== 'object' || s === null) return false
+  const t = s as Record<string, unknown>
+  return (
+    typeof t.access_token === 'string' && t.access_token.length > 0 &&
+    typeof t.member_id === 'string' && t.member_id.length > 0 &&
+    typeof t.display_name === 'string' && t.display_name.length > 0 &&
+    (t.member_role === 'member' || t.member_role === 'officer' || t.member_role === 'owner') &&
+    typeof t.expires_at === 'number' && Number.isFinite(t.expires_at)
+  )
+}
+
 export function saveSession(s: NeoFootSession): void {
+  // CR-02: never persist a malformed session (defense in depth — loadSession
+  // re-validates on read, but refusing the write keeps the key unpoisoned).
+  if (!isValidSession(s)) return
   localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
 }
 
 export function loadSession(): NeoFootSession | null {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  return raw ? (JSON.parse(raw) as NeoFootSession) : null
+  // CR-02: JSON.parse must never throw during render — a corrupted storage
+  // value (or the literal "undefined") self-heals by clearing the key.
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const s: unknown = JSON.parse(raw)
+    if (!isValidSession(s)) {
+      clearSession()
+      return null
+    }
+    return s
+  } catch {
+    clearSession()
+    return null
+  }
 }
 
 export function clearSession(): void {

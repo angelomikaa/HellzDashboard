@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react'
-import { saveSession, type NeoFootSession } from './session'
+import { isValidSession, saveSession, type NeoFootSession } from './session'
 
 type LoginStatus =
   | { kind: 'idle' }
@@ -45,9 +45,17 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
       })
 
       if (res.ok) {
-        const data: { session: NeoFootSession } = await res.json()
-        saveSession(data.session)
-        onLogin(data.session)
+        // CR-02: validate the 200 body's shape before saving — a malformed body
+        // (deploy glitch, proxy rewrite) is treated as NETWORK_ERROR instead of
+        // persisting garbage that would crash RequireAuth on the next load.
+        const data: unknown = await res.json().catch(() => null)
+        const session = (data as { session?: unknown } | null)?.session
+        if (!isValidSession(session)) {
+          setStatus({ kind: 'error', message: NETWORK_ERROR })
+          return
+        }
+        saveSession(session)
+        onLogin(session)
         return
       }
 

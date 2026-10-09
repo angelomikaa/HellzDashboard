@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   clearSession,
   isExpired,
+  isValidSession,
   loadSession,
   saveSession,
   type NeoFootSession,
@@ -60,5 +61,65 @@ describe('session helpers (D-06: 7-day localStorage session)', () => {
 
   it('test 4: loadSession returns null when nothing is stored', () => {
     expect(loadSession()).toBeNull()
+  })
+})
+
+// CR-02: malformed storage / invalid sessions must never crash the app and must
+// self-heal by clearing the poisoned key (loadSession runs during render).
+describe('session hardening against malformed input (CR-02)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', new MemoryStorage())
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('test 5: loadSession returns null and clears storage on corrupted JSON ("undefined")', () => {
+    localStorage.setItem('nefoot_session', 'undefined')
+    expect(loadSession()).toBeNull()
+    expect(localStorage.getItem('nefoot_session')).toBeNull()
+  })
+
+  it('test 6: loadSession returns null and clears storage on any unparseable JSON', () => {
+    localStorage.setItem('nefoot_session', '{not json')
+    expect(loadSession()).toBeNull()
+    expect(localStorage.getItem('nefoot_session')).toBeNull()
+  })
+
+  it('test 7: loadSession returns null and clears storage on a JSON object missing fields', () => {
+    localStorage.setItem('nefoot_session', JSON.stringify({ access_token: 'abc' }))
+    expect(loadSession()).toBeNull()
+    expect(localStorage.getItem('nefoot_session')).toBeNull()
+  })
+
+  it('test 8: loadSession rejects wrong member_role, empty access_token, and non-number expires_at', () => {
+    const badSessions: Record<string, unknown>[] = [
+      { ...futureSession, member_role: 'admin' },
+      { ...futureSession, access_token: '' },
+      { ...futureSession, expires_at: 'soon' },
+      { ...futureSession, member_id: 42 },
+      'just a string',
+      null,
+    ]
+    for (const s of badSessions) {
+      expect(isValidSession(s)).toBe(false)
+      localStorage.setItem('nefoot_session', JSON.stringify(s))
+      expect(loadSession()).toBeNull()
+      expect(localStorage.getItem('nefoot_session')).toBeNull()
+    }
+  })
+
+  it('test 9: saveSession ignores an invalid session (never poisons the key)', () => {
+    saveSession({ ...futureSession, member_role: 'admin' } as unknown as NeoFootSession)
+    saveSession(null as unknown as NeoFootSession)
+    expect(localStorage.getItem('nefoot_session')).toBeNull()
+    expect(loadSession()).toBeNull()
+  })
+
+  it('test 10: a valid session still loads after a poisoned key was self-healed', () => {
+    localStorage.setItem('nefoot_session', 'undefined')
+    expect(loadSession()).toBeNull()
+    saveSession(futureSession)
+    expect(loadSession()).toEqual(futureSession)
   })
 })
