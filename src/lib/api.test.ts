@@ -51,7 +51,9 @@ afterEach(() => {
 
 describe('REST client gateway contract (both headers, every call)', () => {
   it('sends apikey AND Authorization: Bearer <session.access_token> on every call', async () => {
-    nextResponse = () => res(200, '[]')
+    // fetchMe requires its own row; everything else accepts '[]' or the row body.
+    nextResponse = () =>
+      res(200, JSON.stringify([{ class_name: 'Assassin' }]))
     await fetchCatalog(session)
     await fetchClasses(session)
     await fetchMe(session)
