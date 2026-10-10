@@ -152,3 +152,49 @@ export async function fetchMySubmissions(session: NeoFootSession): Promise<Submi
   const res = await restFetch(session, '/submissions?select=id,status,submitted_at&order=submitted_at.desc')
   return (await parseBody<SubmissionRow[]>(res)) ?? []
 }
+
+export async function fetchKeyStats(session: NeoFootSession, className: string): Promise<string[]> {
+  // RLS: staff-only read (staff_select_key_stats, 0009) — a member JWT gets
+  // [] from the policy filter, which is NOT an error.
+  const res = await restFetch(
+    session,
+    `/class_key_stats?class_name=eq.${encodeURIComponent(className)}&select=stat_key`,
+  )
+  const rows = await parseBody<{ stat_key: string }[]>(res)
+  return (rows ?? []).map((r) => r.stat_key)
+}
+
+export async function setKeyStat(
+  session: NeoFootSession,
+  className: string,
+  statKey: string,
+  enabled: boolean,
+): Promise<number> {
+  // SECURITY DEFINER RPC (0009): staff-only gate is INSIDE the function
+  // (member_role claim + active flag) — 'forbidden' / 'key_stat_limit' /
+  // 'unknown_class' raise server-side. Returns the class's current count.
+  const res = await restFetch(session, '/rpc/set_key_stat', {
+    method: 'POST',
+    body: JSON.stringify({ p_class: className, p_stat_key: statKey, p_enabled: enabled }),
+  })
+  return parseBody<number>(res)
+}
+
+export interface ClassTop5Row {
+  display_name: string
+  char_function: 'tank' | 'dps'
+  ovr: number | null
+}
+
+export async function fetchClassTop5(
+  session: NeoFootSession,
+  className: string,
+): Promise<ClassTop5Row[]> {
+  // SECURITY DEFINER RPC (0009): staff-only gate is INSIDE the function —
+  // compute-on-read, so the preview reflects the current key-stat config.
+  const res = await restFetch(session, '/rpc/class_top5', {
+    method: 'POST',
+    body: JSON.stringify({ p_class: className }),
+  })
+  return (await parseBody<ClassTop5Row[]>(res)) ?? []
+}
