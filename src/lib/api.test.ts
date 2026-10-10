@@ -6,9 +6,12 @@ import {
   createSubmission,
   fetchCatalog,
   fetchClasses,
+  fetchClassTop5,
+  fetchKeyStats,
   fetchMe,
   fetchMembers,
   fetchMySubmissions,
+  setKeyStat,
   updateCharacter,
 } from './api'
 
@@ -135,5 +138,88 @@ describe('REST client error handling', () => {
     const err = await fetchMembers(session).catch((e) => e)
     expect(err).toBeInstanceOf(ApiError)
     expect(err.kind).toBe('network')
+  })
+})
+
+// Plan 03-04 task 1: client wrappers for the three 03-03 rank-engine
+// endpoints. Contracts are the LIVE 0009 RPC shapes — exact param names
+// (p_class/p_stat_key/p_enabled), and the staff-only REST read on
+// class_key_stats (staff_select_key_stats policy; a member JWT simply gets
+// [] from RLS, which is NOT an error).
+describe('rank engine client functions (03-03 RPC contracts)', () => {
+  it('fetchKeyStats reads class_key_stats with the encoded class filter and maps to string[]', async () => {
+    nextResponse = () => res(200, JSON.stringify([{ stat_key: 'crit' }, { stat_key: 'atk' }]))
+    const keys = await fetchKeyStats(session, 'Assassin')
+    expect(calls[0].url).toBe(
+      'https://test-project.supabase.co/rest/v1/class_key_stats?class_name=eq.Assassin&select=stat_key',
+    )
+    expect(calls[0].init.method).toBeUndefined() // GET
+    expect(keys).toEqual(['crit', 'atk'])
+  })
+
+  it('fetchKeyStats URL-encodes the class name (interpolation hardening)', async () => {
+    nextResponse = () => res(200, '[]')
+    await fetchKeyStats(session, 'Soul Fighter') // space must not break the filter
+    expect(calls[0].url).toContain(
+      'class_key_stats?class_name=eq.Soul%20Fighter&select=stat_key',
+    )
+  })
+
+  it('fetchKeyStats maps an RLS-empty member response to [] without throwing', async () => {
+    nextResponse = () => res(200, '[]')
+    await expect(fetchKeyStats(session, 'Assassin')).resolves.toEqual([])
+  })
+
+  it('setKeyStat posts the exact RPC param names and unwraps the returned count', async () => {
+    nextResponse = () => res(200, JSON.stringify(4))
+    const count = await setKeyStat(session, 'Assassin', 'crit', true)
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/set_key_stat')
+    expect(calls[0].init.method).toBe('POST')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      p_class: 'Assassin',
+      p_stat_key: 'crit',
+      p_enabled: true,
+    })
+    expect(count).toBe(4)
+  })
+
+  it('setKeyStat sends p_enabled false for a removal', async () => {
+    nextResponse = () => res(200, JSON.stringify(5))
+    await setKeyStat(session, 'Assassin', 'crit', false)
+    expect(JSON.parse(calls[0].init.body as string).p_enabled).toBe(false)
+  })
+
+  it('fetchClassTop5 posts p_class and returns the row shape', async () => {
+    const rows = [
+      { display_name: 'Alpha', char_function: 'dps', ovr: 87 },
+      { display_name: 'Beta', char_function: 'tank', ovr: null },
+    ]
+    nextResponse = () => res(200, JSON.stringify(rows))
+    const top5 = await fetchClassTop5(session, 'Assassin')
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/class_top5')
+    expect(calls[0].init.method).toBe('POST')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ p_class: 'Assassin' })
+    expect(top5).toEqual(rows)
+  })
+
+  it('surfaces a 400 key_stat_limit as ApiError kind server with the marker in the message', async () => {
+    nextResponse = () => res(400, 'key_stat_limit')
+    const err = await setKeyStat(session, 'Assassin', 'seventh', true).catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err.status).toBe(400)
+    expect(err.kind).toBe('server')
+    expect(err.message).toContain('key_stat_limit')
+  })
+
+  it('sends both gateway headers on every rank-engine call', async () => {
+    nextResponse = () => res(200, '[]')
+    await fetchKeyStats(session, 'Assassin')
+    await setKeyStat(session, 'Assassin', 'crit', true)
+    await fetchClassTop5(session, 'Assassin')
+    for (const call of calls) {
+      const headers = call.init.headers as Record<string, string>
+      expect(headers.apikey).toBe('test-anon-key')
+      expect(headers.Authorization).toBe('Bearer test-token')
+    }
   })
 })
