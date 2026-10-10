@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { clearSession } from './features/auth/session'
 import { RequireAuth } from './features/auth/RequireAuth'
 import { CharactersPage } from './features/admin/CharactersPage'
+import { KeyStatsPage } from './features/admin/KeyStatsPage'
 import { SubmitPage } from './features/submit/SubmitPage'
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
@@ -10,7 +11,7 @@ const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   owner: 'Proprietário',
 }
 
-type Tab = 'painel' | 'submit' | 'characters'
+type Tab = 'painel' | 'submit' | 'characters' | 'keystats'
 
 function App() {
   const [tab, setTab] = useState<Tab>('painel')
@@ -33,6 +34,11 @@ function App() {
         const isStaff =
           session.member_role === 'officer' || session.member_role === 'owner'
         const showCharacters = tab === 'characters' && isStaff
+        // Stats-Chave (03-04): same pattern — UX-only tab gating with a
+        // content-level re-check. Enforcement is the staff RLS policy + the
+        // internal gates in the 0009 RPCs; a member session never receives
+        // key-stat data even if a staff tab lingers across logout/login.
+        const showKeyStats = tab === 'keystats' && isStaff
         // Enviar Status is for EVERY role (members submit their own stats).
         const showSubmit = tab === 'submit'
 
@@ -87,12 +93,26 @@ function App() {
                     Personagens
                   </button>
                 )}
+                {isStaff && (
+                  <button
+                    type="button"
+                    onClick={() => setTab('keystats')}
+                    aria-current={showKeyStats ? 'page' : undefined}
+                    className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      showKeyStats ? 'border-accent text-content' : 'border-transparent text-muted'
+                    }`}
+                  >
+                    Stats-Chave
+                  </button>
+                )}
               </div>
             </nav>
             <main className="flex-1">
               <div className="mx-auto w-full max-w-3xl px-4 py-6">
                 {showCharacters ? (
                   <CharactersPage session={session} />
+                ) : showKeyStats ? (
+                  <KeyStatsPage session={session} />
                 ) : showSubmit ? (
                   <SubmitPage session={session} />
                 ) : (
