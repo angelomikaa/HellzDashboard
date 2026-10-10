@@ -37,9 +37,9 @@ Declared values (all multiples of 4 — Tailwind's 4px base):
 
 | Token | Value | Usage in this phase |
 |-------|-------|---------------------|
-| xs | 4px | Icon/badge gaps, legend dot gaps (`gap-1`) |
-| sm | 8px | Legend line spacing, hero→legend gap (`mt-2`), inline chip padding (`px-2 py-0.5`) |
-| md | 16px | Stat-card padding (`p-4`), grid gaps (`gap-4`), strip item padding |
+| xs | 4px | Icon/badge gaps, legend dot gaps (`gap-1`), badge/chip vertical padding (`py-1`) |
+| sm | 8px | Legend line spacing, hero→legend gap (`mt-2`), inline chip horizontal padding (`px-2`) |
+| md | 16px | Stat-card padding (`p-4`), grid gaps (`gap-4`), strip container padding (`p-4`) |
 | lg | 24px | Section separation (`mt-6`), OVR hero padding (`p-6`), empty-state block |
 | xl | 32px | Empty-state vertical padding (`py-8`) |
 | 2xl | 48px | Not used this phase (reserved) |
@@ -47,6 +47,7 @@ Declared values (all multiples of 4 — Tailwind's 4px base):
 
 **Exceptions (declared):**
 - **44px touch targets** (`h-11`) on every interactive element: collapse group headers, "Foco de melhoria" strip items, empty-state CTA — matches the existing App nav / buttons / selects pattern (mobile-first: Ragnarok Origin players are on phones).
+- **12px horizontal padding** (`px-3`) on FocusStrip items — matches the shipped `h-11` control pattern (App.tsx nav buttons, selects, list rows all use `px-3`; only filled CTAs use `px-4`). 12px is a multiple of 4 but sits off the declared scale steps; kept for consistency with the established design system.
 - 12px legend color dots (`h-3 w-3`) — decorative, not interactive.
 
 The dashboard renders inside App's existing `max-w-3xl px-4 py-6` main wrapper (src/App.tsx line 111) — no new page-level spacing is introduced.
@@ -102,7 +103,7 @@ Exactly 4 sizes, 2 weights. All map to existing Tailwind classes used across shi
 | Gold | `tier-gold` | `#E9B44C` | Ouro |
 | Platinum | `tier-platinum` | `#D7E3F0` | Platina |
 
-**Contrast (verified):** all four tier colors pass WCAG AA on `bg-surface` for `font-semibold` 14px+ text (bronze ≈4.9:1, the rest ≥7:1); muted `#8B949E` on surface ≈5.5:1. No contrast exceptions needed.
+**Contrast (verified):** all four tier colors pass WCAG AA on `bg-surface` for `font-semibold` 14px+ text (bronze ≈4.56:1 — clears the 4.5:1 AA floor with a thin ~0.06 margin, hence the locked `font-semibold` rule for tier-colored text; the rest ≥7:1); muted `#8B949E` on surface ≈5.5:1. No contrast exceptions needed.
 
 ---
 
@@ -157,7 +158,7 @@ All strings are final pt-BR copy. Error copy is **enumeration-safe** — raw ser
 | OVR hero insufficient — no class set | Slot: `—` + line: Sem classe definida — peça a um oficial para registrar sua classe e função. (hero class line shows `—`) |
 | Improvement strip heading | Foco de melhoria |
 | Tier legend | Bronze · Prata · Ouro · Platina |
-| Value type tag (D-08) | `FLAT` or `PERCENTUAL` — uppercase `text-xs text-muted` tag beside the label |
+| Value type tag (D-08) | `FLAT` or `PERCENTUAL` — uppercase `text-sm text-muted` tag beside the label |
 | Destructive confirmation | none — this phase is a read-only dashboard; no destructive actions exist |
 
 **Phrase banding formula (discretion resolved — prescriptive):** with `p` = points (0–99, unrounded from RPC):
@@ -266,15 +267,15 @@ Function label via `FUNCTION_LABELS` (`dps → DPS`, `tank → Tank`); class ren
 
 ```
 ┌─ border rounded-lg bg-surface p-4 ──(border-tier-X)─┐
-│ CRIT                    [PERCENTUAL]                 │  text-sm label · text-xs muted tag
-│ 1.234                    [72]                        │  text-xl/600 value · tier badge (px-2 py-0.5, text-sm/600, border+text tier color)
+│ CRIT                    [PERCENTUAL]                 │  text-sm label · text-sm muted tag
+│ 1.234                    [72]                        │  text-xl/600 value · tier badge (px-2 py-1, text-sm/600, border+text tier color)
 │ Você está entre os 20% melhores em CRIT.            │  text-sm text-muted (phrase, own label)
 │ Média: 1.234 · Melhor: 9.876                         │  text-sm text-muted (D-12)
 └──────────────────────────────────────────────────────┘
 ```
 
 - Card border: `border` (1px) tier-colored when points exist; the hero gets the heavier `border-2` metallic emphasis (discretion: weight hierarchy, not decoration).
-- Points badge = tier-colored **border + text** on surface (e.g. `rounded-full border border-tier-gold px-2 py-0.5 text-sm font-semibold text-tier-gold`) — no filled tier backgrounds (fills would break the 60/30/10 balance across 57 cards).
+- Points badge = tier-colored **border + text** on surface (e.g. `rounded-full border border-tier-gold px-2 py-1 text-sm font-semibold text-tier-gold`) — no filled tier backgrounds (fills would break the 60/30/10 balance across 57 cards).
 
 ### FocusStrip (D-16 — the improvement loop)
 
@@ -298,7 +299,7 @@ Function label via `FUNCTION_LABELS` (`dps → DPS`, `tank → Tank`); class ren
 | Empty — no submission | every `stat.own_value === null` | Empty-state card (heading + body + **Enviar Status** CTA → `onNavigate('submit')`). Nothing else renders (D-13) |
 | Success | report loaded, ≥1 own value | Hero + legend + strip (if eligible) + 57 cards |
 | Sem registro (D-14) | `own_value === null`, player has other values | Card stays in place, whole card `opacity-60`; value slot shows **Sem registro** (`text-base text-muted`); no badge, no phrase; Média/Melhor still render |
-| Dados insuficientes (D-15) | `own_value !== null && data_sufficient === false` | Card normal but `border-line`; own value + Média/Melhor render (values are never omitted — 03-CONTEXT D-13); badge slot → muted chip **Dados insuficientes** (`rounded-full border border-line px-2 py-0.5 text-sm text-muted`); no phrase |
+| Dados insuficientes (D-15) | `own_value !== null && data_sufficient === false` | Card normal but `border-line`; own value + Média/Melhor render (values are never omitted — 03-CONTEXT D-13); badge slot → muted chip **Dados insuficientes** (`rounded-full border border-line px-2 py-1 text-sm text-muted`); no phrase |
 | OVR insufficient (D-07/D-15) | `ovr.data_sufficient === false` | Hero `border-line`, `—` slot + explanation line (copy table) |
 | No class set | `char_class === null` | Hero class line `—` + "Sem classe definida" explanation; cards render own values with `Média: — · Melhor: —` (57-card shape stays stable) |
 
