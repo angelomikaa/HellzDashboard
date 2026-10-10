@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 3 context gathered
-last_updated: "2026-10-10T02:51:39.598Z"
-last_activity: 2026-10-10 -- Phase 03 execution started
+stopped_at: Completed 03-01-PLAN.md (rank math spec RED/GREEN)
+last_updated: "2026-10-10T03:08:45.147Z"
+last_activity: 2026-10-10
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 11
-  completed_plans: 7
-  percent: 64
+  completed_plans: 8
+  percent: 73
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 03 (rank-engine) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 03
-Last activity: 2026-10-10 -- Phase 03 execution started
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-10-10
 
-Progress: [██████████] 100%
+Progress: [███████░░░] 73%
 
 ## Performance Metrics
 
@@ -58,6 +58,8 @@ Progress: [██████████] 100%
 
 - Last 4 plans: 01-03 (38min), 02-01 (33min), 02-02 (20min), 02-03 (2h07min wall — active execution ~30min; remainder was the owner UAT checkpoint wait)
 - Trend: execution remains fast (02-03 active work ≈30min); plan-level wall time inflated only by the deliberate owner-verification checkpoint
+
+| Phase 03 P01 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -92,6 +94,8 @@ Recent decisions affecting current work:
 - [Phase 02-03]: Owner UAT APPROVED — steps 1–5 and 8 walked in a real browser; steps 6–7 (DevTools leak-check, direct-abuse select=*) were NOT manually performed (owner didn't know how) and are dispositioned as covered-by-automated-evidence: 02-01 live smoke matrix (select=* fails permission-denied, pin_hash ungranted, no client-visible pin_hash) + 02-03 no-upload grep gate
 - [Phase 02-03]: The 5 planner-discretion calls (02-RESEARCH §6) are RATIFIED by the owner's UAT approval: no server-side screenshot storage (D-10), char_function tank/dps only, General+Quasi required / Especial optional, pt-BR short-form catalog labels, combat_power as a manual intro-step input
 - [Phase 02-03]: Example shots ship as placeholder SVGs in git (public/examples/*.svg); owner acknowledged and replaces them with real screenshots pre-launch (own call whether the real files enter git)
+- [Phase 03-01]: Tie handling CONFIRMED as average-rank semantics (03-CONTEXT discretion resolved) — tied players get the average of their occupied positions' points; locked by worked examples 74.25 (top-tie of 3), 49.5 (mid-tie of 4), 49.5 (all-tied)
+- [Phase 03-01]: rankMath.ts is the executable SPEC only — production rank truth stays in Postgres RPCs (03-03), no UI may import it to compute points; RNK-03/04/05 stay Pending until the live RPC smoke matrix passes (AUTH-01/01-01 precedent)
 
 ### Pending Todos
 
@@ -105,7 +109,6 @@ None yet.
 - ~~[Phase 1 → live deploy]: Push migrations 0003 (lockout RPC + handle length constraints) and 0004 (RLS active checks) to the live project~~ CLEARED 02-01 (2026-10-09): 0003/0004 pushed live together with 0005/0006 via `db push`. REMAINING: redeploy verify-pin — ⚠ BLOCKED: local `verify-pin/index.ts` line 58 references undefined `discordHandle` (would 500 every login once deployed — fix first, see 02 deferred-items.md); then confirm CR-01 atomicity live (parallel wrong-PIN requests → monotonic counter, lock at 5) — see 01-REVIEW-FIX.md
 - ~~[Phase 2]: Storage policy nuance resolved in planning (02-RESEARCH §3.1): no server-side screenshot storage at all (D-10) — awaiting owner ratification with the other discretion calls~~ RATIFIED 02-03 (2026-10-09): owner approved the walked flow with zero upload paths; all 5 discretion calls ratified (see Decisions)
 - [Pre-launch]: Owner must replace public/examples/*.svg placeholder example shots with real game screenshots (acknowledged at 02-03 UAT step 8) before inviting real members
-- [Phase 3]: Percentile formula spec (rank-based, tie handling, insufficient-data states) must be written and unit-tested before UI shows points
 - [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need production-data calibration — spike delivered GO (100.0% on 11 owner-device samples) but device fragmentation is NOT covered; region maps are game-UI-versioned (re-run spike to recalibrate); dual-polarity read and manual fix-up are mandatory
 
 ## Deferred Items
@@ -118,9 +121,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-10T01:40:56.834Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-rank-engine/03-CONTEXT.md
+Last session: 2026-10-10T03:08:19.917Z
+Stopped at: Completed 03-01-PLAN.md (rank math spec RED/GREEN)
+Resume file: None
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*
