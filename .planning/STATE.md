@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: 03-04 checkpoint — owner browser verification of Stats-Chave page (tasks 1-2 committed, dev server running on :5173)
-last_updated: "2026-10-10T06:05:00.000Z"
+status: verifying
+stopped_at: "03-04 COMPLETE — owner UAT approved; Ahrya cleaned from live DB; owner-only-class todo recorded; RNK-01/RNK-02 marked complete; phase ready for orchestrator verification"
+last_updated: "2026-10-10T08:05:00.000Z"
 last_activity: 2026-10-10
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 11
-  completed_plans: 10
-  percent: 91
+  completed_plans: 11
+  percent: 100
 ---
 
 # Project State
@@ -27,18 +27,18 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 
 Phase: 03 (rank-engine) — EXECUTING
 Plan: 4 of 4
-Status: Awaiting owner browser verification (03-04 task 3 checkpoint — human-verify, blocking)
+Status: Phase complete — ready for verification
 Last activity: 2026-10-10
 
-Progress: [█████████░] 91%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 14
-- Average duration: 41min
-- Total execution time: 455min (7h35m)
+- Total plans completed: 15
+- Average duration: 36min
+- Total execution time: 535min (8h55m)
 
 **By Phase:**
 
@@ -62,6 +62,7 @@ Progress: [█████████░] 91%
 | Phase 03 P01 | 8min | 2 tasks | 2 files |
 | Phase 03 P02 | 55min | 2 tasks | 4 files |
 | Phase 03 P03 | 37min | 3 tasks | 2 files |
+| Phase 03 P04 | 1h20min wall (active ~25min; rest was owner UAT wait) | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -106,10 +107,13 @@ Recent decisions affecting current work:
 - [Phase 03-03]: RNK-03/04/05 marked complete (live exact-value proof); RNK-01/RNK-02 stay Pending by traceability — server-side enforcement live-proven, completion in 03-04 (admin toggle UI + UI-side leak-proof), REG-02 precedent
 - [Phase 03-04]: KeyStatsPage group headings use the wizard's real labels (Geral/Quasi/Especial) — the plan's parenthetical ("General/Quasi-Stats/Especial") contradicted its own binding instruction to match the wizard's group headings; wizard consistency wins (D-04 mirrors the wizard)
 - [Phase 03-04]: api.ts wrappers + Stats-Chave page committed (81c47f3, 0e818c2); awaiting owner browser walk (5 checkpoint steps) before SUMMARY + plan completion
+- [Phase 03-04]: Owner UAT APPROVED all 5 Stats-Chave checkpoint steps in a real browser — RNK-01 end-to-end TRUE; RNK-01/RNK-02 marked complete (server side 03-03, UI side 03-04)
+- [Phase 03-04]: Stray class "Ahrya" (accidentally created by the owner while exploring the Personagens tab during UAT) removed from the live DB via direct SQL through the Management API database/query endpoint (legacy /v1) — data hygiene, not a feature; no UI delete path added; zero FK dependents and zero orphaned class_key_stats rows verified before/after
+- [Phase 03-04]: Owner directive from UAT — adding new classes is a STRUCTURAL change and must be owner-only (officers must never be able to add classes); recorded as pending todo .planning/todos/pending/owner-only-class-management.md for a future phase (server-side policy change + UI gating), NOT implemented in Phase 3
 
 ### Pending Todos
 
-None yet.
+- [owner-only-class-management](todos/pending/owner-only-class-management.md) — restrict class creation to the owner handle only (officers must not add classes — structural change); sourced from the 03-04 owner UAT; planner to place in a future phase
 
 ### Blockers/Concerns
 
@@ -132,9 +136,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-10T06:05:00.000Z
-Stopped at: 03-04 task 3 checkpoint (human-verify) — tasks 1-2 committed; owner must walk the Stats-Chave page at http://localhost:5173 (vite dev already running); reply "approved" or describe issues
-Resume file: .planning/phases/03-rank-engine/03-04-PLAN.md (task 3)
+Last session: 2026-10-10 (03-04 owner UAT approved + live-DB cleanup + plan closed)
+Stopped at: 03-04 COMPLETE — owner approved the Stats-Chave page; "Ahrya" cleaned from live DB; owner-only-class-management recorded as a pending todo; RNK-01/RNK-02 marked complete. Phase 3 ready for /gsd-verify-work (orchestrator owns it).
+Resume file: None
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*

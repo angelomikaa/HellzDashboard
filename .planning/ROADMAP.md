@@ -12,7 +12,7 @@ NeoFoot delivers the core loop — register → submit → see standing → impr
 
 - [x] **Phase 1: Foundation — Secure Access & Data Model** - Supabase schema + RLS, per-player PIN auth, project scaffolding, OCR feasibility spike (completed 2026-10-09)
 - [x] **Phase 2: Registry, Catalog & Manual Data Ingestion** - Character registry, stat catalog, guided 3-screenshot upload with manual entry + fix-up gate (completed 2026-10-09)
-- [ ] **Phase 3: Rank Engine** - Postgres RPCs: per-stat percentile (top 1% = 99 pts) + OVR from 6 hidden key stats, floor 51
+- [x] **Phase 3: Rank Engine** - Postgres RPCs: per-stat percentile (top 1% = 99 pts) + OVR from 6 hidden key stats, floor 51 (completed 2026-10-10)
 - [ ] **Phase 4: Member Dashboard & Improvement Screen** - Mobile-first stat cards (bronze→platinum), per-stat comparison, aggregates-only privacy
 - [ ] **Phase 5: OCR Auto-Read Layer** - Tesseract.js client-side pre-fill bolted onto the working submit wizard, mandatory review retained
 - [ ] **Phase 6: Trust & Celebration — Officer Tools & Promotion Page** - Officer validation queue, role management, EAFC-style promotion page
@@ -79,7 +79,7 @@ Plans:
 - [x] 03-01-PLAN.md — Rank math executable spec: percentilePoints + ovrFromPoints pure functions with worked-example unit tests, TDD (RNK-03/04/05 formula; tie handling via average ranks confirmed, D-09/D-10/D-11/D-12)
 - [x] 03-02-PLAN.md — Hardening debt folded in by owner decision: 0007 staff active-check migration (D-14/CR-01) + verify-pin line-58 fix + redeploy + live smoke reconcile with deactivated-staff probe (D-15/CR-02)
 - [x] 03-03-PLAN.md — Migration 0008: set_key_stat (block-at-7, advisory lock), my_report, class_top5 SECURITY DEFINER RPCs + staff read policy on class_key_stats + live deploy + exact-value rank smoke matrix (RNK-01…05 server enforcement)
-- [ ] 03-04-PLAN.md — Key-stat admin page: Stats-Chave staff tab, class selector, grouped 57-stat chips, n/6 counter, top-5-by-OVR preview (RNK-01/02 UI) — ends with owner browser checkpoint
+- [x] 03-04-PLAN.md — Key-stat admin page: Stats-Chave staff tab, class selector, grouped 57-stat chips, n/6 counter, top-5-by-OVR preview (RNK-01/02 UI) — ends with owner browser checkpoint
 
 ### Phase 4: Member Dashboard & Improvement Screen
 **Goal**: Each player sees, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards. (Core value delivered here.)
@@ -124,7 +124,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. Foundation — Secure Access & Data Model | 4/4 | Complete    | 2026-10-09 |
 | 2. Registry, Catalog & Manual Data Ingestion | 3/3 | Complete    | 2026-10-09 |
-| 3. Rank Engine | 2/4 | In Progress|  |
+| 3. Rank Engine | 4/4 | Complete   | 2026-10-10 |
 | 4. Member Dashboard & Improvement Screen | 0/2 | Not started | - |
 | 5. OCR Auto-Read Layer | 0/2 | Not started | - |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | 0/2 | Not started | - |
@@ -145,11 +145,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | INPT-02 | Phase 5 | Pending |
 | INPT-03 | Phase 2 | Complete (02-03: 3-checkbox review gate, Enviar disabled until confirmed, server re-validates via create_submission RPC — owner browser-verified) |
 | INPT-04 | Phase 2 | Complete (02-01: append-only storage + atomic create_submission RPC live-proven; 02-03: owner browser-verified two-row history, both Aguarda validação) |
-| RNK-01 | Phase 3 | Pending |
-| RNK-02 | Phase 3 | Pending |
-| RNK-03 | Phase 3 | Pending |
-| RNK-04 | Phase 3 | Pending |
-| RNK-05 | Phase 3 | Pending |
+| RNK-01 | Phase 3 | Complete (03-03: server-side RPC/RLS enforcement, live smoke; 03-04: admin toggle UI, owner browser-approved) |
+| RNK-02 | Phase 3 | Complete (03-03: live leak-probes; 03-04: UX gate + content re-check on the UI side) |
+| RNK-03 | Phase 3 | Complete (03-01 formula spec + 03-03 live exact-value proof) |
+| RNK-04 | Phase 3 | Complete (03-01 formula spec + 03-03 live exact-value proof) |
+| RNK-05 | Phase 3 | Complete (03-01 formula spec + 03-03 live exact-value proof) |
 | CMP-01 | Phase 4 | Pending |
 | CMP-02 | Phase 4 | Pending |
 | CMP-03 | Phase 4 | Pending |
