@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-02-PLAN.md (0007+0008 live, verify-pin redeployed, smoke 15/15 PASSED)
-last_updated: "2026-10-10T05:51:15.197Z"
+stopped_at: 03-04 checkpoint — owner browser verification of Stats-Chave page (tasks 1-2 committed, dev server running on :5173)
+last_updated: "2026-10-10T06:05:00.000Z"
 last_activity: 2026-10-10
 progress:
   total_phases: 6
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 
 Phase: 03 (rank-engine) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Awaiting owner browser verification (03-04 task 3 checkpoint — human-verify, blocking)
 Last activity: 2026-10-10
 
 Progress: [█████████░] 91%
@@ -104,6 +104,8 @@ Recent decisions affecting current work:
 - [Phase 03-03]: Rank engine live (0009 — plan said 0008, taken by 03-02): set_key_stat (advisory-lock block-at-7), my_report, class_top5 all SECURITY DEFINER with member_role+active gates; RANK SMOKE PASSED 27/27 exact-value on first run + second consecutive run (no residue); RLS regression 19/19 green
 - [Phase 03-03]: Plan's rank fixture was internally contradictory — 74.25 is the locked tie-at-TOP value; sp fixture corrected to {80,80,50} so a/b tie at top and c's OVR is 87 (mean 74.25), not 95; a's live point vector equals the rankMath.test.ts OVR-61 vector [0,74.25,0,49.5,0,0] exactly; SQL and TS spec now provably agree to the decimal
 - [Phase 03-03]: RNK-03/04/05 marked complete (live exact-value proof); RNK-01/RNK-02 stay Pending by traceability — server-side enforcement live-proven, completion in 03-04 (admin toggle UI + UI-side leak-proof), REG-02 precedent
+- [Phase 03-04]: KeyStatsPage group headings use the wizard's real labels (Geral/Quasi/Especial) — the plan's parenthetical ("General/Quasi-Stats/Especial") contradicted its own binding instruction to match the wizard's group headings; wizard consistency wins (D-04 mirrors the wizard)
+- [Phase 03-04]: api.ts wrappers + Stats-Chave page committed (81c47f3, 0e818c2); awaiting owner browser walk (5 checkpoint steps) before SUMMARY + plan completion
 
 ### Pending Todos
 
@@ -130,9 +132,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-10T05:51:01.795Z
-Stopped at: Completed 03-02-PLAN.md (0007+0008 live, verify-pin redeployed, smoke 15/15 PASSED)
-Resume file: None
+Last session: 2026-10-10T06:05:00.000Z
+Stopped at: 03-04 task 3 checkpoint (human-verify) — tasks 1-2 committed; owner must walk the Stats-Chave page at http://localhost:5173 (vite dev already running); reply "approved" or describe issues
+Resume file: .planning/phases/03-rank-engine/03-04-PLAN.md (task 3)
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*
