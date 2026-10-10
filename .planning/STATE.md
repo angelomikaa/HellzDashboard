@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 03-01-PLAN.md (rank math spec RED/GREEN)
-last_updated: "2026-10-10T03:08:45.147Z"
+last_updated: "2026-10-10T03:27:16.406Z"
 last_activity: 2026-10-10
 progress:
   total_phases: 6
@@ -110,6 +110,7 @@ None yet.
 - ~~[Phase 2]: Storage policy nuance resolved in planning (02-RESEARCH §3.1): no server-side screenshot storage at all (D-10) — awaiting owner ratification with the other discretion calls~~ RATIFIED 02-03 (2026-10-09): owner approved the walked flow with zero upload paths; all 5 discretion calls ratified (see Decisions)
 - [Pre-launch]: Owner must replace public/examples/*.svg placeholder example shots with real game screenshots (acknowledged at 02-03 UAT step 8) before inviting real members
 - [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need production-data calibration — spike delivered GO (100.0% on 11 owner-device samples) but device fragmentation is NOT covered; region maps are game-UI-versioned (re-run spike to recalibrate); dual-polarity read and manual fix-up are mandatory
+- [Phase 3 / 03-02]: Task 2 Step B (deploy 0007 + verify-pin, live smoke) BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env — owner must supply as session env var ONLY (never file/commit/echo; rotate after use). Project ref thdxyxsjafimxgxpmpqs (from project URL).
 
 ## Deferred Items
 
@@ -121,8 +122,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-10T03:08:19.917Z
-Stopped at: Completed 03-01-PLAN.md (rank math spec RED/GREEN)
+Last session: 2026-10-10T03:26:29.022Z
+Stopped at: 03-02 checkpoint — task 1 done (0007 + verify-pin fix, 159ff2c), smoke probe done (2fa227d); task 2 Step B deploy blocked on SUPABASE_ACCESS_TOKEN (auth gate)
 Resume file: None
 
 ---
