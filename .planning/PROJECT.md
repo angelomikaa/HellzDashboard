@@ -99,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-09 — Phase 2 complete (registry/catalog/data foundation live in thdxyxsjafimxgxpqs incl. column-level security + append-only create_submission RPC, admin Personagens UI, member submit wizard with mandatory review gate; owner UAT approved, verification 12/12 passed). Phase 3 (Rank Engine) next; advisory code-review findings in 02-REVIEW.md (2 criticals = hardening debt).*
+*Last updated: 2026-10-10 — Phase 3 complete (rank engine live in Postgres: set_key_stat/my_report/class_top5 SECURITY DEFINER RPCs, migration 0009; rank math spec + 101-test local suite; staff Stats-Chave admin page owner-UAT-approved; 02-REVIEW hardening debt cleared via 0007/0008 with live RLS smoke 19/19 incl. deactivated-staff probe; RANK smoke 27 checks ×2 with exact-value fixtures). Verification 4/4 success criteria passed. Advisory code-review findings in 03-REVIEW.md (0 criticals). Phase 4 (Member Dashboard & Improvement Screen) next — cards are pure presentations of my_report.*
