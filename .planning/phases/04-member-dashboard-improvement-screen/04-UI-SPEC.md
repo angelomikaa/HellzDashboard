@@ -1,7 +1,8 @@
 ---
 phase: 4
 slug: member-dashboard-improvement-screen
-status: draft
+status: approved
+reviewed_at: 2026-10-10
 shadcn_initialized: false
 preset: none
 created: 2026-10-10
@@ -103,7 +104,7 @@ Exactly 4 sizes, 2 weights. All map to existing Tailwind classes used across shi
 | Gold | `tier-gold` | `#E9B44C` | Ouro |
 | Platinum | `tier-platinum` | `#D7E3F0` | Platina |
 
-**Contrast (verified):** all four tier colors pass WCAG AA on `bg-surface` for `font-semibold` 14px+ text (bronze ≈4.56:1 — clears the 4.5:1 AA floor with a thin ~0.06 margin, hence the locked `font-semibold` rule for tier-colored text; the rest ≥7:1); muted `#8B949E` on surface ≈5.5:1. No contrast exceptions needed.
+**Contrast (accepted exceptions, recorded honestly):** actual WCAG ratios on `bg-surface`: bronze `#B87333` ≈**2.98:1** (bronze's own luminance caps it at 3.01:1 even against black — it cannot reach AA for text), muted `#8B949E` ≈**3.53:1** (a pre-existing project-wide pattern this phase inherits), silver ≈7.71:1, gold ≈7.83:1, platinum ≈13.45:1. **Accepted exception:** bronze and muted are used for badge/chip/caption text whose meaning is triply redundant (inline legend + numeric points badge + percentile phrase, per Accessibility), so the tier signal survives even where the color's contrast is weak. Do NOT cite font weight as an AA justification for these two colors. If bronze text is ever used outside the redundant-badge context, introduce a lightened bronze tint first.
 
 ---
 
@@ -257,7 +258,7 @@ Page structure, top → bottom (all inside App's existing `max-w-3xl` wrapper):
 ┌─ border-2 border-tier-X rounded-lg bg-surface p-6 ─────────┐
 │ OVR                                  (text-sm text-muted)   │
 │ 87                    (text-5xl font-semibold text-tier-X)  │
-│ Nome do Jogor         (text-xl font-semibold text-content)  │
+│ Nome do Jogador        (text-xl font-semibold text-content)  │
 │ Assassino · DPS       (text-sm text-muted)                 │
 └─────────────────────────────────────────────────────────────┘
 ```
