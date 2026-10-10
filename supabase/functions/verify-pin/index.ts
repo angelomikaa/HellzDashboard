@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
 
   // WR-04: trim + bound the handle server-side so whitespace variants and
   // unbounded junk handles cannot fill the DB or desync the lockout key.
-  const handle = typeof discordHandle === 'string' ? discordHandle.trim() : ''
+  const handle = typeof body.discord_handle === 'string' ? body.discord_handle.trim() : ''
   const pin = body.pin
   if (
     handle.length === 0 || handle.length > 64 ||
