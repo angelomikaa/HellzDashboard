@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 03-02-PLAN.md (0007+0008 live, verify-pin redeployed, smoke 15/15 PASSED)
-last_updated: "2026-10-10T04:20:37.418Z"
+last_updated: "2026-10-10T05:51:15.197Z"
 last_activity: 2026-10-10
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 11
-  completed_plans: 9
-  percent: 82
+  completed_plans: 10
+  percent: 91
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 03 (rank-engine) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-10-10
 
-Progress: [████████░░] 82%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [████████░░] 82%
 
 | Phase 03 P01 | 8min | 2 tasks | 2 files |
 | Phase 03 P02 | 55min | 2 tasks | 4 files |
+| Phase 03 P03 | 37min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,9 @@ Recent decisions affecting current work:
 - [Phase 03-02]: 0007's exists-subquery-on-members staff policies hit Postgres 42P17 infinite recursion LIVE (02-REVIEW CR-01's proposed SQL was itself defective) — fixed by 0008 SECURITY DEFINER helper is_active_staff_member(); staff policies rebuilt on it; policy-time caller lookups on the SAME table must ALWAYS go through a definer function
 - [Phase 03-02]: CR-01 closed live (deactivated-staff probe: 0 rows + denied insert with a valid 7-day token = D-14 invariant) and CR-02 closed live (fixed verify-pin redeployed, every smoke login proves it = D-15 repo==live); 0007+0008 pushed, RLS SMOKE PASSED 15/15
 - [Phase 03-02]: RNK-02 stays Pending by traceability — this plan was D-14/D-15 precondition hardening; RNK-02 completes in 03-03 (server leak-probes) + 03-04 (UI side)
+- [Phase 03-03]: Rank engine live (0009 — plan said 0008, taken by 03-02): set_key_stat (advisory-lock block-at-7), my_report, class_top5 all SECURITY DEFINER with member_role+active gates; RANK SMOKE PASSED 27/27 exact-value on first run + second consecutive run (no residue); RLS regression 19/19 green
+- [Phase 03-03]: Plan's rank fixture was internally contradictory — 74.25 is the locked tie-at-TOP value; sp fixture corrected to {80,80,50} so a/b tie at top and c's OVR is 87 (mean 74.25), not 95; a's live point vector equals the rankMath.test.ts OVR-61 vector [0,74.25,0,49.5,0,0] exactly; SQL and TS spec now provably agree to the decimal
+- [Phase 03-03]: RNK-03/04/05 marked complete (live exact-value proof); RNK-01/RNK-02 stay Pending by traceability — server-side enforcement live-proven, completion in 03-04 (admin toggle UI + UI-side leak-proof), REG-02 precedent
 
 ### Pending Todos
 
@@ -126,7 +130,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-10T04:20:37.286Z
+Last session: 2026-10-10T05:51:01.795Z
 Stopped at: Completed 03-02-PLAN.md (0007+0008 live, verify-pin redeployed, smoke 15/15 PASSED)
 Resume file: None
 

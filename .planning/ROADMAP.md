@@ -78,7 +78,7 @@ Cross-cutting constraints honored: screenshots never leave the player's device (
 Plans:
 - [x] 03-01-PLAN.md — Rank math executable spec: percentilePoints + ovrFromPoints pure functions with worked-example unit tests, TDD (RNK-03/04/05 formula; tie handling via average ranks confirmed, D-09/D-10/D-11/D-12)
 - [x] 03-02-PLAN.md — Hardening debt folded in by owner decision: 0007 staff active-check migration (D-14/CR-01) + verify-pin line-58 fix + redeploy + live smoke reconcile with deactivated-staff probe (D-15/CR-02)
-- [ ] 03-03-PLAN.md — Migration 0008: set_key_stat (block-at-7, advisory lock), my_report, class_top5 SECURITY DEFINER RPCs + staff read policy on class_key_stats + live deploy + exact-value rank smoke matrix (RNK-01…05 server enforcement)
+- [x] 03-03-PLAN.md — Migration 0008: set_key_stat (block-at-7, advisory lock), my_report, class_top5 SECURITY DEFINER RPCs + staff read policy on class_key_stats + live deploy + exact-value rank smoke matrix (RNK-01…05 server enforcement)
 - [ ] 03-04-PLAN.md — Key-stat admin page: Stats-Chave staff tab, class selector, grouped 57-stat chips, n/6 counter, top-5-by-OVR preview (RNK-01/02 UI) — ends with owner browser checkpoint
 
 ### Phase 4: Member Dashboard & Improvement Screen

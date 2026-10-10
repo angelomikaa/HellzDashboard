@@ -32,9 +32,9 @@ Requirements for initial release (MVP — will be escalated later). Each maps to
 
 - [ ] **RNK-01**: Admin can select exactly 6 key stats per class via toggle (independent set per class)
 - [ ] **RNK-02**: Key stats are hidden from members server-side (not just UI-hidden — DevTools must not leak them)
-- [ ] **RNK-03**: Panel computes the overall (OVR) from the 6 key stats of the player's class, with a normalization floor of 51 (never below 51)
-- [ ] **RNK-04**: Panel computes per-stat percentile rank within same class+function (rank-based points: `(count_below / (n-1)) × 99`, preserving EAFC feel at guild scale)
-- [ ] **RNK-05**: Ranks display an "insufficient data" state when too few validated players exist per class
+- [x] **RNK-03**: Panel computes the overall (OVR) from the 6 key stats of the player's class, with a normalization floor of 51 (never below 51)
+- [x] **RNK-04**: Panel computes per-stat percentile rank within same class+function (rank-based points: `(count_below / (n-1)) × 99`, preserving EAFC feel at guild scale)
+- [x] **RNK-05**: Ranks display an "insufficient data" state when too few validated players exist per class
 
 ### Comparison & Dashboard
 
@@ -105,9 +105,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INPT-04 | Phase 2 | Complete (02-01 + 02-03) |
 | RNK-01 | Phase 3 | Pending |
 | RNK-02 | Phase 3 | Pending |
-| RNK-03 | Phase 3 | Pending |
-| RNK-04 | Phase 3 | Pending |
-| RNK-05 | Phase 3 | Pending |
+| RNK-03 | Phase 3 | Complete |
+| RNK-04 | Phase 3 | Complete |
+| RNK-05 | Phase 3 | Complete |
 | CMP-01 | Phase 4 | Pending |
 | CMP-02 | Phase 4 | Pending |
 | CMP-03 | Phase 4 | Pending |
