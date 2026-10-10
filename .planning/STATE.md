@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-01-PLAN.md (rank math spec RED/GREEN)
-last_updated: "2026-10-10T03:27:16.406Z"
+stopped_at: Completed 03-02-PLAN.md (0007+0008 live, verify-pin redeployed, smoke 15/15 PASSED)
+last_updated: "2026-10-10T04:20:37.418Z"
 last_activity: 2026-10-10
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 11
-  completed_plans: 8
-  percent: 73
+  completed_plans: 9
+  percent: 82
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 03 (rank-engine) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-10-10
 
-Progress: [███████░░░] 73%
+Progress: [████████░░] 82%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [███████░░░] 73%
 - Trend: execution remains fast (02-03 active work ≈30min); plan-level wall time inflated only by the deliberate owner-verification checkpoint
 
 | Phase 03 P01 | 8min | 2 tasks | 2 files |
+| Phase 03 P02 | 55min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,9 @@ Recent decisions affecting current work:
 - [Phase 02-03]: Example shots ship as placeholder SVGs in git (public/examples/*.svg); owner acknowledged and replaces them with real screenshots pre-launch (own call whether the real files enter git)
 - [Phase 03-01]: Tie handling CONFIRMED as average-rank semantics (03-CONTEXT discretion resolved) — tied players get the average of their occupied positions' points; locked by worked examples 74.25 (top-tie of 3), 49.5 (mid-tie of 4), 49.5 (all-tied)
 - [Phase 03-01]: rankMath.ts is the executable SPEC only — production rank truth stays in Postgres RPCs (03-03), no UI may import it to compute points; RNK-03/04/05 stay Pending until the live RPC smoke matrix passes (AUTH-01/01-01 precedent)
+- [Phase 03-02]: 0007's exists-subquery-on-members staff policies hit Postgres 42P17 infinite recursion LIVE (02-REVIEW CR-01's proposed SQL was itself defective) — fixed by 0008 SECURITY DEFINER helper is_active_staff_member(); staff policies rebuilt on it; policy-time caller lookups on the SAME table must ALWAYS go through a definer function
+- [Phase 03-02]: CR-01 closed live (deactivated-staff probe: 0 rows + denied insert with a valid 7-day token = D-14 invariant) and CR-02 closed live (fixed verify-pin redeployed, every smoke login proves it = D-15 repo==live); 0007+0008 pushed, RLS SMOKE PASSED 15/15
+- [Phase 03-02]: RNK-02 stays Pending by traceability — this plan was D-14/D-15 precondition hardening; RNK-02 completes in 03-03 (server leak-probes) + 03-04 (UI side)
 
 ### Pending Todos
 
@@ -106,11 +110,11 @@ None yet.
 - ~~[Phase 1]: Custom JWT + PostgREST/RLS-claims wiring is MEDIUM confidence~~ PROVEN 01-02 (see Decisions); operational caution: do NOT revoke signing key 6f7657c3 (standby) — revoking it kills every member session instantly
 - ~~[Phase 1]: OCR feasibility spike must run on 10 real guild screenshots (Portuguese locale, `1.234.567` separators) → go/no-go pivot threshold ~70% field accuracy~~ RESOLVED 01-04: GO — 222/222 fields, 100.0% vs ~70% threshold (see OCR-SPIKE-RESULTS.md and Decisions)
 - [Phase 1]: Owner should rotate the Supabase access token used for deploys, and rotate placeholder whitelist rows/PINs before inviting real members (see 01-USER-SETUP.md) — credentials/hashes remain recoverable from git history (WR-06)
-- ~~[Phase 1 → live deploy]: Push migrations 0003 (lockout RPC + handle length constraints) and 0004 (RLS active checks) to the live project~~ CLEARED 02-01 (2026-10-09): 0003/0004 pushed live together with 0005/0006 via `db push`. REMAINING: redeploy verify-pin — ⚠ BLOCKED: local `verify-pin/index.ts` line 58 references undefined `discordHandle` (would 500 every login once deployed — fix first, see 02 deferred-items.md); then confirm CR-01 atomicity live (parallel wrong-PIN requests → monotonic counter, lock at 5) — see 01-REVIEW-FIX.md
+- ~~[Phase 1 → live deploy]: Push migrations 0003 (lockout RPC + handle length constraints) and 0004 (RLS active checks) to the live project~~ CLEARED 02-01 (2026-10-09): 0003/0004 pushed live together with 0005/0006 via `db push`. ~~REMAINING: redeploy verify-pin — ⚠ BLOCKED: local `verify-pin/index.ts` line 58 references undefined `discordHandle`~~ CLEARED 03-02 (2026-10-10): line-58 fix (`body.discord_handle`) deployed via `functions deploy verify-pin`; logins re-proven live by the smoke matrix (D-15). REMAINING: confirm CR-01 atomicity live (parallel wrong-PIN requests → monotonic counter, lock at 5) — see 01-REVIEW-FIX.md
 - ~~[Phase 2]: Storage policy nuance resolved in planning (02-RESEARCH §3.1): no server-side screenshot storage at all (D-10) — awaiting owner ratification with the other discretion calls~~ RATIFIED 02-03 (2026-10-09): owner approved the walked flow with zero upload paths; all 5 discretion calls ratified (see Decisions)
 - [Pre-launch]: Owner must replace public/examples/*.svg placeholder example shots with real game screenshots (acknowledged at 02-03 UAT step 8) before inviting real members
 - [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need production-data calibration — spike delivered GO (100.0% on 11 owner-device samples) but device fragmentation is NOT covered; region maps are game-UI-versioned (re-run spike to recalibrate); dual-polarity read and manual fix-up are mandatory
-- [Phase 3 / 03-02]: Task 2 Step B (deploy 0007 + verify-pin, live smoke) BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env — owner must supply as session env var ONLY (never file/commit/echo; rotate after use). Project ref thdxyxsjafimxgxpmpqs (from project URL).
+- ~~[Phase 3 / 03-02]: Task 2 Step B (deploy 0007 + verify-pin, live smoke) BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env~~ CLEARED 03-02 (2026-10-10): owner supplied the token as a session env var (never on disk/commit/echo) — 0007 pushed, recursion caught and fixed via 0008, verify-pin redeployed, RLS SMOKE PASSED 15/15. Owner should rotate the deploy token now the deploy is done (standing action)
 
 ## Deferred Items
 
@@ -122,8 +126,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-10T03:26:29.022Z
-Stopped at: 03-02 checkpoint — task 1 done (0007 + verify-pin fix, 159ff2c), smoke probe done (2fa227d); task 2 Step B deploy blocked on SUPABASE_ACCESS_TOKEN (auth gate)
+Last session: 2026-10-10T04:20:37.286Z
+Stopped at: Completed 03-02-PLAN.md (0007+0008 live, verify-pin redeployed, smoke 15/15 PASSED)
 Resume file: None
 
 ---
