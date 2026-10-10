@@ -7,6 +7,11 @@
  * column-security / staff-policy / append-only-RPC matrix. Node-only script —
  * PowerShell 5.1 ConvertTo-Json corrupts long strings (01-01 proven failure).
  *
+ * Extended in plan 03-02 (CR-01 / D-14): check 13 deactivates the smoke
+ * officer via the Management API and asserts staff reads/writes are denied
+ * with the 7-day token still in hand (0007 active-check invariant), with
+ * guaranteed reactivation in cleanup (try/finally — WR-06 lesson).
+ *
  * Env:
  *   SUPABASE_URL / SUPABASE_ANON_KEY       (fallback: local .env VITE_* values)
  *   SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF  (Management API cleanup —
@@ -112,7 +117,9 @@ async function rest(path, { method = 'GET', token = null, body = null } = {}) {
   return { status: res.status, ok: res.ok, json, text }
 }
 
-/** Service-level Management API Run Query (legacy /v1 endpoint, 01-01 proven). */
+/** Service-level Management API Run Query (legacy /v1 endpoint, 01-01 proven).
+ * Returns the parsed response JSON (array of row objects for SELECTs) so
+ * callers can snapshot live values; write statements return null. */
 async function mgmtQuery(sql) {
   const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`, {
     method: 'POST',
@@ -123,6 +130,13 @@ async function mgmtQuery(sql) {
     body: JSON.stringify({ query: sql }),
   })
   if (!res.ok) throw new Error(`mgmt query failed: HTTP ${res.status} ${await res.text()}`)
+  const text = await res.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +275,68 @@ async function main() {
   const catalogCount = Array.isArray(catalog.json) ? catalog.json.length : -1
   check('live stat_catalog has 57 rows', catalog.status === 200 && catalogCount === 57, `count ${catalogCount}`)
 
-  // 13. Cleanup (service-level): remove smoke class + smoke submission (cascades stats).
+  // 13. Deactivated staff lose staff access immediately (0007 / CR-01):
+  //     deactivate the smoke officer via the Management API, assert staff
+  //     reads/writes are denied, then reactivate (with restore of original
+  //     values — WR-06 lesson).
+  let officerDeactivated = false
+  try {
+    // (a) snapshot the officer's current active flag — the probe only proves
+    //     the 0007 invariant if the officer was active before it (and the
+    //     login above already implies it: verify-pin refuses inactive rows).
+    const officerActiveRows = await mgmtQuery(
+      `select active from members where discord_handle = '${OFFICER_HANDLE}';`,
+    )
+    const officerWasActive =
+      Array.isArray(officerActiveRows) &&
+      officerActiveRows.length === 1 &&
+      officerActiveRows[0].active === true
+    check(
+      'officer active before deactivation probe (precondition)',
+      officerWasActive,
+      JSON.stringify(officerActiveRows),
+    )
+
+    // (b) deactivate — the previously-minted 7-day JWT must go dead for staff
+    //     access NOW: the member_role claim is frozen at login, only the live
+    //     active flag can revoke it.
+    await mgmtQuery(`update members set active = false where discord_handle = '${OFFICER_HANDLE}';`)
+    officerDeactivated = true
+
+    // (c) staff read: staff_select_all_members no longer matches — 0 rows or
+    //     a permission error (401/403/42501) all prove the policy is closed.
+    const staffRead = await rest('/members?select=id', { token: officer.access_token })
+    const staffReadDenied =
+      (staffRead.status === 200 && Array.isArray(staffRead.json) && staffRead.json.length === 0) ||
+      staffRead.status === 401 ||
+      staffRead.status === 403 ||
+      staffRead.status === 42501
+    check(
+      'deactivated officer GET /members -> 0 rows / denied',
+      staffReadDenied,
+      `HTTP ${staffRead.status}`,
+    )
+
+    // (d) staff write: staff_insert_classes no longer matches — insert denied.
+    const staffWrite = await rest('/classes', {
+      method: 'POST',
+      token: officer.access_token,
+      body: { class_name: 'ZZSmokeDeactivated' },
+    })
+    check('deactivated officer POST /classes denied', !staffWrite.ok, `HTTP ${staffWrite.status}`)
+  } finally {
+    // (e) ALWAYS reactivate — try/finally so a mid-check failure can never
+    //     leave the live officer deactivated (WR-06 lesson). The precondition
+    //     check above proves true was the original value.
+    if (officerDeactivated) {
+      await mgmtQuery(`update members set active = true where discord_handle = '${OFFICER_HANDLE}';`)
+      console.log('PASS: cleanup reactivated smoke officer (active = true)')
+      await mgmtQuery(`delete from classes where class_name = 'ZZSmokeDeactivated';`)
+      console.log('PASS: cleanup removed ZZSmokeDeactivated class')
+    }
+  }
+
+  // 14. Cleanup (service-level): remove smoke class + smoke submission (cascades stats).
   if (uuid) {
     await mgmtQuery(`delete from submissions where id = '${uuid}';`)
     console.log('PASS: cleanup removed smoke submission (stats cascaded)')
