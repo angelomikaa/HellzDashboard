@@ -89,7 +89,12 @@ Plans:
   1. Player sees their own mobile-first responsive dashboard with tiered stat cards (bronze for mediocre, silver for mildly elevated, gold for highly elevated, platinum for top of the class — own visual identity)
   2. Each stat card shows the player's value, guild average for their class, best in guild, and percentile position (e.g. "you're in the bottom 30% of Assassins for CRIT")
   3. Members see aggregates only — no other individual player's values are accessible via UI or API (the promotion page in Phase 6 is the only sanctioned view of top players)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Data contract + presentation logic: shared group labels (groups.ts), fetchMyReport RPC wrapper + MyReport types, tier bands / 10%-step percentile phrase / focus-strip selection as TDD pure functions (D-01/D-02/D-09..D-12/D-16)
+- [ ] 04-02-PLAN.md — Leaf components to the approved UI-SPEC: StatCard (all 3 variants), OvrHero (insufficient + no-class), TierLegend, CollapsibleGroup, FocusStrip (D-03..D-08, D-14, D-15)
+- [ ] 04-03-PLAN.md — DashboardPage composition (fetch-on-mount state machine, empty state CTA, focus-jump) + App Painel wiring + owner browser UAT incl. DevTools single-call/key-stat leak proof (CMP-01..03 end-to-end)
 **UI hint**: yes
 
 ### Phase 5: OCR Auto-Read Layer
@@ -125,7 +130,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. Foundation — Secure Access & Data Model | 4/4 | Complete    | 2026-10-09 |
 | 2. Registry, Catalog & Manual Data Ingestion | 3/3 | Complete    | 2026-10-09 |
 | 3. Rank Engine | 4/4 | Complete   | 2026-10-10 |
-| 4. Member Dashboard & Improvement Screen | 0/2 | Not started | - |
+| 4. Member Dashboard & Improvement Screen | 0/3 | Not started | - |
 | 5. OCR Auto-Read Layer | 0/2 | Not started | - |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | 0/2 | Not started | - |
 
