@@ -15,7 +15,7 @@ import {
 // phrase banding, D-16 focus selection. The dashboard components (04-02/04-03)
 // consume these pure functions, so the semantics can never drift during UI
 // work. PURE presentation only: points/OVR arrive opaque from my_report()
-// (RNK-02) — nothing here imports rankMath or derives key-stat identity.
+// (RNK-02) — the 03-01 spec module is never imported here.
 
 /** Minimal MyReportStat factory — every field typed, points drives sufficiency. */
 function stat(points: number | null, overrides?: Partial<MyReportStat>): MyReportStat {
