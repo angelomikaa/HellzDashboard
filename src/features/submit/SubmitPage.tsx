@@ -29,8 +29,10 @@ import {
 import { formatStatValue, parseStatValue } from '../../lib/parseStatValue'
 import type { NeoFootSession } from '../auth/session'
 import { HistoryList } from './HistoryList'
+import { OcrCapture } from './OcrCapture'
 import { ReviewStep } from './ReviewStep'
-import { StatGroupStep } from './StatGroupStep'
+import { OCR_FIELD_FAILURE, StatGroupStep } from './StatGroupStep'
+import type { OcrFieldOutcome } from './ocr'
 import {
   WIZARD_GROUPS,
   buildStatsPayload,
@@ -45,6 +47,9 @@ const NETWORK_ERROR =
 const SESSION_ERROR = 'Sua sessão expirou ou você não tem permissão. Entre novamente.'
 const SUBMIT_ERROR = 'Não foi possível enviar. Verifique sua conexão e tente novamente.'
 const INVALID_HINT = 'Valor inválido — use números (ex.: 1.234.567 ou 12,5%).'
+// Running skeleton placeholder for the step-1 combat_power input (D-17 —
+// same copy StatGroupStep uses for its rows).
+const OCR_READING_PLACEHOLDER = 'Lendo captura…'
 
 const BLOCKED_MEMBER_COPY =
   'Seu personagem ainda não foi registrado. Peça a um oficial para registrá-lo na aba Personagens.'
@@ -119,6 +124,18 @@ export function SubmitPage({ session }: SubmitPageProps) {
     4: false,
   })
 
+  // OCR wiring (05-04): which step's read is in flight (inputs skeletonize,
+  // D-17), and which of each step's displayed fields the LATEST read could
+  // not fill (D-14/D-15 — a fresh read replaces the step's failure set
+  // wholesale).
+  const [ocrRunningStep, setOcrRunningStep] = useState<1 | 2 | 3 | 4 | null>(null)
+  const [failedFields, setFailedFields] = useState<Record<1 | 2 | 3 | 4, ReadonlySet<string>>>({
+    1: new Set(),
+    2: new Set(),
+    3: new Set(),
+    4: new Set(),
+  })
+
   // Intro-step parse feedback (Poder de Combate).
   const [combatPowerBlurred, setCombatPowerBlurred] = useState(false)
 
@@ -159,14 +176,24 @@ export function SubmitPage({ session }: SubmitPageProps) {
     return groupStep >= 0 ? ((groupStep + 2) as 2 | 3 | 4) : null
   }
 
-  /** THE single edit path (D-08): every value write — manual typing now, OCR
-   *  pre-fill in 05-04 — updates the input AND unchecks the owning step's
-   *  verification, so a stale confirmation never survives an edit
-   *  (T-05-10). */
+  /** THE single edit path (D-08): every value write — manual typing, OCR
+   *  pre-fill via applyOcrOutcomes — updates the input AND unchecks the
+   *  owning step's verification, so a stale confirmation never survives an
+   *  edit (T-05-10). Typing in a failed-OCR field also clears its failure
+   *  flag: from then on the regular parse feedback governs (D-14). */
   function handleChange(statKey: string, raw: string) {
     setInputs((prev) => ({ ...prev, [statKey]: raw }))
     const owner = stepForStat(statKey)
-    if (owner !== null) setStepVerified((v) => ({ ...v, [owner]: false }))
+    if (owner !== null) {
+      setStepVerified((v) => ({ ...v, [owner]: false }))
+      setFailedFields((prev) => {
+        const set = prev[owner]
+        if (!set.has(statKey)) return prev
+        const next = new Set(set)
+        next.delete(statKey)
+        return { ...prev, [owner]: next }
+      })
+    }
   }
 
   /** Restart as a NEW submission: fresh inputs, nothing prefilled or
@@ -174,6 +201,8 @@ export function SubmitPage({ session }: SubmitPageProps) {
   function restartWizard() {
     setInputs({})
     setStepVerified({ 1: false, 2: false, 3: false, 4: false })
+    setOcrRunningStep(null)
+    setFailedFields({ 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set() })
     setCombatPowerBlurred(false)
     setMissingRequired(null)
     setSubmitError(null)
@@ -248,6 +277,42 @@ export function SubmitPage({ session }: SubmitPageProps) {
       (e) => e.group_name === group && !(group === 'general' && e.stat_key === 'combat_power'),
     )
 
+  /** D-15 replace-all-displayed: a read replaces EXACTLY this step's
+   *  displayed fields — detected values overwrite, undetected or unmapped
+   *  fields (e.g. dmg_vs_demi_human on special) go blank + failure flag —
+   *  and the step's failure set is replaced wholesale (a fresh read resets
+   *  prior failures). Every write flows through the central handleChange
+   *  wrapper, so pre-fill unchecks the step's verification exactly like a
+   *  manual edit (05-03 engine, T-05-12). Reads are step-scoped: fields of
+   *  other steps are never touched. */
+  function applyOcrOutcomes(step: 1 | 2 | 3 | 4, outcomes: OcrFieldOutcome[]) {
+    const displayed: string[] =
+      step === 1 ? ['combat_power'] : groupEntries(STEP_GROUP[step]).map((e) => e.stat_key)
+    const byKey = new Map(outcomes.map((o) => [o.stat_key, o]))
+    const newFailed = new Set<string>()
+    for (const statKey of displayed) {
+      const outcome = byKey.get(statKey)
+      if (outcome !== undefined && outcome.status === 'filled') {
+        handleChange(statKey, outcome.raw)
+      } else {
+        handleChange(statKey, '')
+        newFailed.add(statKey)
+      }
+    }
+    setFailedFields((prev) => ({ ...prev, [step]: newFailed }))
+  }
+
+  /** D-18: nothing was read — the step's failure claims are cleared (no
+   *  per-field claims without a read); inputs stay untouched for manual
+   *  entry. */
+  function handleOcrReadFailed(step: 1 | 2 | 3 | 4) {
+    setFailedFields((prev) => ({ ...prev, [step]: new Set() }))
+  }
+
+  function handleOcrRunState(step: 1 | 2 | 3 | 4, running: boolean) {
+    setOcrRunningStep(running ? step : null)
+  }
+
   const combatPowerRaw = inputs['combat_power'] ?? ''
   const combatPowerParsed = parseStatValue(combatPowerRaw)
   const combatPowerTouched = combatPowerBlurred && combatPowerRaw.trim() !== ''
@@ -318,6 +383,15 @@ export function SubmitPage({ session }: SubmitPageProps) {
                 <h2 className="text-xl font-semibold text-content">
                   {`${me.display_name} — ${me.char_class} (${FUNCTION_LABELS[me.char_function]})`}
                 </h2>
+                {/* OCR entry for the basic header capture (D-06: the basic
+                    capture reads ONLY combat_power; nickname/job are admin
+                    data, never inputs). */}
+                <OcrCapture
+                  capture="basic"
+                  onOutcomes={(outcomes) => applyOcrOutcomes(1, outcomes)}
+                  onReadFailed={() => handleOcrReadFailed(1)}
+                  onRunStateChange={(running) => handleOcrRunState(1, running)}
+                />
                 <div className="flex flex-col gap-1">
                   <label htmlFor="combat-power" className="text-sm font-semibold text-content">
                     Poder de Combate
@@ -331,9 +405,11 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     onChange={(e) => handleChange('combat_power', e.target.value)}
                     onBlur={() => setCombatPowerBlurred(true)}
                     aria-invalid={combatPowerInvalid || undefined}
+                    disabled={ocrRunningStep === 1}
+                    placeholder={ocrRunningStep === 1 ? OCR_READING_PLACEHOLDER : undefined}
                     className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                       combatPowerInvalid ? 'border-destructive' : 'border-line'
-                    }`}
+                    } ${ocrRunningStep === 1 ? 'animate-pulse' : ''}`}
                   />
                   {combatPowerTouched && combatPowerParsed.ok && combatPowerParsed.value !== null && (
                     <p className="text-sm font-semibold text-success">
@@ -343,6 +419,11 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   {combatPowerInvalid && (
                     <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
                       {INVALID_HINT}
+                    </p>
+                  )}
+                  {!combatPowerInvalid && failedFields[1].has('combat_power') && (
+                    <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+                      {OCR_FIELD_FAILURE}
                     </p>
                   )}
                 </div>
@@ -357,11 +438,23 @@ export function SubmitPage({ session }: SubmitPageProps) {
 
           {(step === 2 || step === 3 || step === 4) && (
             <div className="mt-6">
+              {/* OCR entry above the example-shot list: the capture key
+                  mirrors the step's group (general/quasi/special). */}
+              <div className="mb-4">
+                <OcrCapture
+                  capture={STEP_GROUP[step]}
+                  onOutcomes={(outcomes) => applyOcrOutcomes(step, outcomes)}
+                  onReadFailed={() => handleOcrReadFailed(step)}
+                  onRunStateChange={(running) => handleOcrRunState(step, running)}
+                />
+              </div>
               <StatGroupStep
                 group={STEP_GROUP[step]}
                 entries={groupEntries(STEP_GROUP[step])}
                 inputs={inputs}
                 onChange={handleChange}
+                ocrRunning={ocrRunningStep === step}
+                failedFields={failedFields[step]}
               />
               <div className="mt-4">
                 <StepVerifyCheckbox

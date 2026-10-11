@@ -6,8 +6,8 @@
 // (criterion 3), and re-uploading simply runs the read again (D-10/D-15).
 //
 // D-10/T-05-11: the uploaded bytes are decoded and read ENTIRELY on this
-// device — no FormData, no upload path, no Storage; the bitmap is dropped
-// (close()) as soon as the read is done.
+// device — no multipart/upload machinery of any kind, no Storage; the
+// bitmap is dropped (close()) as soon as the read is done.
 //
 // Lazy-load boundary (criterion 3): the OCR engine is pulled in ONLY via
 // the dynamic import inside runRead — never a static import of the ocr

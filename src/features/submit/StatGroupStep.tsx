@@ -5,12 +5,28 @@
 // parent (SubmitPage owns the inputs), this component only tracks which
 // fields have been blurred so hints appear only after the player leaves the
 // field.
+//
+// 05-04 OCR field states: while a read runs the step's inputs are disabled
+// with a shimmer and the reading placeholder (D-17 — no typing/OCR race);
+// fields the read could not fill render the locked failure message below
+// (D-04/D-14/D-16 — blank + manual-fill instruction, never a machine guess).
+// The parent (SubmitPage) owns the flag set and clears a flag when the
+// player types; the failure message and the parse hint never coexist.
 import { useState } from 'react'
 import type { StatCatalogEntry } from '../../lib/api'
 import { formatStatValue, parseStatValue } from '../../lib/parseStatValue'
 import type { GroupInputs, WizardGroup } from './wizard'
 
 const INVALID_HINT = 'Valor inválido — use números (ex.: 1.234.567 ou 12,5%).'
+
+// Locked UI-SPEC copy (definition site, exported for the step-1 combat_power
+// field in SubmitPage — the single definition site codebase-wide; comments
+// describe it, never quote it).
+export const OCR_FIELD_FAILURE =
+  'O valor não foi detectado na print - Por favor preencha o campo manualmente'
+
+// Reading placeholder doubles as the running skeleton hint (D-17).
+const READING_PLACEHOLDER = 'Lendo captura…'
 
 const GROUP_LABELS: Record<WizardGroup, string> = {
   general: 'Geral',
@@ -24,9 +40,13 @@ interface StatGroupStepProps {
   entries: StatCatalogEntry[]
   inputs: GroupInputs
   onChange: (statKey: string, raw: string) => void
+  /** true while this step's OCR read is in flight (D-17 skeleton state) */
+  ocrRunning: boolean
+  /** stat_keys of this step's fields the read could not fill (D-14) */
+  failedFields: ReadonlySet<string>
 }
 
-export function StatGroupStep({ group, entries, inputs, onChange }: StatGroupStepProps) {
+export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, failedFields }: StatGroupStepProps) {
   // Hints appear after the first blur of a field; from then on the feedback
   // updates live so fixing a bad value immediately clears the error.
   const [blurred, setBlurred] = useState<Record<string, boolean>>({})
@@ -79,9 +99,11 @@ export function StatGroupStep({ group, entries, inputs, onChange }: StatGroupSte
                   onChange={(e) => onChange(entry.stat_key, e.target.value)}
                   onBlur={() => setBlurred((b) => ({ ...b, [entry.stat_key]: true }))}
                   aria-invalid={invalid || undefined}
+                  disabled={ocrRunning}
+                  placeholder={ocrRunning ? READING_PLACEHOLDER : undefined}
                   className={`h-11 w-full rounded-md border bg-surface text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                     invalid ? 'border-destructive' : 'border-line'
-                  } ${percentual ? 'pr-8' : 'px-3'}`}
+                  } ${percentual ? 'pr-8' : 'px-3'} ${ocrRunning ? 'animate-pulse' : ''}`}
                 />
                 {percentual && (
                   <span
@@ -100,6 +122,11 @@ export function StatGroupStep({ group, entries, inputs, onChange }: StatGroupSte
               {invalid && (
                 <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
                   {INVALID_HINT}
+                </p>
+              )}
+              {!invalid && failedFields.has(entry.stat_key) && (
+                <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+                  {OCR_FIELD_FAILURE}
                 </p>
               )}
             </div>
