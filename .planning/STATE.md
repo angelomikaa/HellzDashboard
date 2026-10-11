@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 05-03-PLAN.md (wizard realignment, all 3 commits in). 05-02 task 3 STILL BLOCKED on SUPABASE_ACCESS_TOKEN (0010 live push + smokes). Next: 05-04 OCR wizard wiring, or resume 05-02 when the owner supplies the token"
-last_updated: "2026-10-11T20:01:28.708Z"
+stopped_at: "Completed 05-02-PLAN.md continuation (0010 pushed live, LIFECYCLE SMOKE PASSED 11/11 twice, RANK SMOKE PASSED). Phase 05 plans 01/02/03 all done; next: 05-04 OCR wizard wiring"
+last_updated: "2026-10-11T20:34:35.853Z"
 last_activity: 2026-10-11
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 19
-  completed_plans: 16
-  percent: 84
+  completed_plans: 17
+  percent: 89
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 05 (ocr-auto-read-layer) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-10-11
 
-Progress: [████████░░] 84%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Progress: [████████░░] 84%
 | Phase 04 P03 | 55min wall (active ~25min; rest was owner UAT wait) | 2 tasks | 2 files |
 | Phase 05 P01 | 50min | 3 tasks | 13 files |
 | Phase 05 P03 | 16min | 2 tasks | 4 files |
+| Phase 05 P02 | 25min (continuation session: live push + smokes + docs) | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,10 @@ Recent decisions affecting current work:
 - [Phase 05-03]: stepForStat is the ONE group-to-step mapping (combat_power→1, general→2, quasi→3, special→4): handleChange uses it to uncheck the owning step and handleFixStat was consolidated onto it — no mirror, no drift
 - [Phase 05-03]: D-07/D-08 shipped in the manual flow: Especial required exactly like Geral/Quasi (combat_power the only optional stat), all four capture steps own a verification checkbox, Revisão shrunk to tap-to-fix with Enviar gated on allStepsVerified; edits force-uncheck the owning step via the single central handleChange path (T-05-10)
 - [Phase 05-03]: INPT-02 stays Pending by traceability (05-01/04-01 precedent) — this plan is the manual-flow realignment only; the requirement completes when 05-04 wires the wizard and 05-05 UAT-verifies; the plan's 'existing cases must keep passing' RED constraint was unsatisfiable for the four tests pinning the superseded Special-optional rule (updated in the same RED commit)
+- [Phase 05-02]: 0010 is an append-only corrective (0008 precedent): the 0001 status check is resolved from the catalog by definition (never hardcoded name) and re-added with all four statuses; 0005 create_submission and 0009 my_report/class_top5 are superseded via create or replace — prior migration files byte-untouched
+- [Phase 05-02]: Discard is a status mark, never a delete (INPT-04): the RLS surface is column-grant-scoped (update (status) only) and the policy admits exactly one transition — own row, pending to discarded, using+with check both; live-proven LIFECYCLE SMOKE PASSED 11/11 twice consecutively
+- [Phase 05-02]: PostgREST zero-row-update probe pattern established: an RLS UPDATE policy's 'using' clause filters rows out of the update set SILENTLY (never reaching 'with check'), so a fully-blocked PATCH answers 204/200-empty, not 403 — the correct probe is Prefer return=representation + assert 0 rows updated; caught live when the first smoke run failed 2/11 on assertion shape, not on behavior (fixed in 873c0d1)
+- [Phase 05-02]: INPT-02 stays Pending by traceability (05-01/05-03 precedent) — 05-02 is the lifecycle foundation only; the requirement completes when 05-04 wires the wizard and 05-05 UAT-verifies end-to-end
 
 ### Pending Todos
 
@@ -146,7 +151,7 @@ Recent decisions affecting current work:
 - [Pre-launch]: Owner must replace public/examples/*.svg placeholder example shots with real game screenshots (acknowledged at 02-03 UAT step 8) before inviting real members
 - [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need production-data calibration — spike delivered GO (100.0% on 11 owner-device samples) but device fragmentation is NOT covered; region maps are game-UI-versioned (re-run spike to recalibrate); dual-polarity read and manual fix-up are mandatory — all four land in 05-01 as seeded constants (OCR_ACCEPT_CONFIDENCE=85, sanity defaults+overrides); recalibration after a game UI change = recalibrate spike maps → re-run scripts/convert-spike-regions.mjs → normal deploy (05 planning)
 - ~~[Phase 3 / 03-02]: Task 2 Step B (deploy 0007 + verify-pin, live smoke) BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env~~ CLEARED 03-02 (2026-10-10): owner supplied the token as a session env var (never on disk/commit/echo) — 0007 pushed, recursion caught and fixed via 0008, verify-pin redeployed, RLS SMOKE PASSED 15/15. Owner should rotate the deploy token now the deploy is done (standing action)
-- [Phase 5 / 05-02 task 3] Live push of migration 0010 + lifecycle smoke BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env — owner must supply as a SESSION env var only (never on disk/commit/echo, 03-02 precedent). Committed and ready: migration 0010 (cd54b84), client status surface (49c156a), smoke-lifecycle.mjs (3126cd0). Remaining: npx supabase db push, run smoke-lifecycle.mjs twice consecutively, re-run smoke-rank.mjs (27/27 regression gate).
+- ~~[Phase 5 / 05-02 task 3] Live push of migration 0010 + lifecycle smoke BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env~~ CLEARED 05-02 (2026-10-11): owner supplied the token as a session env var (never on disk/commit/echo, 03-02 precedent) — 0010 pushed live (dry-run confirmed it was the only pending migration), LIFECYCLE SMOKE PASSED 11/11 twice consecutively (no residue; one assertion-shape fix in 873c0d1 — RLS `using` zero-row semantics, see Decisions), RANK SMOKE PASSED (no 0009→0010 regression). Owner should rotate the deploy token now the deploy is done (standing action).
 
 ## Deferred Items
 
@@ -158,8 +163,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-11T20:01:28.655Z
-Stopped at: Completed 05-03-PLAN.md (wizard realignment, all 3 commits in). 05-02 task 3 STILL BLOCKED on SUPABASE_ACCESS_TOKEN (0010 live push + smokes). Next: 05-04 OCR wizard wiring, or resume 05-02 when the owner supplies the token
+Last session: 2026-10-11T20:34:35.782Z
+Stopped at: Completed 05-02-PLAN.md continuation (0010 pushed live, LIFECYCLE SMOKE PASSED 11/11 twice, RANK SMOKE PASSED). Phase 05 plans 01/02/03 all done; next: 05-04 OCR wizard wiring
 Resume file: None
 
 ---

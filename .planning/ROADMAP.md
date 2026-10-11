@@ -105,13 +105,13 @@ Plans:
   1. Uploading a screenshot auto-pre-fills stat values via region-based client-side OCR with digit/percent whitelisting and canvas preprocessing (never whole-image recognition)
   2. Player must review and fix pre-filled values before the submission is accepted — OCR misreads cannot slip through silently (fix-up gate applies to OCR output)
   3. OCR works in the production build (worker/core path bundling verified on Vite), is lazy-loaded so it doesn't slow initial page load, and manual entry still works fully when OCR fails
-**Plans**: 5 plans
+**Plans**: 3/5 plans executed
 
 Plans:
 
 **Wave 1** *(blocked on nothing — three parallel slices)*
 - [x] 05-01-PLAN.md — Client OCR module (TDD port of the validated spike pipeline): percentage region maps generated from the committed calibration (D-01/D-19/D-21), hardcoded sanity ranges + confidence gate 85 (D-03/D-16/D-20), dual-polarity preprocessing pure functions, worker lifecycle with self-hosted worker/core assets, lazy-import chunk (criterion 3 build half)
-- [ ] 05-02-PLAN.md — Migration 0010 (append-only corrective): `discarded` status, one-pending-per-player rule in create_submission (D-11), rank cohort filters exclude discarded in my_report/class_top5 (D-12), pending→discarded-own-rows RLS policy, live push + lifecycle smoke (server-side half; officer queue stays Phase 6 per D-13)
+- [x] 05-02-PLAN.md — Migration 0010 (append-only corrective): `discarded` status, one-pending-per-player rule in create_submission (D-11), rank cohort filters exclude discarded in my_report/class_top5 (D-12), pending→discarded-own-rows RLS policy, live push + lifecycle smoke (server-side half; officer queue stays Phase 6 per D-13)
 - [x] 05-03-PLAN.md — Wizard realignment, manual-only: Especial required like Geral/Quasi (D-07, routed from Phase 3), combat_power still the only optional stat, per-step verification checkboxes on all four capture steps (D-08), edits uncheck stale confirmations, ReviewStep shrinks to tap-to-fix summary
 
 **Wave 2** *(blocked on Wave 1 — 05-01 engine + 05-03 step engine)*
@@ -146,7 +146,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. Registry, Catalog & Manual Data Ingestion | 3/3 | Complete    | 2026-10-09 |
 | 3. Rank Engine | 4/4 | Complete   | 2026-10-10 |
 | 4. Member Dashboard & Improvement Screen | 3/3 | Complete   | 2026-10-11 |
-| 5. OCR Auto-Read Layer | 1/5 | In Progress|  |
+| 5. OCR Auto-Read Layer | 3/5 | In Progress |  |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | 0/2 | Not started | - |
 
 ## Traceability
