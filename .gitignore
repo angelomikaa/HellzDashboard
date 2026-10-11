@@ -33,3 +33,4 @@ dist-ssr
 # Self-hosted OCR worker/core assets — regenerated from node_modules by the
 # predev/prebuild hooks (scripts/copy-ocr-assets.mjs); no binaries in git
 public/ocr/
+.preview-log.txt
