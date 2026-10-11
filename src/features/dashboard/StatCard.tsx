@@ -20,7 +20,7 @@ export function StatCard({ stat }: { stat: MyReportStat }) {
     !missing && stat.points !== null ? percentilePhrase(stat.points, stat.label) : null
 
   // Badge slot (D-14/D-15): empty when the stat is missing; the muted
-  // "Dados insuficientes" chip when the cohort is too small; the tier-colored
+  // insufficient-data chip when the cohort is too small; the tier-colored
   // integer points badge when points exist (integer only — no "pts" suffix).
   let badge: ReactNode = null
   if (!missing) {

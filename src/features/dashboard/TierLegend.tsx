@@ -1,6 +1,6 @@
 // TierLegend — the always-visible one-line color decoder (D-03/D-04).
 // Tier meaning on cards is color-only, so this line directly under the OVR
-// hero makes the code self-explanatory: Bronze · Prata · Ouro · Platina.
+// hero makes the four-color code self-explanatory.
 // The four dot classes are literal strings (Tailwind v4 JIT-safe), generated
 // from the existing @theme tier tokens in src/index.css.
 export function TierLegend() {
