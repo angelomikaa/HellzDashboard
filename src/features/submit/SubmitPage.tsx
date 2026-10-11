@@ -2,6 +2,13 @@
 // INPT-01). Manual entry is the designed backbone: the example shot beside
 // the input boxes is a static panel-provided reference image.
 //
+// 05-03 realignment (D-07/D-08): Especial is required exactly like
+// Geral/Quasi (combat_power stays the only optional stat), and every capture
+// step (1-4) carries its own verification checkbox — the review gate lives
+// per step now; step 5 is the shrunk tap-to-fix summary whose Enviar is
+// gated on all four verifications. The checkbox gate is UX-only — the server
+// re-validates regardless (INPT-03).
+//
 // Screenshots never leave the player's device (D-10) — example images only:
 // this feature sends only parsed stat numbers; the player's own screenshots
 // stay physical/on-device and no image bytes ever reach the network.
@@ -54,6 +61,43 @@ const STEP_GROUP: Record<2 | 3 | 4, WizardGroup> = { 2: 'general', 3: 'quasi', 4
 
 const STEP_NAMES = ['Personagem', 'Geral', 'Quasi', 'Especial', 'Revisão'] as const
 
+// Per-step verification copy (D-08): the review gate moved from the
+// end-of-flow screen onto each capture step. Steps 2-4 reuse the locked
+// group strings verbatim (moved from the former ReviewStep checkboxes);
+// step 1 gets its own Personagem line.
+const VERIFY_COPY: Record<1 | 2 | 3 | 4, string> = {
+  1: 'Revisei os valores do personagem e estão corretos.',
+  2: 'Revisei os valores de Geral contra as capturas e estão corretos.',
+  3: 'Revisei os valores de Quasi contra as capturas e estão corretos.',
+  4: 'Revisei os valores de Especial contra as capturas e estão corretos.',
+}
+
+/** Per-step verification checkbox (D-08) — identical markup to the former
+ *  ReviewStep confirmation rows: native checkbox in a <label> with a 44px
+ *  row. Editing any value on the step unchecks it (handleChange), so a
+ *  checked box always attests to the CURRENT values the player saw. */
+function StepVerifyCheckbox({
+  stepNo,
+  checked,
+  onChange,
+}: {
+  stepNo: 1 | 2 | 3 | 4
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-1 py-1.5 text-base text-content focus-within:focus-visible:ring-2 focus-within:focus-visible:ring-accent">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-5 w-5 shrink-0 accent-[#E3B341] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      />
+      <span>{VERIFY_COPY[stepNo]}</span>
+    </label>
+  )
+}
+
 interface SubmitPageProps {
   session: NeoFootSession
 }
@@ -65,6 +109,15 @@ export function SubmitPage({ session }: SubmitPageProps) {
   const [phase, setPhase] = useState<'wizard' | 'submitted'>('wizard')
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
   const [inputs, setInputs] = useState<GroupInputs>({})
+
+  // Per-step verification gate (D-08): Continuar on each capture step (and
+  // Enviar on Revisão, via allStepsVerified) requires the step's checkbox.
+  const [stepVerified, setStepVerified] = useState<Record<1 | 2 | 3 | 4, boolean>>({
+    1: false,
+    2: false,
+    3: false,
+    4: false,
+  })
 
   // Intro-step parse feedback (Poder de Combate).
   const [combatPowerBlurred, setCombatPowerBlurred] = useState(false)
@@ -95,14 +148,32 @@ export function SubmitPage({ session }: SubmitPageProps) {
     }
   }, [session])
 
+  /** Owning capture step for a stat (the single group→step mapping):
+   *  combat_power → step 1; otherwise the catalog group maps
+   *  general→2, quasi→3, special→4. Unknown keys own no step. */
+  function stepForStat(statKey: string): 1 | 2 | 3 | 4 | null {
+    if (statKey === 'combat_power') return 1
+    const entry = data?.catalog.find((e) => e.stat_key === statKey)
+    if (!entry) return null
+    const groupStep = WIZARD_GROUPS.indexOf(entry.group_name)
+    return groupStep >= 0 ? ((groupStep + 2) as 2 | 3 | 4) : null
+  }
+
+  /** THE single edit path (D-08): every value write — manual typing now, OCR
+   *  pre-fill in 05-04 — updates the input AND unchecks the owning step's
+   *  verification, so a stale confirmation never survives an edit
+   *  (T-05-10). */
   function handleChange(statKey: string, raw: string) {
     setInputs((prev) => ({ ...prev, [statKey]: raw }))
+    const owner = stepForStat(statKey)
+    if (owner !== null) setStepVerified((v) => ({ ...v, [owner]: false }))
   }
 
   /** Restart as a NEW submission: fresh inputs, nothing prefilled or
    *  overwritten (append-only, INPT-04). */
   function restartWizard() {
     setInputs({})
+    setStepVerified({ 1: false, 2: false, 3: false, 4: false })
     setCombatPowerBlurred(false)
     setMissingRequired(null)
     setSubmitError(null)
@@ -112,14 +183,8 @@ export function SubmitPage({ session }: SubmitPageProps) {
 
   /** Tap a value on the review screen to jump back and fix it. */
   function handleFixStat(statKey: string) {
-    if (statKey === 'combat_power') setStep(1)
-    else {
-      const entry = data?.catalog.find((e) => e.stat_key === statKey)
-      if (entry) {
-        const stepForGroup = WIZARD_GROUPS.indexOf(entry.group_name)
-        if (stepForGroup >= 0) setStep((stepForGroup + 2) as 2 | 3 | 4)
-      }
-    }
+    const owner = stepForStat(statKey)
+    if (owner !== null) setStep(owner)
   }
 
   async function handleSubmit() {
@@ -281,6 +346,11 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     </p>
                   )}
                 </div>
+                <StepVerifyCheckbox
+                  stepNo={1}
+                  checked={stepVerified[1]}
+                  onChange={(checked) => setStepVerified((v) => ({ ...v, 1: checked }))}
+                />
               </div>
             </div>
           )}
@@ -293,6 +363,13 @@ export function SubmitPage({ session }: SubmitPageProps) {
                 inputs={inputs}
                 onChange={handleChange}
               />
+              <div className="mt-4">
+                <StepVerifyCheckbox
+                  stepNo={step}
+                  checked={stepVerified[step]}
+                  onChange={(checked) => setStepVerified((v) => ({ ...v, [step]: checked }))}
+                />
+              </div>
             </div>
           )}
 
@@ -301,6 +378,9 @@ export function SubmitPage({ session }: SubmitPageProps) {
               <ReviewStep
                 entries={catalog}
                 inputs={inputs}
+                allStepsVerified={
+                  stepVerified[1] && stepVerified[2] && stepVerified[3] && stepVerified[4]
+                }
                 submitting={submitting}
                 missingRequired={missingRequired}
                 submitError={submitError}
@@ -328,7 +408,8 @@ export function SubmitPage({ session }: SubmitPageProps) {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  disabled={!stepVerified[1]}
+                  className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Continuar
                 </button>
@@ -338,8 +419,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   type="button"
                   onClick={() => setStep((s) => (s + 1) as 2 | 3 | 4 | 5)}
                   disabled={
-                    STEP_GROUP[step] !== 'special' &&
-                    !groupComplete(catalog, STEP_GROUP[step], inputs)
+                    !groupComplete(catalog, STEP_GROUP[step], inputs) || !stepVerified[step]
                   }
                   className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
