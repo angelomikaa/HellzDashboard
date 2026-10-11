@@ -1,11 +1,11 @@
 ---
-status: pending-owner-walk
+status: partial
 phase: 05-ocr-auto-read-layer
 source: [05-05-PLAN.md, 05-04-SUMMARY.md, 05-02-SUMMARY.md]
 build_tested: "commit 8d7e6d3 — vite preview of the production-shaped dist (src tree identical to c95c794, the 05-04 wizard wiring)"
-server: "http://localhost:4173 (vite preview — running)"
+server: "http://localhost:4173 (vite preview — restart with npm run preview; see How to resume)"
 started: 2026-10-11T21:23:18Z
-updated: 2026-10-11T21:23:18Z
+updated: 2026-10-11T21:38:15Z
 ---
 
 # Phase 5 Owner UAT — OCR Auto-Read Layer (INPT-02 end-to-end)
@@ -113,6 +113,19 @@ Use your real screenshots from `.secrets/ocr-samples/`. Expected behavior per st
 
 ## Verdict
 
-**OWNER UAT: PENDING — awaiting the owner's walk of steps 1–11.**
+**OWNER UAT: DEFERRED — not walked, not approved.**
 
-Resume signal: type **"approved"** to accept, or describe any step that behaved differently (step number + what you saw). Optional: supply `SUPABASE_ACCESS_TOKEN` as a session env var for a fresh live smoke re-run (gates 7–8) during the same session.
+**Deferral record (2026-10-11):** the owner was absent at the checkpoint and directed (verbatim): *"I'll be absent for a while hence cannot do tests — let's proceed with the next step. Record steps 1 to 11 so we can do it later."*
+
+- Steps 1–11 are preserved above, each with its expected behavior and `result: [pending]` — **no verdicts filled, no step marked PASS**. The deferral is a schedule fact, not an approval.
+- The 8 automated-gate results from task 1 stand as recorded: vitest 179/179, tsc clean, build pass, dist OCR assets present, lazy-chunk 0-matches, FormData 0; live smokes auth-gated with the 05-02 live evidence standing.
+- INPT-02 completion and Phase 5 verification are intentionally **HELD** until the owner's real walk lands. A continuation session will fill the verdicts, write 05-05-SUMMARY.md, and only then does the phase verification chain run.
+
+## How to resume
+
+1. Restart the preview server: `npm run preview` (serves the production-shaped build at http://localhost:4173).
+2. Walk steps 1–11 above in a real browser with your real screenshots from `.secrets/ocr-samples/` (sampbasic.png, sampideal1-3.png, common samples — they never enter git or the network).
+3. Reply **"approved"** to accept, or report the step numbers + observed behavior for anything that differed (each deviation gets a disposition: accepted / needs-fix → becomes a gap plan and feeds /gsd-verify-work).
+4. The continuation session then fills the verdicts in this file, writes 05-05-SUMMARY.md, and the phase verification chain (/gsd-verify-work → /gsd-transition) runs.
+
+Optional during the walk: supply `SUPABASE_ACCESS_TOKEN` (+ `SUPABASE_PROJECT_REF` if not defaulted) as a session env var for a fresh live smoke re-run (gates 7–8) — same discipline as 03-02/05-02. Otherwise the recorded 05-02 live evidence stands.

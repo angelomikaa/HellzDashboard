@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 05-04-PLAN.md (OCR wizard wiring: OcrCapture/CropOverlay + all four capture steps wired, 179/179 tests, build proof — tesseract lazy-chunked, self-hosted assets, 0 FormData). Next: 05-05 owner UAT"
-last_updated: "2026-10-11T21:30:11.981Z"
+stopped_at: "Phase 5 plan 05-05 owner UAT DEFERRED (owner absent, directive 2026-10-11) — steps 1-11 preserved [pending] in 05-UAT.md with all task-1 gate evidence; INPT-02 completion + phase-5 verification held until the walk lands"
+last_updated: "2026-10-11T21:38:15Z"
 last_activity: 2026-10-11
 progress:
   total_phases: 6
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 
 Phase: 05 (ocr-auto-read-layer) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: awaiting owner browser UAT (deferred — owner absent, steps recorded in 05-UAT.md)
 Last activity: 2026-10-11
 
 Progress: [██████████] 95%
@@ -157,6 +157,7 @@ Recent decisions affecting current work:
 - [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need production-data calibration — spike delivered GO (100.0% on 11 owner-device samples) but device fragmentation is NOT covered; region maps are game-UI-versioned (re-run spike to recalibrate); dual-polarity read and manual fix-up are mandatory — all four land in 05-01 as seeded constants (OCR_ACCEPT_CONFIDENCE=85, sanity defaults+overrides); recalibration after a game UI change = recalibrate spike maps → re-run scripts/convert-spike-regions.mjs → normal deploy (05 planning)
 - ~~[Phase 3 / 03-02]: Task 2 Step B (deploy 0007 + verify-pin, live smoke) BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env~~ CLEARED 03-02 (2026-10-10): owner supplied the token as a session env var (never on disk/commit/echo) — 0007 pushed, recursion caught and fixed via 0008, verify-pin redeployed, RLS SMOKE PASSED 15/15. Owner should rotate the deploy token now the deploy is done (standing action)
 - ~~[Phase 5 / 05-02 task 3] Live push of migration 0010 + lifecycle smoke BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env~~ CLEARED 05-02 (2026-10-11): owner supplied the token as a session env var (never on disk/commit/echo, 03-02 precedent) — 0010 pushed live (dry-run confirmed it was the only pending migration), LIFECYCLE SMOKE PASSED 11/11 twice consecutively (no residue; one assertion-shape fix in 873c0d1 — RLS `using` zero-row semantics, see Decisions), RANK SMOKE PASSED (no 0009→0010 regression). Owner should rotate the deploy token now the deploy is done (standing action).
+- [Phase 5 / 05-05] Owner UAT walk DEFERRED by owner directive 2026-10-11 (owner absent: "I'll be absent for a while hence cannot do tests — let's proceed with the next step. Record steps 1 to 11 so we can do it later.") — steps 1–11 preserved `result: [pending]` in 05-UAT.md alongside all 8 task-1 automated-gate results (vitest 179/179, tsc clean, build pass, dist assets, lazy-chunk 0-matches, FormData 0; live smokes auth-gated, 05-02 live evidence standing). INPT-02 completion and phase-5 verification intentionally HELD until the walk lands — no verdicts filled, nothing marked PASS. Resume: `npm run preview` → walk steps 1–11 with real screenshots from .secrets/ocr-samples/ → reply "approved" or report step numbers + observed behavior; a continuation session then fills verdicts, writes 05-05-SUMMARY.md, and the verification chain runs.
 
 ## Deferred Items
 
@@ -168,9 +169,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-11T21:30:11.941Z
-Stopped at: Completed 05-04-PLAN.md (OCR wizard wiring: OcrCapture/CropOverlay + all four capture steps wired, 179/179 tests, build proof — tesseract lazy-chunked, self-hosted assets, 0 FormData). Next: 05-05 owner UAT
-Resume file: None
+Last session: 2026-10-11T21:38:15Z
+Stopped at: Phase 5 plan 05-05 owner UAT deferred
+Resume file: .planning/phases/05-ocr-auto-read-layer/05-UAT.md
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*
