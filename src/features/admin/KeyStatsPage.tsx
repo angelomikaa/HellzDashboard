@@ -57,7 +57,8 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
   const [top5, setTop5] = useState<ClassTop5Row[] | null>(null)
   const [classError, setClassError] = useState<string | null>(null)
 
-  // Any in-flight toggle disables every chip on the page (global busy flag).
+  // Any in-flight toggle disables every chip AND the class selector on the
+  // page (global busy flag) — see the CR-01 notes below.
   const [toggling, setToggling] = useState(false)
   const [toggleError, setToggleError] = useState<string | null>(null)
 
@@ -81,13 +82,18 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
     }
   }, [session])
 
-  // Per-class load: key stats + top-5 preview, on every class change.
+  // Per-class load: key stats + top-5 preview, on every class change. The
+  // isStale guard (the cancelled-flag pattern from DashboardPage's mount
+  // effect, CR-01) makes an out-of-order response for a previously selected
+  // class a no-op instead of overwriting the current class's view — the
+  // officer must never see one class's config under another class's heading.
   const loadClassData = useCallback(
-    async (className: string) => {
+    async (className: string, isStale?: () => boolean) => {
       const [keys, preview] = await Promise.all([
         fetchKeyStats(session, className),
         fetchClassTop5(session, className),
       ])
+      if (isStale?.()) return // stale response — drop
       setKeyStats(keys)
       setTop5(preview)
     },
@@ -101,7 +107,10 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
     setTop5(null)
     setClassError(null)
     setToggleError(null)
-    loadClassData(selectedClass).catch((err: unknown) => {
+    // The cancelled flag guards ALL state writes for this class's fetch
+    // (success path via isStale, error path via the catch) — not just the
+    // error copy.
+    loadClassData(selectedClass, () => cancelled).catch((err: unknown) => {
       if (cancelled) return
       setClassError(
         err instanceof ApiError && err.kind === 'unauthorized' ? SESSION_ERROR : NETWORK_ERROR,
@@ -122,6 +131,9 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
       // Optimistic local mirror of the toggle, then refresh-after-save: both
       // server views are re-read so the preview reflects the new config. A
       // refresh failure keeps the stale view — the toggle itself succeeded.
+      // No staleness guard needed here (CR-01): the class selector is
+      // disabled while toggling, so selectedClass can't change mid-toggle and
+      // the captured class can never diverge from the selector.
       setKeyStats((keys) =>
         enabled ? [...(keys ?? []), statKey] : (keys ?? []).filter((k) => k !== statKey),
       )
@@ -170,7 +182,11 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
         <p className="mt-6 text-base text-muted">Carregando…</p>
       ) : (
         <>
-          {/* Class selector (same markup pattern as Personagens' Classe select) */}
+          {/* Class selector (same markup pattern as Personagens' Classe
+              select). Disabled while toggling (CR-01): a mid-toggle class
+              switch would run the refresh-after-save with the class captured
+              at click time and deterministically overwrite the newly selected
+              class's view with the old class's data. */}
           <div className="mt-6 flex max-w-72 flex-col gap-2">
             <label htmlFor="keystats-class" className="text-sm font-semibold text-content">
               Classe
@@ -179,7 +195,8 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
               id="keystats-class"
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              disabled={busy}
+              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="">—</option>
               {classes.map((className) => (
