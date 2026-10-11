@@ -277,8 +277,14 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                 ) : (
                   <ol className="mt-2 flex flex-col gap-2">
                     {top5.map((row, index) => (
+                      // display_name has NO unique constraint (0001) — two
+                      // same-class members can share a nickname, so a
+                      // name-only React key can collide and drop rows.
+                      // Composite with the position (WR-01); returning the
+                      // member id from class_top5 instead would need a
+                      // migration (server change, out of scope here).
                       <li
-                        key={row.display_name}
+                        key={`${row.display_name}-${index}`}
                         className="flex flex-wrap items-baseline justify-between gap-2 text-base text-content"
                       >
                         <span>
