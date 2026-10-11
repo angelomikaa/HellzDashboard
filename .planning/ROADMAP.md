@@ -105,7 +105,22 @@ Plans:
   1. Uploading a screenshot auto-pre-fills stat values via region-based client-side OCR with digit/percent whitelisting and canvas preprocessing (never whole-image recognition)
   2. Player must review and fix pre-filled values before the submission is accepted — OCR misreads cannot slip through silently (fix-up gate applies to OCR output)
   3. OCR works in the production build (worker/core path bundling verified on Vite), is lazy-loaded so it doesn't slow initial page load, and manual entry still works fully when OCR fails
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+
+**Wave 1** *(blocked on nothing — three parallel slices)*
+- [ ] 05-01-PLAN.md — Client OCR module (TDD port of the validated spike pipeline): percentage region maps generated from the committed calibration (D-01/D-19/D-21), hardcoded sanity ranges + confidence gate 85 (D-03/D-16/D-20), dual-polarity preprocessing pure functions, worker lifecycle with self-hosted worker/core assets, lazy-import chunk (criterion 3 build half)
+- [ ] 05-02-PLAN.md — Migration 0010 (append-only corrective): `discarded` status, one-pending-per-player rule in create_submission (D-11), rank cohort filters exclude discarded in my_report/class_top5 (D-12), pending→discarded-own-rows RLS policy, live push + lifecycle smoke (server-side half; officer queue stays Phase 6 per D-13)
+- [ ] 05-03-PLAN.md — Wizard realignment, manual-only: Especial required like Geral/Quasi (D-07, routed from Phase 3), combat_power still the only optional stat, per-step verification checkboxes on all four capture steps (D-08), edits uncheck stale confirmations, ReviewStep shrinks to tap-to-fix summary
+
+**Wave 2** *(blocked on Wave 1 — 05-01 engine + 05-03 step engine)*
+- [ ] 05-04-PLAN.md — OCR capture UI + integration: upload CTA with locked string (D-09/D-10), skeleton/disabled running state (D-17), silent pre-fill + per-field failure message (D-04/D-14/D-16), re-upload replaces the step (D-15), optional aspect-locked crop with decline-cancels-read (D-05), graceful degradation (D-18), production-build lazy-chunk + self-hosted asset proof
+
+**Wave 3** *(blocked on Wave 2 + 05-02 live)*
+- [ ] 05-05-PLAN.md — Consolidated automated gate re-run + owner browser UAT with real screenshots (all 4 captures, crop trigger, failure message, DevTools: no image egress + lazy load only on first upload, manual-only path, Descartado lifecycle) — INPT-02 criteria closed owner-witnessed
+
+Cross-cutting constraints: "screenshots never leave the player's device (D-10 — no FormData/upload anywhere; OCR entirely client-side)" (05-01, 05-04, 05-05); "OCR is never a silent authority — per-step human verification + server re-validation via create_submission (INPT-03)" (05-03, 05-04, 05-05); "submissions stay append-only — discard is a status mark only, rows never deleted or overwritten (INPT-04)" (05-02, 05-05).
 **UI hint**: yes
 
 ### Phase 6: Trust & Celebration — Officer Tools & Promotion Page
@@ -131,7 +146,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. Registry, Catalog & Manual Data Ingestion | 3/3 | Complete    | 2026-10-09 |
 | 3. Rank Engine | 4/4 | Complete   | 2026-10-10 |
 | 4. Member Dashboard & Improvement Screen | 3/3 | Complete   | 2026-10-11 |
-| 5. OCR Auto-Read Layer | 0/2 | Not started | - |
+| 5. OCR Auto-Read Layer | 0/5 | Not started | - |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | 0/2 | Not started | - |
 
 ## Traceability
