@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 05-02-PLAN.md continuation (0010 pushed live, LIFECYCLE SMOKE PASSED 11/11 twice, RANK SMOKE PASSED). Phase 05 plans 01/02/03 all done; next: 05-04 OCR wizard wiring"
-last_updated: "2026-10-11T20:34:35.853Z"
+stopped_at: "Completed 05-04-PLAN.md (OCR wizard wiring: OcrCapture/CropOverlay + all four capture steps wired, 179/179 tests, build proof — tesseract lazy-chunked, self-hosted assets, 0 FormData). Next: 05-05 owner UAT"
+last_updated: "2026-10-11T21:20:27.744Z"
 last_activity: 2026-10-11
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 19
-  completed_plans: 17
-  percent: 89
+  completed_plans: 18
+  percent: 95
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 05 (ocr-auto-read-layer) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-10-11
 
-Progress: [█████████░] 89%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -71,6 +71,7 @@ Progress: [█████████░] 89%
 | Phase 05 P01 | 50min | 3 tasks | 13 files |
 | Phase 05 P03 | 16min | 2 tasks | 4 files |
 | Phase 05 P02 | 25min (continuation session: live push + smokes + docs) | 3 tasks | 4 files |
+| Phase 05 P04 | 32min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -136,6 +137,10 @@ Recent decisions affecting current work:
 - [Phase 05-02]: Discard is a status mark, never a delete (INPT-04): the RLS surface is column-grant-scoped (update (status) only) and the policy admits exactly one transition — own row, pending to discarded, using+with check both; live-proven LIFECYCLE SMOKE PASSED 11/11 twice consecutively
 - [Phase 05-02]: PostgREST zero-row-update probe pattern established: an RLS UPDATE policy's 'using' clause filters rows out of the update set SILENTLY (never reaching 'with check'), so a fully-blocked PATCH answers 204/200-empty, not 403 — the correct probe is Prefer return=representation + assert 0 rows updated; caught live when the first smoke run failed 2/11 on assertion shape, not on behavior (fixed in 873c0d1)
 - [Phase 05-02]: INPT-02 stays Pending by traceability (05-01/05-03 precedent) — 05-02 is the lifecycle foundation only; the requirement completes when 05-04 wires the wizard and 05-05 UAT-verifies end-to-end
+- [Phase 05-04]: The plan's lazy-import specifier '../ocr' cannot resolve from src/features/submit/ (its own tsc -b gate would fail) — used './ocr'; the lazy-chunk intent is build-proven (entry chunk createWorker: 0 matches, dedicated ocr-*.js chunk: 1)
+- [Phase 05-04]: needsCrop pins the binding formula (>12% exclusive): the plan's 11.2% 'true' case contradicted its own parenthetical and formula (pinned false, 05-01 clamp-example class), and a 1e-9 epsilon absorbs IEEE-754 noise at the exact-12% boundary so 'exactly 0.12 -> false' holds
+- [Phase 05-04]: OCR outcomes flow through the single central handleChange wrapper (D-15 replace-all-displayed: filled -> raw, failed/unmapped -> blank + locked failure flag, failure set replaced wholesale) so every pre-fill unchecks the owning step's verification (T-05-12); declining the crop cancels the read entirely — no outcomes, no failure spam (pitfall 7)
+- [Phase 05-04]: INPT-02 stays Pending by traceability (05-01/02/03 precedent) — criteria 1+2 code-complete, criterion 3's build half proven (tesseract only in the lazy chunk, self-hosted worker/core in dist/ocr/, 0 FormData); completes at 05-05 owner UAT
 
 ### Pending Todos
 
@@ -163,8 +168,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-11T20:34:35.782Z
-Stopped at: Completed 05-02-PLAN.md continuation (0010 pushed live, LIFECYCLE SMOKE PASSED 11/11 twice, RANK SMOKE PASSED). Phase 05 plans 01/02/03 all done; next: 05-04 OCR wizard wiring
+Last session: 2026-10-11T21:20:27.688Z
+Stopped at: Completed 05-04-PLAN.md (OCR wizard wiring: OcrCapture/CropOverlay + all four capture steps wired, 179/179 tests, build proof — tesseract lazy-chunked, self-hosted assets, 0 FormData). Next: 05-05 owner UAT
 Resume file: None
 
 ---

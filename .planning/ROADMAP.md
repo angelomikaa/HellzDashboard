@@ -115,7 +115,7 @@ Plans:
 - [x] 05-03-PLAN.md — Wizard realignment, manual-only: Especial required like Geral/Quasi (D-07, routed from Phase 3), combat_power still the only optional stat, per-step verification checkboxes on all four capture steps (D-08), edits uncheck stale confirmations, ReviewStep shrinks to tap-to-fix summary
 
 **Wave 2** *(blocked on Wave 1 — 05-01 engine + 05-03 step engine)*
-- [ ] 05-04-PLAN.md — OCR capture UI + integration: upload CTA with locked string (D-09/D-10), skeleton/disabled running state (D-17), silent pre-fill + per-field failure message (D-04/D-14/D-16), re-upload replaces the step (D-15), optional aspect-locked crop with decline-cancels-read (D-05), graceful degradation (D-18), production-build lazy-chunk + self-hosted asset proof
+- [x] 05-04-PLAN.md — OCR capture UI + integration: upload CTA with locked string (D-09/D-10), skeleton/disabled running state (D-17), silent pre-fill + per-field failure message (D-04/D-14/D-16), re-upload replaces the step (D-15), optional aspect-locked crop with decline-cancels-read (D-05), graceful degradation (D-18), production-build lazy-chunk + self-hosted asset proof
 
 **Wave 3** *(blocked on Wave 2 + 05-02 live)*
 - [ ] 05-05-PLAN.md — Consolidated automated gate re-run + owner browser UAT with real screenshots (all 4 captures, crop trigger, failure message, DevTools: no image egress + lazy load only on first upload, manual-only path, Descartado lifecycle) — INPT-02 criteria closed owner-witnessed
