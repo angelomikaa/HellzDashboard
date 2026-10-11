@@ -10,6 +10,7 @@ import {
   fetchKeyStats,
   fetchMe,
   fetchMembers,
+  fetchMyReport,
   fetchMySubmissions,
   setKeyStat,
   updateCharacter,
@@ -221,5 +222,53 @@ describe('rank engine client functions (03-03 RPC contracts)', () => {
       expect(headers.apikey).toBe('test-anon-key')
       expect(headers.Authorization).toBe('Bearer test-token')
     }
+  })
+})
+
+// Plan 04-01 task 1: the Phase 4 member data contract. my_report() takes ZERO
+// parameters (identity from the JWT only — T-03-11), so the wrapper posts an
+// empty JSON body and unwraps the single jsonb object. RNK-02: the response
+// carries no key-stat identity, and the client types cannot represent it.
+describe('my_report client contract (Phase 4 data contract)', () => {
+  it('fetchMyReport POSTs to /rpc/my_report with an empty JSON body and both gateway headers', async () => {
+    nextResponse = () => res(200, '[]')
+    await fetchMyReport(session)
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/my_report')
+    expect(calls[0].init.method).toBe('POST')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({})
+    const headers = calls[0].init.headers as Record<string, string>
+    expect(headers.apikey).toBe('test-anon-key')
+    expect(headers.Authorization).toBe('Bearer test-token')
+  })
+
+  it('unwraps the returned jsonb object into the typed MyReport shape', async () => {
+    const report = {
+      char_class: 'Assassino',
+      char_function: 'dps',
+      stats: [
+        {
+          stat_key: 'crit',
+          label: 'CRIT',
+          group_name: 'quasi',
+          value_type: 'flat',
+          own_value: 1234,
+          class_average: 1000,
+          best: 9876,
+          points: 72.5,
+          data_sufficient: true,
+        },
+      ],
+      ovr: { value: 87.4, data_sufficient: true },
+    }
+    nextResponse = () => res(200, JSON.stringify(report))
+    await expect(fetchMyReport(session)).resolves.toEqual(report)
+  })
+
+  it('surfaces a 500 as ApiError kind server (shared restFetch error path)', async () => {
+    nextResponse = () => res(500, 'boom')
+    const err = await fetchMyReport(session).catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err.status).toBe(500)
+    expect(err.kind).toBe('server')
   })
 })

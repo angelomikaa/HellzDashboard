@@ -198,3 +198,33 @@ export async function fetchClassTop5(
   })
   return (await parseBody<ClassTop5Row[]>(res)) ?? []
 }
+
+export interface MyReportStat {
+  stat_key: string
+  label: string
+  group_name: 'general' | 'quasi' | 'special'
+  value_type: 'flat' | 'percentual'
+  own_value: number | null
+  class_average: number | null
+  best: number | null
+  points: number | null // null when data_sufficient=false or own_value=null
+  data_sufficient: boolean // cohort n >= 3 (03-CONTEXT D-12)
+}
+
+export interface MyReport {
+  char_class: string | null
+  char_function: 'tank' | 'dps'
+  stats: MyReportStat[] // always all 57 catalog entries, ordered group_name, label
+  ovr: { value: number | null; data_sufficient: boolean }
+}
+
+export async function fetchMyReport(session: NeoFootSession): Promise<MyReport> {
+  // SECURITY DEFINER RPC (0009): THE member contract. Identity comes from
+  // the JWT only — zero parameters, empty JSON body. The response NEVER
+  // carries key-stat identity (RNK-02); render it verbatim.
+  const res = await restFetch(session, '/rpc/my_report', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  return parseBody<MyReport>(res)
+}

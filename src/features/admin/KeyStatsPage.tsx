@@ -18,6 +18,7 @@ import {
   type ClassTop5Row,
   type StatCatalogEntry,
 } from '../../lib/api'
+import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER } from '../../lib/groups'
 import type { NeoFootSession } from '../auth/session'
 
 // Enumeration-safe pt-BR copy (UI contract): never raw server error text.
@@ -29,22 +30,6 @@ const LIMIT_ERROR = 'Máximo de 6 stats por classe — remova uma antes de adici
 const SELECT_CLASS_PROMPT = 'Selecione uma classe para configurar.'
 const EMPTY_TOP5 = 'Nenhum jogador com OVR calculado ainda.'
 const INSUFFICIENT_OVR = '— dados insuficientes'
-
-// D-04 mirrors the submit wizard: fixed group order and the SAME group
-// headings the wizard uses (Geral / Quasi / Especial).
-const GROUP_ORDER = ['general', 'quasi', 'special'] as const
-type ChipGroup = (typeof GROUP_ORDER)[number]
-
-const GROUP_LABELS: Record<ChipGroup, string> = {
-  general: 'Geral',
-  quasi: 'Quasi',
-  special: 'Especial',
-}
-
-const FUNCTION_LABELS: Record<'dps' | 'tank', string> = {
-  dps: 'DPS',
-  tank: 'Tank',
-}
 
 // D-02: exactly 6 key stats per class — client blocks the 7th; the server's
 // 'key_stat_limit' (0009) is the race-proof backstop, not the only gate.
