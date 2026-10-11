@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-10-11T19:13:06.562Z"
+stopped_at: 05-02 task 3 blocked on SUPABASE_ACCESS_TOKEN (auth gate)
+last_updated: "2026-10-11T19:29:19.731Z"
 last_activity: 2026-10-11
 progress:
   total_phases: 6
@@ -142,6 +142,7 @@ Recent decisions affecting current work:
 - [Pre-launch]: Owner must replace public/examples/*.svg placeholder example shots with real game screenshots (acknowledged at 02-03 UAT step 8) before inviting real members
 - [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need production-data calibration — spike delivered GO (100.0% on 11 owner-device samples) but device fragmentation is NOT covered; region maps are game-UI-versioned (re-run spike to recalibrate); dual-polarity read and manual fix-up are mandatory — all four land in 05-01 as seeded constants (OCR_ACCEPT_CONFIDENCE=85, sanity defaults+overrides); recalibration after a game UI change = recalibrate spike maps → re-run scripts/convert-spike-regions.mjs → normal deploy (05 planning)
 - ~~[Phase 3 / 03-02]: Task 2 Step B (deploy 0007 + verify-pin, live smoke) BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env~~ CLEARED 03-02 (2026-10-10): owner supplied the token as a session env var (never on disk/commit/echo) — 0007 pushed, recursion caught and fixed via 0008, verify-pin redeployed, RLS SMOKE PASSED 15/15. Owner should rotate the deploy token now the deploy is done (standing action)
+- [Phase 5 / 05-02 task 3] Live push of migration 0010 + lifecycle smoke BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env — owner must supply as a SESSION env var only (never on disk/commit/echo, 03-02 precedent). Committed and ready: migration 0010 (cd54b84), client status surface (49c156a), smoke-lifecycle.mjs (3126cd0). Remaining: npx supabase db push, run smoke-lifecycle.mjs twice consecutively, re-run smoke-rank.mjs (27/27 regression gate).
 
 ## Deferred Items
 
@@ -153,9 +154,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-11T19:13:06.479Z
-Stopped at: Phase 5 UI-SPEC approved
-Resume file: None
+Last session: 2026-10-11T19:29:19.731Z
+Stopped at: 05-02 task 3 blocked on SUPABASE_ACCESS_TOKEN (auth gate — tasks 1-2 committed, awaiting token to push 0010 + run smokes)
+Resume file: scripts/smoke-lifecycle.mjs
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*
