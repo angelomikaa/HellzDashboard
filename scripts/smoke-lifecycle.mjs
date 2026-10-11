@@ -12,8 +12,10 @@
  *   T-05-04/T-05-08 policy tightness (direct REST PATCH probes):
  *         - status='validated' PATCH on own row MUST fail (non-2xx)
  *         - status='discarded' PATCH on own PENDING row succeeds
- *         - a second PATCH on the ALREADY-discarded row MUST fail
- *           (only pending -> discarded, never back, never anything else)
+ *         - a PATCH on the ALREADY-discarded row MUST update 0 rows
+ *           (RLS `using` filters it out of the update set -> PostgREST
+ *           204 no-content; proven via Prefer return=representation —
+ *           only pending -> discarded, never back, never anything else)
  *
  * If create_submission does NOT discard the prior pending, migration 0010
  * has not landed live — the smoke FAILS loudly (push gate).
@@ -115,8 +117,8 @@ async function login(handle) {
 }
 
 /** PostgREST call. token === null means anon (apikey only). */
-async function rest(path, { method = 'GET', token = null, body = null } = {}) {
-  const headers = { apikey: ANON_KEY }
+async function rest(path, { method = 'GET', token = null, body = null, extraHeaders = {} } = {}) {
+  const headers = { apikey: ANON_KEY, ...extraHeaders }
   if (token) headers.Authorization = `Bearer ${token}`
   if (body !== null) headers['Content-Type'] = 'application/json'
   const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
@@ -277,6 +279,14 @@ async function main() {
     // ---- 5. Only pending -> discarded is reachable: PATCH discarded on own
     //         PENDING row succeeds; a second PATCH on the ALREADY-discarded
     //         row (either back to pending or to re-discard) fails.
+    //         RLS nuance: for UPDATE, the policy's `using` (status = 'pending')
+    //         silently filters the already-discarded row out of the update
+    //         set — Postgres never evaluates `with check` (which is what
+    //         yields the 403 on the pending row above). PostgREST reports a
+    //         zero-row PATCH as 204 No Content, so the proof here is
+    //         "0 rows updated": Prefer return=representation makes PostgREST
+    //         return 200 + the updated rows when ANY row changes, and bare
+    //         204 (empty body) when none does.
     const patchDiscardPending = await rest(`/submissions?id=eq.${row2.id}`, {
       method: 'PATCH',
       token: session.access_token,
@@ -291,20 +301,24 @@ async function main() {
       method: 'PATCH',
       token: session.access_token,
       body: { status: 'discarded' },
+      extraHeaders: { Prefer: 'return=representation' },
     })
     check(
-      'T-05-08: PATCH on the already-discarded row -> non-2xx (no transition back)',
-      !patchDiscardedRow.ok,
+      'T-05-08: PATCH on the already-discarded row updates 0 rows (no transition back)',
+      patchDiscardedRow.status === 204 ||
+        (Array.isArray(patchDiscardedRow.json) && patchDiscardedRow.json.length === 0),
       `HTTP ${patchDiscardedRow.status} ${patchDiscardedRow.text.slice(0, 120)}`,
     )
     const patchValidatedDiscarded = await rest(`/submissions?id=eq.${row1.id}`, {
       method: 'PATCH',
       token: session.access_token,
       body: { status: 'validated' },
+      extraHeaders: { Prefer: 'return=representation' },
     })
     check(
-      'T-05-04: PATCH status=validated on the already-discarded row -> non-2xx',
-      !patchValidatedDiscarded.ok,
+      'T-05-04: PATCH status=validated on the already-discarded row updates 0 rows',
+      patchValidatedDiscarded.status === 204 ||
+        (Array.isArray(patchValidatedDiscarded.json) && patchValidatedDiscarded.json.length === 0),
       `HTTP ${patchValidatedDiscarded.status} ${patchValidatedDiscarded.text.slice(0, 120)}`,
     )
 
