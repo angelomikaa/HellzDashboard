@@ -1,7 +1,7 @@
 ---
 phase: 5
 slug: ocr-auto-read-layer
-status: draft
+status: approved
 reviewed_at: 2026-10-11
 shadcn_initialized: false
 preset: none
