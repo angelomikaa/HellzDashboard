@@ -15,12 +15,16 @@ const STATUS_LABELS: Record<SubmissionRow['status'], string> = {
   pending: 'Aguarda validação',
   validated: 'Validado',
   rejected: 'Rejeitado',
+  discarded: 'Descartado',
 }
 
 const STATUS_CLASSES: Record<SubmissionRow['status'], string> = {
   pending: 'text-muted',
   validated: 'text-success',
   rejected: 'text-destructive',
+  // Same visual weight as Aguarda validação — the player's own replaced
+  // pending (0010 one-pending rule), not an officer judgment (per UI-SPEC).
+  discarded: 'text-muted',
 }
 
 const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })

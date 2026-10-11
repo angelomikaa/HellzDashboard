@@ -38,7 +38,7 @@ export interface MemberRow {
 
 export interface SubmissionRow {
   id: string
-  status: 'pending' | 'validated' | 'rejected'
+  status: 'pending' | 'validated' | 'rejected' | 'discarded'
   submitted_at: string
 }
 
