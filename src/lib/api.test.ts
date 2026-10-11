@@ -94,6 +94,13 @@ describe('REST client gateway contract (both headers, every call)', () => {
     expect(calls[2].init.method).toBe('PATCH')
   })
 
+  it('updateCharacter URL-encodes the id (interpolation hardening)', async () => {
+    nextResponse = () => res(200, '')
+    // A crafted id must not be able to inject PostgREST query operators.
+    await updateCharacter(session, 'abc def/1', { char_class: 'Assassin' })
+    expect(calls[0].url).toContain('/members?id=eq.abc%20def%2F1')
+  })
+
   it('parses catalog entries and maps classes to string[]', async () => {
     nextResponse = () =>
       res(

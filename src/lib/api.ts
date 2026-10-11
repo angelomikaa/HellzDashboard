@@ -124,7 +124,13 @@ export async function updateCharacter(
 ): Promise<void> {
   // Column grants allow updating display_name/char_class/char_function ONLY —
   // role/pin_hash are ungranted and fail server-side. RLS: staff policy.
-  await restFetch(session, `/members?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
+  // The id is URL-encoded (interpolation hardening, same standard as
+  // fetchKeyStats): the signature accepts any string, and a crafted value
+  // must not be able to inject PostgREST query operators.
+  await restFetch(session, `/members?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
 }
 
 export async function createClass(session: NeoFootSession, className: string): Promise<void> {
