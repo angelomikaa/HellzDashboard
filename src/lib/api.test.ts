@@ -120,6 +120,11 @@ describe('REST client gateway contract (both headers, every call)', () => {
     const uuid = await createSubmission(session, [{ stat_key: 'crit', value: 16 }])
     expect(uuid).toBe('22222222-2222-2222-2222-222222222222')
   })
+
+  it('fetchCatalog maps an empty 2xx body to [] (parseBody guard)', async () => {
+    nextResponse = () => res(200, '')
+    await expect(fetchCatalog(session)).resolves.toEqual([])
+  })
 })
 
 describe('REST client error handling', () => {
@@ -238,7 +243,18 @@ describe('rank engine client functions (03-03 RPC contracts)', () => {
 // carries no key-stat identity, and the client types cannot represent it.
 describe('my_report client contract (Phase 4 data contract)', () => {
   it('fetchMyReport POSTs to /rpc/my_report with an empty JSON body and both gateway headers', async () => {
-    nextResponse = () => res(200, '[]')
+    // Minimal VALID report shape — the WR-03 malformed-response guard now
+    // rejects empty/array bodies, so this request-level fixture must satisfy it.
+    nextResponse = () =>
+      res(
+        200,
+        JSON.stringify({
+          char_class: null,
+          char_function: 'dps',
+          stats: [],
+          ovr: { value: null, data_sufficient: false },
+        }),
+      )
     await fetchMyReport(session)
     expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/my_report')
     expect(calls[0].init.method).toBe('POST')
@@ -277,5 +293,29 @@ describe('my_report client contract (Phase 4 data contract)', () => {
     expect(err).toBeInstanceOf(ApiError)
     expect(err.status).toBe(500)
     expect(err.kind).toBe('server')
+  })
+
+  it('throws ApiError kind server on an empty 2xx body (malformed-response guard)', async () => {
+    nextResponse = () => res(200, '') // RPC returning NULL -> empty body
+    const err = await fetchMyReport(session).catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err.kind).toBe('server')
+    expect(err.message).toContain('malformed my_report response')
+  })
+
+  it('throws ApiError kind server when stats is not an array (malformed-response guard)', async () => {
+    nextResponse = () =>
+      res(
+        200,
+        JSON.stringify({
+          char_class: 'Assassino',
+          char_function: 'dps',
+          ovr: { value: null, data_sufficient: false },
+        }),
+      )
+    const err = await fetchMyReport(session).catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err.kind).toBe('server')
+    expect(err.message).toContain('malformed my_report response')
   })
 })

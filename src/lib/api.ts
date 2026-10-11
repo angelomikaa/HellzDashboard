@@ -82,7 +82,10 @@ export async function fetchCatalog(session: NeoFootSession): Promise<StatCatalog
     session,
     '/stat_catalog?select=stat_key,label,group_name,value_type&order=stat_key',
   )
-  return parseBody<StatCatalogEntry[]>(res)
+  // parseBody maps an empty 2xx body to undefined (WR-03) — same ?? [] guard
+  // as every other list wrapper; a shape the client can't control must not
+  // crash the render path.
+  return (await parseBody<StatCatalogEntry[]>(res)) ?? []
 }
 
 export async function fetchClasses(session: NeoFootSession): Promise<string[]> {
@@ -232,5 +235,13 @@ export async function fetchMyReport(session: NeoFootSession): Promise<MyReport> 
     method: 'POST',
     body: JSON.stringify({}),
   })
-  return parseBody<MyReport>(res)
+  // parseBody maps an empty 2xx body to undefined (WR-03) — e.g. the RPC
+  // returning NULL or a proxy 204. fetchMyReport is typed non-nullable and
+  // feeds the render path directly, so a malformed shape must surface as
+  // ApiError (enumeration-safe copy) instead of a crash at report.stats.
+  const report = await parseBody<MyReport>(res)
+  if (!report || !Array.isArray(report.stats)) {
+    throw new ApiError(0, 'server', 'malformed my_report response')
+  }
+  return report
 }
