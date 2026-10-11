@@ -5,7 +5,7 @@ source: [05-05-PLAN.md, 05-04-SUMMARY.md, 05-02-SUMMARY.md]
 build_tested: "commit 8d7e6d3 — vite preview of the production-shaped dist (src tree identical to c95c794, the 05-04 wizard wiring)"
 server: "http://localhost:4173 (vite preview — restart with npm run preview; see How to resume)"
 started: 2026-10-11T21:23:18Z
-updated: 2026-10-11T21:38:15Z
+updated: 2026-10-11T23:55:00Z
 ---
 
 # Phase 5 Owner UAT — OCR Auto-Read Layer (INPT-02 end-to-end)
@@ -46,7 +46,9 @@ The standing live evidence from **05-02 (2026-10-11)** remains valid and is the 
 
 ---
 
-## Owner Browser Walk — 11 steps (result: PENDING)
+## Owner Browser Walk — 11 steps (result: BLOCKED BY DEFECTS)
+
+*(Walk attempted 2026-10-11 after the earlier deferral — could not be completed; see Deviations below. Step verdicts stay `[pending]` until the defects are fixed and the walk is re-run.)*
 
 Use your real screenshots from `.secrets/ocr-samples/`. Expected behavior per step, from the locked 05-05 plan / 05-UI-SPEC:
 
@@ -109,23 +111,36 @@ Use your real screenshots from `.secrets/ocr-samples/`. Expected behavior per st
 
 ## Deviations from Expected Behavior
 
-*(none recorded yet — owner reports go here verbatim; each gets a disposition: accepted / needs-fix → becomes a gap plan and feeds /gsd-verify-work)*
+**Owner report (verbatim, 2026-10-11):**
+
+> "the sheer amount of error on readings while using our optimal input and the crop step appering all the time and completely failed readings render testing the points 1-11 completely impossible"
+
+**Derived defect list (each needs a disposition via the debug session):**
+
+| # | Symptom | Suspect area (to be confirmed by diagnosis) |
+|---|---------|---------------------------------------------|
+| D-05-UAT-1 | Crop overlay appears on **every upload** — even on the spike-calibrated optimal samples (`.secrets/ocr-samples/`) where it should not trigger | `needsCrop` trigger in `OcrCapture.tsx` / aspect/area basis vs sample geometry |
+| D-05-UAT-2 | High rate of **wrong values** pre-filled when reading the optimal input (spike delivered 100.0% on the same samples in Node) | region-map scaling basis (crop vs full image), preprocessing, decode divergence between spike and browser pipeline |
+| D-05-UAT-3 | Some reads **fail completely** (all fields failing/blank) | worker/core/lang path wiring under vite preview, out-of-bounds regions after crop, read-error handling |
+
+**Consequence:** steps 1–11 could not be walked — the UAT is blocked, not approved. Routed to a debug session for root-cause diagnosis before any re-walk.
 
 ## Verdict
 
-**OWNER UAT: DEFERRED — not walked, not approved.**
+**OWNER UAT: BLOCKED BY DEFECTS — walk attempted 2026-10-11, could not be completed.**
 
-**Deferral record (2026-10-11):** the owner was absent at the checkpoint and directed (verbatim): *"I'll be absent for a while hence cannot do tests — let's proceed with the next step. Record steps 1 to 11 so we can do it later."*
+The earlier deferral record (below) is superseded by this attempt: the owner returned, ran the preview at http://localhost:4173 with the real screenshots, and hit the three defects above. **No step is marked PASS; INPT-02 completion and Phase 5 verification remain HELD.**
 
-- Steps 1–11 are preserved above, each with its expected behavior and `result: [pending]` — **no verdicts filled, no step marked PASS**. The deferral is a schedule fact, not an approval.
-- The 8 automated-gate results from task 1 stand as recorded: vitest 179/179, tsc clean, build pass, dist OCR assets present, lazy-chunk 0-matches, FormData 0; live smokes auth-gated with the 05-02 live evidence standing.
-- INPT-02 completion and Phase 5 verification are intentionally **HELD** until the owner's real walk lands. A continuation session will fill the verdicts, write 05-05-SUMMARY.md, and only then does the phase verification chain run.
+---
+
+*Superseded deferral record (2026-10-11, kept for history):* the owner was absent at the first checkpoint and directed (verbatim): *"I'll be absent for a while hence cannot do tests — let's proceed with the next step. Record steps 1 to 11 so we can do it later."*
 
 ## How to resume
 
-1. Restart the preview server: `npm run preview` (serves the production-shaped build at http://localhost:4173).
-2. Walk steps 1–11 above in a real browser with your real screenshots from `.secrets/ocr-samples/` (sampbasic.png, sampideal1-3.png, common samples — they never enter git or the network).
-3. Reply **"approved"** to accept, or report the step numbers + observed behavior for anything that differed (each deviation gets a disposition: accepted / needs-fix → becomes a gap plan and feeds /gsd-verify-work).
-4. The continuation session then fills the verdicts in this file, writes 05-05-SUMMARY.md, and the phase verification chain (/gsd-verify-work → /gsd-transition) runs.
+1. **Fixes land first:** the debug session (see `.planning/debug/`) must diagnose and fix D-05-UAT-1/2/3, proven by an offline exact-value harness on the real samples + full suite + build.
+2. Restart the preview server: `npm run preview` (serves http://localhost:4173).
+3. Re-walk steps 1–11 above in a real browser with your real screenshots from `.secrets/ocr-samples/` (sampbasic.png, sampideal1-3.png, common samples — they never enter git or the network).
+4. Reply **"approved"** to accept, or report the step numbers + observed behavior for anything that differed (each deviation gets a disposition: accepted / needs-fix → becomes a gap plan and feeds /gsd-verify-work).
+5. The continuation session then fills the verdicts in this file, writes 05-05-SUMMARY.md, and the phase verification chain (/gsd-verify-work → /gsd-transition) runs.
 
 Optional during the walk: supply `SUPABASE_ACCESS_TOKEN` (+ `SUPABASE_PROJECT_REF` if not defaulted) as a session env var for a fresh live smoke re-run (gates 7–8) — same discipline as 03-02/05-02. Otherwise the recorded 05-02 live evidence stands.

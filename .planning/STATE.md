@@ -157,7 +157,7 @@ Recent decisions affecting current work:
 - [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need production-data calibration — spike delivered GO (100.0% on 11 owner-device samples) but device fragmentation is NOT covered; region maps are game-UI-versioned (re-run spike to recalibrate); dual-polarity read and manual fix-up are mandatory — all four land in 05-01 as seeded constants (OCR_ACCEPT_CONFIDENCE=85, sanity defaults+overrides); recalibration after a game UI change = recalibrate spike maps → re-run scripts/convert-spike-regions.mjs → normal deploy (05 planning)
 - ~~[Phase 3 / 03-02]: Task 2 Step B (deploy 0007 + verify-pin, live smoke) BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env~~ CLEARED 03-02 (2026-10-10): owner supplied the token as a session env var (never on disk/commit/echo) — 0007 pushed, recursion caught and fixed via 0008, verify-pin redeployed, RLS SMOKE PASSED 15/15. Owner should rotate the deploy token now the deploy is done (standing action)
 - ~~[Phase 5 / 05-02 task 3] Live push of migration 0010 + lifecycle smoke BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env~~ CLEARED 05-02 (2026-10-11): owner supplied the token as a session env var (never on disk/commit/echo, 03-02 precedent) — 0010 pushed live (dry-run confirmed it was the only pending migration), LIFECYCLE SMOKE PASSED 11/11 twice consecutively (no residue; one assertion-shape fix in 873c0d1 — RLS `using` zero-row semantics, see Decisions), RANK SMOKE PASSED (no 0009→0010 regression). Owner should rotate the deploy token now the deploy is done (standing action).
-- [Phase 5 / 05-05] Owner UAT walk DEFERRED by owner directive 2026-10-11 (owner absent: "I'll be absent for a while hence cannot do tests — let's proceed with the next step. Record steps 1 to 11 so we can do it later.") — steps 1–11 preserved `result: [pending]` in 05-UAT.md alongside all 8 task-1 automated-gate results (vitest 179/179, tsc clean, build pass, dist assets, lazy-chunk 0-matches, FormData 0; live smokes auth-gated, 05-02 live evidence standing). INPT-02 completion and phase-5 verification intentionally HELD until the walk lands — no verdicts filled, nothing marked PASS. Resume: `npm run preview` → walk steps 1–11 with real screenshots from .secrets/ocr-samples/ → reply "approved" or report step numbers + observed behavior; a continuation session then fills verdicts, writes 05-05-SUMMARY.md, and the verification chain runs.
+- ~~[Phase 5 / 05-05] Owner UAT walk DEFERRED by owner directive 2026-10-11 (owner absent)~~ SUPERSEDED — walk ATTEMPTED 2026-10-11 and **BLOCKED BY DEFECTS** (owner report verbatim in 05-UAT.md): (1) crop overlay triggers on EVERY upload including the spike-calibrated optimal samples; (2) high rate of wrong pre-filled values on optimal input (spike was 100.0% on the same samples in Node); (3) some reads fail completely. Steps 1-11 could not be walked — no verdicts filled, INPT-02 and phase-5 verification HELD. Routed to a debug session for root-cause diagnosis (suspects: needsCrop geometry basis, crop-vs-full-image region scaling mismatch between spike calibration and browser pipeline, worker/core/lang path wiring in vite preview); fixes must be proven by an offline exact-value harness on the real samples before the UAT re-walk.
 
 ## Deferred Items
 
@@ -169,9 +169,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-11T23:27:29.417Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-trust-celebration-officer-tools-promotion-page/06-CONTEXT.md
+Last session: 2026-10-11T23:55:00.000Z
+Stopped at: Phase 5 plan 05-05 owner UAT blocked by OCR defects — debug session
+Resume file: .planning/phases/05-ocr-auto-read-layer/05-UAT.md
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*
