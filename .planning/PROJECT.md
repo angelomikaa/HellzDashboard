@@ -14,26 +14,25 @@ Each player can see, through their stat cards, exactly where they stand compared
 
 - [x] 4-digit PIN set and used to access the panel — Validated in Phase 1: hashed bcrypt PINs, login/reload/logout owner-verified, server-side lockout, RLS blocking proven live (AUTH-01, AUTH-02)
 - [x] Backend connection to a free-tier storage like Supabase or a superior alternative — Validated in Phase 1: live Supabase project with 6-table append-only schema and RLS on every table
+- [x] Store all player status data (flat and percentage values across General, Quasi, and Special stat groups) — Validated in Phase 2: manual ingestion wizard live with 57-stat catalog, owner UAT-approved
+- [x] Per-stat percentile ranking within the guild (top 1% = 99 points) — Validated in Phase 3: live in my_report RPC (0009, 27/27 exact-value rank smoke); member-visible since Phase 4 (RNK-03/04/05)
+- [x] Overall rating based on 6 key stats per class, with a normalization floor of 51 OVR (never falls below 51) — Validated in Phase 3: live in my_report (51 + mean(6 key-stat points) × 48/99, all-6-or-nothing); member-visible since Phase 4
+- [x] Key stats are admin-tweakable: an admin can toggle a stat to make it key; each class has an independent set of exactly 6 key stats — Validated in Phase 3: set_key_stat RPC live (advisory-lock block-at-7), Stats-Chave admin page owner-UAT-approved (RNK-01)
+- [x] Key stats are NOT explicit to members (prevents stat skewing to artificially improve ranks) — Validated in Phase 3: member contract structurally key-stat-free, RANK smoke leak-probes green (RNK-02); Phase 4 DevTools-verified by owner (single /rpc/my_report response, no is_key/key_stats)
+- [x] Improvement screen: per-stat cards showing player's value, guild average, best in guild, and percentile position (e.g. "you're in the bottom 30% of Assassins for CRIT") — Validated in Phase 4: CMP-02 owner browser-verified (UAT step 4)
+- [x] Tiered stat cards: bronze for mediocre stats, silver for mildly elevated, gold for highly elevated, platinum for top of the class (own improved version of the reference model, not a copy) — Validated in Phase 4: SHWC-01 owner browser-verified (D-01/D-02 bands, legend + colored badges)
+- [x] Members see aggregates only on their own improvement screen (never individual players' values) — Validated in Phase 4: CMP-03 owner DevTools-verified (one /rpc/my_report request, aggregates only)
+- [x] Fully functional dashboard for all members — Validated in Phase 4: CMP-01 owner browser-verified (Painel tab, mobile-first 1→2→3 column grid)
+- [x] Frontend written in TypeScript using React — Validated in Phases 1–4: React 19 + TypeScript, live and owner-used
 
 ### Active
 
 - [ ] Stat data input: screenshots per character (Basic header + General Stats + Quasi-Stats + Special) with example shots shown beside input boxes — Phase 1 OCR spike added the "basic" character header screen (job, nickname, combat power) as the first capture; reconcile capture count in Phase 2 planning
 - [ ] OCR auto-reads screenshots; failed OCR captures are manually fixed before a successful registration
-- [ ] Store all player status data (flat and percentage values across General, Quasi, and Special stat groups)
-- [ ] Per-stat percentile ranking within the guild (top 1% = 99 points)
-- [ ] Overall rating based on 6 key stats per class, with a normalization floor of 51 OVR (never falls below 51)
-- [ ] Key stats are admin-tweakable: an admin can toggle a stat to make it key; each class has an independent set of exactly 6 key stats
-- [ ] Key stats are NOT explicit to members (prevents stat skewing to artificially improve ranks)
-- [ ] Improvement screen: per-stat cards showing player's value, guild average, best in guild, and percentile position (e.g. "you're in the bottom 30% of Assassins for CRIT")
-- [ ] Tiered stat cards: bronze for mediocre stats, silver for mildly elevated, gold for highly elevated, platinum for top of the class (own improved version of the reference model, not a copy)
 - [ ] Delta badges: track changes since the player's last submission (e.g. ▲ 5,00%)
 - [ ] Separate promotion page showing key stats as "EAFC cards" to promote the best players in the guild
-- [ ] Members see aggregates only on their own improvement screen (never individual players' values)
 - [ ] Officers have elevated role: validate and remove players and registers, blocking access to players from other guilds
 - [ ] Officer role granted manually by the owner
-- [ ] Fully functional dashboard for all members
-- [ ] Frontend written in TypeScript using React
-- [ ] Backend connection to a free-tier storage like Supabase or a superior alternative
 
 ### Out of Scope
 
@@ -68,12 +67,12 @@ Each player can see, through their stat cards, exactly where they stand compared
 |----------|-----------|---------|
 | OCR auto-read + manual fix-up (not pure manual typing) | Reduces input friction; screenshots are the source of truth | — Phase 1 spike: GO (222/222 fields, 100.0% on 11 real samples; device-fragmentation caveats documented) |
 | 3 screenshots per character (General, Quasi, Special) | Example shots beside input boxes; repeat 3x + fix failed OCR | — Phase 2: reconciled — combat_power entered manually on the wizard intro step (catalog stat), example shots rendered beside inputs, no screenshot storage at all (D-10 ratified); Phase 5 will OCR-fill on top |
-| Per-stat percentile points (top 1% = 99 pts) | EAFC Ultimate Team feel based on tops | — Pending |
-| Overall from 6 key stats, floor of 51 OVR | Normalization; overall never below 51 | — Pending |
-| Key stats admin-tweakable, exactly 6 per class | Flexibility; independent set per class | — Pending |
-| Key stats hidden from members | Avoid stat skewing for artificial rank gains | — Pending |
-| Card tiers: bronze/silver/gold/platinum | Own improved pattern instead of reference's orange/green borders | — Pending |
-| Members see aggregates only; promotion page shows top players as EAFC cards | Promote best players; protect individual data | — Pending |
+| Per-stat percentile points (top 1% = 99 pts) | EAFC Ultimate Team feel based on tops | — Live (Phase 3: my_report RPC, 27/27 exact-value smoke; Phase 4: member-visible, owner UAT) |
+| Overall from 6 key stats, floor of 51 OVR | Normalization; overall never below 51 | — Live (Phase 3 RPC; Phase 4 OvrHero member-visible, owner UAT) |
+| Key stats admin-tweakable, exactly 6 per class | Flexibility; independent set per class | — Live (Phase 3: set_key_stat block-at-7 + Stats-Chave owner-UAT) |
+| Key stats hidden from members | Avoid stat skewing for artificial rank gains | — Live (Phase 3 leak-probes; Phase 4 DevTools-verified by owner) |
+| Card tiers: bronze/silver/gold/platinum | Own improved pattern instead of reference's orange/green borders | — Live (Phase 4: D-01/D-02 bands + legend, owner UAT) |
+| Members see aggregates only; promotion page shows top players as EAFC cards | Promote best players; protect individual data | — Split: aggregates-only live (Phase 4, CMP-03 owner-verified); promotion page Phase 6 |
 | 4-digit PIN auth with officer elevation by owner | Simple access; officers validate/remove players and registers | — Phase 1: live (verify-pin + lockout + 7-day custom-claim JWT); follow-up hardening applied 2026-10-09 via code-review-fix (CR-01 atomic lockout RPC, CR-02 session hardening, WR-01..09) — see 01-REVIEW-FIX.md |
 | Dedicated HS256 signing key for custom-claim JWTs (NEFOOT_JWT_SECRET) | Platform redacts the legacy JWT secret; key 6f7657c3 must never be revoked | — Phase 1 |
 | Panel branded "Hellz" (subtitle "Painel Geral") | "NeoFoot" was an abandoned folder name reused for the repo; UI shows Hellz — internal identifiers (repo, storage key, JWT issuer) unchanged | — Phase 1 |
@@ -99,4 +98,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-10 — Phase 3 complete (rank engine live in Postgres: set_key_stat/my_report/class_top5 SECURITY DEFINER RPCs, migration 0009; rank math spec + 101-test local suite; staff Stats-Chave admin page owner-UAT-approved; 02-REVIEW hardening debt cleared via 0007/0008 with live RLS smoke 19/19 incl. deactivated-staff probe; RANK smoke 27 checks ×2 with exact-value fixtures). Verification 4/4 success criteria passed. Advisory code-review findings in 03-REVIEW.md (0 criticals). Phase 4 (Member Dashboard & Improvement Screen) next — cards are pure presentations of my_report.*
+*Last updated: 2026-10-11 — Phase 4 complete (Member Dashboard & Improvement Screen: DashboardPage wired into the Painel tab, 57 tiered stat cards in collapsible Geral/Quasi/Especial groups, OVR hero, Foco de melhoria focus strip with jump-to-card, empty state with Enviar Status CTA; fetchMyReport contract + TDD-locked presentation pure functions from 04-01, five leaf components per the approved 04-UI-SPEC from 04-02. Owner browser UAT approved all 8 steps incl. DevTools single-request/no-key-stat proof — CMP-01/02/03, SHWC-01 complete, SHWC-02 deferred to Phase 6. 128/128 tests, build, lint green. Advisory 04-REVIEW: 1 blocker (KeyStatsPage stale-class race, pre-existing Phase-3 defect) + 3 warnings — run /gsd-code-review-fix 4. Owner follow-up: pick 6 key stats for the new "gypsy" class in Stats-Chave so gypsy members get an OVR. Core value delivered end-to-end. Phase 5 (OCR Auto-Read Layer) next.*
