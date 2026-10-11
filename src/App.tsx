@@ -4,6 +4,7 @@ import { RequireAuth } from './features/auth/RequireAuth'
 import { CharactersPage } from './features/admin/CharactersPage'
 import { KeyStatsPage } from './features/admin/KeyStatsPage'
 import { SubmitPage } from './features/submit/SubmitPage'
+import { DashboardPage } from './features/dashboard/DashboardPage'
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   member: 'Membro',
@@ -11,7 +12,10 @@ const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   owner: 'Proprietário',
 }
 
-type Tab = 'painel' | 'submit' | 'characters' | 'keystats'
+// Exported for DashboardPage's type-only import (erased at build — no
+// runtime cycle: App imports the page's value, the page imports only the
+// Tab union as a type).
+export type Tab = 'painel' | 'submit' | 'characters' | 'keystats'
 
 function App() {
   const [tab, setTab] = useState<Tab>('painel')
@@ -116,9 +120,7 @@ function App() {
                 ) : showSubmit ? (
                   <SubmitPage session={session} />
                 ) : (
-                  <p className="pt-16 text-center text-base text-muted">
-                    O painel de status está em construção — as próximas telas chegam em breve.
-                  </p>
+                  <DashboardPage session={session} onNavigate={setTab} />
                 )}
               </div>
             </main>
