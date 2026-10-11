@@ -92,7 +92,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Data contract + presentation logic: shared group labels (groups.ts), fetchMyReport RPC wrapper + MyReport types, tier bands / 10%-step percentile phrase / focus-strip selection as TDD pure functions (D-01/D-02/D-09..D-12/D-16)
+- [x] 04-01-PLAN.md — Data contract + presentation logic: shared group labels (groups.ts), fetchMyReport RPC wrapper + MyReport types, tier bands / 10%-step percentile phrase / focus-strip selection as TDD pure functions (D-01/D-02/D-09..D-12/D-16)
 - [ ] 04-02-PLAN.md — Leaf components to the approved UI-SPEC: StatCard (all 3 variants), OvrHero (insufficient + no-class), TierLegend, CollapsibleGroup, FocusStrip (D-03..D-08, D-14, D-15)
 - [ ] 04-03-PLAN.md — DashboardPage composition (fetch-on-mount state machine, empty state CTA, focus-jump) + App Painel wiring + owner browser UAT incl. DevTools single-call/key-stat leak proof (CMP-01..03 end-to-end)
 **UI hint**: yes
