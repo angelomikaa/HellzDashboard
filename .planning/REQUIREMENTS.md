@@ -38,13 +38,13 @@ Requirements for initial release (MVP — will be escalated later). Each maps to
 
 ### Comparison & Dashboard
 
-- [ ] **CMP-01**: Player sees their own dashboard with stat cards (mobile-first responsive)
-- [ ] **CMP-02**: Player sees per-stat comparison: their value, guild average for their class, best in guild, and percentile position (e.g. "you're in the bottom 30% of Assassins for CRIT")
-- [ ] **CMP-03**: Members see aggregates only — never other individual players' values
+- [x] **CMP-01**: Player sees their own dashboard with stat cards (mobile-first responsive) *(04-03: DashboardPage wired into the Painel tab, 1→2→3 column grid — owner browser-verified, UAT steps 1–5)*
+- [x] **CMP-02**: Player sees per-stat comparison: their value, guild average for their class, best in guild, and percentile position (e.g. "you're in the bottom 30% of Assassins for CRIT") *(04-01 tested percentile phrase + 04-02 StatCard + 04-03; owner browser-verified, UAT step 4)*
+- [x] **CMP-03**: Members see aggregates only — never other individual players' values *(04-03: owner DevTools-verified exactly one /rpc/my_report request with aggregates only — UAT step 6; no-key-stat-leak + import gates since 04-01)*
 
 ### Showcase
 
-- [ ] **SHWC-01**: Stat cards are tiered: bronze for mediocre stats, silver for mildly elevated, gold for highly elevated, platinum for top of the class (own visual identity, not a copy of the reference model)
+- [x] **SHWC-01**: Stat cards are tiered: bronze for mediocre stats, silver for mildly elevated, gold for highly elevated, platinum for top of the class (own visual identity, not a copy of the reference model) *(04-01 tier bands + 04-02 StatCard/TierLegend + 04-03; owner browser-verified, UAT steps 1/4)*
 - [ ] **SHWC-02**: Promotion page shows top players as EAFC-style cards to promote the best players in the guild
 
 ## v2 Requirements
@@ -108,10 +108,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RNK-03 | Phase 3 | Complete |
 | RNK-04 | Phase 3 | Complete |
 | RNK-05 | Phase 3 | Complete |
-| CMP-01 | Phase 4 | Pending |
-| CMP-02 | Phase 4 | Pending |
-| CMP-03 | Phase 4 | Pending |
-| SHWC-01 | Phase 4 | Pending |
+| CMP-01 | Phase 4 | Complete |
+| CMP-02 | Phase 4 | Complete |
+| CMP-03 | Phase 4 | Complete |
+| SHWC-01 | Phase 4 | Complete |
 | SHWC-02 | Phase 6 | Pending |
 
 **Coverage:**
@@ -121,4 +121,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-10-07*
-*Last updated: 2026-10-09 after 02-03 execution (INPT-01, INPT-03 complete; INPT-04 UI-proofed — Phase 2 requirements all done)*
+*Last updated: 2026-10-11 after 04-03 execution (CMP-01, CMP-02, CMP-03, SHWC-01 complete — Phase 4 requirements all done)*

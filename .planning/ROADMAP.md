@@ -13,7 +13,7 @@ NeoFoot delivers the core loop — register → submit → see standing → impr
 - [x] **Phase 1: Foundation — Secure Access & Data Model** - Supabase schema + RLS, per-player PIN auth, project scaffolding, OCR feasibility spike (completed 2026-10-09)
 - [x] **Phase 2: Registry, Catalog & Manual Data Ingestion** - Character registry, stat catalog, guided 3-screenshot upload with manual entry + fix-up gate (completed 2026-10-09)
 - [x] **Phase 3: Rank Engine** - Postgres RPCs: per-stat percentile (top 1% = 99 pts) + OVR from 6 hidden key stats, floor 51 (completed 2026-10-10)
-- [ ] **Phase 4: Member Dashboard & Improvement Screen** - Mobile-first stat cards (bronze→platinum), per-stat comparison, aggregates-only privacy
+- [x] **Phase 4: Member Dashboard & Improvement Screen** - Mobile-first stat cards (bronze→platinum), per-stat comparison, aggregates-only privacy (completed 2026-10-11)
 - [ ] **Phase 5: OCR Auto-Read Layer** - Tesseract.js client-side pre-fill bolted onto the working submit wizard, mandatory review retained
 - [ ] **Phase 6: Trust & Celebration — Officer Tools & Promotion Page** - Officer validation queue, role management, EAFC-style promotion page
 
@@ -94,7 +94,7 @@ Plans:
 Plans:
 - [x] 04-01-PLAN.md — Data contract + presentation logic: shared group labels (groups.ts), fetchMyReport RPC wrapper + MyReport types, tier bands / 10%-step percentile phrase / focus-strip selection as TDD pure functions (D-01/D-02/D-09..D-12/D-16)
 - [x] 04-02-PLAN.md — Leaf components to the approved UI-SPEC: StatCard (all 3 variants), OvrHero (insufficient + no-class), TierLegend, CollapsibleGroup, FocusStrip (D-03..D-08, D-14, D-15)
-- [ ] 04-03-PLAN.md — DashboardPage composition (fetch-on-mount state machine, empty state CTA, focus-jump) + App Painel wiring + owner browser UAT incl. DevTools single-call/key-stat leak proof (CMP-01..03 end-to-end)
+- [x] 04-03-PLAN.md — DashboardPage composition (fetch-on-mount state machine, empty state CTA, focus-jump) + App Painel wiring + owner browser UAT incl. DevTools single-call/key-stat leak proof (CMP-01..03 end-to-end)
 **UI hint**: yes
 
 ### Phase 5: OCR Auto-Read Layer
@@ -130,7 +130,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. Foundation — Secure Access & Data Model | 4/4 | Complete    | 2026-10-09 |
 | 2. Registry, Catalog & Manual Data Ingestion | 3/3 | Complete    | 2026-10-09 |
 | 3. Rank Engine | 4/4 | Complete   | 2026-10-10 |
-| 4. Member Dashboard & Improvement Screen | 0/3 | Not started | - |
+| 4. Member Dashboard & Improvement Screen | 3/3 | Complete   | 2026-10-11 |
 | 5. OCR Auto-Read Layer | 0/2 | Not started | - |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | 0/2 | Not started | - |
 
@@ -155,10 +155,10 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | RNK-03 | Phase 3 | Complete (03-01 formula spec + 03-03 live exact-value proof) |
 | RNK-04 | Phase 3 | Complete (03-01 formula spec + 03-03 live exact-value proof) |
 | RNK-05 | Phase 3 | Complete (03-01 formula spec + 03-03 live exact-value proof) |
-| CMP-01 | Phase 4 | Pending |
-| CMP-02 | Phase 4 | Pending |
-| CMP-03 | Phase 4 | Pending |
-| SHWC-01 | Phase 4 | Pending |
+| CMP-01 | Phase 4 | Complete (04-03: DashboardPage mobile-first composition wired into Painel; owner browser-verified, UAT steps 1–5) |
+| CMP-02 | Phase 4 | Complete (04-01 tested phrase + 04-02 StatCard + 04-03; owner browser-verified, UAT step 4) |
+| CMP-03 | Phase 4 | Complete (04-03: owner DevTools-verified single /rpc/my_report request, aggregates only, UAT step 6; import gates since 04-01) |
+| SHWC-01 | Phase 4 | Complete (04-01 tier bands + 04-02 StatCard/TierLegend + 04-03; owner browser-verified, UAT steps 1/4) |
 | SHWC-02 | Phase 6 | Pending |
 
 **Coverage: 22/22 requirement-to-phase mappings complete (20 unique v1 requirements, no orphans, no duplicates) ✓**
