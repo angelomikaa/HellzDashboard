@@ -1,17 +1,17 @@
-// Wizard core logic (plan 02-03) — PURE functions, no React imports.
-// Required/optional rules per 02-RESEARCH §6 P2D-C: General + Quasi fields
-// are required; Special fields are optional (blank = not captured — a blank is
-// never stored as 0); combat_power lives in group 'general' in the catalog
-// but is optional here (special-cased by stat_key — entered on the intro
-// step, OCR-filled in Phase 5).
+// Wizard core logic (plan 02-03; realigned by 05-03) — PURE functions, no React imports.
+// Required/optional rules per D-07 (supersedes 02-RESEARCH §6 P2D-C):
+// General, Quasi AND Especial (special) fields are all required; combat_power
+// lives in group 'general' in the catalog but is optional here (special-cased
+// by stat_key — entered on the intro step, OCR-filled in Phase 5); a blank
+// optional is never stored as 0.
 import type { StatCatalogEntry } from '../../lib/api'
 import { parseStatValue } from '../../lib/parseStatValue'
-
-export const REQUIRED_GROUPS: ReadonlyArray<'general' | 'quasi'> = ['general', 'quasi']
 
 export const WIZARD_GROUPS = ['general', 'quasi', 'special'] as const
 
 export type WizardGroup = (typeof WIZARD_GROUPS)[number]
+
+export const REQUIRED_GROUPS: ReadonlyArray<WizardGroup> = ['general', 'quasi', 'special']
 
 /** stat_key -> raw user input (exactly what the player typed, pt-BR forms). */
 export type GroupInputs = Record<string, string>
@@ -27,16 +27,16 @@ export type StatsPayloadResult =
 
 /** combat_power is optional even though it sits in the 'general' catalog group. */
 function isOptionalEntry(entry: StatCatalogEntry): boolean {
-  return entry.group_name === 'special' || entry.stat_key === 'combat_power'
+  return entry.stat_key === 'combat_power'
 }
 
-function isRequiredGroup(group: WizardGroup): group is 'general' | 'quasi' {
+function isRequiredGroup(group: WizardGroup): boolean {
   return (REQUIRED_GROUPS as readonly string[]).includes(group)
 }
 
 /**
  * A group is complete when every required field parses via parseStatValue.
- * Optional fields (special group, combat_power) may stay blank — but if the
+ * Optional fields (combat_power only) may stay blank — but if the
  * player typed something, it must parse.
  */
 export function groupComplete(
