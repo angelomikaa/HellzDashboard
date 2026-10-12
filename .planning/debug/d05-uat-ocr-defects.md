@@ -1,31 +1,54 @@
 ---
-status: awaiting_human_verify
+status: investigating
 trigger: "Phase 5 owner UAT BLOCKED by 3 OCR defects: crop overlay appears on every upload (incl. optimal samples), high rate of wrong pre-filled values on optimal input, some reads fail completely. Spike scored 222/222 on the same samples in Node."
 created: 2026-10-11T00:00:00Z
-updated: 2026-10-12T00:00:00Z
+updated: 2026-10-12T12:00:00Z
 symptoms_prefilled: true
 goal: find_and_fix
 ---
 
+# ROUND 2 — CropOverlay defects D-05-UAT-4/5/6 (owner re-walk after round-1 fixes)
+
+Owner report (verbatim, round 2): "crop tool is appearing incorrectly and cropping incorrenctly
+(it forces the crop into a square, optimal input is a rectangle, send without cropping doesnt
+work, and square, unoptimal cropping forced by the cropping tool working in a way that is not
+intended still is unable to read any values." Observed during the step-8 walk (full phone
+screenshot — the crop appearing there IS by design under the 5% gate).
+
 ## Current Focus
 
-hypothesis: Primary suspect (H1, explains all three): needsCrop fires on the optimal samples
-  because the actual PNG file dimensions differ from the calibration `resolution` recorded in
-  scripts/ocr-regions.json (or the aspect stored in generated regions.ts is otherwise not the
-  aspect the real file decodes to). Once the crop overlay wrongly fires, the owner drags an
-  arbitrary aspect-locked box over an ALREADY-optimal image; the read then scales region rects
-  against the re-cropped bitmap => systematically displaced regions => wrong values (D-2) and
-  all-field failures (D-3). Secondary suspects: (H2) worker/core/lang URL wiring broken under
-  vite preview => total failures; (H3) preprocessing divergence (canvas upscale vs sharp cubic)
-  => wrong values.
-test: Measure actual PNG dimensions of every .secrets/ocr-samples/*.png with sharp; compute
-  needsCrop(actualAspect, CAPTURES[capture].aspect) for the canonical capture<-sample pairs.
-expecting: If H1 is true, at least the canonical samples show |imgAspect/refAspect - 1| > 0.12
-  (or the raw dims differ from the recorded resolution). If H1 is false, all canonical samples
-  return needsCrop=false and the crop defect must live elsewhere (e.g. decode/EXIF).
-next_action: Run a Node dimension-measurement script over .secrets/ocr-samples/, compare each
-  sample's real WxH and aspect to scripts/ocr-regions.json resolution entries and to the
-  CAPTURES aspects in src/features/submit/ocr/regions.ts.
+hypothesis: (R2-H1, D-05-UAT-4) The "forced square" is NOT a 1:1 lock: src AND dist bytes prove
+  the box model is `height = width / CAPTURES[capture].aspect` everywhere (verified in the
+  compiled entry chunk index-CYbfIruJ.js). But general/quasi/special lock at aspects
+  0.8538/0.8867/0.8299 => box h/w = 1.17/1.13/1.20 — visually NEAR-SQUARE tall rectangles that
+  exactly match the tall calibration frames (648x759 etc.); only basic (1.6611) is a wide
+  rectangle. If the owner walked step 8 at a step 2-4 lock with a wide/basic-content
+  screenshot, the lock box looks square-ish, cannot cover the wide panel, and any confirmed
+  crop reads zero — matching every clause of the report. (R2-H2, D-05-UAT-5) The decline
+  button is fully wired in dist (onClick -> cancel handler -> bitmap.close, overlay unmount,
+  status idle, onRunStateChange(false)); ratified semantics are spec'd in 05-UI-SPEC
+  ("decline -> idle", silent) — "doesn't work" is either the label-semantics mismatch
+  ("Enviar sem recortar" reads as 'proceed uncropped' but cancels) or the silent-idle giving
+  zero visible feedback. (R2-H3, D-05-UAT-6) Zero values after a rough/mismatched crop is the
+  harness-D mechanism (regions scaled to the cropped bitmap require a frame-exact crop; the
+  default centered-80% box measured 0/14); the crop->read contract itself (rectToPixels
+  against cropped dims) is correct and must be PROVEN by a correct-aspect frame-exact crop
+  reading 14/14.
+test: (1) Pin the overlay geometry with unit tests: export maxBoxWidth/clampPosition/defaultBox
+  and assert the default box ratio == capture aspect for all four captures (never 1:1).
+  (2) Extend the harness: E1 full-screenshot -> needsCrop true -> aspect-locked frame-exact
+  crop -> readScreenshot -> 14/14 exact; E2 same screenshot square-cropped around the panel
+  (the owner's claimed tool behavior) -> ~zero reads; E3 decline-path: no read, no outcomes.
+  (3) Re-verify all 11 samples' dims match their recorded calibration resolutions and the
+  canonical 4 stay no-crop at the 5% gate.
+expecting: E1 14/14 proves the crop->read contract; E2 near-zero proves a square crop (if it
+  were ever forced) yields exactly the owner's zero-value symptom; the geometry pins pass
+  immediately (byte-verified behavior) — if any pin FAILS, the real defect is found and gets a
+  RED->GREEN fix.
+next_action: Write the geometry pin tests + harness extension (E1/E2/E3 + all-11 re-verify),
+  run them against the shipped code, record results, then write dispositions + re-walk
+  guidance; owner-decision items (decline label/feedback copy) go to the checkpoint, not
+  unilateral spec changes.
 
 ## Symptoms
 
@@ -329,3 +352,71 @@ evidence (re-run 2026-10-12 post-change):
     dist entry formula compiles as `Math.abs(e/t-1)>.050000001` (epsilon convention
     consistent with the prior `.120000001` fold)
 
+
+## Evidence (continued � round 2 investigation)
+
+- timestamp: 2026-10-12 R2 code+dist review (D-05-UAT-4 aspect-lock source)
+  checked: src/features/submit/CropOverlay.tsx, OcrCapture.tsx, and the COMPILED dist entry
+    (dist/assets/index-CYbfIruJ.js) around the overlay component; git history of CropOverlay
+  found: The lock is CAPTURES[capture].aspect at the call site (src line 197 and compiled
+    spect:nn[e].aspect); box height is ox.w / aspect in the initial-box effect, the
+    clamp, the resize bound, the confirm drawImage, the cropped-canvas dims, AND the rendered
+    style (height:c.w/t). CropOverlay has exactly 2 commits (6401f95, f5e32c1) � NO version
+    ever carried a 1:1/square lock. CAPTURES aspects in dist: 1.6611/.8538/.8867/.8299 � none
+    is 1. The default centered-80% box uses the same aspect (same formulas).
+  implication: Hypothesis "lock reads wrong source / hardcoded 1:1 / missing-aspect default"
+    is ELIMINATED at byte level for src and dist. A literal square box is impossible in any
+    shipped build.
+
+- timestamp: 2026-10-12 R2 geometry analysis (the near-square shapes)
+  checked: default box h/w = 1/aspect per capture, vs the calibration frames
+  found: basic 0.602 (wide, like 691x416); general 1.171, quasi 1.128, special 1.205 �
+    near-square TALL rectangles that match the tall calibration frames exactly (sampideal1
+    648x759 => 1.171, sampideal2 673x759 => 1.128, sampideal3 649x782 => 1.205). The
+    near-square look at steps 2-4 is the CORRECT lock; only step 1 (basic) yields a wide box.
+  implication: The owner's "it forces the crop into a square, optimal input is a rectangle"
+    is coherently explained by walking step 8 at a step-2/3/4 lock (near-square box) with a
+    wide/basic-content screenshot (691x416 = 1.66): the lock prevents the wide selection,
+    and the forced near-square crop then reads zero. Tool working AS SPECIFIED (05-UI-SPEC:
+    "lock ratio = reference aspect"), but nothing in the UI tells the player which frame
+    shape the step expects � a UX gap to surface to the owner, not a code defect.
+
+- timestamp: 2026-10-12 R2 cancel-path review (D-05-UAT-5)
+  checked: compiled OcrCapture cancel handler (m) + CropOverlay decline wiring + wizard
+    callbacks (SubmitPage handleOcrRunState/applyOcrOutcomes/handleOcrReadFailed)
+  found: Decline button onClick and Escape both route to the cancel handler: bitmap.close(),
+    cropBitmap=null (overlay unmounts), status 'reading'->'idle', onRunStateChange(false)
+    (wizard un-skeletons inputs). No outcomes, no onReadFailed � no pre-fill, no failure
+    spam, manual entry intact. This is EXACTLY the ratified D-05 semantics, and 05-UI-SPEC
+    state matrix line "decline -> idle" makes the silent return spec'd behavior.
+  implication: No functional defect in the cancel path (src, dist, and wiring all verified).
+    The report is explained by (a) label semantics � "Enviar sem recortar" (Send without
+    cropping) reads as 'proceed uncropped' while the ratified behavior cancels the read; and
+    (b) the spec'd silent idle giving zero visible feedback. Changing label/copy or adding a
+    cancelled-status line = UI-SPEC copy-table deviation => OWNER DECISION, not unilateral.
+
+- timestamp: 2026-10-12 R2 crop->read contract review (D-05-UAT-6)
+  checked: readScreenshot (recognize.ts) � rectToPixels(region.rect, image.width,
+    image.height) against the CROPPED canvas dims; regions are fractions of the capture frame
+  found: the contract is correct: an aspect-preserving, frame-exact crop reproduces the
+    calibration frame exactly, so fractions land on the right pixels. Frame-exactness is the
+    binding constraint: regions tolerate ~2% displacement (round-1 harness D measured the
+    default centered-80% box at 0/14 fields). To be PROVEN by harness E1/E2 below.
+  implication: zero values after the owner's rough/near-square crop is the EXPECTED
+    consequence of a non-frame-exact crop (mechanism already pinned by harness D); the
+    contract itself needs the positive proof (correct-aspect frame-exact crop -> 14/14).
+
+## Resolution (round 2 — 2026-10-12)
+
+- **Harness construction bug found and fixed (D/E experiments):** the full-screenshot canvas was built with the 9-arg drawImage form drawImage(panel, 216, 420, 648, 759, 216, 420, 648, 759) — a SOURCE rect (216,420,648,759) off the 648x759 panel itself, i.e. out of bounds: the panel stamped BLACK. Round-1 D's ""0/14 misalignment"" evidence was therefore unsound as coded (black canvas, not displacement). Fix: the 5-arg form drawImage(panel, 216, 420, 648, 759) (draw AT position, natural size) in both D and E. The displacement mechanism is now re-proven with a real panel in the frame.
+- **E1 (frame-exact, capture-aspect crop of a full screenshot): 14/14 exact** — the crop→read contract is SOUND: regions are fractions of the capture frame, and an aspect-preserving frame-exact crop reproduces the uncropped spike-bar read.
+- **E2 (forced 1:1 square containing the panel): 0/14** — documents why a square crop cannot read: region fractions scale to the wrong frame shape.
+- **D (default centered-80% box, real panel): 0/14 (11 failed + 3 wrong)** — a one-click default crop misaligns every region; the mandatory verification checkbox + manual fix-up is the designed safety net for rough crops.
+
+### Dispositions
+
+- **D-05-UAT-4 (crop forces a square): NO CODE DEFECT.** Byte-level: the lock is CAPTURES[capture].aspect everywhere (default box, drag clamp, resize bound, confirm drawImage, cropped-canvas dims, rendered style); dist matches src; no shipped version ever locked 1:1 (aspects 1.6611/0.8538/0.8867/0.8299 — none is 1). The near-square boxes at steps 2–4 are CORRECT: their calibration frames are TALL rectangles (648x759, 673x759, 649x782 → h/w 1.17–1.21); only basic (691x416) is wide. The owner's perception came from cropping a WIDE screenshot against a TALL step lock. Open UX decision for the owner: nothing in the UI communicates the expected frame shape per step.
+- **D-05-UAT-5 (""Enviar sem recortar"" doesn't work): NO CODE DEFECT.** Decline (button + Escape) routes to the cancel handler: bitmap closed, overlay unmounts, status idle, wizard skeleton cleared, no pre-fill, no failure spam — exactly the ratified D-05 semantics (""declining the crop cancels the read"") and the 05-UI-SPEC state matrix (""decline -> idle""). The report is explained by (a) the label reading as ""proceed uncropped"" while the ratified behavior CANCELS, and (b) the spec'd silent return giving zero visible feedback. Copy/feedback changes are UI-SPEC deviations → OWNER DECISION.
+- **D-05-UAT-6 (zero values after crop): EXPECTED CONSEQUENCE, contract proven.** A non-frame-exact crop (forced square or rough default box) misaligns every region (E2: 0/14; D: 0/14); a frame-exact crop reads exactly (E1: 14/14). The mandatory manual fix-up is the designed safety net.
+
+Pinned permanently by CropOverlay.test.ts (geometry pins: no capture locks 1:1, default box carries the capture aspect) and harness experiments A/D/E.

@@ -149,6 +149,12 @@ Use your real screenshots from `.secrets/ocr-samples/`. Expected behavior per st
 | D-05-UAT-5 | **`Enviar sem recortar` doesn't work** (ratified design: declining cancels the read entirely and returns cleanly to manual entry — determine whether the button no-ops, errors, or leaves the overlay/state stuck) | cancel handler wiring in `CropOverlay.tsx` / `OcrCapture.tsx` |
 | D-05-UAT-6 | After the (forced-square) crop, the read produces **zero values** — expected consequence of a wrong-aspect crop vs. region fractions calibrated to the capture frame; must ALSO be verified independently: a correct-aspect crop of a full screenshot must read well | crop→read geometry contract (region scaling applied to the cropped bitmap) |
 
+**Round 2 dispositions (debug session, 2026-10-12 — full evidence in `.planning/debug/d05-uat-ocr-defects.md`):**
+
+- **D-05-UAT-4: NO CODE DEFECT.** The lock is always the step's capture aspect (verified src + dist, pinned by `CropOverlay.test.ts`). Steps 2–4 lock **tall near-square** boxes because their calibration frames ARE tall rectangles (648×759, 673×759, 649×782); only Basic is wide (691×416). The "forced square" perception = cropping a wide screenshot against a tall step's lock. **Open owner decision:** nothing in the UI communicates the expected frame shape per step.
+- **D-05-UAT-5: NO CODE DEFECT.** Decline (button + Escape) cancels the read exactly as ratified (D-05: "declining the crop cancels the read"; UI-SPEC: decline → idle) — overlay closes, no pre-fill, manual entry intact. The label `Enviar sem recortar` reads as "proceed uncropped" while the behavior cancels, and the return is silent by spec. **Open owner decision:** relabel (e.g. `Cancelar leitura`) and/or add a cancelled-feedback status line — a UI-SPEC copy deviation that needs ratification.
+- **D-05-UAT-6: EXPECTED CONSEQUENCE — contract proven sound.** Harness (after fixing a harness-only canvas-construction bug that had invalidated the D evidence): **frame-exact crop → 14/14 exact**; forced square → 0/14; default rough box → 0/14 (11 failed + 3 wrong). Rough crops are caught by the mandatory verification checkbox + manual fix-up (the designed safety net).
+
 ## Verdict
 
 **OWNER UAT: BLOCKED BY DEFECTS — round 1 walk attempted 2026-10-11 (crop trigger + accept gate: fixed, owner-ratified 5% threshold); round 2 re-walk hit CropOverlay defects (D-05-UAT-4/5/6) — still blocked, not approved.**
