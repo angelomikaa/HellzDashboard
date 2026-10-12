@@ -143,15 +143,17 @@ Plans:
 **Wave 2** *(blocked on 06-01 push — smokes need the live schema)*
 - [ ] 06-02-PLAN.md — Live smoke matrices: smoke-officer.mjs (queue/transitions/roles/removal/cohort), smoke-promotion.mjs (member boundary + key-stat leak diff + D-13 hiding), smoke-rls check-7 flip (owner-only classes); full matrix green twice consecutively
 
-**Wave 3** *(blocked on 06-03 — two parallel UI slices)*
+**Wave 3** *(blocked on 06-03 — UI slice)*
 - [ ] 06-04-PLAN.md — Validações staff tab: shared ConfirmDialog + App.tsx two-tab wiring + ValidacoesPage (57-value read-only review, Validar/Rejeitar with confirm modal, stale-row recovery) (AUTH-05)
-- [ ] 06-05-PLAN.md — Destaques promotion page: PromotionCard (EAFC card, tier palette, 6 facets) + HighlightsPage (per-class top-5 sections) (SHWC-02)
 
-**Wave 4** *(blocked on 06-03 + 06-04 ConfirmDialog)*
-- [ ] 06-06-PLAN.md — Personagens owner controls: role grant/revoke + removal/reactivation via RPCs, owner-only add-class gate (folded todo) (AUTH-03/AUTH-04)
+**Wave 4** *(blocked on 06-03 + 06-04 — HighlightsPage placeholder handoff + ConfirmDialog reuse)*
+- [ ] 06-05-PLAN.md — Destaques promotion page: PromotionCard (EAFC card, tier palette, 6 facets) + HighlightsPage (per-class top-5 sections) (SHWC-02)
+- [ ] 06-06-PLAN.md — Personagens owner controls: role grant/revoke + removal/reactivation via RPCs (role-differentiated per D-08: officers remove member rows, owner removes officers + grants roles), owner-only add-class gate (folded todo) (AUTH-03/AUTH-04)
 
 **Wave 5** *(blocked on all — owner gate)*
 - [ ] 06-07-PLAN.md — Consolidated automated gate re-run + owner browser UAT (Validações walk, Destaques walk + DevTools key-stat leak proof, Personagens owner controls, D-06 "Rejeitado" wording ratification)
+
+Cross-cutting constraints: "key-stat identity never crosses the member API boundary — get_promotion serializes top-6-by-points stats only, never the key set (RNK-02, D-01/D-14; leak-diff smoke + DevTools UAT)" (06-01, 06-02, 06-05, 06-07); "append-only preserved — validate/reject/remove are status and active-flag marks, rows never deleted or overwritten (D-04/D-05/D-07)" (06-01, 06-02, 06-06); "all role/active gates read auth.jwt()->>'member_role' + active flag INSIDE SECURITY DEFINER RPCs — UI gating is UX-only (0006/0008 pattern)" (06-01, 06-02, 06-06); "role/active changes flow only through RPCs — role and pin_hash columns stay ungranted (0005 column security)" (06-01, 06-03, 06-06).
 **UI hint**: yes
 
 ## Progress
