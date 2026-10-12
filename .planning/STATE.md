@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-10-12T22:51:07.977Z"
+last_updated: "2026-10-12T23:00:55.675Z"
 last_activity: 2026-10-12
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 26
-  completed_plans: 20
-  percent: 77
+  completed_plans: 21
+  percent: 81
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 06 (trust-celebration-officer-tools-promotion-page) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 Last activity: 2026-10-12
 
-Progress: [████████░░] 77%
+Progress: [████████░░] 81%
 
 ## Performance Metrics
 
@@ -75,6 +75,7 @@ Progress: [████████░░] 77%
 | Phase 05 P04 | 32min | 2 tasks | 5 files |
 | Phase 05 P05 | 23h wall (4 debug/fix rounds + owner-verification waits; active work concentrated in round sessions) | 3 tasks | 20 files |
 | Phase 06 P01 | 15min | 2 tasks | 2 files |
+| Phase 06 P03 | 4min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -156,6 +157,8 @@ Recent decisions affecting current work:
 - [Phase 06-01]: 0011 pushed live (dry-run proved sole pending migration) - 7 RPCs + owner-only class policy live; D-07 cohort supersession proven behavior-neutral: RANK SMOKE PASSED 27/27 exact-value post-push; RLS smoke 18/19 with ONLY check 7 (officer class insert) expected-red until 06-02
 - [Phase 06-01]: set_member_role grants no path to 'owner' (D-08), takes effect at next login (D-10: verify-pin mints member_role at login); deactivation is the immediate kill-switch via 0004/0008 active checks; officer self-validation of own pending submission ALLOWED (locked small-guild discretion)
 - [Phase 06-01]: Deploy done - owner should rotate the deploy token now the push is complete (03-02/05-02 standing action)
+- [Phase 06-03]: Contract layer complete in one file - all five 0011 RPC surfaces wrapped as typed clients in api.ts with closed-list payload types (QueueStat/OfficerQueueRow/PromotionHighlight/PromotionCardRow/PromotionSection); PromotionHighlight pinned to exactly {stat_key,label,value_type,value,points} so a server-side field addition is a type error at review (T-06-10)
+- [Phase 06-03]: MemberRow.active added via explicit projection extension (never select=*) - 0005 column-grant backstop untouched; owner Remover/Reativar controls in 06-05 consume it
 
 ### Pending Todos
 
@@ -184,7 +187,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-12T22:45:55.316Z
+Last session: 2026-10-12T22:58:23.564Z
 Stopped at: Phase 6 UI-SPEC approved
 Resume file: None
 
