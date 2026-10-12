@@ -155,7 +155,17 @@ Use your real screenshots from `.secrets/ocr-samples/`. Expected behavior per st
 - **D-05-UAT-5: NO CODE DEFECT.** Decline (button + Escape) cancels the read exactly as ratified (D-05: "declining the crop cancels the read"; UI-SPEC: decline → idle) — overlay closes, no pre-fill, manual entry intact. The label `Enviar sem recortar` read as "proceed uncropped" while the behavior cancels, and the return was silent by spec. **RESOLVED (owner-ratified 2026-10-12):** the decline button is relabelled to `Cancelar leitura` AND a visible cancelled-feedback status line `Leitura cancelada` now surfaces on decline (button or Escape) before the flow returns to manual entry — the line clears on the next upload. Decline still CANCELS the read entirely (ratified D-05 semantics unchanged: no pre-fill, no failure spam, manual entry intact). Recorded in 05-UI-SPEC.md as an owner-ratified copy deviation (2026-10-12); pinned by the statusMessage tests (cancelled line, single-slot replacement on next upload).
 - **D-05-UAT-6: EXPECTED CONSEQUENCE — contract proven sound.** Harness (after fixing a harness-only canvas-construction bug that had invalidated the D evidence): **frame-exact crop → 14/14 exact**; forced square → 0/14; default rough box → 0/14 (11 failed + 3 wrong). Rough crops are caught by the mandatory verification checkbox + manual fix-up (the designed safety net) — and, since the 2026-10-12 free-crop ratification, by the confirm gate: an off-capture-aspect crop can no longer reach the read at all (only a same-aspect but non-frame-exact crop still relies on the human backstop).
 
-## Verdict
+**Round 3 — owner report (verbatim, 2026-10-12):**
+
+> "first, we need a small adjustment to OCR - the readings are failing on the first step - probably because the "combat power field" is not completerly associated with the power field (they're the same). For instance, the correct return for this example would be 288927"
+
+**Round 3 defect candidate (diagnosis pending the actual screenshot file):**
+
+| # | Symptom | Notes |
+|---|---------|-------|
+| D-05-UAT-7 | Basic-step read fails on a NEW screenshot (Ahrya/Gypsy, Power = **288927** expected — image shown in chat, file NOT yet in `.secrets/ocr-samples/`) | Owner's hypothesis: the wizard's Poder de Combate and the game's "Power" row are the same field and the read isn't associating them. Confirmed mapping: `combat_power` IS the Power row (D-06: basic map = combat_power only). Calibration frame sampbasic.png is 691×416 (aspect 1.6611); the reported shot appears to be a DIFFERENT window size — region fractions are calibrated to the exact frame, so window-size variance is the prime suspect. Exact failure mode (blank vs wrong value) to be established by reproduction. |
+
+
 
 **OWNER UAT: BLOCKED BY DEFECTS — round 1 walk attempted 2026-10-11 (crop trigger + accept gate: fixed, owner-ratified 5% threshold); round 2 re-walk hit CropOverlay defects (D-05-UAT-4/5/6) — still blocked, not approved.**
 
