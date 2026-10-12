@@ -1,16 +1,30 @@
-// CropOverlay — the optional aspect-locked crop prompt (D-05, 05-UI-SPEC).
-// Rendered ONLY when the uploaded image's aspect deviates >5% from the
-// capture's reference aspect ("excessive information" — a full screenshot
-// or bad crop vs the expected panel crop): the player drags an
-// aspect-locked box over the image and resizes it via one corner handle,
-// ratio always preserved, minimum 40% of the limiting dimension. Plain
-// pointer events — no library; react is the only import.
+// CropOverlay — the optional crop prompt (D-05, 05-UI-SPEC). The
+// free-form box, the dashed example rectangle, the confirm-time aspect
+// gate and the decline relabel are OWNER-RATIFIED DEVIATIONS from the
+// locked spec (2026-10-12, 05-UAT.md round-2 dispositions D-05-UAT-4/5 —
+// they supersede the Phase 5 planning discretion that made the crop box
+// aspect-locked hard). Rendered ONLY when the uploaded image's aspect
+// deviates >5% (owner-ratified threshold, 2026-10-11) from the capture's
+// reference aspect ("excessive information" — a full screenshot or bad
+// crop vs the expected panel crop): the player freely drags and resizes
+// the crop box to ANY shape over their uploaded image, guided by a
+// dashed EXAMPLE rectangle at the step's CAPTURE aspect — the framing
+// the read expects (region fractions are calibrated to that frame;
+// harness-proven: a frame-exact crop reads 14/14 exact, a forced 1:1
+// square 0/14).
 //
-// Confirm draws the cropped region to a canvas and hands it to the read;
-// decline (outline button or Escape) CANCELS the read entirely — the
-// player lands in manual entry with fields untouched, never a garbage
-// scaled-to-wrong-frame read (05-RESEARCH §6 pitfall 7). The decline
-// button is the full keyboard path; the drag gesture is pointer-only.
+// Confirm is GATED (non-negotiable physics): a crop whose aspect
+// deviates from the capture aspect beyond the ~2% frame tolerance
+// (inclusive + epsilon, the needsCrop convention) is NOT consumed — an
+// inline message directs the player to match the example and the
+// overlay stays open to fix or cancel. Within tolerance, confirm draws
+// the cropped region to a canvas and hands it to the read. Decline
+// (outline button or Escape) CANCELS the read entirely — the player
+// lands in manual entry with fields untouched, never a garbage
+// scaled-to-wrong-frame read (05-RESEARCH §6 pitfall 7), and the capture
+// step surfaces a visible cancelled-feedback status line (ratified
+// deviation, handled by the parent). Plain pointer events — no library;
+// react is the only import.
 import { useEffect, useRef, useState } from 'react'
 
 interface CropOverlayProps {
@@ -20,55 +34,132 @@ interface CropOverlayProps {
   onCancel: () => void
 }
 
-/** Crop box in DISPLAYED pixels over the rendered image. Height is always w / aspect. */
+/** Crop box in DISPLAYED pixels over the rendered image. Free-form: w and h are independent. */
 export interface CropBox {
   x: number
   y: number
   w: number
+  h: number
+}
+
+/** Free-crop manipulation bounds in DISPLAYED pixels. */
+export interface BoxBounds {
+  minW: number
+  minH: number
+  maxW: number
+  maxH: number
 }
 
 const MIN_BOX_FRACTION = 0.4
 
+// Confirm gate: the crop must match the step's CAPTURE aspect within the
+// ~2% frame tolerance evidenced in the round-2 debug session (region
+// rects tolerate only ~2% frame displacement). Inclusive boundary + a
+// tiny epsilon that absorbs IEEE-754 representation noise — the needsCrop
+// convention — so a mathematically exact 2% deviation stays on the
+// CONFIRM side of the boundary; real deviations (2.1% and up) are orders
+// of magnitude above it.
+const CONFIRM_TOLERANCE = 0.02
+const CONFIRM_FLOAT_EPSILON = 1e-9
+
 const HEADING = 'Ajuste o recorte da captura'
 const CONFIRM_LABEL = 'Usar recorte'
-const DECLINE_LABEL = 'Enviar sem recortar'
+// Ratified relabel (D-05-UAT-5): the decline button cancels the read —
+// its label now says so.
+const DECLINE_LABEL = 'Cancelar leitura'
+// Helper copy (D-05-UAT-4): reproduce the dashed example's framing with
+// the crop box.
+const EXAMPLE_HINT = 'Ajuste a área de recorte no formato do exemplo tracejado'
+// Inline confirm-gate message: the crop's shape is off the example's
+// format — the read is not consumed, the overlay stays open.
+const FIT_MESSAGE = 'Ajuste o recorte ao formato do exemplo'
 
 /**
- * Widest box the ratio-locked crop can reach inside the image (D-05-UAT-4
- * pin: the lock ratio is ALWAYS the step's CAPTURE aspect — see
+ * Widest capture-aspect rectangle that fits the image (the example's
+ * width). The capture aspect is ALWAYS the step's CAPTURES aspect (see
  * CropOverlay.test.ts).
  */
 export function maxBoxWidth(imgW: number, imgH: number, aspect: number): number {
   return Math.min(imgW, imgH * aspect)
 }
 
+/** Tallest capture-aspect rectangle that fits the image (the example's height). */
+export function maxBoxHeight(imgW: number, imgH: number, aspect: number): number {
+  return Math.min(imgH, imgW / aspect)
+}
+
 function clamp(n: number, lo: number, hi: number): number {
   return Math.min(Math.max(n, lo), hi)
 }
 
-/** Keep the box fully inside the image at its current size. */
-export function clampPosition(box: CropBox, imgW: number, imgH: number, aspect: number): CropBox {
-  const h = box.w / aspect
+/**
+ * Free-crop manipulation bounds: each axis spans the full image, floored
+ * at 40% of the capture-frame extent on that axis (the old lock's minimum
+ * footprint — every box the aspect-locked tool allowed stays reachable,
+ * plus every other shape, which the confirm gate governs).
+ */
+export function boxBounds(imgW: number, imgH: number, aspect: number): BoxBounds {
   return {
-    ...box,
-    x: clamp(box.x, 0, Math.max(0, imgW - box.w)),
-    y: clamp(box.y, 0, Math.max(0, imgH - h)),
+    minW: MIN_BOX_FRACTION * maxBoxWidth(imgW, imgH, aspect),
+    minH: MIN_BOX_FRACTION * maxBoxHeight(imgW, imgH, aspect),
+    maxW: imgW,
+    maxH: imgH,
   }
 }
 
-/**
- * The opening crop box: centered, 80% of the widest ratio-locked box
- * (D-05-UAT-4 pin: the default box carries the SAME capture aspect as the
- * drag/resize lock — never 1:1).
- */
-export function defaultBox(imgW: number, imgH: number, aspect: number): CropBox {
-  const initialW = 0.8 * maxBoxWidth(imgW, imgH, aspect)
+/** Keep the box fully inside the image at its current size and shape. */
+export function clampPosition(box: CropBox, imgW: number, imgH: number): CropBox {
+  return {
+    ...box,
+    x: clamp(box.x, 0, Math.max(0, imgW - box.w)),
+    y: clamp(box.y, 0, Math.max(0, imgH - box.h)),
+  }
+}
+
+/** Free resize anchored top-left: each axis follows its pointer delta independently. */
+export function resizeBox(
+  box: CropBox,
+  dx: number,
+  dy: number,
+  imgW: number,
+  imgH: number,
+  aspect: number,
+): CropBox {
+  const b = boxBounds(imgW, imgH, aspect)
   return clampPosition(
-    { w: initialW, x: (imgW - initialW) / 2, y: (imgH - initialW / aspect) / 2 },
+    { ...box, w: clamp(box.w + dx, b.minW, b.maxW), h: clamp(box.h + dy, b.minH, b.maxH) },
     imgW,
     imgH,
-    aspect,
   )
+}
+
+/**
+ * The opening crop box: centered, 80% of the capture-frame extents, at
+ * the CAPTURE aspect — a good starting point that already matches the
+ * example, now freely adjustable.
+ */
+export function defaultBox(imgW: number, imgH: number, aspect: number): CropBox {
+  const w = 0.8 * maxBoxWidth(imgW, imgH, aspect)
+  return clampPosition({ w, h: w / aspect, x: (imgW - w) / 2, y: (imgH - w / aspect) / 2 }, imgW, imgH)
+}
+
+/**
+ * The dashed EXAMPLE rectangle: centered, full capture-frame size, at
+ * the CAPTURE aspect — the framing the read expects, rendered behind the
+ * player's crop box.
+ */
+export function exampleBox(imgW: number, imgH: number, aspect: number): CropBox {
+  const w = maxBoxWidth(imgW, imgH, aspect)
+  return clampPosition({ w, h: w / aspect, x: (imgW - w) / 2, y: (imgH - w / aspect) / 2 }, imgW, imgH)
+}
+
+/**
+ * Confirm gate: the crop confirms only when its aspect matches the step's
+ * CAPTURE aspect within the 2% frame tolerance (inclusive; the epsilon
+ * absorbs float noise so a mathematically exact 2% deviation confirms).
+ */
+export function cropAspectMatches(cropW: number, cropH: number, captureAspect: number): boolean {
+  return Math.abs(cropW / cropH / captureAspect - 1) <= CONFIRM_TOLERANCE + CONFIRM_FLOAT_EPSILON
 }
 
 export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlayProps) {
@@ -76,10 +167,11 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
   const confirmBtnRef = useRef<HTMLButtonElement>(null)
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null)
   const [box, setBox] = useState<CropBox | null>(null)
+  const [fitError, setFitError] = useState(false)
   const dragRef = useRef<null | { kind: 'move' | 'resize'; startX: number; startY: number; box: CropBox }>(null)
 
   // Draw the decoded bitmap (bytes stay on-device, T-05-11), measure the
-  // rendered size, and open with a centered 80% box.
+  // rendered size, and open with a centered 80% box at the capture aspect.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -109,6 +201,7 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
     e.preventDefault()
     if (kind === 'resize') e.stopPropagation() // don't bubble into the move drag
     if (box === null) return
+    setFitError(false) // manipulating the box retries the fit
     e.currentTarget.setPointerCapture(e.pointerId)
     dragRef.current = { kind, startX: e.clientX, startY: e.clientY, box }
   }
@@ -119,15 +212,13 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
     const dx = e.clientX - drag.startX
     const dy = e.clientY - drag.startY
     if (drag.kind === 'move') {
-      setBox(clampPosition({ ...drag.box, x: drag.box.x + dx, y: drag.box.y + dy }, imgSize.w, imgSize.h, aspect))
+      setBox(clampPosition({ ...drag.box, x: drag.box.x + dx, y: drag.box.y + dy }, imgSize.w, imgSize.h))
       return
     }
-    // Resize: width follows the pointer, ratio locked, anchored top-left,
-    // bounded by [40% of the limiting dimension, the full limiting extent].
-    const minW = MIN_BOX_FRACTION * maxBoxWidth(imgSize.w, imgSize.h, aspect)
-    const maxW = maxBoxWidth(imgSize.w, imgSize.h, aspect)
-    const w = clamp(drag.box.w + dx, minW, maxW)
-    setBox(clampPosition({ ...drag.box, w }, imgSize.w, imgSize.h, aspect))
+    // Free resize: each axis follows its pointer delta independently —
+    // the box can take any shape; the confirm gate governs what reaches
+    // the read.
+    setBox(resizeBox(drag.box, dx, dy, imgSize.w, imgSize.h, aspect))
   }
 
   function endDrag(): void {
@@ -136,11 +227,18 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
 
   function handleConfirm(): void {
     if (box === null || imgSize === null) return
+    // Ratified confirm gate: an off-example shape never reaches the read
+    // (a wrong-frame read is parseable-but-garbage — harness E). Keep the
+    // overlay open so the player fixes the crop or cancels.
+    if (!cropAspectMatches(box.w, box.h, aspect)) {
+      setFitError(true)
+      return
+    }
     const scaleX = bitmap.width / imgSize.w
     const scaleY = bitmap.height / imgSize.h
     const cropped = document.createElement('canvas')
     cropped.width = Math.max(1, Math.round(box.w * scaleX))
-    cropped.height = Math.max(1, Math.round((box.w / aspect) * scaleY))
+    cropped.height = Math.max(1, Math.round(box.h * scaleY))
     const ctx = cropped.getContext('2d')
     if (!ctx) {
       // A 2d context is always available on a fresh canvas; if it somehow
@@ -153,7 +251,7 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
       box.x * scaleX,
       box.y * scaleY,
       box.w * scaleX,
-      (box.w / aspect) * scaleY,
+      box.h * scaleY,
       0,
       0,
       cropped.width,
@@ -161,6 +259,8 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
     )
     onConfirm(cropped)
   }
+
+  const ghost = imgSize === null ? null : exampleBox(imgSize.w, imgSize.h, aspect)
 
   return (
     <div
@@ -171,8 +271,16 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
     >
       <div className="flex max-h-full w-full max-w-3xl flex-col gap-4 overflow-auto rounded-lg bg-surface p-6">
         <h2 className="text-xl font-semibold text-content">{HEADING}</h2>
+        <p className="text-sm text-muted">{EXAMPLE_HINT}</p>
         <div className="relative mx-auto">
           <canvas ref={canvasRef} className="block max-h-[80vh] max-w-full" />
+          {ghost !== null && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute border-2 border-dashed border-muted"
+              style={{ left: ghost.x, top: ghost.y, width: ghost.w, height: ghost.h }}
+            />
+          )}
           {box !== null && (
             <div
               className="absolute cursor-move border-2 border-accent"
@@ -180,7 +288,7 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
                 left: box.x,
                 top: box.y,
                 width: box.w,
-                height: box.w / aspect,
+                height: box.h,
                 touchAction: 'none',
               }}
               onPointerDown={(e) => startDrag('move', e)}
@@ -200,6 +308,11 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
             </div>
           )}
         </div>
+        {fitError && (
+          <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+            {FIT_MESSAGE}
+          </p>
+        )}
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
