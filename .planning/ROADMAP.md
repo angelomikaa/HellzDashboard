@@ -132,7 +132,26 @@ Cross-cutting constraints: "screenshots never leave the player's device (D-10 �
   2. Officer can validate or reject submitted registers before they count toward ranks
   3. Officer can remove players, revoking their panel access — removed players can no longer log in, and players from other guilds remain blocked
   4. A separate promotion page shows the guild's top players as EAFC-style cards featuring their key stats
-**Plans**: TBD
+**Plans**: 7 plans
+
+Plans:
+
+**Wave 1** *(blocked on nothing — server surfaces + client contracts in parallel)*
+- [ ] 06-01-PLAN.md — Migration 0011 (append-only corrective): officer_queue + set_submission_status (AUTH-05), set_member_role owner-only (AUTH-03), set_member_active role-differentiated (AUTH-04), get_promotion member-invocable (SHWC-02), my_report/class_top5 v3 with active-member cohort filter (D-07), owner-only staff_insert_classes (folded todo); [BLOCKING] live push + rank smoke regression
+- [ ] 06-03-PLAN.md — Contract-first data layer: 5 typed RPC wrappers + queue/promotion types + MemberRow.active in api.ts
+
+**Wave 2** *(blocked on 06-01 push — smokes need the live schema)*
+- [ ] 06-02-PLAN.md — Live smoke matrices: smoke-officer.mjs (queue/transitions/roles/removal/cohort), smoke-promotion.mjs (member boundary + key-stat leak diff + D-13 hiding), smoke-rls check-7 flip (owner-only classes); full matrix green twice consecutively
+
+**Wave 3** *(blocked on 06-03 — two parallel UI slices)*
+- [ ] 06-04-PLAN.md — Validações staff tab: shared ConfirmDialog + App.tsx two-tab wiring + ValidacoesPage (57-value read-only review, Validar/Rejeitar with confirm modal, stale-row recovery) (AUTH-05)
+- [ ] 06-05-PLAN.md — Destaques promotion page: PromotionCard (EAFC card, tier palette, 6 facets) + HighlightsPage (per-class top-5 sections) (SHWC-02)
+
+**Wave 4** *(blocked on 06-03 + 06-04 ConfirmDialog)*
+- [ ] 06-06-PLAN.md — Personagens owner controls: role grant/revoke + removal/reactivation via RPCs, owner-only add-class gate (folded todo) (AUTH-03/AUTH-04)
+
+**Wave 5** *(blocked on all — owner gate)*
+- [ ] 06-07-PLAN.md — Consolidated automated gate re-run + owner browser UAT (Validações walk, Destaques walk + DevTools key-stat leak proof, Personagens owner controls, D-06 "Rejeitado" wording ratification)
 **UI hint**: yes
 
 ## Progress
@@ -147,7 +166,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Rank Engine | 4/4 | Complete   | 2026-10-10 |
 | 4. Member Dashboard & Improvement Screen | 3/3 | Complete   | 2026-10-11 |
 | 5. OCR Auto-Read Layer | 3/5 | In Progress |  |
-| 6. Trust & Celebration — Officer Tools & Promotion Page | 0/2 | Not started | - |
+| 6. Trust & Celebration — Officer Tools & Promotion Page | 0/7 | Not started | - |
 
 ## Traceability
 
