@@ -263,6 +263,40 @@ function matchesExpected(raw, expectedRaw) {
   return e.ok && p.ok && e.value === p.value && e.isPercentual === p.isPercentual
 }
 
+describe('matchesExpected — combat_power acceptance tolerance (D-05-UAT-11(a), round 4)', () => {
+  it('accepts the exact printed value', () => {
+    expect(matchesExpected('288115', '288115', 'combat_power')).toBe(true)
+  })
+
+  it('accepts a read within the 2000 tolerance (game drift at thousands scale)', () => {
+    expect(matchesExpected('289000', '288115', 'combat_power')).toBe(true)
+  })
+
+  it('accepts a read exactly at the 2000 boundary (inclusive)', () => {
+    expect(matchesExpected('290115', '288115', 'combat_power')).toBe(true)
+  })
+
+  it('rejects a read beyond the 2000 tolerance', () => {
+    expect(matchesExpected('290200', '288115', 'combat_power')).toBe(false)
+  })
+
+  it('still requires the same polarity (a % read never matches a flat expectation)', () => {
+    expect(matchesExpected('288115%', '288115', 'combat_power')).toBe(false)
+  })
+
+  it('unparseable reads never match', () => {
+    expect(matchesExpected('N/A', '288115', 'combat_power')).toBe(false)
+  })
+
+  it('every OTHER stat stays exact-value (the tolerance is combat_power ONLY)', () => {
+    expect(matchesExpected('699', '699', 'pve_dmg_bonus')).toBe(true)
+    expect(matchesExpected('700', '699', 'pve_dmg_bonus')).toBe(false)
+    expect(matchesExpected('5678', '5679', 'hp')).toBe(false)
+    expect(matchesExpected('12,34', '12,34', 'crit')).toBe(true)
+    expect(matchesExpected('12,35', '12,34', 'crit')).toBe(false)
+  })
+})
+
 describe.skipIf(!hasSamples)('offline exact-value harness — real samples through the ACTUAL ported pipeline', () => {
   beforeAll(() => {
     global.document = {
