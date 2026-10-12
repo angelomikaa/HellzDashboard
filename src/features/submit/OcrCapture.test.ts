@@ -15,7 +15,7 @@
 // samples deviate at most 0.01% and must stay no-crop (pinned below +
 // harness test A on the real bytes).
 import { describe, expect, it } from 'vitest'
-import { needsCrop } from './OcrCapture'
+import { needsCrop, statusMessage } from './OcrCapture'
 
 describe('needsCrop — D-05 aspect-deviation trigger (>5%, exclusive)', () => {
   it('an optimal crop (identical aspect) never triggers cropping', () => {
@@ -67,5 +67,31 @@ describe('needsCrop — D-05 aspect-deviation trigger (>5%, exclusive)', () => {
     expect(needsCrop(648 / 759, 0.8538)).toBe(false) // sampideal1 -> general
     expect(needsCrop(673 / 759, 0.8867)).toBe(false) // sampideal2 -> quasi
     expect(needsCrop(649 / 782, 0.8299)).toBe(false) // sampideal3 -> special
+  })
+})
+
+describe('statusMessage — cancelled-read feedback line (D-05-UAT-5, owner-ratified 2026-10-12)', () => {
+  it('declining the crop surfaces a visible cancelled status line — the return is no longer silent', () => {
+    const line = statusMessage('cancelled')
+    expect(line).not.toBe(null)
+    expect(line?.tone).toBe('muted') // neutral notice, same weight as the failed-read line
+  })
+
+  it('each status renders exactly one distinct line (single status slot)', () => {
+    const texts = new Set(
+      (['reading', 'done', 'failed', 'cancelled'] as const).map((s) => statusMessage(s)?.text),
+    )
+    expect(texts.size).toBe(4)
+  })
+
+  it('idle renders no status line — the pure manual flow stays copy-free', () => {
+    expect(statusMessage('idle')).toBe(null)
+  })
+
+  it('the next upload clears the cancelled line: the reading line replaces it in the single status slot', () => {
+    // handleFile's first transition is to the reading status; rendering
+    // switches on the one status slot, so the cancelled line is gone the
+    // moment a new upload starts (and the CTA re-disables for the read).
+    expect(statusMessage('reading')).not.toEqual(statusMessage('cancelled'))
   })
 })
