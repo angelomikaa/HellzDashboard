@@ -26,12 +26,12 @@ import {
   type MemberRow,
   type StatCatalogEntry,
 } from '../../lib/api'
-import { formatStatValue, parseStatValue } from '../../lib/parseStatValue'
 import type { NeoFootSession } from '../auth/session'
 import { HistoryList } from './HistoryList'
 import { OcrCapture } from './OcrCapture'
 import { ReviewStep } from './ReviewStep'
 import { OCR_FIELD_FAILURE, StatGroupStep } from './StatGroupStep'
+import { INVALID_HINT, statFieldFeedback } from './fieldValidation'
 import type { OcrFieldOutcome } from './ocr'
 import {
   WIZARD_GROUPS,
@@ -46,7 +46,6 @@ const NETWORK_ERROR =
   'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 const SESSION_ERROR = 'Sua sessão expirou ou você não tem permissão. Entre novamente.'
 const SUBMIT_ERROR = 'Não foi possível enviar. Verifique sua conexão e tente novamente.'
-const INVALID_HINT = 'Valor inválido — use números (ex.: 1.234.567 ou 12,5%).'
 // Running skeleton placeholder for the step-1 combat_power input (D-17 —
 // same copy StatGroupStep uses for its rows).
 const OCR_READING_PLACEHOLDER = 'Lendo captura…'
@@ -125,11 +124,19 @@ export function SubmitPage({ session }: SubmitPageProps) {
   })
 
   // OCR wiring (05-04): which step's read is in flight (inputs skeletonize,
-  // D-17), and which of each step's displayed fields the LATEST read could
+  // D-17), which of each step's displayed fields the LATEST read could
   // not fill (D-14/D-15 — a fresh read replaces the step's failure set
-  // wholesale).
+  // wholesale), and which it DID fill (D-05-UAT-9 — a fresh read replaces
+  // the step's filled set wholesale too; filled fields are validation-
+  // engaged exactly like blurred fields).
   const [ocrRunningStep, setOcrRunningStep] = useState<1 | 2 | 3 | 4 | null>(null)
   const [failedFields, setFailedFields] = useState<Record<1 | 2 | 3 | 4, ReadonlySet<string>>>({
+    1: new Set(),
+    2: new Set(),
+    3: new Set(),
+    4: new Set(),
+  })
+  const [ocrFilledFields, setOcrFilledFields] = useState<Record<1 | 2 | 3 | 4, ReadonlySet<string>>>({
     1: new Set(),
     2: new Set(),
     3: new Set(),
@@ -203,6 +210,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
     setStepVerified({ 1: false, 2: false, 3: false, 4: false })
     setOcrRunningStep(null)
     setFailedFields({ 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set() })
+    setOcrFilledFields({ 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set() })
     setCombatPowerBlurred(false)
     setMissingRequired(null)
     setSubmitError(null)
@@ -280,26 +288,31 @@ export function SubmitPage({ session }: SubmitPageProps) {
   /** D-15 replace-all-displayed: a read replaces EXACTLY this step's
    *  displayed fields — detected values overwrite, undetected or unmapped
    *  fields (e.g. dmg_vs_demi_human on special) go blank + failure flag —
-   *  and the step's failure set is replaced wholesale (a fresh read resets
-   *  prior failures). Every write flows through the central handleChange
-   *  wrapper, so pre-fill unchecks the step's verification exactly like a
-   *  manual edit (05-03 engine, T-05-12). Reads are step-scoped: fields of
-   *  other steps are never touched. */
+   *  and BOTH per-step sets (failed AND filled) are replaced wholesale (a
+   *  fresh read resets prior claims). Every write flows through the central
+   *  handleChange wrapper, so pre-fill unchecks the step's verification
+   *  exactly like a manual edit (05-03 engine, T-05-12). Reads are
+   *  step-scoped: fields of other steps are never touched. Filled fields
+   *  are recorded in ocrFilledFields so the shared per-field validation
+   *  engages for them exactly as for manual blur (D-05-UAT-9). */
   function applyOcrOutcomes(step: 1 | 2 | 3 | 4, outcomes: OcrFieldOutcome[]) {
     const displayed: string[] =
       step === 1 ? ['combat_power'] : groupEntries(STEP_GROUP[step]).map((e) => e.stat_key)
     const byKey = new Map(outcomes.map((o) => [o.stat_key, o]))
     const newFailed = new Set<string>()
+    const newFilled = new Set<string>()
     for (const statKey of displayed) {
       const outcome = byKey.get(statKey)
       if (outcome !== undefined && outcome.status === 'filled') {
         handleChange(statKey, outcome.raw)
+        newFilled.add(statKey)
       } else {
         handleChange(statKey, '')
         newFailed.add(statKey)
       }
     }
     setFailedFields((prev) => ({ ...prev, [step]: newFailed }))
+    setOcrFilledFields((prev) => ({ ...prev, [step]: newFilled }))
   }
 
   /** D-18: nothing was read — the step's failure claims are cleared (no
@@ -314,9 +327,14 @@ export function SubmitPage({ session }: SubmitPageProps) {
   }
 
   const combatPowerRaw = inputs['combat_power'] ?? ''
-  const combatPowerParsed = parseStatValue(combatPowerRaw)
-  const combatPowerTouched = combatPowerBlurred && combatPowerRaw.trim() !== ''
-  const combatPowerInvalid = combatPowerTouched && !combatPowerParsed.ok
+  // D-05-UAT-9: the intro step's field is validation-engaged by a manual
+  // blur OR by the latest OCR read pre-filling it — the shared rule, same
+  // display as the StatGroupStep rows.
+  const combatPowerFeedback = statFieldFeedback(
+    combatPowerRaw,
+    'flat',
+    combatPowerBlurred || ocrFilledFields[1].has('combat_power'),
+  )
 
   return (
     <section className="rounded-lg border border-line bg-surface p-6">
@@ -404,24 +422,24 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     value={combatPowerRaw}
                     onChange={(e) => handleChange('combat_power', e.target.value)}
                     onBlur={() => setCombatPowerBlurred(true)}
-                    aria-invalid={combatPowerInvalid || undefined}
+                    aria-invalid={combatPowerFeedback.invalid || undefined}
                     disabled={ocrRunningStep === 1}
                     placeholder={ocrRunningStep === 1 ? OCR_READING_PLACEHOLDER : undefined}
                     className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      combatPowerInvalid ? 'border-destructive' : 'border-line'
+                      combatPowerFeedback.invalid ? 'border-destructive' : 'border-line'
                     } ${ocrRunningStep === 1 ? 'animate-pulse' : ''}`}
                   />
-                  {combatPowerTouched && combatPowerParsed.ok && combatPowerParsed.value !== null && (
+                  {combatPowerFeedback.ok && (
                     <p className="text-sm font-semibold text-success">
-                      {`✓ ${formatStatValue(combatPowerParsed.value, 'flat')}`}
+                      {combatPowerFeedback.checkText}
                     </p>
                   )}
-                  {combatPowerInvalid && (
+                  {combatPowerFeedback.invalid && (
                     <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
                       {INVALID_HINT}
                     </p>
                   )}
-                  {!combatPowerInvalid && failedFields[1].has('combat_power') && (
+                  {!combatPowerFeedback.invalid && failedFields[1].has('combat_power') && (
                     <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
                       {OCR_FIELD_FAILURE}
                     </p>
@@ -455,6 +473,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                 onChange={handleChange}
                 ocrRunning={ocrRunningStep === step}
                 failedFields={failedFields[step]}
+                ocrFilledFields={ocrFilledFields[step]}
               />
               <div className="mt-4">
                 <StepVerifyCheckbox

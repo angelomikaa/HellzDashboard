@@ -12,12 +12,15 @@
 // (D-04/D-14/D-16 — blank + manual-fill instruction, never a machine guess).
 // The parent (SubmitPage) owns the flag set and clears a flag when the
 // player types; the failure message and the parse hint never coexist.
+//
+// D-05-UAT-9 (owner-ratified 2026-10-12): the parse feedback runs for OCR
+// pre-fills exactly as for typed values — the parent passes the step's
+// ocrFilledFields set and the shared rule (fieldValidation.ts) engages the
+// display for blurred OR OCR-filled fields. Same rule, same display.
 import { useState } from 'react'
 import type { StatCatalogEntry } from '../../lib/api'
-import { formatStatValue, parseStatValue } from '../../lib/parseStatValue'
 import type { GroupInputs, WizardGroup } from './wizard'
-
-const INVALID_HINT = 'Valor inválido — use números (ex.: 1.234.567 ou 12,5%).'
+import { INVALID_HINT, isFieldEngaged, statFieldFeedback } from './fieldValidation'
 
 // Locked UI-SPEC copy (definition site, exported for the step-1 combat_power
 // field in SubmitPage — the single definition site codebase-wide; comments
@@ -44,9 +47,12 @@ interface StatGroupStepProps {
   ocrRunning: boolean
   /** stat_keys of this step's fields the read could not fill (D-14) */
   failedFields: ReadonlySet<string>
+  /** stat_keys of this step's fields the LATEST read pre-filled — they are
+   *  validation-engaged exactly like blurred fields (D-05-UAT-9) */
+  ocrFilledFields: ReadonlySet<string>
 }
 
-export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, failedFields }: StatGroupStepProps) {
+export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, failedFields, ocrFilledFields }: StatGroupStepProps) {
   // Hints appear after the first blur of a field; from then on the feedback
   // updates live so fixing a bad value immediately clears the error.
   const [blurred, setBlurred] = useState<Record<string, boolean>>({})
@@ -80,9 +86,8 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
       <div className="flex flex-1 flex-col gap-4">
         {entries.map((entry) => {
           const raw = inputs[entry.stat_key] ?? ''
-          const parsed = parseStatValue(raw)
-          const touched = blurred[entry.stat_key] === true && raw.trim() !== ''
-          const invalid = touched && !parsed.ok
+          const engaged = isFieldEngaged(entry.stat_key, blurred, ocrFilledFields)
+          const feedback = statFieldFeedback(raw, entry.value_type, engaged)
           const percentual = entry.value_type === 'percentual'
           return (
             <div key={entry.stat_key} className="flex flex-col gap-1">
@@ -98,11 +103,11 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
                   value={raw}
                   onChange={(e) => onChange(entry.stat_key, e.target.value)}
                   onBlur={() => setBlurred((b) => ({ ...b, [entry.stat_key]: true }))}
-                  aria-invalid={invalid || undefined}
+                  aria-invalid={feedback.invalid || undefined}
                   disabled={ocrRunning}
                   placeholder={ocrRunning ? READING_PLACEHOLDER : undefined}
                   className={`h-11 w-full rounded-md border bg-surface text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                    invalid ? 'border-destructive' : 'border-line'
+                    feedback.invalid ? 'border-destructive' : 'border-line'
                   } ${percentual ? 'pr-8' : 'px-3'} ${ocrRunning ? 'animate-pulse' : ''}`}
                 />
                 {percentual && (
@@ -114,17 +119,17 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
                   </span>
                 )}
               </div>
-              {touched && parsed.ok && parsed.value !== null && (
+              {feedback.ok && (
                 <p className="text-sm font-semibold text-success">
-                  {`✓ ${formatStatValue(parsed.value, entry.value_type)}`}
+                  {feedback.checkText}
                 </p>
               )}
-              {invalid && (
+              {feedback.invalid && (
                 <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
                   {INVALID_HINT}
                 </p>
               )}
-              {!invalid && failedFields.has(entry.stat_key) && (
+              {!feedback.invalid && failedFields.has(entry.stat_key) && (
                 <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
                   {OCR_FIELD_FAILURE}
                 </p>
