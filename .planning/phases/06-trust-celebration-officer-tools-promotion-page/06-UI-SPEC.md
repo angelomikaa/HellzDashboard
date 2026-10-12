@@ -53,6 +53,8 @@ Existing Tailwind default scale (multiples of 4) — unchanged from Phases 1–5
 
 **Exceptions:** none. All interactive targets stay `h-11` (44px) per the established touch-target convention (buttons, inputs, selects, tab buttons).
 
+**Grandfathered internals (not new tokens):** component-internal paddings inherited from existing anatomy (px-3 rows, py-0.5 badges) are grandfathered precedents, not new scale tokens.
+
 **Layout constants (locked by existing shell):** mobile-first, content column `mx-auto max-w-3xl px-4 py-6` (App.tsx). All three Phase 6 surfaces render inside this column — no wider layouts.
 
 ---
@@ -99,11 +101,11 @@ Rules:
 **Accent (`#E3B341`) reserved for — exact list:**
 
 1. Active tab underline (`border-accent`) in the nav — existing pattern; "Destaques" and "Validações" tab buttons follow it.
-2. Primary action buttons only: the expanded queue card's **Validar** button (`bg-accent text-accent-foreground`) and the owner **Salvar**-style primary confirm inside modals.
+2. Primary action buttons only: the expanded queue card's **Validar** button (`bg-accent text-accent-foreground`) and the primary confirm buttons inside non-destructive modals: `Conceder oficial`, `Revogar oficial`, and `Reativar`. Destructive modal confirms (`Rejeitar`, `Remover`) are NOT accent.
 3. Focus rings (`focus-visible:ring-2 focus-visible:ring-accent`) on all interactive elements.
 4. Nothing else. Rejeitar, Remover, and role buttons are NOT accent — they are outline buttons (`border-line text-content`) or destructive-styled per § Interaction Contracts.
 
-**Second accent rule (auto-resolved):** the owner-only controls on Personagens get NO new color. Owner identity is communicated by the existing role pill; owner-only controls are visually identical to staff controls. The destructive color is reserved for rejection/deactivation/error semantics only.
+**Second accent rule (auto-resolved):** the staff-only controls on Personagens get NO new color. Owner identity is communicated by the existing role pill; staff controls are visually identical for owner and officer. The destructive color is reserved for rejection/deactivation/error semantics only.
 
 ---
 
@@ -128,11 +130,12 @@ Global error copy (reuse verbatim from existing pages — never expose HTTP code
 | Destructive confirmation (Rejeitar) | Title: `Rejeitar envio` · Body: `O envio de {display_name} será marcado como rejeitado e deixará de contar para os ranks. O jogador poderá enviar novamente.` · Buttons: `Rejeitar` (destructive-styled) / `Cancelar` |
 | Destructive confirmation (Remover jogador) | Title: `Remover {display_name}` · Body: `{display_name} perderá o acesso ao painel imediatamente e sairá dos ranks. Os envios permanecem salvos e o acesso pode ser restaurado.` · Buttons: `Remover` (destructive-styled) / `Cancelar` |
 | Destructive confirmation (Remover oficial — owner only) | same as above; body adds: `Somente você pode remover oficiais.` |
-| Confirmation (Revogar oficial) | Title: `Revogar papel de oficial` · Body: `{display_name} voltará a ser membro no próximo login.` (documents D-10 timing honestly in UI copy) |
-| Confirmation (Conceder oficial) | Title: `Conceder papel de oficial` · Body: `{display_name} se tornará oficial no próximo login.` |
+| Confirmation (Revogar oficial) | Title: `Revogar papel de oficial` · Body: `{display_name} voltará a ser membro no próximo login.` (documents D-10 timing honestly in UI copy) · Buttons: `Revogar oficial` (accent primary) / `Cancelar` |
+| Confirmation (Conceder oficial) | Title: `Conceder papel de oficial` · Body: `{display_name} se tornará oficial no próximo login.` · Buttons: `Conceder oficial` (accent primary) / `Cancelar` |
+| Confirmation (Reativar) | Title: `Reativar {display_name}?` · Buttons: `Reativar` (accent primary — non-destructive) / `Cancelar` |
 | Success copy (role change) | `Papel atualizado. Efetivo no próximo login.` (D-10) |
 | Success copy (removal) | `Membro removido.` / Success (reactivation): `Membro reativado.` |
-| Reactivation affordance | Button **Reativar** (outline style, NOT destructive) on inactive member rows |
+| Reactivation affordance | Button **Reativar** (outline style, NOT destructive) on inactive rows — member rows for officers; member + officer rows for the owner (D-08) |
 | HistoryList status label (D-06) | Existing **Rejeitado** is KEPT (masculine agreement with the row subject "Envio de …", HistoryList.tsx:17). Research recommendation accepted: no code change; planner records the wording call. Research assumption A5 resolved: keep "Rejeitado". |
 
 Officer self-validation (RESEARCH Open Question 2, auto-resolved): the queue allows an officer to validate/reject their own pending submission — no special-case UI, no self-blocking. Small guild; owner trusts officers; rejection is recoverable by resubmission.
@@ -212,23 +215,23 @@ No third-party registries declared; no blocks enter the contract.
 
 **Accessibility:** each card is an `<article>` with `aria-label` = `{display_name} — {char_class}`; the points chip carries `aria-label="{n} pontos em {label}"`. No interactive elements inside cards (v1: no sharing, no drill-in — SHAR-01 deferred).
 
-### Surface 3 — Personagens owner controls (AUTH-03/AUTH-04; D-08/D-09)
+### Surface 3 — Personagens staff controls (AUTH-03/AUTH-04; D-08/D-09)
 
-**File:** extend `src/features/admin/CharactersPage.tsx`. All controls render only when `session.member_role === 'owner'`. Officers see the page exactly as today plus nothing new.
+**File:** extend `src/features/admin/CharactersPage.tsx`. Controls are role-differentiated per D-08: the OWNER sees role grant/revoke plus removal/reactivation on member AND officer targets; OFFICERS see Remover/Reativar on `role='member'` rows ONLY — no role grant/revoke buttons, no controls on officer or owner rows. Owner rows render `—` for every viewer.
 
 **Data prerequisite:** `fetchMembers` projection extends to include `active` (column already granted, 0005:31 — explicit projection extension, never `select=*`). `MemberRow` gains `active: boolean`.
 
 **Add-class gate (folded todo, D-09):** the `Nova classe` form renders only for the owner. Officers get no form, no placeholder — the section simply doesn't exist in their DOM. Server policy is the enforcement.
 
-**Per-row owner controls (new column "Controles", owner-only):**
+**Per-row staff controls (new column "Controles"):**
 
-- Role control: for `role ∈ {member, officer}` targets only — a **pair of small outline buttons** `Conceder oficial` / `Revogar oficial` (NOT a select; state is unambiguous, confirmation copy differs per direction). Owner rows (`role === 'owner'`): no role control, render `—`. (auto-resolved: buttons over select)
-- Removal control: for `role ∈ {member, officer}` targets only:
-  - `active === true` → **Remover** outline button → confirm modal (copy table) → `setMemberActive(member, false)` → success line `Membro removido.` → refetch.
-  - `active === false` → **Reativar** outline button (plain `text-content`, not destructive) → single confirm `Reativar {display_name}?` → `setMemberActive(member, true)` → success `Membro reativado.`
-  - Owner rows: no removal control, render `—`.
-- Inactive-row visual state: the whole `<tr>` gets `opacity-60` (StatCard missing-state precedent) so deactivated members are scannable at a glance without a new color. (auto-resolved)
-- Confirmation modal pattern (reserving 01-UI-SPEC's promise): a fixed-overlay dialog `bg-dominant/80` backdrop, centered `bg-surface border border-line rounded-lg p-6 max-w-sm`, title 16px semibold, body 14px text-muted, actions right-aligned: destructive/primary confirm + `Cancelar`. Focus moves to the confirm button on open; `Escape` and backdrop click cancel. Implemented as one shared local component (e.g. `src/features/admin/ConfirmDialog.tsx`) reused by both Validações and Personagens. (auto-resolved)
+- Role control (OWNER viewer only): for `role ∈ {member, officer}` targets — a **pair of small outline buttons** `Conceder oficial` / `Revogar oficial` (NOT a select; state is unambiguous, confirmation copy differs per direction). Officer targets are owner-only territory. Owner rows (`role === 'owner'`): no role control, render `—`. Officer viewers: no role control anywhere (render `—` on those cells). (auto-resolved: buttons over select)
+- Removal control (role-differentiated per D-08):
+  - Owner viewer: `role ∈ {member, officer}` targets get **Remover** (when `active === true`) → confirm modal (copy table) → `setMemberActive(member, false)` → success line `Membro removido.` → refetch; **Reativar** (when `active === false`) → single confirm `Reativar {display_name}?` → `setMemberActive(member, true)` → success `Membro reativado.`
+  - Officer viewer: SAME Remover/Reativar affordances on `role === 'member'` targets ONLY. Officer and owner target rows render `—` for officer viewers (D-08: "Officers deactivate/reactivate ordinary members. The owner grants/revokes officers and removes officers.").
+  - Owner rows: no removal control, render `—` for every viewer.
+- Inactive-row visual state: the whole `<tr>` gets `opacity-60` (StatCard missing-state precedent) for staff viewers (owner or officer — both see actionable inactive rows) so deactivated members are scannable at a glance without a new color. (auto-resolved)
+- Confirmation modal pattern (reserving 01-UI-SPEC's promise): a fixed-overlay dialog `bg-dominant/80` backdrop, centered `bg-surface border border-line rounded-lg p-6 max-w-sm`, title 16px semibold, body 14px text-muted, actions right-aligned: destructive/primary confirm + `Cancelar`. Role-change confirms use direction-matching confirm labels (`Conceder oficial` / `Revogar oficial`); Reativar confirm uses the `Reativar` label. Focus moves to the confirm button on open; `Escape` and backdrop click cancel. Implemented as one shared local component (e.g. `src/features/admin/ConfirmDialog.tsx`) reused by both Validações and Personagens. (auto-resolved)
 - Per-row state machine: reuse `savingRowId`/`savedRowId`/`saveErrorRowId` conventions; role actions and removal actions share the same single-flight `busy` lock.
 - D-10 copy duty: every role-change success line says "Efetivo no próximo login." — the stale-JWT caveat is visible in the UI, not just documented.
 

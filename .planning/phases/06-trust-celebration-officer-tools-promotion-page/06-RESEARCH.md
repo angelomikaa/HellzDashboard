@@ -355,10 +355,10 @@ SQL/RLS behavior is proven by live smoke scripts (established convention — no 
 | A4 | Exactly-6 highlight stats when available; fewer only if fewer stats carry points | Area 4 | Cosmetic; planner may lock exactly-6-or-hide-card instead |
 | A5 | HistoryList wording "Rejeitado" satisfies D-06's "Rejeitada" (grammatical agreement with "Envio") | Area 6 | Pure copy call — owner may prefer "Rejeitada"; one-line change either way |
 
-## Open Questions
+## Open Questions (RESOLVED — locked during planning)
 
-1. **Queue payload size / limits** — What we know: one-pending rule caps rows at #members; 57 stats each. What's unclear: none material at guild scale (~tens). Recommendation: no pagination in v1.
-2. **Should `set_submission_status` also admit officer-own pending rows?** What we know: an officer's own submission sits in their own queue. What's unclear: whether validating your own row should be blocked. Recommendation: allow (small guild, owner trusts officers; reject-by-self is harmless — the player can resubmit). Planner may lock either.
+1. **Queue payload size / limits** — What we know: one-pending rule caps rows at #members; 57 stats each. What's unclear: none material at guild scale (~tens). Recommendation: no pagination in v1. → **RESOLVED: no pagination in v1** (locked in plan 06-04, task 3 step 9; one-pending rule caps rows).
+2. **Should `set_submission_status` also admit officer-own pending rows?** What we know: an officer's own submission sits in their own queue. What's unclear: whether validating your own row should be blocked. Recommendation: allow (small guild, owner trusts officers; reject-by-self is harmless — the player can resubmit). Planner may lock either. → **RESOLVED: officer own-row validation ALLOWED** (locked in plan 06-01 task 3 — no self-blocking in `set_submission_status` — and UI-SPEC Surface 1: "no special-case UI, no self-blocking").
 
 ## Sources
 

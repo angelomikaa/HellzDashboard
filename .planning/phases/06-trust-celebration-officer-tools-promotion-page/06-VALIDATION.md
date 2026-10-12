@@ -1,8 +1,8 @@
 ---
 phase: 6
 slug: trust-celebration-officer-tools-promotion-page
-status: draft
-nyquist_compliant: false
+status: final
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-10-12
 ---
@@ -42,14 +42,14 @@ SQL/RLS behavior is proven by live smoke scripts (established convention — no 
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | 06-01-01 | 01 | 1 | AUTH-05 | T-06-01 | Queue RPC returns all pending rows w/ 57 values for staff; member/anon denied | live smoke | `node scripts/smoke-officer.mjs` | ❌ W0 | ⬜ pending |
 | 06-01-02 | 01 | 1 | AUTH-05 | T-06-02 | pending→validated raises my_report points; pending→rejected removes from cohort (compute-on-read) | live smoke | `node scripts/smoke-officer.mjs` | ❌ W0 | ⬜ pending |
-| 06-01-03 | 01 | 1 | AUTH-05 | T-06-02 | member CANNOT set statuses; non-pending row → `not_pending`; own-discard policy still one-transition | live smoke | `node scripts/smoke-officer.mjs` + `node scripts/smoke-lifecycle.mjs` | ❌/✅ | ⬜ pending |
-| 06-0X-XX | XX | X | AUTH-03 | T-06-03 | owner RPC grants/revokes officer; officer call → forbidden; role effective at next login | live smoke | `node scripts/smoke-officer.mjs` | ❌ W0 | ⬜ pending |
-| 06-0X-XX | XX | X | AUTH-04 | T-06-04 | deactivation → token denied everywhere; reactivation → access restored; rows leave/return to cohort | live smoke | `node scripts/smoke-officer.mjs` | ❌ W0 | ⬜ pending |
-| 06-0X-XX | XX | X | AUTH-04 | T-06-05 | owner rows untouchable; officer cannot touch officer targets | live smoke | `node scripts/smoke-officer.mjs` | ❌ W0 | ⬜ pending |
-| 06-0X-XX | XX | X | SHWC-02 | T-06-06 | member `get_promotion()` returns top-5-by-OVR cards; anon denied; class_top5 staff-only unchanged | live smoke | `node scripts/smoke-promotion.mjs` | ❌ W0 | ⬜ pending |
-| 06-0X-XX | XX | X | SHWC-02 | T-06-07 | key-stat leak probe: member promotion response contains ZERO class key-stat stat_keys, no is_key-like fields | live smoke | `node scripts/smoke-promotion.mjs` | ❌ W0 | ⬜ pending |
-| 06-0X-XX | XX | X | SHWC-02 | — | D-13: class with insufficient data → section omitted | live smoke | `node scripts/smoke-promotion.mjs` (fixture class) | ❌ W0 | ⬜ pending |
-| 06-0X-XX | XX | X | (folded todo) | T-06-08 | owner-only classes: officer POST /classes denied; owner allowed; smoke-rls check 7 flipped | live smoke | `node scripts/smoke-rls.mjs` (extended) | ✅ extend | ⬜ pending |
+| 06-02-01 | 02 | 2 | AUTH-05 | T-06-02 | member CANNOT set statuses; non-pending row → `not_pending`; own-discard policy still one-transition | live smoke | `node scripts/smoke-officer.mjs` + `node scripts/smoke-lifecycle.mjs` | ❌/✅ | ⬜ pending |
+| 06-02-01 | 02 | 2 | AUTH-03 | T-06-03 | owner RPC grants/revokes officer; officer call → forbidden; role effective at next login | live smoke | `node scripts/smoke-officer.mjs` | ❌ W0 | ⬜ pending |
+| 06-02-01 | 02 | 2 | AUTH-04 | T-06-04 | deactivation → token denied everywhere; reactivation → access restored; rows leave/return to cohort | live smoke | `node scripts/smoke-officer.mjs` | ❌ W0 | ⬜ pending |
+| 06-02-01 | 02 | 2 | AUTH-04 | T-06-05 | owner rows untouchable; officer cannot touch officer targets | live smoke | `node scripts/smoke-officer.mjs` | ❌ W0 | ⬜ pending |
+| 06-01-01 | 01 | 1 | SHWC-02 | T-06-06 | member `get_promotion()` returns top-5-by-OVR cards; anon denied; class_top5 staff-only unchanged | live smoke | `node scripts/smoke-promotion.mjs` | ❌ W0 | ⬜ pending |
+| 06-02-02 | 02 | 2 | SHWC-02 | T-06-07 | key-stat leak probe: member promotion response contains ZERO class key-stat stat_keys, no is_key-like fields | live smoke | `node scripts/smoke-promotion.mjs` | ❌ W0 | ⬜ pending |
+| 06-02-02 | 02 | 2 | SHWC-02 | — | D-13: class with insufficient data → section omitted | live smoke | `node scripts/smoke-promotion.mjs` (fixture class) | ❌ W0 | ⬜ pending |
+| 06-02-02 | 02 | 2 | (folded todo) | T-06-08 | owner-only classes: officer POST /classes denied; owner allowed; smoke-rls check 7 flipped | live smoke | `node scripts/smoke-rls.mjs` (extended) | ✅ extend | ⬜ pending |
 | — | — | — | (regression) | — | my_report/class_top5 v3: no rank regression | live smoke | `node scripts/smoke-rank.mjs` (27/27 exact-value) | ✅ exists | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
@@ -72,17 +72,17 @@ SQL/RLS behavior is proven by live smoke scripts (established convention — no 
 |----------|-------------|------------|-------------------|
 | Validações queue walk: officer reviews 57-value read-only view, validates/rejects, sees empty state | AUTH-05 | Visual/UX judgment | `npm run preview` → officer login → Validações tab → walk queue → validate one, reject one → verify member history shows "Rejeitada" and ranks auto-revert |
 | Promotion page (Destaques) walk: per-class top-5 EAFC cards, tier styling, insufficient-data classes hidden | SHWC-02 | Visual/UX judgment | Member login → Destaques tab → verify card contents (OVR, 6 stats, tier palette), no key-stat labels |
-| Personagens owner controls: grant/revoke officer, remove/reactivate member, owner-only add-class | AUTH-03/04 | Visual/UX judgment + cross-session effects | Owner login → Personagens → role controls visible only for owner; officer login sees them absent; add-class blocked for officer (UI + server) |
+| Personagens staff controls: owner grants/revokes officers + removes/reactivates members and officers; officers remove/reactivate ordinary members only; owner-only add-class | AUTH-03/04 | Visual/UX judgment + cross-session effects | Owner login → Personagens → full Controles column (role grant/revoke + Remover/Reativar on member AND officer rows, own row '—'); officer login → Remover/Reativar visible on member rows ONLY, no role grant/revoke buttons, '—' on officer/owner rows; Nova classe form owner-only (officer form absent; POST /classes server-refused) |
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete — all task IDs resolved to real plan tasks (06-01-01, 06-02-01, 06-02-02); Wave 0 scripts (smoke-officer.mjs, smoke-promotion.mjs, smoke-rls flip) are authored by plan 06-02 in Wave 2.
