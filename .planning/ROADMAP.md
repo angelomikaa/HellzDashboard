@@ -137,7 +137,7 @@ Cross-cutting constraints: "screenshots never leave the player's device (D-10 �
 Plans:
 
 **Wave 1** *(blocked on nothing — server surfaces + client contracts in parallel)*
-- [ ] 06-01-PLAN.md — Migration 0011 (append-only corrective): officer_queue + set_submission_status (AUTH-05), set_member_role owner-only (AUTH-03), set_member_active role-differentiated (AUTH-04), get_promotion member-invocable (SHWC-02), my_report/class_top5 v3 with active-member cohort filter (D-07), owner-only staff_insert_classes (folded todo); [BLOCKING] live push + rank smoke regression
+- [x] 06-01-PLAN.md — Migration 0011 (append-only corrective): officer_queue + set_submission_status (AUTH-05), set_member_role owner-only (AUTH-03), set_member_active role-differentiated (AUTH-04), get_promotion member-invocable (SHWC-02), my_report/class_top5 v3 with active-member cohort filter (D-07), owner-only staff_insert_classes (folded todo); [BLOCKING] live push + rank smoke regression
 - [ ] 06-03-PLAN.md — Contract-first data layer: 5 typed RPC wrappers + queue/promotion types + MemberRow.active in api.ts
 
 **Wave 2** *(blocked on 06-01 push — smokes need the live schema)*

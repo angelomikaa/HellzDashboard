@@ -11,9 +11,9 @@ Requirements for initial release (MVP — will be escalated later). Each maps to
 
 - [x] **AUTH-01**: Player can access the panel with their personal 4-digit PIN (stored hashed)
 - [x] **AUTH-02**: Only whitelisted guild members can access; players from other guilds are blocked
-- [ ] **AUTH-03**: Owner can grant or revoke the officer (admin) role manually
-- [ ] **AUTH-04**: Officers can remove players, revoking their panel access
-- [ ] **AUTH-05**: Officers can validate or reject submitted registers before they count toward ranks
+- [x] **AUTH-03**: Owner can grant or revoke the officer (admin) role manually
+- [x] **AUTH-04**: Officers can remove players, revoking their panel access
+- [x] **AUTH-05**: Officers can validate or reject submitted registers before they count toward ranks
 
 ### Registry & Catalog
 
@@ -45,7 +45,7 @@ Requirements for initial release (MVP — will be escalated later). Each maps to
 ### Showcase
 
 - [x] **SHWC-01**: Stat cards are tiered: bronze for mediocre stats, silver for mildly elevated, gold for highly elevated, platinum for top of the class (own visual identity, not a copy of the reference model) *(04-01 tier bands + 04-02 StatCard/TierLegend + 04-03; owner browser-verified, UAT steps 1/4)*
-- [ ] **SHWC-02**: Promotion page shows top players as EAFC-style cards to promote the best players in the guild
+- [x] **SHWC-02**: Promotion page shows top players as EAFC-style cards to promote the best players in the guild
 
 ## v2 Requirements
 
@@ -93,9 +93,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | AUTH-01 | Phase 1 | Complete |
 | AUTH-02 | Phase 1 | Complete |
-| AUTH-03 | Phase 6 | Pending |
-| AUTH-04 | Phase 6 | Pending |
-| AUTH-05 | Phase 6 | Pending |
+| AUTH-03 | Phase 6 | Complete |
+| AUTH-04 | Phase 6 | Complete |
+| AUTH-05 | Phase 6 | Complete |
 | REG-01 | Phase 2 | Complete (02-02) |
 | REG-02 | Phase 2 | Complete (02-01 + 02-02) |
 | REG-03 | Phase 2 | Complete (02-01) |
@@ -112,7 +112,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CMP-02 | Phase 4 | Complete |
 | CMP-03 | Phase 4 | Complete |
 | SHWC-01 | Phase 4 | Complete |
-| SHWC-02 | Phase 6 | Pending |
+| SHWC-02 | Phase 6 | Complete |
 
 **Coverage:**
 - v1 requirements: 20 total

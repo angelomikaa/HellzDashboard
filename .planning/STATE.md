@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
+status: executing
 stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-10-12T21:42:09.922Z"
+last_updated: "2026-10-12T22:51:07.977Z"
 last_activity: 2026-10-12
 progress:
   total_phases: 6
-  completed_phases: 6
+  completed_phases: 5
   total_plans: 26
-  completed_plans: 19
-  percent: 100
+  completed_plans: 20
+  percent: 77
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-07)
 
 **Core value:** Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
-**Current focus:** Phase 05 — ocr-auto-read-layer
+**Current focus:** Phase 06 — trust-celebration-officer-tools-promotion-page
 
 ## Current Position
 
-Phase: 06
-Plan: Not started
-Status: Ready to plan
+Phase: 06 (trust-celebration-officer-tools-promotion-page) — EXECUTING
+Plan: 2 of 7
+Status: Ready to execute
 Last activity: 2026-10-12
 
-Progress: [███████░░░] 73%
+Progress: [████████░░] 77%
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Progress: [███████░░░] 73%
 | Phase 05 P02 | 25min (continuation session: live push + smokes + docs) | 3 tasks | 4 files |
 | Phase 05 P04 | 32min | 2 tasks | 5 files |
 | Phase 05 P05 | 23h wall (4 debug/fix rounds + owner-verification waits; active work concentrated in round sessions) | 3 tasks | 20 files |
+| Phase 06 P01 | 15min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -152,6 +153,9 @@ Recent decisions affecting current work:
 - [Phase 05-05 / round-4 batch 1 (2026-10-12)]: the three owner-ratified UAT fixes implemented TDD-first (RED→GREEN), owner verbatim untouched: **D-05-UAT-9 validation parity** — OCR pre-fills engage the SAME per-field validation display as typed values (one shared rule in fieldValidation.ts, per-step ocrFilledFields replaced wholesale per fresh read, both render sites consume it; no special-casing); **D-05-UAT-10 the 6 damage stats are FLAT everywhere** (owner-authoritative — flat and percentual forms are DISTINCT stats): the misclassification lived ONLY in the catalog seed's value_type (single definition site the client display/review/dashboard inherit; the OCR read path is trailing-%-flag based and was already correct, which is why the harness grid read sampideal3's flat values exact) — pve_dmg_bonus, pvp_dmg_bonus, mdmg_bonus, pdmg_bonus, pve_dmg_reduction, pvp_dmg_reduction reclassified 'flat', percentual siblings pinned unchanged, live re-seed via apply-seed.mjs still PENDING (auth-gated, 05-02 precedent); **D-05-UAT-11(a) combat_power acceptance tolerance = thousands scale** — the harness's EXPECTATION matching for combat_power alone accepts |read − expected| ≤ 2000 (the read itself stays exact; every other stat exact; rationale in the harness header; tolerance lives in harness code, never in .secrets/). Proof: full suite 276/276 (structural-reader harness grid B/G/H/E green), tsc -b clean, build green, criterion-3 gates holding (entry-chunk createWorker 0, FormData 0, dist/ocr assets present). Batch 2 (D-05-UAT-8, step-8 crop-error diagnosis) runs separately — OcrCapture's decode/needsCrop/overlay decision path untouched; INPT-02 stays HELD for the owner's re-walk.
 - [Phase 05-05 / round-4 batch 2 — D-05-UAT-8 (2026-10-12)]: step-8 "full phone screenshot went directly to error, crop interface never opened" ROOT-CAUSED and FIXED (debug session .planning/debug/d05-uat-8-fullshot-no-crop.md): the decode was a single createImageBitmap(file, {imageOrientation:'from-image'}) call and the ONLY await between the reading status and the crop-overlay decision in handleFile — a file-specific decode rejection (unsupported format / dimension-overflow capture / corrupt transfer) short-circuited to the failed status BEFORE needsCrop ran. The crop decision itself is provably sound (new pins: phone-shaped aspects fire needsCrop on ALL four captures; no error boundary; overlay/cancel/read paths cannot yield the failed line without the overlay; the structural reader degrades gracefully on full frames — no throw). Fix: decodeUpload fallback chain in OcrCapture.tsx (from-image createImageBitmap → bare createImageBitmap → <img> element decode, object URL revoked) — the crop decision is reachable for every decodable upload; only a total decode failure lands in the designed D-18 failed status (a file no strategy decodes, e.g. true HEIC on Chromium, must be converted before upload). Crop math/UX untouched (5% trigger + ratified simplifications stand). TDD: RED 7743f04 → GREEN cfedfc5; harness F (4210264) = permanent realistic full-phone-shot variant (1080x2280, panel ~30% width: trigger fires on every capture, loose panel+8% crop reads 14/14 EXACT, direct full-frame read graceful 0/14). Full suite 284/284 (grids B/G/H/E green), tsc -b clean, build green, criterion-3 gates holding. Owner acceptance pending: re-walk step 8 on a FRESH build with the SAME screenshot; the actual file was requested into .secrets/ocr-samples/ (not yet present) to run as harness acceptance too; INPT-02 stays HELD for the re-walk.
 - [Phase 05-05]: Owner UAT APPROVED (2026-10-12, verbatim: "approved - lets follow to the next step") - all 11 steps PASS across 4 rounds; step 8 passed after the decode-fallback fix (cfedfc5). Acceptance stands via the harness variants + the approved walk: the Ahrya (D-05-UAT-7) and step-8 (D-05-UAT-8) files were never dropped into .secrets/ocr-samples/ - the tolerance-based combat_power matcher (<=2000) and harness acceptance slots stand ready if the files ever land. INPT-02 unblocked for the verification chain (/gsd-verify-work marks it via traceability, not by hand); debug sessions d05-uat-ocr-defects + d05-uat-8-fullshot-no-crop resolved
+- [Phase 06-01]: 0011 pushed live (dry-run proved sole pending migration) - 7 RPCs + owner-only class policy live; D-07 cohort supersession proven behavior-neutral: RANK SMOKE PASSED 27/27 exact-value post-push; RLS smoke 18/19 with ONLY check 7 (officer class insert) expected-red until 06-02
+- [Phase 06-01]: set_member_role grants no path to 'owner' (D-08), takes effect at next login (D-10: verify-pin mints member_role at login); deactivation is the immediate kill-switch via 0004/0008 active checks; officer self-validation of own pending submission ALLOWED (locked small-guild discretion)
+- [Phase 06-01]: Deploy done - owner should rotate the deploy token now the push is complete (03-02/05-02 standing action)
 
 ### Pending Todos
 
@@ -180,9 +184,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-12T04:27:04.041Z
+Last session: 2026-10-12T22:45:55.316Z
 Stopped at: Phase 6 UI-SPEC approved
-Resume file: .planning/phases/06-trust-celebration-officer-tools-promotion-page/06-UI-SPEC.md
+Resume file: None
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*
