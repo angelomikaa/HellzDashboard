@@ -47,6 +47,16 @@
 //   The crop UX itself was ratified 2026-10-12 ("Remove gate, keep crop" —
 //   full-image default box, always-confirm; the centered-80% default is
 //   retired with it) and is pinned by CropOverlay.test.ts.]
+//
+// Acceptance tolerance (D-05-UAT-11(a), round 4, owner verbatim 2026-10-12):
+// "power in the game is somewhat volatile, minor tweaks might cost hundreds
+// in power. shifts in power are only relevant when they are in the thousands
+// between submissions." The read itself stays EXACT (the engine reads what's
+// printed); only the EXPECTATION matching for combat_power becomes
+// tolerance-based — |read - expected| <= 2000 (thousands scale, inclusive).
+// Every other stat keeps the exact-value bar, and the polarity must always
+// agree. The tolerance lives HERE (harness code), never in expected.json —
+// .secrets/ files are runtime-read only and never enter git.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -256,11 +266,23 @@ async function paddedSample(file, margins, bg) {
   return canvas
 }
 
-/** Compare an outcome raw string against the expected.json string (spike semantics). */
-function matchesExpected(raw, expectedRaw) {
+/** Compare an outcome raw string against the expected.json string (spike
+ *  semantics), with the D-05-UAT-11(a) acceptance tolerance for combat_power
+ *  ONLY: the read itself stays exact (the engine reads what's printed), but
+ *  the EXPECTATION matching accepts |read - expected| <= 2000 — the game's
+ *  Power is volatile (minor tweaks cost hundreds), so only thousands-scale
+ *  shifts are meaningful between submissions (owner verbatim, 2026-10-12).
+ *  Every other stat stays exact-value; polarity must always agree. */
+const COMBAT_POWER_TOLERANCE = 2000
+
+export function matchesExpected(raw, expectedRaw, statKey) {
   const e = parseStatValue(String(expectedRaw))
   const p = parseStatValue(raw)
-  return e.ok && p.ok && e.value === p.value && e.isPercentual === p.isPercentual
+  if (!e.ok || !p.ok || e.isPercentual !== p.isPercentual) return false
+  if (statKey === 'combat_power') {
+    return Math.abs(p.value - e.value) <= COMBAT_POWER_TOLERANCE
+  }
+  return e.value === p.value
 }
 
 describe('matchesExpected — combat_power acceptance tolerance (D-05-UAT-11(a), round 4)', () => {
@@ -366,7 +388,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
           total += 1
           if (o.status === 'filled') {
             filled += 1
-            if (matchesExpected(o.raw, exp[o.stat_key])) correct += 1
+            if (matchesExpected(o.raw, exp[o.stat_key], o.stat_key)) correct += 1
             else misses.push(`${file}:${o.stat_key} WRONG raw="${o.raw}" expected="${exp[o.stat_key]}"`)
           } else {
             misses.push(`${file}:${o.stat_key} FAILED expected="${exp[o.stat_key]}"`)
@@ -398,7 +420,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
           let total = 0
           for (const o of outcomes) {
             total += 1
-            if (o.status === 'filled' && matchesExpected(o.raw, exp[o.stat_key])) correct += 1
+            if (o.status === 'filled' && matchesExpected(o.raw, exp[o.stat_key], o.stat_key)) correct += 1
             else
               lines.push(
                 `    MISS ${o.stat_key}: got=${o.status === 'filled' ? JSON.stringify(o.raw) : '<failed>'} expected="${exp[o.stat_key]}"`,
@@ -443,7 +465,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
           let total = 0
           for (const o of outcomes) {
             total += 1
-            if (o.status === 'filled' && matchesExpected(o.raw, exp[o.stat_key])) correct += 1
+            if (o.status === 'filled' && matchesExpected(o.raw, exp[o.stat_key], o.stat_key)) correct += 1
             else
               lines.push(
                 `    MISS ${o.stat_key}: got=${o.status === 'filled' ? JSON.stringify(o.raw) : '<failed>'} expected="${exp[o.stat_key]}"`,
@@ -494,7 +516,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       const lines = []
       for (const o of outcomes) {
         if (o.status === 'filled') {
-          const ok = matchesExpected(o.raw, exp[o.stat_key])
+          const ok = matchesExpected(o.raw, exp[o.stat_key], o.stat_key)
           if (ok) correct += 1
           lines.push(`${o.stat_key}: filled raw="${o.raw}" expected="${exp[o.stat_key]}" ${ok ? 'OK' : 'WRONG'}`)
         } else {
