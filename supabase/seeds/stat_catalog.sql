@@ -1,8 +1,12 @@
 -- 57-stat catalog seed (REG-03): re-runnable upsert.
 -- Keys are the owner-eye-validated OCR region keys (Phase 1 spike, D-09/D-10).
 -- value_type: 'percentual' iff the key ends in _pct OR it is a % damage
--- modifier (pdmg_bonus, mdmg_bonus, pve/pvp dmg reduction/bonus, dmg_vs_*,
--- dmg_reduction_vs_*); everything else is 'flat'.
+-- modifier (dmg_vs_*, dmg_reduction_vs_*); everything else is 'flat'.
+-- D-05-UAT-10 (owner-authoritative, 2026-10-12): pdmg_bonus, mdmg_bonus,
+-- pve_dmg_reduction, pve_dmg_bonus, pvp_dmg_reduction and pvp_dmg_bonus are
+-- FLAT values in the game — flat and percentual forms exist as DISTINCT
+-- stats (e.g. PDMG vs PDMG.R), so there is no ambiguity; the percentual
+-- siblings (_r/_pct/dmg_vs families) keep their 'percentual' classification.
 insert into stat_catalog (stat_key, label, group_name, value_type) values
   ('hp','HP','general','flat'),
   ('sp','SP','general','flat'),
@@ -39,12 +43,12 @@ insert into stat_catalog (stat_key, label, group_name, value_type) values
   ('ignore_pdef_pct','Ignorar PDEF %','quasi','percentual'),
   ('ignore_mdef','Ignorar MDEF','quasi','flat'),
   ('ignore_mdef_pct','Ignorar MDEF %','quasi','percentual'),
-  ('pdmg_bonus','Bônus PDMG','quasi','percentual'),
-  ('mdmg_bonus','Bônus MDMG','quasi','percentual'),
-  ('pve_dmg_reduction','Redução Dano PvE','quasi','percentual'),
-  ('pve_dmg_bonus','Bônus Dano PvE','quasi','percentual'),
-  ('pvp_dmg_reduction','Redução Dano PvP','quasi','percentual'),
-  ('pvp_dmg_bonus','Bônus Dano PvP','quasi','percentual'),
+  ('pdmg_bonus','Bônus PDMG','quasi','flat'),
+  ('mdmg_bonus','Bônus MDMG','quasi','flat'),
+  ('pve_dmg_reduction','Redução Dano PvE','quasi','flat'),
+  ('pve_dmg_bonus','Bônus Dano PvE','quasi','flat'),
+  ('pvp_dmg_reduction','Redução Dano PvP','quasi','flat'),
+  ('pvp_dmg_bonus','Bônus Dano PvP','quasi','flat'),
   ('max_sp_pct','SP Máx. %','special','percentual'),
   ('equip_patk_pct','Equip. PATK %','special','percentual'),
   ('equip_matk_pct','Equip. MATK %','special','percentual'),
