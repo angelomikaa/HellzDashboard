@@ -21,7 +21,7 @@ interface CropOverlayProps {
 }
 
 /** Crop box in DISPLAYED pixels over the rendered image. Height is always w / aspect. */
-interface CropBox {
+export interface CropBox {
   x: number
   y: number
   w: number
@@ -33,8 +33,12 @@ const HEADING = 'Ajuste o recorte da captura'
 const CONFIRM_LABEL = 'Usar recorte'
 const DECLINE_LABEL = 'Enviar sem recortar'
 
-/** Widest box the ratio-locked crop can reach inside the image. */
-function maxBoxWidth(imgW: number, imgH: number, aspect: number): number {
+/**
+ * Widest box the ratio-locked crop can reach inside the image (D-05-UAT-4
+ * pin: the lock ratio is ALWAYS the step's CAPTURE aspect — see
+ * CropOverlay.test.ts).
+ */
+export function maxBoxWidth(imgW: number, imgH: number, aspect: number): number {
   return Math.min(imgW, imgH * aspect)
 }
 
@@ -43,13 +47,28 @@ function clamp(n: number, lo: number, hi: number): number {
 }
 
 /** Keep the box fully inside the image at its current size. */
-function clampPosition(box: CropBox, imgW: number, imgH: number, aspect: number): CropBox {
+export function clampPosition(box: CropBox, imgW: number, imgH: number, aspect: number): CropBox {
   const h = box.w / aspect
   return {
     ...box,
     x: clamp(box.x, 0, Math.max(0, imgW - box.w)),
     y: clamp(box.y, 0, Math.max(0, imgH - h)),
   }
+}
+
+/**
+ * The opening crop box: centered, 80% of the widest ratio-locked box
+ * (D-05-UAT-4 pin: the default box carries the SAME capture aspect as the
+ * drag/resize lock — never 1:1).
+ */
+export function defaultBox(imgW: number, imgH: number, aspect: number): CropBox {
+  const initialW = 0.8 * maxBoxWidth(imgW, imgH, aspect)
+  return clampPosition(
+    { w: initialW, x: (imgW - initialW) / 2, y: (imgH - initialW / aspect) / 2 },
+    imgW,
+    imgH,
+    aspect,
+  )
 }
 
 export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlayProps) {
@@ -72,8 +91,7 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
     const h = canvas.clientHeight
     if (w === 0 || h === 0) return
     setImgSize({ w, h })
-    const initialW = 0.8 * maxBoxWidth(w, h, aspect)
-    setBox(clampPosition({ w: initialW, x: (w - initialW) / 2, y: (h - initialW / aspect) / 2 }, w, h, aspect))
+    setBox(defaultBox(w, h, aspect))
   }, [bitmap, aspect])
 
   // Focus moves to the confirm button on open (keyboard-safe primary
