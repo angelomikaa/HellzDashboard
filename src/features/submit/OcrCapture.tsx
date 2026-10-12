@@ -23,17 +23,22 @@ import { CropOverlay } from './CropOverlay'
 import type { CaptureKey, OcrFieldOutcome } from './ocr'
 import { CAPTURES } from './ocr/regions'
 
-// D-05 crop-trigger threshold: strictly more than 12% deviation. The tiny
-// epsilon absorbs IEEE-754 representation noise (e.g. 1.12 - 1 evaluates a
-// hair above 0.12) so a mathematically exact 12% deviation stays on the
-// no-crop side of the boundary, as documented; real deviations (0.121 and
-// up) are orders of magnitude above it.
-const CROP_DEVIATION_MAX = 0.12
+// D-05 crop-trigger threshold: strictly more than 5% deviation (owner-
+// ratified calibration change, 2026-10-11 — see .planning/debug/
+// d05-uat-ocr-defects.md: at the old 12% gate, 5-12% misaligned frames
+// passed uncropped and produced parseable-but-wrong values; 5% routes
+// them to the crop overlay. The exact calibration frames deviate ≤0.01%
+// and stay no-crop). The tiny epsilon absorbs IEEE-754 representation
+// noise (e.g. 1.05 - 1 evaluates a hair above 0.05) so a mathematically
+// exact 5% deviation stays on the no-crop side of the boundary, as
+// documented; real deviations (0.051 and up) are orders of magnitude
+// above it.
+const CROP_DEVIATION_MAX = 0.05
 const CROP_FLOAT_EPSILON = 1e-9
 
 /**
  * D-05 crop trigger: the optional crop prompt appears only when the
- * uploaded image's aspect deviates MORE than 12% (exclusive boundary)
+ * uploaded image's aspect deviates MORE than 5% (exclusive boundary)
  * from the capture's reference aspect. Optimal crops skip cropping.
  */
 export function needsCrop(imgAspect: number, refAspect: number): boolean {

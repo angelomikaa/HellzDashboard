@@ -1,5 +1,5 @@
 // CropOverlay — the optional aspect-locked crop prompt (D-05, 05-UI-SPEC).
-// Rendered ONLY when the uploaded image's aspect deviates >12% from the
+// Rendered ONLY when the uploaded image's aspect deviates >5% from the
 // capture's reference aspect ("excessive information" — a full screenshot
 // or bad crop vs the expected panel crop): the player drags an
 // aspect-locked box over the image and resizes it via one corner handle,
