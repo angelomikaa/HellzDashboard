@@ -165,6 +165,13 @@ Use your real screenshots from `.secrets/ocr-samples/`. Expected behavior per st
 |---|---------|-------|
 | D-05-UAT-7 | Basic-step read fails on a NEW screenshot (Ahrya/Gypsy, Power = **288927** expected — image shown in chat, file NOT yet in `.secrets/ocr-samples/`) | Owner's hypothesis: the wizard's Poder de Combate and the game's "Power" row are the same field and the read isn't associating them. Confirmed mapping: `combat_power` IS the Power row (D-06: basic map = combat_power only). Calibration frame sampbasic.png is 691×416 (aspect 1.6611); the reported shot appears to be a DIFFERENT window size — region fractions are calibrated to the exact frame, so window-size variance is the prime suspect. Exact failure mode (blank vs wrong value) to be established by reproduction. |
 
+**Round 3 owner directive — ARCHITECTURE PIVOT (verbatim, 2026-10-12):**
+
+> "the screenshots will vary in size inevitably - screenshots from windows are made via a crop of the full screen, not every player will crop the exact same size - we need a reading model that actually can read data from an image without relying on a pixel map"
+
+**Disposition:** the pixel-fraction region-map strategy is retired as the reading model. The engine pivots to a STRUCTURAL reader — locate values by the panel's visual grammar (value-pill color signatures / label anchors / fixed row order), which is invariant to crop size, translation, and margins. `readScreenshot`'s public contract, the parse+sanity gates, dual polarity, and the UI flow stay unchanged. The D-19 recalibration model is amended accordingly (a game-UI change now recalibrates the visual grammar, not pixel fractions). Proof bar: the 11 real samples at native size AND synthetic rescales/margin-padded variants (simulating hand-cropped screenshots), exact-value against expected.json; the owner's new Ahrya shot (D-05-UAT-7) is the acceptance test once dropped into `.secrets/ocr-samples/`.
+
+
 
 
 **OWNER UAT: BLOCKED BY DEFECTS — round 1 walk attempted 2026-10-11 (crop trigger + accept gate: fixed, owner-ratified 5% threshold); round 2 re-walk hit CropOverlay defects (D-05-UAT-4/5/6) — still blocked, not approved.**
