@@ -105,7 +105,7 @@ Plans:
   1. Uploading a screenshot auto-pre-fills stat values via region-based client-side OCR with digit/percent whitelisting and canvas preprocessing (never whole-image recognition)
   2. Player must review and fix pre-filled values before the submission is accepted — OCR misreads cannot slip through silently (fix-up gate applies to OCR output)
   3. OCR works in the production build (worker/core path bundling verified on Vite), is lazy-loaded so it doesn't slow initial page load, and manual entry still works fully when OCR fails
-**Plans**: 3/5 plans executed
+**Plans**: 5/5 plans executed
 
 Plans:
 
@@ -118,7 +118,7 @@ Plans:
 - [x] 05-04-PLAN.md — OCR capture UI + integration: upload CTA with locked string (D-09/D-10), skeleton/disabled running state (D-17), silent pre-fill + per-field failure message (D-04/D-14/D-16), re-upload replaces the step (D-15), optional aspect-locked crop with decline-cancels-read (D-05), graceful degradation (D-18), production-build lazy-chunk + self-hosted asset proof
 
 **Wave 3** *(blocked on Wave 2 + 05-02 live)*
-- [ ] 05-05-PLAN.md — Consolidated automated gate re-run + owner browser UAT with real screenshots (all 4 captures, crop trigger, failure message, DevTools: no image egress + lazy load only on first upload, manual-only path, Descartado lifecycle) — INPT-02 criteria closed owner-witnessed
+- [x] 05-05-PLAN.md — Consolidated automated gate re-run + owner browser UAT with real screenshots (all 4 captures, crop trigger, failure message, DevTools: no image egress + lazy load only on first upload, manual-only path, Descartado lifecycle) — INPT-02 criteria closed owner-witnessed
 
 Cross-cutting constraints: "screenshots never leave the player's device (D-10 — no FormData/upload anywhere; OCR entirely client-side)" (05-01, 05-04, 05-05); "OCR is never a silent authority — per-step human verification + server re-validation via create_submission (INPT-03)" (05-03, 05-04, 05-05); "submissions stay append-only — discard is a status mark only, rows never deleted or overwritten (INPT-04)" (05-02, 05-05).
 **UI hint**: yes
@@ -167,7 +167,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. Registry, Catalog & Manual Data Ingestion | 3/3 | Complete    | 2026-10-09 |
 | 3. Rank Engine | 4/4 | Complete   | 2026-10-10 |
 | 4. Member Dashboard & Improvement Screen | 3/3 | Complete   | 2026-10-11 |
-| 5. OCR Auto-Read Layer | 3/5 | In Progress |  |
+| 5. OCR Auto-Read Layer | 5/5 | Complete (owner UAT approved 2026-10-12) | 2026-10-12 |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | 0/7 | Not started | - |
 
 ## Traceability
