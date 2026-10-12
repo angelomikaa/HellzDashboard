@@ -1,8 +1,9 @@
 ---
-status: investigating
+status: resolved
 trigger: "Phase 5 owner UAT BLOCKED by 3 OCR defects: crop overlay appears on every upload (incl. optimal samples), high rate of wrong pre-filled values on optimal input, some reads fail completely. Spike scored 222/222 on the same samples in Node."
 created: 2026-10-11T00:00:00Z
-updated: 2026-10-12T12:00:00Z
+updated: 2026-10-12T21:50:00Z
+resolution: "All three rounds closed: round-1 defects D-05-UAT-1/2/3 (5% crop trigger, spike-parity accept gate), round-2 D-05-UAT-4/5/6 (no code defect; ratified UX changes, later superseded by the structural-reader 'Remove gate, keep crop'), round-3 ARCHITECTURE PIVOT implemented (structural reader wired behind the unchanged readScreenshot contract; harness grids B/G/H/E/F exact). Owner UAT APPROVED 2026-10-12 (all 11 steps PASS). The D-05-UAT-7 Ahrya acceptance file never landed in .secrets/ocr-samples/ — acceptance stands via the harness variants + the approved walk. Final state: suite 284/284, tsc clean, build green, criterion-3 gates holding."
 symptoms_prefilled: true
 goal: find_and_fix
 ---

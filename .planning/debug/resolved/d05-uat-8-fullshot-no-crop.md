@@ -1,8 +1,9 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "Phase 5 round-4 batch 2 — owner UAT re-walk: uploading a FULL phone screenshot on a capture step went DIRECTLY TO ERROR — the crop interface never opened (all other steps pass). Diagnose the actual code path, fix, add a realistic full-phone-shot harness variant. TDD, atomic commits."
 created: 2026-10-12T16:00:00Z
-updated: 2026-10-12T16:45:00Z
+updated: 2026-10-12T21:50:00Z
+resolution: "Owner re-walked step 8 on the fresh build after the decode-fallback fix (cfedfc5): PASS. Owner UAT APPROVED 2026-10-12 (all 11 steps PASS; verbatim 'approved - lets follow to the next step'). The actual step-8 file was never dropped into .secrets/ocr-samples/ — acceptance stands via the approved walk; harness F remains the permanent full-phone regression variant."
 symptoms_prefilled: true
 goal: find_and_fix
 ---
