@@ -205,13 +205,29 @@ async function main() {
     `HTTP ${officerMembers.status}, ${rows.length} rows`,
   )
 
-  // 7. officer CAN insert a class.
+  // 7. Class creation is OWNER-ONLY (Phase 6: owner-only per 06-CONTEXT D-09,
+  //    migration 0011) — officers are structurally barred from the change
+  //    (03-04 owner directive), the owner still inserts. NOTE: PostgREST
+  //    unique-PK residue would 409 the owner insert, so a defensive
+  //    service-level delete precedes the probe (WR-06).
+  await mgmtQuery(`delete from classes where class_name = 'ZZSmokeTest';`)
   const officerClassInsert = await rest('/classes', {
     method: 'POST',
     token: officer.access_token,
     body: { class_name: 'ZZSmokeTest' },
   })
-  check('officer POST /classes -> 201', officerClassInsert.status === 201, `HTTP ${officerClassInsert.status}`)
+  check(
+    'officer POST /classes DENIED (owner-only per migration 0011)',
+    !officerClassInsert.ok,
+    `HTTP ${officerClassInsert.status}`,
+  )
+  const owner = await login('owner-handle')
+  const ownerClassInsert = await rest('/classes', {
+    method: 'POST',
+    token: owner.access_token,
+    body: { class_name: 'ZZSmokeTest' },
+  })
+  check('owner POST /classes -> 201', ownerClassInsert.status === 201, `HTTP ${ownerClassInsert.status}`)
 
   // 8. officer CANNOT touch role (column not granted — privilege escalation blocked).
   const rolePatchRes = await rest(`/members?id=eq.${member.member_id}`, {
