@@ -14,8 +14,8 @@
 // crop overlay instead of reading garbage uncropped. The 11 calibration
 // samples deviate at most 0.01% and must stay no-crop (pinned below +
 // harness test A on the real bytes).
-import { describe, expect, it } from 'vitest'
-import { needsCrop, statusMessage } from './OcrCapture'
+import { describe, expect, it, vi, afterEach } from 'vitest'
+import { decodeUpload, needsCrop, statusMessage } from './OcrCapture'
 
 describe('needsCrop — D-05 aspect-deviation trigger (>5%, exclusive)', () => {
   it('an optimal crop (identical aspect) never triggers cropping', () => {
@@ -93,5 +93,130 @@ describe('statusMessage — cancelled-read feedback line (D-05-UAT-5, owner-rati
     // switches on the one status slot, so the cancelled line is gone the
     // moment a new upload starts (and the CTA re-disables for the read).
     expect(statusMessage('reading')).not.toEqual(statusMessage('cancelled'))
+  })
+})
+
+describe('needsCrop — full phone screenshots fire on EVERY capture step (D-05-UAT-8 pin)', () => {
+  it('a 1080x2280 full phone shot (aspect ~0.47) deviates 43-71% from every reference — the crop must fire on all four steps', () => {
+    const aspect = 1080 / 2280
+    expect(needsCrop(aspect, 1.6611)).toBe(true) // basic
+    expect(needsCrop(aspect, 0.8538)).toBe(true) // general
+    expect(needsCrop(aspect, 0.8867)).toBe(true) // quasi
+    expect(needsCrop(aspect, 0.8299)).toBe(true) // special
+  })
+
+  it('a landscape phone shot (2280x1080, aspect ~2.11) also triggers on every step', () => {
+    const aspect = 2280 / 1080
+    expect(needsCrop(aspect, 1.6611)).toBe(true)
+    expect(needsCrop(aspect, 0.8538)).toBe(true)
+    expect(needsCrop(aspect, 0.8867)).toBe(true)
+    expect(needsCrop(aspect, 0.8299)).toBe(true)
+  })
+})
+
+// D-05-UAT-8 (round 4): the ONLY await between the reading status and the
+// needsCrop/crop-overlay decision is the decode. When it rejects — an
+// unsupported format, a dimension-overflow capture, or a browser whose
+// options dict is rejected — the old single-call code short-circuited
+// straight to the failed status: the crop interface never opened, exactly
+// the owner's step-8 report. decodeUpload is the fallback chain that keeps
+// the ratified crop tool reachable for every decodable upload:
+//   1. createImageBitmap(file, { imageOrientation: 'from-image' }) — the
+//      correct path (EXIF-oriented); 'from-image' is the spec default on
+//      modern engines but was added to the ImageOrientation enum late, so
+//      some engines reject the whole call for it.
+//   2. bare createImageBitmap(file) — engines that reject the options dict
+//      but decode the blob fine (orientation only diverges for rotated-EXIF
+//      uploads, which screenshots do not carry).
+//   3. the <img> element decode path (object URL + decode()) — a distinct
+//      decoder route that succeeds where the blob bitmap path fails.
+// Only when ALL THREE reject does the promise reject — the caller then
+// shows the designed failed status (D-18) and the file genuinely cannot be
+// read on this device.
+describe('decodeUpload — decode fallback chain (D-05-UAT-8)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function stubGlobals({
+    withOptions,
+    bare,
+    imgBitmap,
+  }: {
+    withOptions?: (source: unknown, options: unknown) => Promise<unknown>
+    bare?: (source: unknown) => Promise<unknown>
+    imgBitmap?: (source: unknown, options?: unknown) => Promise<unknown>
+  }): { images: Array<{ src: string }> } {
+    const images: Array<{ src: string }> = []
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async (source: unknown, options?: unknown) => {
+        const isBlob = source instanceof FakeUpload
+        if (!isBlob) {
+          if (imgBitmap === undefined) throw new Error('img call rejected')
+          return imgBitmap(source, options)
+        }
+        if (options !== undefined) {
+          if (withOptions === undefined) throw new Error('options call rejected')
+          return withOptions(source, options)
+        }
+        if (bare === undefined) throw new Error('bare call rejected')
+        return bare(source)
+      }),
+    )
+    vi.stubGlobal(
+      'URL',
+      Object.assign(Object.create(URL), {
+        createObjectURL: vi.fn(() => 'blob:mock'),
+        revokeObjectURL: vi.fn(),
+      }) as unknown as typeof URL,
+    )
+    class FakeImage {
+      src = ''
+      decoding = 'async'
+      decode = async () => {
+        images.push(this)
+      }
+    }
+    vi.stubGlobal('Image', FakeImage as unknown as typeof Image)
+    return { images }
+  }
+
+  class FakeUpload {
+    size = 10
+    type = 'image/png'
+  }
+
+  const BITMAP = { width: 1080, height: 2280, close() {} } as unknown as ImageBitmap
+
+  it('strategy 1: the from-image options call is tried first and its bitmap is returned', async () => {
+    stubGlobals({ withOptions: async () => BITMAP })
+    const bitmap = await decodeUpload(new FakeUpload() as unknown as Blob)
+    expect(bitmap).toBe(BITMAP)
+  })
+
+  it('strategy 2: falls back to bare createImageBitmap when the options call rejects', async () => {
+    stubGlobals({ bare: async () => BITMAP })
+    const bitmap = await decodeUpload(new FakeUpload() as unknown as Blob)
+    expect(bitmap).toBe(BITMAP)
+  })
+
+  it('strategy 3: falls back to the <img> element decode path when both blob decodes reject', async () => {
+    const { images } = stubGlobals({ imgBitmap: async () => BITMAP })
+    const bitmap = await decodeUpload(new FakeUpload() as unknown as Blob)
+    expect(bitmap).toBe(BITMAP)
+    expect(images).toHaveLength(1)
+    expect(images[0].src).toBe('blob:mock')
+  })
+
+  it('the object URL is revoked after the <img> fallback (no leak)', async () => {
+    stubGlobals({ imgBitmap: async () => BITMAP })
+    await decodeUpload(new FakeUpload() as unknown as Blob)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock')
+  })
+
+  it('when ALL strategies reject, the promise rejects — the caller shows the designed failed status', async () => {
+    stubGlobals({})
+    await expect(decodeUpload(new FakeUpload() as unknown as Blob)).rejects.toThrow()
   })
 })
