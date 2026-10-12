@@ -186,6 +186,21 @@ The earlier deferral record (below) is superseded by this attempt: the owner ret
 
 ---
 
+**Round 4 owner report (verbatim, 2026-10-12, after the structural-reader pivot + crop simplification):**
+
+> "all pass, except for 8.crop - it went directly to error instead of opening the crop inferface. I wanna call attention to behavior, manually typing a field will show green check below the field, but values from the print will not. the readings from the print must also get validated like typed in values. Also some flat fields (Bônus Dano PvE, Bônus Dano PvP, Bônus MDMG, Bônus PDMG, Redução Dano PvE, Redução Dano PvP) seem to be getting treated as percentual when they are flat values in the game. Some attributes exist in both forms, as a flat and as a percentual, so there's no ambiguity, they do the same thing in a different way. About the acceptance test, power in the game is somewhat volatile, minor tweaks might cost hundreds in power. shifts in power are only relevant when they are in the thousands between submissions."
+
+**Round 4 status: steps 1-7 and 9-11 PASS.** Step 8 blocked (D-05-UAT-8) plus three owner-raised points — triaged per the owner's directive (fix now vs assign later):
+
+| # | Point | Triage | Disposition |
+|---|-------|--------|-------------|
+| D-05-UAT-8 | Step 8: full phone screenshot went **directly to error** — the crop interface never opened | **FIX NOW** (UAT blocker — step 8 must pass) | Diagnose why the needsCrop/overlay path was skipped (decode error? aspect check? overlay crash?); add a realistic full-phone-shot harness variant (margins far beyond the tested 12-20%); owner's actual file = final acceptance |
+| D-05-UAT-9 | **Validation parity**: manually typed values show the green per-field check; OCR-filled values do not | **FIX NOW** (UI consistency — the mandatory fix-up gate's spirit: reads must be validated like typed values) | The per-field validation indicator must run for OCR pre-fills exactly as for manual input |
+| D-05-UAT-10 | **Stat-type misclassification**: Bônus Dano PvE, Bônus Dano PvP, Bônus MDMG, Bônus PDMG, Redução Dano PvE, Redução Dano PvP are flat values in the game but treated as percentual (both flat and percentual forms exist as DISTINCT stats — no ambiguity) | **FIX NOW** (classification fix in the shared parse/sanity layer so typed + read validation agree) | Reclassify those 6 keys as flat everywhere (parse, sanity, wizard field validation); pin with tests |
+| D-05-UAT-11 | **Power volatility**: minor tweaks cost hundreds; only shifts in the thousands matter between submissions | **SPLIT** | (a) NOW: harness/UAT acceptance expectation for combat_power becomes tolerance-based (exact read of what's printed; tolerant vs game drift at thousands scale); (b) DEFERRED: any power-shift-significance gameplay rule (comparing submissions) belongs to a future phase — fits the v2 deferred delta-badges/history domain; recorded as a pending todo |
+
+---
+
 *Superseded deferral record (2026-10-11, kept for history):* the owner was absent at the first checkpoint and directed (verbatim): *"I'll be absent for a while hence cannot do tests — let's proceed with the next step. Record steps 1 to 11 so we can do it later."*
 
 ## How to resume
