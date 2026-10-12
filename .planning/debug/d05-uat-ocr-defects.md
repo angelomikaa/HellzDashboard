@@ -353,7 +353,7 @@ evidence (re-run 2026-10-12 post-change):
     consistent with the prior `.120000001` fold)
 
 
-## Evidence (continued — round 2 investigation)
+## Evidence (continued ï¿½ round 2 investigation)
 
 - timestamp: 2026-10-12 R2 code+dist review (D-05-UAT-4 aspect-lock source)
   checked: src/features/submit/CropOverlay.tsx, OcrCapture.tsx, and the COMPILED dist entry
@@ -361,8 +361,8 @@ evidence (re-run 2026-10-12 post-change):
   found: The lock is CAPTURES[capture].aspect at the call site (src line 197 and compiled
     spect:nn[e].aspect); box height is ox.w / aspect in the initial-box effect, the
     clamp, the resize bound, the confirm drawImage, the cropped-canvas dims, AND the rendered
-    style (height:c.w/t). CropOverlay has exactly 2 commits (6401f95, f5e32c1) — NO version
-    ever carried a 1:1/square lock. CAPTURES aspects in dist: 1.6611/.8538/.8867/.8299 — none
+    style (height:c.w/t). CropOverlay has exactly 2 commits (6401f95, f5e32c1) ï¿½ NO version
+    ever carried a 1:1/square lock. CAPTURES aspects in dist: 1.6611/.8538/.8867/.8299 ï¿½ none
     is 1. The default centered-80% box uses the same aspect (same formulas).
   implication: Hypothesis "lock reads wrong source / hardcoded 1:1 / missing-aspect default"
     is ELIMINATED at byte level for src and dist. A literal square box is impossible in any
@@ -370,7 +370,7 @@ evidence (re-run 2026-10-12 post-change):
 
 - timestamp: 2026-10-12 R2 geometry analysis (the near-square shapes)
   checked: default box h/w = 1/aspect per capture, vs the calibration frames
-  found: basic 0.602 (wide, like 691x416); general 1.171, quasi 1.128, special 1.205 —
+  found: basic 0.602 (wide, like 691x416); general 1.171, quasi 1.128, special 1.205 ï¿½
     near-square TALL rectangles that match the tall calibration frames exactly (sampideal1
     648x759 => 1.171, sampideal2 673x759 => 1.128, sampideal3 649x782 => 1.205). The
     near-square look at steps 2-4 is the CORRECT lock; only step 1 (basic) yields a wide box.
@@ -379,24 +379,24 @@ evidence (re-run 2026-10-12 post-change):
     wide/basic-content screenshot (691x416 = 1.66): the lock prevents the wide selection,
     and the forced near-square crop then reads zero. Tool working AS SPECIFIED (05-UI-SPEC:
     "lock ratio = reference aspect"), but nothing in the UI tells the player which frame
-    shape the step expects — a UX gap to surface to the owner, not a code defect.
+    shape the step expects ï¿½ a UX gap to surface to the owner, not a code defect.
 
 - timestamp: 2026-10-12 R2 cancel-path review (D-05-UAT-5)
   checked: compiled OcrCapture cancel handler (m) + CropOverlay decline wiring + wizard
     callbacks (SubmitPage handleOcrRunState/applyOcrOutcomes/handleOcrReadFailed)
   found: Decline button onClick and Escape both route to the cancel handler: bitmap.close(),
     cropBitmap=null (overlay unmounts), status 'reading'->'idle', onRunStateChange(false)
-    (wizard un-skeletons inputs). No outcomes, no onReadFailed — no pre-fill, no failure
+    (wizard un-skeletons inputs). No outcomes, no onReadFailed ï¿½ no pre-fill, no failure
     spam, manual entry intact. This is EXACTLY the ratified D-05 semantics, and 05-UI-SPEC
     state matrix line "decline -> idle" makes the silent return spec'd behavior.
   implication: No functional defect in the cancel path (src, dist, and wiring all verified).
-    The report is explained by (a) label semantics — "Enviar sem recortar" (Send without
+    The report is explained by (a) label semantics ï¿½ "Enviar sem recortar" (Send without
     cropping) reads as 'proceed uncropped' while the ratified behavior cancels the read; and
     (b) the spec'd silent idle giving zero visible feedback. Changing label/copy or adding a
     cancelled-status line = UI-SPEC copy-table deviation => OWNER DECISION, not unilateral.
 
 - timestamp: 2026-10-12 R2 crop->read contract review (D-05-UAT-6)
-  checked: readScreenshot (recognize.ts) — rectToPixels(region.rect, image.width,
+  checked: readScreenshot (recognize.ts) ï¿½ rectToPixels(region.rect, image.width,
     image.height) against the CROPPED canvas dims; regions are fractions of the capture frame
   found: the contract is correct: an aspect-preserving, frame-exact crop reproduces the
     calibration frame exactly, so fractions land on the right pixels. Frame-exactness is the
@@ -420,3 +420,47 @@ evidence (re-run 2026-10-12 post-change):
 - **D-05-UAT-6 (zero values after crop): EXPECTED CONSEQUENCE, contract proven.** A non-frame-exact crop (forced square or rough default box) misaligns every region (E2: 0/14; D: 0/14); a frame-exact crop reads exactly (E1: 14/14). The mandatory manual fix-up is the designed safety net.
 
 Pinned permanently by CropOverlay.test.ts (geometry pins: no capture locks 1:1, default box carries the capture aspect) and harness experiments A/D/E.
+
+## ROUND 3 â€” Architecture pivot: structural OCR spike proven (2026-10-12)
+
+Owner directive (verbatim in 05-UAT.md round 3): "we need a reading model that actually can read
+data from an image without relying on a pixel map" â€” the round-1/2 dispositions showed the
+pixel-fraction region maps (regions.ts) are only valid on frame-exact crops, so the reading
+strategy itself was pivoted. Proof spike: `scripts/ocr-spike-structural.mjs` (commit 012956f).
+
+strategy:
+  - Basic screen (sampbasic): value PILLS detected by color saturation (chroma >= 50 column/row
+    runs; the gray Job pill is excluded by the same mask). Pill text is WHITE on a saturated
+    fill â€” located by a high-luma (>= 210) column extent scanned over the band's middle rows,
+    binarized at 180 (the 05-01 normalize+140 recipe binarizes the gradient into hollow
+    outlines). combat_power = the bottom-most pill whose digits-whitelist read parses as a flat
+    number inside sanity (HP/SP read "N/N", Base "MAX/MAX" â€” both rejected by the content gate).
+  - Details screens (sampideal1-3): text row BANDS from a dark-pixel row profile; within a band,
+    value clusters are the LOW-CHROMA dark clusters (values render dark navy, labels indigo â€”
+    chroma separates them; chevrons/header bars excluded by the same mask). Two-column screens
+    split at the content midline; the value is the rightmost cluster per cell. Keys map from
+    OCR'd labels via fuzzy match against the game-label vocabulary, with a fixed-row-order
+    fallback when the band count matches exactly (skips label OCR).
+  - Background-independent localization: both readers crop to the panel's cream paper rectangle
+    first (high luma + low chroma run detection), so synthetic white/gray/dark margins do not
+    perturb detection.
+  - Recognition core unchanged: the proven 05-01 recipe (grayscale -> adaptive upscale ->
+    normalize -> threshold -> dual polarity -> digits whitelist -> best-read scoring).
+
+grid (the pivot's acceptance bar â€” exact values on the 56 shipped fields):
+  - F native: all 4 canonical samples PASS (1/1, 14/14, 26/26, 15/15).
+  - G rescales 0.6x/0.75x/1.25x/1.5x: all 16 variants PASS.
+  - H loose crops (white/gray/dark synthetic margins, 5 pad patterns): all 20 variants PASS.
+  - Final line: "Variants failing the exact-value bar: 0".
+  - Last fix (G x1.5 sampbasic, root cause): row-label glyph antialiasing (indigo on cream
+    blends to ~rgb(142,164,208), chroma 66 >= the 50 pill threshold) crossed the pill column
+    threshold at 1.5x, forming w=4 saturated runs 318px left of the Power pill; the first..last
+    pill extent dragged across the label, the white-text scan then swept the cream paper, and
+    the read collapsed to "4" (which passes the sanity gate). Fix: anchor the pill extent on the
+    dominant saturated mass (drop column runs < 15% of the widest run before spanning) â€”
+    scale-invariant, no 1.5x special case; every other variant stayed green.
+
+D-10 discipline: the spike reads .secrets/ocr-samples/ at runtime and contains no image bytes or
+derived pixel data; the 9 scratch _debug-*.mjs scripts used during calibration were deleted
+uncommitted. The structural reader is NOT yet wired into src/ â€” the engine implementation is a
+separate task (INPT-02 remains open; no SUMMARY written for it).
