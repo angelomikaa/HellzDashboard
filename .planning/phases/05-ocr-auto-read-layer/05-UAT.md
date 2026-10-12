@@ -137,9 +137,21 @@ Use your real screenshots from `.secrets/ocr-samples/`. Expected behavior per st
 
 **Consequence:** steps 1–11 could not be walked — the UAT is blocked, not approved. Routed to a debug session for root-cause diagnosis before any re-walk.
 
+**Round 2 — owner report (verbatim, 2026-10-11, after the 5% recalibration + accept-gate fix):**
+
+> "crop tool is appearing incorrectly and cropping incorrenctly (it forces the crop into a square, optimal input is a rectangle, send without cropping doesnt work, and square, unoptimal cropping forced by the cropping tool working in a way that is not intended still is unable to read any values."
+
+**Round 2 defect list (observed during the step-8 crop test — full phone screenshot, where the crop appearing IS by design):**
+
+| # | Symptom | Suspect area (to be confirmed by diagnosis) |
+|---|---------|---------------------------------------------|
+| D-05-UAT-4 | Crop tool **forces a square** crop box — but the optimal capture frame is a wide rectangle (calibration aspect ≈ 1.66:1); the aspect lock appears to be 1:1 instead of the step's capture aspect | `CropOverlay.tsx` aspect-lock source; default centered-80% box aspect |
+| D-05-UAT-5 | **`Enviar sem recortar` doesn't work** (ratified design: declining cancels the read entirely and returns cleanly to manual entry — determine whether the button no-ops, errors, or leaves the overlay/state stuck) | cancel handler wiring in `CropOverlay.tsx` / `OcrCapture.tsx` |
+| D-05-UAT-6 | After the (forced-square) crop, the read produces **zero values** — expected consequence of a wrong-aspect crop vs. region fractions calibrated to the capture frame; must ALSO be verified independently: a correct-aspect crop of a full screenshot must read well | crop→read geometry contract (region scaling applied to the cropped bitmap) |
+
 ## Verdict
 
-**OWNER UAT: BLOCKED BY DEFECTS — walk attempted 2026-10-11, could not be completed.**
+**OWNER UAT: BLOCKED BY DEFECTS — round 1 walk attempted 2026-10-11 (crop trigger + accept gate: fixed, owner-ratified 5% threshold); round 2 re-walk hit CropOverlay defects (D-05-UAT-4/5/6) — still blocked, not approved.**
 
 The earlier deferral record (below) is superseded by this attempt: the owner returned, ran the preview at http://localhost:4173 with the real screenshots, and hit the three defects above. **No step is marked PASS; INPT-02 completion and Phase 5 verification remain HELD.**
 
