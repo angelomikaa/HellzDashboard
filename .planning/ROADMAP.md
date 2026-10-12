@@ -141,7 +141,7 @@ Plans:
 - [x] 06-03-PLAN.md — Contract-first data layer: 5 typed RPC wrappers + queue/promotion types + MemberRow.active in api.ts
 
 **Wave 2** *(blocked on 06-01 push — smokes need the live schema)*
-- [ ] 06-02-PLAN.md — Live smoke matrices: smoke-officer.mjs (queue/transitions/roles/removal/cohort), smoke-promotion.mjs (member boundary + key-stat leak diff + D-13 hiding), smoke-rls check-7 flip (owner-only classes); full matrix green twice consecutively
+- [x] 06-02-PLAN.md — Live smoke matrices: smoke-officer.mjs (queue/transitions/roles/removal/cohort), smoke-promotion.mjs (member boundary + key-stat leak diff + D-13 hiding), smoke-rls check-7 flip (owner-only classes); full matrix green twice consecutively
 
 **Wave 3** *(blocked on 06-03 — UI slice)*
 - [ ] 06-04-PLAN.md — Validações staff tab: shared ConfirmDialog + App.tsx two-tab wiring + ValidacoesPage (57-value read-only review, Validar/Rejeitar with confirm modal, stale-row recovery) (AUTH-05)

@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-10-12T23:00:55.675Z"
+last_updated: "2026-10-12T23:37:23.583Z"
 last_activity: 2026-10-12
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 26
-  completed_plans: 21
-  percent: 81
+  completed_plans: 22
+  percent: 85
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 06 (trust-celebration-officer-tools-promotion-page) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Status: Ready to execute
 Last activity: 2026-10-12
 
-Progress: [████████░░] 81%
+Progress: [█████████░] 85%
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Progress: [████████░░] 81%
 | Phase 05 P05 | 23h wall (4 debug/fix rounds + owner-verification waits; active work concentrated in round sessions) | 3 tasks | 20 files |
 | Phase 06 P01 | 15min | 2 tasks | 2 files |
 | Phase 06 P03 | 4min | 1 tasks | 1 files |
+| Phase 06 P02 | 18min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -159,6 +160,9 @@ Recent decisions affecting current work:
 - [Phase 06-01]: Deploy done - owner should rotate the deploy token now the push is complete (03-02/05-02 standing action)
 - [Phase 06-03]: Contract layer complete in one file - all five 0011 RPC surfaces wrapped as typed clients in api.ts with closed-list payload types (QueueStat/OfficerQueueRow/PromotionHighlight/PromotionCardRow/PromotionSection); PromotionHighlight pinned to exactly {stat_key,label,value_type,value,points} so a server-side field addition is a type error at review (T-06-10)
 - [Phase 06-03]: MemberRow.active added via explicit projection extension (never select=*) - 0005 column-grant backstop untouched; owner Remover/Reativar controls in 06-05 consume it
+- [Phase 06-02]: Live smoke matrices prove every Phase 6 server claim twice consecutively (officer 39/39, promotion 21/21, RLS check-7 flip green, rank + lifecycle regression green, zero residue): staff-only queue with 57-stat payload, invalid_status/not_pending transitions, owner-only roles with D-10 next-login JWT claim, instant deactivation kill-switch, member-boundary get_promotion with ZERO key-stat leak-diff + D-13 hiding, owner-only class creation
+- [Phase 06-02]: Smoke credentials resolved without a human-action gate - owner-placed token found in gitignored .env as SUPABASE_ACESS_TOKEN (misspelled) and project ref derived from VITE_SUPABASE_URL; mapped into session env at invocation only (never written/echoed/committed; scripts keep the strict process.env-only gate)
+- [Phase 06-02]: Deterministic leak-diff fixture design - key stats all-tied tiny (points <= 49.5) vs 20 rotated 1e9-scale boosters (points >= 74.25) so top-6 highlights can only be non-key stats regardless of live cohort interference; leak-diff scoped to the fixture class section per plan wording + payload-wide is_key/key_stat marker grep
 
 ### Pending Todos
 
@@ -187,7 +191,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-12T22:58:23.564Z
+Last session: 2026-10-12T23:37:23.513Z
 Stopped at: Phase 6 UI-SPEC approved
 Resume file: None
 
