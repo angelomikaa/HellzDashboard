@@ -13,6 +13,7 @@
 // these rows. The OCR read path is parse-flag based (trailing %) and never
 // consults the catalog, so typed and read validation agree once this source
 // is right.
+/// <reference types="node" />
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
