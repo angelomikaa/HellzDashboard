@@ -48,6 +48,56 @@ export function needsCrop(imgAspect: number, refAspect: number): boolean {
   return Math.abs(imgAspect / refAspect - 1) > CROP_DEVIATION_MAX + CROP_FLOAT_EPSILON
 }
 
+/**
+ * Decode an uploaded image file to an EXIF-oriented ImageBitmap — with a
+ * fallback chain (D-05-UAT-8, round 4): the decode is the ONLY await
+ * between the reading status and the crop-overlay decision, so a single
+ * createImageBitmap call that rejects short-circuits straight to the failed
+ * status and the crop interface never opens (the owner's step-8 report:
+ * a full phone screenshot went "directly to error"). The chain:
+ *   1. createImageBitmap(file, { imageOrientation: 'from-image' }) — the
+ *      correct path; 'from-image' entered the ImageOrientation enum late,
+ *      so some engines reject the whole call over it.
+ *   2. bare createImageBitmap(file) — engines that reject the options dict
+ *      but decode the blob fine (orientation only diverges for rotated-EXIF
+ *      uploads, which screenshots do not carry).
+ *   3. the <img> element decode path (object URL + decode()) — a distinct
+ *      decoder route that succeeds where the blob bitmap path fails.
+ * Only when ALL THREE reject does this reject — the caller then shows the
+ * designed failed status (D-18) and the file genuinely cannot be read on
+ * this device.
+ */
+export async function decodeUpload(file: Blob): Promise<ImageBitmap> {
+  try {
+    return await createImageBitmap(file, { imageOrientation: 'from-image' })
+  } catch {
+    try {
+      return await createImageBitmap(file)
+    } catch {
+      const url = URL.createObjectURL(file)
+      try {
+        const img = new Image()
+        img.src = url
+        if (typeof img.decode === 'function') {
+          await img.decode()
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve()
+            img.onerror = () => reject(new Error('[ocr] image decode failed'))
+          })
+        }
+        try {
+          return await createImageBitmap(img, { imageOrientation: 'from-image' })
+        } catch {
+          return await createImageBitmap(img)
+        }
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    }
+  }
+}
+
 // Locked UI-SPEC copy (definition site — comments describe, never quote).
 const CTA_LABEL = 'Faça upload dos seus status aqui'
 
@@ -136,8 +186,9 @@ export function OcrCapture({
     try {
       // EXIF orientation (05-RESEARCH §6 pitfall 6): decode with the
       // image's own orientation or a phone-portrait screenshot crops at
-      // wrong rects.
-      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      // wrong rects. decodeUpload's fallback chain (D-05-UAT-8) keeps the
+      // crop tool reachable when the primary decode path rejects.
+      const bitmap = await decodeUpload(file)
       const imgAspect = bitmap.width / bitmap.height
       if (needsCrop(imgAspect, CAPTURES[capture].aspect)) {
         // Full screenshot / bad crop: the optional crop runs BEFORE any
