@@ -6,10 +6,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   binarize,
+  chroma,
+  cropImageData,
+  luma,
   meanLuma,
   negate,
   needsDualPolarity,
   normalizeContrast,
+  padBinarized,
   pickBestRead,
   toGrayscale,
   type ImageDataLike,
@@ -129,5 +133,57 @@ describe('pickBestRead (spike recognizeBest semantics)', () => {
 
   it('returns the empty text for an empty candidate list', () => {
     expect(pickBestRead([])).toBe('')
+  })
+})
+
+describe('luma/chroma (float pixel statistics — structural detection thresholds)', () => {
+  it('computes ITU-R 601 luma without rounding', () => {
+    expect(luma(20, 24, 58)).toBeCloseTo(26.66, 2)
+    expect(luma(255, 255, 255)).toBe(255)
+  })
+  it('computes the max-min channel spread', () => {
+    expect(chroma(142, 164, 208)).toBe(66) // the measured label-halo case
+    expect(chroma(128, 128, 128)).toBe(0)
+  })
+})
+
+describe('padBinarized (spike ocrRect margin — lone glyphs misread on a tight canvas)', () => {
+  it('pads a constant-value border around the content, alpha opaque', () => {
+    const bin = img(2, 2, [
+      [0, 0, 0, 255],
+      [255, 255, 255, 255],
+      [255, 255, 255, 255],
+      [0, 0, 0, 255],
+    ])
+    const out = padBinarized(bin, 1, 1, 255)
+    expect(out.width).toBe(4)
+    expect(out.height).toBe(4)
+    // border is the pad value, interior preserved
+    expect([...out.data.slice(0, 4)]).toEqual([255, 255, 255, 255])
+    expect([...out.data.slice((1 * 4 + 1) * 4, (1 * 4 + 1) * 4 + 4)]).toEqual([0, 0, 0, 255])
+    expect([...out.data.slice((2 * 4 + 2) * 4, (2 * 4 + 2) * 4 + 4)]).toEqual([0, 0, 0, 255])
+  })
+  it('never mutates the input', () => {
+    const bin = img(1, 1, [[0, 0, 0, 255]])
+    const snapshot = [...bin.data]
+    padBinarized(bin, 2, 2, 255)
+    expect([...bin.data]).toEqual(snapshot)
+  })
+})
+
+describe('cropImageData (pure sub-rect extraction)', () => {
+  it('extracts the clamped sub-rect', () => {
+    const src = img(3, 3, Array.from({ length: 9 }, (_, i) => [i, i, i, 255] as [number, number, number, number]))
+    const out = cropImageData(src, { left: 1, top: 1, width: 2, height: 2 })
+    expect(out.width).toBe(2)
+    expect(out.height).toBe(2)
+    expect(out.data[0]).toBe(4) // pixel (1,1) = index 4
+    expect(out.data[out.data.length - 4]).toBe(8) // pixel (2,2) = index 8
+  })
+  it('clamps out-of-bounds rects to the image', () => {
+    const src = img(2, 2, Array.from({ length: 4 }, (_, i) => [i, i, i, 255] as [number, number, number, number]))
+    const out = cropImageData(src, { left: 1, top: 1, width: 10, height: 10 })
+    expect(out.width).toBe(1)
+    expect(out.height).toBe(1)
   })
 })
