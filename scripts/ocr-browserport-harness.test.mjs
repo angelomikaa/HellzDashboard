@@ -17,7 +17,8 @@
 // scoring, gates, and readScreenshot itself run VERBATIM from src.
 //
 // Experiments:
-//   A) needsCrop stays silent on every canonical optimal sample (D-05-UAT-1 optimal path)
+//   A) needsCrop stays silent on every canonical optimal sample (D-05-UAT-1 optimal path);
+//      all 11 calibration samples decode at their recorded calibration resolutions exactly
 //   B) exact-value comparison vs expected.json on the 56 shipped fields (the spike's
 //      222/222 bar restricted to the shipped region maps)
 //   C) diagnostic replica: per-field raw reads, confidences, and gate
@@ -26,6 +27,9 @@
 //   D) owner-flow reproduction: a full-phone-screenshot upload fires the crop, and the
 //      crop overlay's DEFAULT centered-80% confirm box produces a misaligned frame
 //      (mechanism candidate for D-05-UAT-2/3)
+//   E) crop→read contract (D-05-UAT-6, round 2): a correct-aspect frame-exact crop of
+//      a full screenshot reads 14/14 exact; a forced-square (1:1) crop containing the
+//      panel reads near-zero — the expected consequence of a wrong-aspect frame
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -37,6 +41,7 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const SAMPLES_DIR = path.join(ROOT, '.secrets', 'ocr-samples')
 const EXPECTED_PATH = path.join(SAMPLES_DIR, 'expected.json')
+const CALIBRATION_PATH = path.join(ROOT, 'scripts', 'ocr-regions.json')
 const hasSamples =
   existsSync(SAMPLES_DIR) && readdirSync(SAMPLES_DIR).some((f) => /\.png$/i.test(f))
 
@@ -242,8 +247,28 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
   })
 
   it(
-    'A) needsCrop stays silent on every canonical optimal sample (D-05-UAT-1 optimal path)',
+    'A) needsCrop stays silent on every canonical optimal sample (D-05-UAT-1 optimal path); all 11 calibration samples decode at their recorded resolutions',
     async () => {
+      // Every one of the 11 calibration samples must decode at EXACTLY its
+      // recorded calibration resolution (the round-1/round-2 "0.00% deviation"
+      // pin) — the shipped 5% needsCrop then keeps the canonical optimal
+      // samples no-crop at their matching wizard steps.
+      const groups = Object.values(JSON.parse(readFileSync(CALIBRATION_PATH, 'utf8')).groups)
+      expect(groups.length).toBe(11)
+      for (const g of groups) {
+        const meta = await sharp(path.join(SAMPLES_DIR, g.screenshot)).metadata()
+        expect(
+          [meta.width, meta.height],
+          `${g.screenshot} decoded dims vs recorded calibration resolution`,
+        ).toEqual([g.resolution.width, g.resolution.height])
+        const imgAspect = meta.width / meta.height
+        const devs = Object.entries(CAPTURES).map(
+          ([key, m]) => `${key}=${(Math.abs(imgAspect / m.aspect - 1) * 100).toFixed(2)}%`,
+        )
+        console.log(
+          `[harness A] ${g.screenshot} ${meta.width}x${meta.height}: deviation vs captures ${devs.join(' ')}`,
+        )
+      }
       for (const { capture, file } of CANONICAL) {
         const meta = await sharp(path.join(SAMPLES_DIR, file)).metadata()
         const imgAspect = meta.width / meta.height
@@ -357,9 +382,13 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
     async () => {
       // Synthesize a full phone screenshot: 1080x2280 device frame with the sampideal1
       // panel (648x759) placed inside it (game screens sit offset inside a phone shot).
+      // 5-arg drawImage: draw the panel AT (216,420) at natural size (source rect is
+      // the whole panel). The 9-arg form would read source rect (216,420,648,759) OFF
+      // the 648x759 panel itself — out of bounds, stamping black (harness bug caught
+      // when E1's frame-exact crop read a black canvas).
       const panel = await loadSampleCanvas('sampideal1.png')
       const full = new FakeCanvas(1080, 2280)
-      full.getContext().drawImage(panel, 216, 420, 648, 759, 216, 420, 648, 759)
+      full.getContext().drawImage(panel, 216, 420, 648, 759)
       const fullAspect = full.width / full.height
       expect(needsCrop(fullAspect, CAPTURES.general.aspect)).toBe(true) // crop fires (D-05-UAT-1 for full screenshots)
 
@@ -408,6 +437,62 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       // Documents the defect mechanism: a one-click default crop cannot reproduce the
       // spike bar (regions are displaced far beyond the ~2% frame tolerance).
       expect(correct).toBeLessThan(outcomes.length)
+    },
+  )
+
+  it(
+    'E) crop→read contract (D-05-UAT-6): correct-aspect frame-exact crop of a full screenshot reads exactly; a forced-square crop reads near-zero',
+    { timeout: 30 * 60_000 },
+    async () => {
+      // Synthesize the owner's upload: a 1080x2280 full phone screenshot with
+      // the sampideal1 panel (648x759) at (216,420) — same construction as D.
+      const expected = JSON.parse(readFileSync(EXPECTED_PATH, 'utf8'))
+      const exp = expected['sampideal1.png']
+      const panel = await loadSampleCanvas('sampideal1.png')
+      const full = new FakeCanvas(1080, 2280)
+      // 5-arg form: panel drawn AT (216,420) at natural size (see the harness-bug
+      // note in experiment D — the 9-arg form reads an out-of-bounds source rect).
+      full.getContext().drawImage(panel, 216, 420, 648, 759)
+      expect(needsCrop(full.width / full.height, CAPTURES.general.aspect)).toBe(true)
+
+      /** CropOverlay.handleConfirm replica: draw a lock-shaped box off the full frame and read it. */
+      async function readCropped(boxW, boxH, boxX, boxY, label) {
+        const cropped = new FakeCanvas(Math.max(1, Math.round(boxW)), Math.max(1, Math.round(boxH)))
+        cropped.getContext().drawImage(full, boxX, boxY, boxW, boxH, 0, 0, cropped.width, cropped.height)
+        const outcomes = await readScreenshot('general', cropped)
+        let correct = 0
+        const lines = []
+        for (const o of outcomes) {
+          if (o.status === 'filled') {
+            const ok = matchesExpected(o.raw, exp[o.stat_key])
+            if (ok) correct += 1
+            lines.push(`${o.stat_key}: filled raw="${o.raw}" expected="${exp[o.stat_key]}" ${ok ? 'OK' : 'WRONG'}`)
+          } else {
+            lines.push(`${o.stat_key}: FAILED expected="${exp[o.stat_key]}"`)
+          }
+        }
+        console.log(`[harness E-${label}] ${correct}/${outcomes.length} correct\n${lines.join('\n')}`)
+        return { correct, total: outcomes.length }
+      }
+
+      // E1 — the lock at its target: box width = the panel's exact width; the
+      // capture-aspect lock derives the height (648/0.8538 = 758.04 — the
+      // stored aspect is 4-dp rounded vs the panel's true 759, a 0.13%
+      // shortfall well inside the ~2% frame tolerance). The crop is
+      // frame-exact, so the contract MUST reproduce the uncropped 14/14 read.
+      const aspect = CAPTURES.general.aspect
+      const exact = await readCropped(648, 648 / aspect, 216, 420, 'exact')
+      expect(exact.correct).toBe(exact.total)
+
+      // E2 — the owner's claimed tool behavior: a 1:1 square crop (the largest
+      // square the image fits, positioned to fully contain the panel). The
+      // region fractions then scale to the square frame and displace off every
+      // value row: near-zero reads — the EXPECTED consequence if a square
+      // were ever forced (the shipped lock never forces one; see
+      // CropOverlay.test.ts pins).
+      const side = Math.min(full.width, full.height)
+      const square = await readCropped(side, side, 0, 420, 'square')
+      expect(square.correct).toBeLessThan(square.total)
     },
   )
 })
