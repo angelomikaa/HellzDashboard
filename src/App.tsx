@@ -3,6 +3,8 @@ import { clearSession } from './features/auth/session'
 import { RequireAuth } from './features/auth/RequireAuth'
 import { CharactersPage } from './features/admin/CharactersPage'
 import { KeyStatsPage } from './features/admin/KeyStatsPage'
+import { ValidacoesPage } from './features/admin/ValidacoesPage'
+import { HighlightsPage } from './features/highlights/HighlightsPage'
 import { SubmitPage } from './features/submit/SubmitPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 
@@ -15,7 +17,7 @@ const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
 // Exported for DashboardPage's type-only import (erased at build — no
 // runtime cycle: App imports the page's value, the page imports only the
 // Tab union as a type).
-export type Tab = 'painel' | 'submit' | 'characters' | 'keystats'
+export type Tab = 'painel' | 'submit' | 'validacoes' | 'destaques' | 'characters' | 'keystats'
 
 function App() {
   const [tab, setTab] = useState<Tab>('painel')
@@ -31,10 +33,12 @@ function App() {
     <RequireAuth>
       {({ session, invalidate }) => {
         // Tab visibility is UX-ONLY gating (T-02-09): members never see the
-        // Personagens button, but enforcement is the staff RLS policies from
-        // 02-01 — a tampered client is refused server-side. The showCharacters
-        // fallback also covers a staff tab lingering after a logout/login
-        // switch on the same browser (App stays mounted across sessions).
+        // staff buttons, but enforcement is the staff RLS policies / RPC
+        // internal gates — a tampered client is refused server-side. Every
+        // show* flag is also a content re-check covering a staff tab lingering
+        // after a logout/login switch on the same browser (App stays mounted
+        // across sessions); the new Validações staff tab follows the same
+        // UX-only gate + content re-check pattern (T-06-01).
         const isStaff =
           session.member_role === 'officer' || session.member_role === 'owner'
         const showCharacters = tab === 'characters' && isStaff
@@ -43,8 +47,16 @@ function App() {
         // internal gates in the 0009 RPCs; a member session never receives
         // key-stat data even if a staff tab lingers across logout/login.
         const showKeyStats = tab === 'keystats' && isStaff
+        // Validações (06-04): same UX-only staff gate + content re-check —
+        // enforcement is the officer_queue/set_submission_status RPC staff
+        // gates (0011); a member session never receives queue data.
+        const showValidacoes = tab === 'validacoes' && isStaff
         // Enviar Status is for EVERY role (members submit their own stats).
         const showSubmit = tab === 'submit'
+        // Destaques (06-04): every logged-in member — celebration is the point
+        // (D-12); mirrors showSubmit with no role condition. Enforcement is
+        // the member-invocable get_promotion RPC.
+        const showHighlights = tab === 'destaques'
 
         return (
           <div className="flex min-h-screen flex-col bg-dominant text-content">
@@ -85,6 +97,28 @@ function App() {
                 >
                   Enviar Status
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('destaques')}
+                  aria-current={showHighlights ? 'page' : undefined}
+                  className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    showHighlights ? 'border-accent text-content' : 'border-transparent text-muted'
+                  }`}
+                >
+                  Destaques
+                </button>
+                {isStaff && (
+                  <button
+                    type="button"
+                    onClick={() => setTab('validacoes')}
+                    aria-current={showValidacoes ? 'page' : undefined}
+                    className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      showValidacoes ? 'border-accent text-content' : 'border-transparent text-muted'
+                    }`}
+                  >
+                    Validações
+                  </button>
+                )}
                 {isStaff && (
                   <button
                     type="button"
@@ -113,7 +147,11 @@ function App() {
             </nav>
             <main className="flex-1">
               <div className="mx-auto w-full max-w-3xl px-4 py-6">
-                {showCharacters ? (
+                {showValidacoes ? (
+                  <ValidacoesPage session={session} />
+                ) : showHighlights ? (
+                  <HighlightsPage session={session} />
+                ) : showCharacters ? (
                   <CharactersPage session={session} />
                 ) : showKeyStats ? (
                   <KeyStatsPage session={session} />
