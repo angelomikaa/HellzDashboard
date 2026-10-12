@@ -37,6 +37,14 @@
 //   H) [= the spike's H] loose crops: the 4 canonical samples padded with
 //      synthetic plain margins (white/gray/dark) — exact (the reader must
 //      locate the panel grammar, not assume full-bleed)
+//   F) full-phone-shot variant (D-05-UAT-8, round 4): a realistic 1080x2280
+//      full phone screenshot (dark game-bg backdrop, panel scaled to ~30% of
+//      the frame width — margins far beyond H's 20%) — the crop trigger fires
+//      on EVERY capture step, and the owner's ratified gesture (shrink the
+//      crop box loosely around the panel, confirm) reads 14/14 exact
+//      end-to-end; the DIRECT unadjusted read on the full frame resolves
+//      without throwing (graceful all-failed — the crop overlay is the
+//      isolation tool, owner-ratified 2026-10-12)
 //   [C RETIRED (round 3): the per-field diagnostic replica pinned the OLD
 //   region-map read path (rectToPixels + prepareCandidates); the structural
 //   reader has no per-region replica to mirror. Gate decomposition evidence
@@ -525,6 +533,84 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       }
       console.log(`[harness E] frame-exact crop: ${correct}/${outcomes.length} correct\n${lines.join('\n')}`)
       expect(correct).toBe(outcomes.length)
+    },
+  )
+
+  it(
+    'F) full-phone-shot variant (D-05-UAT-8): the crop trigger fires on EVERY capture step and a panel-isolating crop of a realistic 1080x2280 screenshot reads exactly end-to-end',
+    { timeout: 30 * 60_000 },
+    async () => {
+      // The owner's step-8 upload: a FULL phone screenshot — the game panel
+      // a minority of the frame, deep game-UI margins all around. Synthetic
+      // construction only (no image bytes committed): the sampideal1 panel
+      // scaled to 0.5x (324x380 — ~30% of the 1080-wide frame, inside the
+      // panel's proven rescale grid at the 0.6x floor boundary) centered
+      // horizontally at y=420 on a 1080x2280 dark game-bg backdrop.
+      const expected = JSON.parse(readFileSync(EXPECTED_PATH, 'utf8'))
+      const exp = expected['sampideal1.png']
+      const SCALE = 0.5
+      const pw = Math.round(648 * SCALE)
+      const ph = Math.round(759 * SCALE)
+      const src = await sharp(path.join(SAMPLES_DIR, 'sampideal1.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      const { data, info } = await sharp(src.data, {
+        raw: { width: src.info.width, height: src.info.height, channels: 4 },
+      })
+        .resize(pw, ph, { kernel: 'cubic' })
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true })
+      const panel = new FakeCanvas(info.width, info.height)
+      panel._buf = new Uint8ClampedArray(data)
+
+      const full = new FakeCanvas(1080, 2280)
+      full._buffer().fill(34) // dark game-bg-like backdrop (harness H's dark pad color)
+      const px = Math.round((1080 - pw) / 2)
+      const py = 420
+      full.getContext().drawImage(panel, px, py, pw, ph)
+
+      // The trigger MUST fire on every capture step — this is what routes the
+      // full shot to the crop overlay (the decode-fallback fix keeps this
+      // decision reachable; see decodeUpload in OcrCapture.tsx).
+      const imgAspect = full.width / full.height
+      for (const [key, m] of Object.entries(CAPTURES)) {
+        expect(needsCrop(imgAspect, m.aspect), `full phone shot vs capture "${key}"`).toBe(true)
+      }
+
+      // The owner's ratified gesture: shrink/move the crop box loosely around
+      // the panel (panel + 8% margins — any shape confirms) and read it.
+      // CropOverlay.handleConfirm replica: draw the box region off the full
+      // frame onto a fresh canvas, hand it to readScreenshot.
+      const mx = Math.round(pw * 0.08)
+      const my = Math.round(ph * 0.08)
+      const bx = Math.max(0, px - mx)
+      const by = Math.max(0, py - my)
+      const bw = Math.min(full.width - bx, pw + 2 * mx)
+      const bh = Math.min(full.height - by, ph + 2 * my)
+      const cropped = new FakeCanvas(bw, bh)
+      cropped.getContext().drawImage(full, bx, by, bw, bh, 0, 0, bw, bh)
+      const outcomes = await readScreenshot('general', cropped)
+      let correct = 0
+      const lines = []
+      for (const o of outcomes) {
+        const ok = o.status === 'filled' && matchesExpected(o.raw, exp[o.stat_key], o.stat_key)
+        if (ok) correct += 1
+        lines.push(
+          `  ${o.stat_key}: ${o.status === 'filled' ? `raw="${o.raw}"` : '<failed>'} expected="${exp[o.stat_key]}" ${ok ? 'OK' : 'MISS'}`,
+        )
+      }
+      console.log(`[harness F] full-phone crop-then-read (${bw}x${bh} box): ${correct}/${outcomes.length} correct\n${lines.join('\n')}`)
+      expect(correct).toBe(outcomes.length)
+
+      // Confirming WITHOUT adjusting reads the whole upload: the structural
+      // reader cannot localize a panel this deep in the frame (its paper-run
+      // thresholds are span-relative by design) — the ratified behavior is a
+      // GRACEFUL all-failed outcome set (per-field failure alerts, manual
+      // fix-up), never an exception. Pins the D-18 degradation contract.
+      const direct = await readScreenshot('general', full)
+      const directFilled = direct.filter((o) => o.status === 'filled').length
+      console.log(`[harness F] direct full-frame read: ${directFilled}/${direct.length} filled (resolved without throwing)`)
+      expect(Array.isArray(direct)).toBe(true)
+      expect(direct).toHaveLength(14)
     },
   )
 })
