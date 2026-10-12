@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: awaiting owner browser UAT (deferred — owner absent, steps recorded in 05-UAT.md)
-stopped_at: Phase 6 context gathered
-last_updated: "2026-10-11T23:27:29.469Z"
+stopped_at: Phase 6 UI-SPEC approved
+last_updated: "2026-10-12T04:27:04.107Z"
 last_activity: 2026-10-11
 progress:
   total_phases: 6
@@ -141,6 +141,9 @@ Recent decisions affecting current work:
 - [Phase 05-04]: needsCrop pins the binding formula (>12% exclusive): the plan's 11.2% 'true' case contradicted its own parenthetical and formula (pinned false, 05-01 clamp-example class), and a 1e-9 epsilon absorbs IEEE-754 noise at the exact-12% boundary so 'exactly 0.12 -> false' holds
 - [Phase 05-04]: OCR outcomes flow through the single central handleChange wrapper (D-15 replace-all-displayed: filled -> raw, failed/unmapped -> blank + locked failure flag, failure set replaced wholesale) so every pre-fill unchecks the owning step's verification (T-05-12); declining the crop cancels the read entirely — no outcomes, no failure spam (pitfall 7)
 - [Phase 05-04]: INPT-02 stays Pending by traceability (05-01/02/03 precedent) — criteria 1+2 code-complete, criterion 3's build half proven (tesseract only in the lazy chunk, self-hosted worker/core in dist/ocr/, 0 FormData); completes at 05-05 owner UAT
+- [Phase 05-04]: Owner-ratified deviation (2026-10-12, D-05-UAT-4; owner verbatim: "make the square unlocked - the player can crop the way he feels necessary - he must be shown an example of how to crop properly, and reproduce it using the crop tool."): the crop box is FREE-FORM (any shape, free drag + resize) with a dashed example rectangle at the step's CAPTURE aspect + helper copy — supersedes the Phase 5 planning discretion that made the crop aspect-locked hard; recorded in 05-UI-SPEC as a ratified deviation
+- [Phase 05-04]: Confirm gate added with the free crop (physics, non-negotiable): confirm requires the capture aspect within 2% (inclusive + 1e-9 epsilon, the needsCrop convention) — out-of-tolerance shows an inline message and keeps the overlay open, no read consumed; harness E evidence: frame-exact crop 14/14 exact, forced square 0/14, default rough box 0/14 (region fractions are calibrated to the frame)
+- [Phase 05-04]: Owner-ratified deviation (2026-10-12, D-05-UAT-5): crop decline relabelled from the send-uncropped wording to a cancel-reading label + a visible cancelled-feedback status line now surfaces on decline (button or Escape) before the flow returns to manual entry, clearing on the next upload; decline still CANCELS the read entirely (ratified D-05 semantics unchanged — no pre-fill, no failure spam)
 
 ### Pending Todos
 
@@ -157,7 +160,7 @@ Recent decisions affecting current work:
 - [Phase 5]: OCR confidence threshold (~85) and sanity-range rules need production-data calibration — spike delivered GO (100.0% on 11 owner-device samples) but device fragmentation is NOT covered; region maps are game-UI-versioned (re-run spike to recalibrate); dual-polarity read and manual fix-up are mandatory — all four land in 05-01 as seeded constants (OCR_ACCEPT_CONFIDENCE=85, sanity defaults+overrides); recalibration after a game UI change = recalibrate spike maps → re-run scripts/convert-spike-regions.mjs → normal deploy (05 planning)
 - ~~[Phase 3 / 03-02]: Task 2 Step B (deploy 0007 + verify-pin, live smoke) BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env~~ CLEARED 03-02 (2026-10-10): owner supplied the token as a session env var (never on disk/commit/echo) — 0007 pushed, recursion caught and fixed via 0008, verify-pin redeployed, RLS SMOKE PASSED 15/15. Owner should rotate the deploy token now the deploy is done (standing action)
 - ~~[Phase 5 / 05-02 task 3] Live push of migration 0010 + lifecycle smoke BLOCKED: SUPABASE_ACCESS_TOKEN missing from session env~~ CLEARED 05-02 (2026-10-11): owner supplied the token as a session env var (never on disk/commit/echo, 03-02 precedent) — 0010 pushed live (dry-run confirmed it was the only pending migration), LIFECYCLE SMOKE PASSED 11/11 twice consecutively (no residue; one assertion-shape fix in 873c0d1 — RLS `using` zero-row semantics, see Decisions), RANK SMOKE PASSED (no 0009→0010 regression). Owner should rotate the deploy token now the deploy is done (standing action).
-- ~~[Phase 5 / 05-05] Owner UAT walk DEFERRED by owner directive 2026-10-11 (owner absent)~~ SUPERSEDED — walk ATTEMPTED 2026-10-11 and **BLOCKED BY DEFECTS** (owner report verbatim in 05-UAT.md): (1) crop overlay triggers on EVERY upload including the spike-calibrated optimal samples; (2) high rate of wrong pre-filled values on optimal input (spike was 100.0% on the same samples in Node); (3) some reads fail completely. Steps 1-11 could not be walked — no verdicts filled, INPT-02 and phase-5 verification HELD. Routed to a debug session for root-cause diagnosis (suspects: needsCrop geometry basis, crop-vs-full-image region scaling mismatch between spike calibration and browser pipeline, worker/core/lang path wiring in vite preview); fixes must be proven by an offline exact-value harness on the real samples before the UAT re-walk. **ROUND 1 RESOLVED** (crop trigger recalibrated to owner-ratified 5%; accept gate recalibrated to spike parity — 56/56 exact on real samples, 187/187 tests). **ROUND 2 (2026-10-11):** re-walk hit CropOverlay defects (verbatim in 05-UAT.md): the crop tool forces a SQUARE box (optimal frame is a ~1.66:1 rectangle), `Enviar sem recortar` doesn't work, and a forced-square crop reads zero values — debug session d05-uat-ocr-defects.md extended; INPT-02 and phase-5 verification still HELD.
+- ~~[Phase 5 / 05-05] Owner UAT walk DEFERRED by owner directive 2026-10-11 (owner absent)~~ SUPERSEDED — walk ATTEMPTED 2026-10-11 and **BLOCKED BY DEFECTS** (owner report verbatim in 05-UAT.md): (1) crop overlay triggers on EVERY upload including the spike-calibrated optimal samples; (2) high rate of wrong pre-filled values on optimal input (spike was 100.0% on the same samples in Node); (3) some reads fail completely. Steps 1-11 could not be walked — no verdicts filled, INPT-02 and phase-5 verification HELD. Routed to a debug session for root-cause diagnosis (suspects: needsCrop geometry basis, crop-vs-full-image region scaling mismatch between spike calibration and browser pipeline, worker/core/lang path wiring in vite preview); fixes must be proven by an offline exact-value harness on the real samples before the UAT re-walk. **ROUND 1 RESOLVED** (crop trigger recalibrated to owner-ratified 5%; accept gate recalibrated to spike parity — 56/56 exact on real samples, 187/187 tests). **ROUND 2 (2026-10-11):** re-walk hit CropOverlay defects (verbatim in 05-UAT.md): the crop tool forces a SQUARE box (optimal frame is a ~1.66:1 rectangle), `Enviar sem recortar` doesn't work, and a forced-square crop reads zero values — debug session d05-uat-ocr-defects.md extended; INPT-02 and phase-5 verification still HELD. **ROUND 2 DISPOSITIONS RESOLVED + IMPLEMENTED (2026-10-12):** owner ratified the D-05-UAT-4/5 UI changes (free-form crop + dashed example + 2% confirm gate; decline relabel + cancelled status line) — implemented TDD-first (full suite 209/209, tsc clean, build green, criterion-3 gates holding); INPT-02 stays HELD until the re-walk passes.
 
 ## Deferred Items
 
@@ -169,9 +172,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-11T23:55:00.000Z
-Stopped at: Phase 5 plan 05-05 owner UAT blocked by OCR defects — debug session
-Resume file: .planning/phases/05-ocr-auto-read-layer/05-UAT.md
+Last session: 2026-10-12T04:27:04.041Z
+Stopped at: Phase 6 UI-SPEC approved
+Resume file: .planning/phases/06-trust-celebration-officer-tools-promotion-page/06-UI-SPEC.md
 
 ---
 *v1 milestone: Phases 1-6 (v2 deferred items: delta badges, history view, officer guild-health dashboard, catalog self-service, OCR confidence surfacing, shareable PNG export)*

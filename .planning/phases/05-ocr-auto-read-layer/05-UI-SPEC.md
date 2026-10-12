@@ -15,6 +15,8 @@ created: 2026-10-11
 > **pt-BR throughout.** All user-facing strings are final copy. The two CONTEXT-locked strings are marked 🔒.
 >
 > **Update mode:** this contract refines the planner-derived baseline (same file, 2026-10-11) into the full 6-dimension format. Every locked decision (05-CONTEXT.md, 05-DISCUSSION-LOG.md) and every baseline-resolved discretion value (crop trigger, micro-copy, crop mechanics) is preserved verbatim; additions are the explicit token/spacing/typography/color declarations, state matrix, component inventory, and a11y/security contracts the checker and executor consume. The owner ratifies this spec at the 05-05 UAT checkpoint (STATE.md Phase 05 planning decision).
+>
+> **Owner-ratified deviations recorded in place (2026-10-12, 05-UAT.md round-2 dispositions D-05-UAT-4/5):** (1) the crop box is FREE-FORM (any shape) with a dashed example rectangle at the capture aspect, and confirm is gated on a 2% aspect tolerance — superseding the aspect-locked crop mechanics discretion below; (2) the crop decline button is relabelled and declining now surfaces a cancelled-feedback status line — superseding the silent decline copy/semantics presentation. Earlier ratified deviation (2026-10-11): the crop trigger runs at >5% aspect deviation (was >12%). All other contract dimensions are unchanged.
 
 ---
 
@@ -98,7 +100,7 @@ Exactly 3 sizes, 2 weights (all map to existing Tailwind classes in the shipped 
 4. Active tab underline (existing App pattern — unchanged)
 5. **Crop overlay selection affordance**: crop box border (`border-2 border-accent`) + corner handle (`bg-accent`)
 
-**Accent is NOT used for:** input borders, failure messages, status lines, skeleton shimmer, the crop-decline button (outline `border-line`), or the cropped-image preview. `animate-pulse` runs on the token default (content color at reduced opacity) — no new color introduced.
+**Accent is NOT used for:** input borders, failure messages, status lines, skeleton shimmer, the crop-decline button (outline `border-line`), the dashed crop example/ghost rectangle (muted), or the cropped-image preview. `animate-pulse` runs on the token default (content color at reduced opacity) — no new color introduced.
 
 ---
 
@@ -113,9 +115,12 @@ All strings are final pt-BR copy. Error copy is enumeration-safe — raw engine/
 | Reading status | `Lendo captura…` (also the disabled input placeholder) |
 | Read done | `Leitura concluída — confira os valores abaixo.` |
 | Read failed / OCR unavailable (D-18) | `Não foi possível ler a captura automaticamente. Preencha os valores manualmente.` |
+| Read cancelled (ratified deviation, D-05-UAT-5) | `Leitura cancelada` |
 | Crop heading | `Ajuste o recorte da captura` |
+| Crop example helper (ratified deviation, D-05-UAT-4) | `Ajuste a área de recorte no formato do exemplo tracejado` |
 | Crop confirm | `Usar recorte` |
-| Crop decline | `Enviar sem recortar` |
+| Crop decline (ratified relabel, D-05-UAT-5) | `Cancelar leitura` |
+| Crop confirm-gate message (ratified deviation, D-05-UAT-4) | `Ajuste o recorte ao formato do exemplo` |
 | Step 1 verification checkbox | `Revisei os valores do personagem e estão corretos.` |
 | Steps 2–4 verification checkboxes | existing group copy verbatim: `Revisei os valores de {Geral\|Quasi\|Especial} contra as capturas e estão corretos.` |
 | Discarded history badge (D-11) | `Descartado` |
@@ -159,12 +164,16 @@ Each capture step (Personagem/step 1 = basic header, Geral, Quasi, Especial) gai
 
 ## Crop Overlay (D-05 — optional, triggered only on "excessive information")
 
-**Trigger (discretion, seeded):** the uploaded image's aspect ratio deviates > **12%** from the capture's reference aspect (basic 1.661 / general 0.854 / quasi 0.887 / special 0.830) → the crop prompt appears BEFORE any read. Optimal crops skip cropping entirely.
+**Trigger (ratified calibration change, 2026-10-11):** the uploaded image's aspect ratio deviates > **5%** (exclusive boundary, was >12% at baseline) from the capture's reference aspect (basic 1.661 / general 0.854 / quasi 0.887 / special 0.830) → the crop prompt appears BEFORE any read. Optimal crops skip cropping entirely.
 
-- Fullscreen fixed overlay (`fixed inset-0 bg-black/80 z-50`), the image contained (`max-h-[80vh]`), pt-BR heading `Ajuste o recorte da captura` (`text-xl font-semibold text-content` on a `bg-surface` panel, `p-6`).
-- **Aspect-locked crop box**: `border-2 border-accent`, lock ratio = reference aspect. Drag inside the box to move; one corner handle (16px `h-4 w-4`, `bg-accent`) to resize; minimum box = 40% of the limiting dimension. Pointer events, no library.
-- Buttons (both `h-11`): `Usar recorte` (accent-filled — proceeds to the read with the cropped canvas) and `Enviar sem recortar` (`border-line` outline — **cancels the read**; per D-05 declining the crop lands the player in manual entry, no garbage read on a full screenshot).
-- **Decline semantics:** overlay closes, NO read runs, no field/failure changes — the step returns to idle (CTA enabled, no status line). Declining is always a complete, safe exit.
+**Crop mechanics (owner-ratified deviation, 2026-10-12 — D-05-UAT-4, supersedes the baseline's aspect-locked box):**
+
+- Fullscreen fixed overlay (`fixed inset-0 bg-black/80 z-50`), the image contained (`max-h-[80vh]`), pt-BR heading `Ajuste o recorte da captura` (`text-xl font-semibold text-content` on a `bg-surface` panel, `p-6`), helper line `Ajuste a área de recorte no formato do exemplo tracejado` (`text-sm text-muted`).
+- **Example:** a dashed ghost/template rectangle at the step's CAPTURE aspect (the framing the read expects — region fractions are calibrated to that frame), centered at the full capture-frame size, rendered BEHIND the player's crop box (`border-2 border-dashed border-muted`, non-interactive). The helper copy tells the player to reproduce that framing with the crop box.
+- **Free-form crop box**: `border-2 border-accent`, NO aspect lock — the player drags it anywhere and resizes it via one corner handle (16px `h-4 w-4`, `bg-accent`) to ANY shape; each axis is bounded by the image and floored at 40% of the capture-frame extent on that axis. The default opening box starts AT the capture aspect (centered, 80% of the capture-frame extents — a good starting point that already matches the example), freely adjustable from there. Pointer events, no library.
+- **Confirm gate (non-negotiable physics, harness-proven):** `Usar recorte` proceeds ONLY when the crop's aspect matches the capture aspect within the **2% frame tolerance** (inclusive + a 1e-9 epsilon, the needsCrop convention). Out of tolerance → the read is NOT consumed: an inline message `Ajuste o recorte ao formato do exemplo` (`role="alert" aria-live="polite"`, `text-sm font-semibold text-destructive`) shows and the overlay stays OPEN so the player fixes the crop or cancels. Within tolerance → the read proceeds with the cropped canvas exactly as before. Evidence: harness experiment E — frame-exact crop → 14/14 exact; forced 1:1 square → 0/14; default rough box → 0/14.
+- Buttons (both `h-11`): `Usar recorte` (accent-filled — proceeds to the read via the confirm gate) and `Cancelar leitura` (`border-line` outline — **cancels the read**; per D-05 declining the crop lands the player in manual entry, no garbage read on a full screenshot).
+- **Decline semantics (ratified deviation, 2026-10-12 — D-05-UAT-5):** overlay closes, NO read runs, no field/failure changes — and the step now surfaces a visible cancelled-feedback status line `Leitura cancelada` (`text-muted`) so the return is no longer silent. The line clears on the next upload (reading state). Declining is always a complete, safe exit.
 - **Focus management:** on open, focus moves to `Usar recorte`; both buttons are keyboard-operable; `Escape` maps to decline (cancel). The drag/resize gesture itself is pointer-only — the decline button is the full keyboard path.
 
 ---
@@ -193,7 +202,7 @@ New UI surface (decomposition within `src/features/submit/` is the planner's cal
 |---------|----------|
 | Upload CTA block | `{ state: 'idle' \| 'reading' \| 'done' \| 'failed'; onFile: (file: File) => void }` — accent button + hidden `accept="image/*"` input + status line; the single OCR entry per step |
 | OCR field-state wiring | StatGroupStep (and step 1's combat_power input) gain a per-field outcome map + `reading` flag driving disabled/`animate-pulse`/failure-message rendering; parse feedback paths unchanged |
-| CropOverlay | `{ imageUrl: string; referenceAspect: number; onConfirm: (crop: Rect) => void; onDecline: () => void }` — aspect-locked box, pointer drag/resize, focus + Escape handling per above |
+| CropOverlay | `{ bitmap: ImageBitmap; aspect: number; onConfirm: (cropped: HTMLCanvasElement) => void; onCancel: () => void }` — FREE-FORM box (ratified deviation) + dashed example at the capture aspect + 2% confirm gate (out-of-tolerance: inline message, overlay stays open); decline cancels the read; focus + Escape handling per above |
 | Per-step checkbox | native checkbox row, copy per table, stale-reset wiring in the step component |
 | ReviewStep (restructured) | summary rows + Enviar; loses its checkbox block; gains the four-verifications gate |
 | HistoryList | status map extension only |
@@ -209,12 +218,13 @@ The OCR engine module itself (`src/features/submit/ocr/` — regions, sanity, pr
 | State | Detection | Rendering |
 |-------|-----------|-----------|
 | Idle | no read on this step | CTA enabled, no status line — pure manual flow (02-UI-SPEC unchanged) |
-| Crop prompt | aspect deviates > 12% from reference | overlay before any read; confirm → read, decline → idle |
+| Crop prompt | aspect deviates > 5% from reference (ratified threshold, 2026-10-11) | overlay before any read; confirm → 2% aspect gate: in-tolerance → read, out-of-tolerance → inline message + overlay stays open (no read consumed); decline → cancelled state |
 | Reading | read in flight | CTA disabled + `aria-busy`; status `Lendo captura…` (`text-muted`); all step inputs disabled + `animate-pulse` + placeholder |
 | Done | read finished (any outcome mix) | status `Leitura concluída…` (`text-success`); CTA re-enabled; step checkbox unchecked |
 | Failed / unavailable | engine crash or unavailable (D-18) | status `Não foi possível ler…` (`role="status"`, `text-muted`); fields untouched; CTA re-enabled (retry = re-upload) |
+| Cancelled (ratified deviation, 2026-10-12) | player declined the crop (button or Escape) | status `Leitura cancelada` (`role="status"`, `text-muted`); CTA enabled; fields untouched; cleared by the next upload (reading state) |
 
-Precedence: crop prompt > reading > done/failed. Existing wizard errors (network/session/submit) are unchanged and separate.
+Precedence: crop prompt > reading > done/failed/cancelled. Existing wizard errors (network/session/submit) are unchanged and separate.
 
 **Field-level (within a reading step):**
 

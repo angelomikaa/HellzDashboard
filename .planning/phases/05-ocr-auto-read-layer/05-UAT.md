@@ -5,7 +5,7 @@ source: [05-05-PLAN.md, 05-04-SUMMARY.md, 05-02-SUMMARY.md]
 build_tested: "commit 8d7e6d3 — vite preview of the production-shaped dist (src tree identical to c95c794, the 05-04 wizard wiring)"
 server: "http://localhost:4173 (vite preview — restart with npm run preview; see How to resume)"
 started: 2026-10-11T21:23:18Z
-updated: 2026-10-11T23:55:00Z
+updated: 2026-10-12T13:45:00Z
 ---
 
 # Phase 5 Owner UAT — OCR Auto-Read Layer (INPT-02 end-to-end)
@@ -87,8 +87,8 @@ Use your real screenshots from `.secrets/ocr-samples/`. Expected behavior per st
 - **result:** pending
 - **owner notes:** —
 
-### Step 8 — Crop trigger (D-05)
-- **expected:** upload a FULL phone screenshot (with surrounding UI) on any step → the crop overlay appears (`Ajuste o recorte da captura`, aspect-locked box, drag + corner resize) → crop roughly to the panel → `Usar recorte` → the read proceeds. In a second attempt press `Enviar sem recortar` → the read is **CANCELLED**: no garbage pre-fill, fields stay blank, manual entry continues.
+### Step 8 — Crop trigger (D-05; free-crop + example per the 2026-10-12 ratification)
+- **expected:** upload a FULL phone screenshot (with surrounding UI) on any step → the crop overlay appears (`Ajuste o recorte da captura`, a dashed example rectangle at the step's capture frame, a FREE crop box opening at that same shape) → freely drag/resize the box; crop roughly to the panel in the example's shape → `Usar recorte` → the read proceeds. If you confirm a crop shaped clearly off the example (e.g. a square on the Basic step), the inline message `Ajuste o recorte ao formato do exemplo` shows and the overlay stays open — fix the shape or cancel. In a second attempt press `Cancelar leitura` → the read is **CANCELLED**: no garbage pre-fill, fields stay blank, the status line `Leitura cancelada` shows, manual entry continues (the line clears on the next upload).
 - **result:** pending
 - **owner notes:** —
 
@@ -151,9 +151,9 @@ Use your real screenshots from `.secrets/ocr-samples/`. Expected behavior per st
 
 **Round 2 dispositions (debug session, 2026-10-12 — full evidence in `.planning/debug/d05-uat-ocr-defects.md`):**
 
-- **D-05-UAT-4: NO CODE DEFECT.** The lock is always the step's capture aspect (verified src + dist, pinned by `CropOverlay.test.ts`). Steps 2–4 lock **tall near-square** boxes because their calibration frames ARE tall rectangles (648×759, 673×759, 649×782); only Basic is wide (691×416). The "forced square" perception = cropping a wide screenshot against a tall step's lock. **Open owner decision:** nothing in the UI communicates the expected frame shape per step.
-- **D-05-UAT-5: NO CODE DEFECT.** Decline (button + Escape) cancels the read exactly as ratified (D-05: "declining the crop cancels the read"; UI-SPEC: decline → idle) — overlay closes, no pre-fill, manual entry intact. The label `Enviar sem recortar` reads as "proceed uncropped" while the behavior cancels, and the return is silent by spec. **Open owner decision:** relabel (e.g. `Cancelar leitura`) and/or add a cancelled-feedback status line — a UI-SPEC copy deviation that needs ratification.
-- **D-05-UAT-6: EXPECTED CONSEQUENCE — contract proven sound.** Harness (after fixing a harness-only canvas-construction bug that had invalidated the D evidence): **frame-exact crop → 14/14 exact**; forced square → 0/14; default rough box → 0/14 (11 failed + 3 wrong). Rough crops are caught by the mandatory verification checkbox + manual fix-up (the designed safety net).
+- **D-05-UAT-4: NO CODE DEFECT.** The lock was always the step's capture aspect (verified src + dist, pinned by `CropOverlay.test.ts`). Steps 2–4 locked **tall near-square** boxes because their calibration frames ARE tall rectangles (648×759, 673×759, 649×782); only Basic is wide (691×416). The "forced square" perception = cropping a wide screenshot against a tall step's lock. **RESOLVED (owner-ratified 2026-10-12, verbatim directive: "make the square unlocked - the player can crop the way he feels necessary - he must be shown an example of how to crop properly, and reproduce it using the crop tool."):** the hard aspect lock is REMOVED — the crop box is now free-form (drag/resize to any shape) with a dashed EXAMPLE rectangle at the step's capture aspect plus helper copy, and confirm is GATED on the crop matching that aspect within the 2% frame tolerance (out-of-tolerance: inline message, overlay stays open, no read consumed — harness E: frame-exact 14/14, square 0/14). Supersedes the Phase 5 planning discretion that made the crop aspect-locked hard; recorded in 05-UI-SPEC.md as an owner-ratified deviation (2026-10-12). TDD-proven: geometry pins rewritten (free-crop + example + confirm-gate), full suite 209/209, `tsc -b` clean, build green with all criterion-3 gates holding.
+- **D-05-UAT-5: NO CODE DEFECT.** Decline (button + Escape) cancels the read exactly as ratified (D-05: "declining the crop cancels the read"; UI-SPEC: decline → idle) — overlay closes, no pre-fill, manual entry intact. The label `Enviar sem recortar` read as "proceed uncropped" while the behavior cancels, and the return was silent by spec. **RESOLVED (owner-ratified 2026-10-12):** the decline button is relabelled to `Cancelar leitura` AND a visible cancelled-feedback status line `Leitura cancelada` now surfaces on decline (button or Escape) before the flow returns to manual entry — the line clears on the next upload. Decline still CANCELS the read entirely (ratified D-05 semantics unchanged: no pre-fill, no failure spam, manual entry intact). Recorded in 05-UI-SPEC.md as an owner-ratified copy deviation (2026-10-12); pinned by the statusMessage tests (cancelled line, single-slot replacement on next upload).
+- **D-05-UAT-6: EXPECTED CONSEQUENCE — contract proven sound.** Harness (after fixing a harness-only canvas-construction bug that had invalidated the D evidence): **frame-exact crop → 14/14 exact**; forced square → 0/14; default rough box → 0/14 (11 failed + 3 wrong). Rough crops are caught by the mandatory verification checkbox + manual fix-up (the designed safety net) — and, since the 2026-10-12 free-crop ratification, by the confirm gate: an off-capture-aspect crop can no longer reach the read at all (only a same-aspect but non-frame-exact crop still relies on the human backstop).
 
 ## Verdict
 
@@ -161,13 +161,15 @@ Use your real screenshots from `.secrets/ocr-samples/`. Expected behavior per st
 
 The earlier deferral record (below) is superseded by this attempt: the owner returned, ran the preview at http://localhost:4173 with the real screenshots, and hit the three defects above. **No step is marked PASS; INPT-02 completion and Phase 5 verification remain HELD.**
 
+**Round-2 owner decisions RESOLVED and implemented (2026-10-12):** D-05-UAT-4/5 were ratified by the owner (free-form crop + dashed example + 2% confirm gate; decline relabel + cancelled status line — dispositions above) and implemented with TDD proof (full suite 209/209, `tsc -b` clean, build green, all criterion-3 gates holding). The re-walk below exercises the new flow; D-05-UAT-6 needs no code action.
+
 ---
 
 *Superseded deferral record (2026-10-11, kept for history):* the owner was absent at the first checkpoint and directed (verbatim): *"I'll be absent for a while hence cannot do tests — let's proceed with the next step. Record steps 1 to 11 so we can do it later."*
 
 ## How to resume
 
-1. **Fixes land first:** the debug session (see `.planning/debug/`) must diagnose and fix D-05-UAT-1/2/3, proven by an offline exact-value harness on the real samples + full suite + build.
+1. **Fixes land first:** the debug session (see `.planning/debug/`) diagnosed D-05-UAT-1/2/3 (fixed + owner-ratified 5% threshold, proven by the offline exact-value harness on the real samples + full suite + build) and the round-2 dispositions D-05-UAT-4/5 were owner-ratified 2026-10-12 and implemented (free-form crop + example + confirm gate; cancel feedback). All automated gates re-verified post-change (full suite 209/209, `tsc -b` clean, build green, lazy-chunk + no-upload + dist-assets gates holding).
 2. Restart the preview server: `npm run preview` (serves http://localhost:4173).
 3. Re-walk steps 1–11 above in a real browser with your real screenshots from `.secrets/ocr-samples/` (sampbasic.png, sampideal1-3.png, common samples — they never enter git or the network).
 4. Reply **"approved"** to accept, or report the step numbers + observed behavior for anything that differed (each deviation gets a disposition: accepted / needs-fix → becomes a gap plan and feeds /gsd-verify-work).
