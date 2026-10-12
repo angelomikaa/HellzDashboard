@@ -1,20 +1,23 @@
-// Crop-trigger boundary tests (plan 05-04 task 1, TDD RED). Pure helper
-// only — vitest runs node-env (no DOM), per the house pattern in
-// ../auth/session.test.ts. Behavior source: 05-04-PLAN <behavior> + D-05
-// (crop prompt appears only when the uploaded image's aspect deviates from
-// the capture's reference aspect by MORE than 12%; optimal crops skip
-// cropping entirely).
+// Crop-trigger boundary tests (plan 05-04 task 1, TDD RED; recalibrated
+// 2026-10-11 to the owner-ratified 5% gate — debug session
+// .planning/debug/d05-uat-ocr-defects.md, D-05-UAT-2 disposition). Pure
+// helper only — vitest runs node-env (no DOM), per the house pattern in
+// ../auth/session.test.ts. Behavior source: D-05 — the crop prompt appears
+// only when the uploaded image's aspect deviates from the capture's
+// reference aspect by MORE than 5% (exclusive boundary); optimal crops and
+// the exact calibration frames (deviation ≤0.01%) skip cropping entirely.
 //
-// Deviation note (plan <behavior> is self-contradictory on one case): the
-// plan lists an expectation of "true" for the 11.2% case while its own
-// parenthetical and the binding formula in <action> (deviation strictly
-// greater than 0.12) both yield false — 11.2% is below the 12% trigger.
-// These tests pin the formula, the exact-boundary cases, and the UI-SPEC
-// trigger definition; the contradiction is recorded in the plan SUMMARY.
+// Why 5% (owner-ratified calibration change): at the old 12% gate, frames
+// with 5-12% deviation (e.g. samp2 vs quasi = 9.4%) passed uncropped and
+// produced parseable-but-wrong values — the regions are valid only on the
+// calibration frame. Tightening routes those misaligned uploads to the
+// crop overlay instead of reading garbage uncropped. The 11 calibration
+// samples deviate at most 0.01% and must stay no-crop (pinned below +
+// harness test A on the real bytes).
 import { describe, expect, it } from 'vitest'
 import { needsCrop } from './OcrCapture'
 
-describe('needsCrop — D-05 aspect-deviation trigger (>12%, exclusive)', () => {
+describe('needsCrop — D-05 aspect-deviation trigger (>5%, exclusive)', () => {
   it('an optimal crop (identical aspect) never triggers cropping', () => {
     expect(needsCrop(1.661, 1.661)).toBe(false)
   })
@@ -23,12 +26,29 @@ describe('needsCrop — D-05 aspect-deviation trigger (>12%, exclusive)', () => 
     expect(needsCrop(0.9, 1.661)).toBe(true)
   })
 
-  it('deviation of exactly 0.12 does not trigger (boundary is exclusive)', () => {
-    expect(needsCrop(1.12, 1)).toBe(false)
-    expect(needsCrop(0.88, 1)).toBe(false)
+  it('deviation of exactly 0.05 does not trigger (boundary is exclusive)', () => {
+    expect(needsCrop(1.05, 1)).toBe(false)
+    expect(needsCrop(0.95, 1)).toBe(false)
   })
 
-  it('deviation of 0.121 triggers', () => {
+  it('deviation just above 0.05 triggers', () => {
+    expect(needsCrop(1.0501, 1)).toBe(true)
+    expect(needsCrop(0.9499, 1)).toBe(true)
+  })
+
+  it('the samp2-vs-quasi misalignment (9.4% deviation) now triggers', () => {
+    // 650x670 frame read against the 673x759 quasi calibration — the
+    // D-05-UAT-2 case that passed the old 12% gate uncropped and produced
+    // parseable-but-wrong values.
+    expect(needsCrop(650 / 670, 673 / 759)).toBe(true)
+  })
+
+  it('the old 12% boundary cases now trigger', () => {
+    expect(needsCrop(1.12, 1)).toBe(true)
+    expect(needsCrop(0.88, 1)).toBe(true)
+  })
+
+  it('deviation of 0.121 still triggers', () => {
     expect(needsCrop(1.121, 1)).toBe(true)
     expect(needsCrop(0.879, 1)).toBe(true)
   })
@@ -38,7 +58,14 @@ describe('needsCrop — D-05 aspect-deviation trigger (>12%, exclusive)', () => 
     expect(needsCrop(1.0, 0.854)).toBe(true) // 17.1%
   })
 
-  it('general reference: 11.2% deviation stays under the 12% trigger', () => {
-    expect(needsCrop(0.95, 0.854)).toBe(false)
+  it('general reference: 11.2% deviation now triggers (above the 5% gate)', () => {
+    expect(needsCrop(0.95, 0.854)).toBe(true)
+  })
+
+  it('the exact calibration frames (deviation ≤0.01%) stay no-crop', () => {
+    expect(needsCrop(691 / 416, 1.6611)).toBe(false) // sampbasic -> basic
+    expect(needsCrop(648 / 759, 0.8538)).toBe(false) // sampideal1 -> general
+    expect(needsCrop(673 / 759, 0.8867)).toBe(false) // sampideal2 -> quasi
+    expect(needsCrop(649 / 782, 0.8299)).toBe(false) // sampideal3 -> special
   })
 })
