@@ -1,30 +1,24 @@
-// CropOverlay — the optional crop prompt (D-05, 05-UI-SPEC). The
-// free-form box, the dashed example rectangle, the confirm-time aspect
-// gate and the decline relabel are OWNER-RATIFIED DEVIATIONS from the
-// locked spec (2026-10-12, 05-UAT.md round-2 dispositions D-05-UAT-4/5 —
-// they supersede the Phase 5 planning discretion that made the crop box
-// aspect-locked hard). Rendered ONLY when the uploaded image's aspect
-// deviates >5% (owner-ratified threshold, 2026-10-11) from the capture's
-// reference aspect ("excessive information" — a full screenshot or bad
-// crop vs the expected panel crop): the player freely drags and resizes
-// the crop box to ANY shape over their uploaded image, guided by a
-// dashed EXAMPLE rectangle at the step's CAPTURE aspect — the framing
-// the read expects (region fractions are calibrated to that frame;
-// harness-proven: a frame-exact crop reads 14/14 exact, a forced 1:1
-// square 0/14).
-//
-// Confirm is GATED (non-negotiable physics): a crop whose aspect
-// deviates from the capture aspect beyond the ~2% frame tolerance
-// (inclusive + epsilon, the needsCrop convention) is NOT consumed — an
-// inline message directs the player to match the example and the
-// overlay stays open to fix or cancel. Within tolerance, confirm draws
-// the cropped region to a canvas and hands it to the read. Decline
-// (outline button or Escape) CANCELS the read entirely — the player
-// lands in manual entry with fields untouched, never a garbage
-// scaled-to-wrong-frame read (05-RESEARCH §6 pitfall 7), and the capture
-// step surfaces a visible cancelled-feedback status line (ratified
-// deviation, handled by the parent). Plain pointer events — no library;
-// react is the only import.
+// CropOverlay — the optional crop prompt (D-05, 05-UI-SPEC). Owner-ratified
+// crop-UX change (2026-10-12, question "With the structural reader, the 2%
+// confirm gate and the example enforcement in the crop tool are obsolete..."
+// → answer: "Remove gate, keep crop"): the round-2 dashed example rectangle,
+// its helper copy, and the 2% confirm gate are RETIRED — with the structural
+// reader live (reads are scale/margin invariant; harness grid green) they
+// would reject crops that read perfectly. The overlay stays as an OPTIONAL
+// isolation tool for busy/large screenshots (rendered only when the
+// uploaded image's aspect deviates >5% — owner-ratified threshold,
+// 2026-10-11 — from the capture's reference aspect): the player freely drags
+// and resizes the crop box to ANY shape, and `Usar recorte` ALWAYS confirms
+// — whatever box the player drew — drawing the cropped region to a canvas
+// and handing it to the read. The default opening box is the FULL image:
+// confirming without adjusting equals reading the whole upload (sane
+// semantics for an optional isolation tool); the player shrinks/moves the
+// box only to isolate the panel on busy screenshots. Decline (outline
+// button or Escape) CANCELS the read entirely — the player lands in manual
+// entry with fields untouched, never a garbage read (05-RESEARCH §6 pitfall
+// 7), and the capture step surfaces a visible cancelled-feedback status
+// line (ratified deviation, handled by the parent). Plain pointer events —
+// no library; react is the only import.
 import { useEffect, useRef, useState } from 'react'
 
 interface CropOverlayProps {
@@ -52,38 +46,22 @@ export interface BoxBounds {
 
 const MIN_BOX_FRACTION = 0.4
 
-// Confirm gate: the crop must match the step's CAPTURE aspect within the
-// ~2% frame tolerance evidenced in the round-2 debug session (region
-// rects tolerate only ~2% frame displacement). Inclusive boundary + a
-// tiny epsilon that absorbs IEEE-754 representation noise — the needsCrop
-// convention — so a mathematically exact 2% deviation stays on the
-// CONFIRM side of the boundary; real deviations (2.1% and up) are orders
-// of magnitude above it.
-const CONFIRM_TOLERANCE = 0.02
-const CONFIRM_FLOAT_EPSILON = 1e-9
-
 const HEADING = 'Ajuste o recorte da captura'
 const CONFIRM_LABEL = 'Usar recorte'
 // Ratified relabel (D-05-UAT-5): the decline button cancels the read —
 // its label now says so.
 const DECLINE_LABEL = 'Cancelar leitura'
-// Helper copy (D-05-UAT-4): reproduce the dashed example's framing with
-// the crop box.
-const EXAMPLE_HINT = 'Ajuste a área de recorte no formato do exemplo tracejado'
-// Inline confirm-gate message: the crop's shape is off the example's
-// format — the read is not consumed, the overlay stays open.
-const FIT_MESSAGE = 'Ajuste o recorte ao formato do exemplo'
 
 /**
- * Widest capture-aspect rectangle that fits the image (the example's
- * width). The capture aspect is ALWAYS the step's CAPTURES aspect (see
- * CropOverlay.test.ts).
+ * Widest capture-aspect rectangle that fits the image. Serves ONLY the
+ * resize floor below — the isolation tool's sanity minimum (there is no
+ * example rectangle and no confirm gate to serve anymore).
  */
 export function maxBoxWidth(imgW: number, imgH: number, aspect: number): number {
   return Math.min(imgW, imgH * aspect)
 }
 
-/** Tallest capture-aspect rectangle that fits the image (the example's height). */
+/** Tallest capture-aspect rectangle that fits the image (the resize floor's basis). */
 export function maxBoxHeight(imgW: number, imgH: number, aspect: number): number {
   return Math.min(imgH, imgW / aspect)
 }
@@ -94,9 +72,10 @@ function clamp(n: number, lo: number, hi: number): number {
 
 /**
  * Free-crop manipulation bounds: each axis spans the full image, floored
- * at 40% of the capture-frame extent on that axis (the old lock's minimum
- * footprint — every box the aspect-locked tool allowed stays reachable,
- * plus every other shape, which the confirm gate governs).
+ * at 40% of the capture-frame extent on that axis — an isolation-tool
+ * sanity minimum against absurdly tiny crops (every box the old tools
+ * allowed stays reachable, plus every other shape; confirm governs
+ * nothing — the read is structural and shape-tolerant).
  */
 export function boxBounds(imgW: number, imgH: number, aspect: number): BoxBounds {
   return {
@@ -134,32 +113,13 @@ export function resizeBox(
 }
 
 /**
- * The opening crop box: centered, 80% of the capture-frame extents, at
- * the CAPTURE aspect — a good starting point that already matches the
- * example, now freely adjustable.
+ * The opening crop box: the FULL image (owner-ratified 2026-10-12 — the
+ * old centered-80% default was a pixel-map relic that would clip the panel
+ * on tight screenshots). Confirming without adjusting reads the whole
+ * upload; the player shrinks/moves the box only to isolate the panel.
  */
-export function defaultBox(imgW: number, imgH: number, aspect: number): CropBox {
-  const w = 0.8 * maxBoxWidth(imgW, imgH, aspect)
-  return clampPosition({ w, h: w / aspect, x: (imgW - w) / 2, y: (imgH - w / aspect) / 2 }, imgW, imgH)
-}
-
-/**
- * The dashed EXAMPLE rectangle: centered, full capture-frame size, at
- * the CAPTURE aspect — the framing the read expects, rendered behind the
- * player's crop box.
- */
-export function exampleBox(imgW: number, imgH: number, aspect: number): CropBox {
-  const w = maxBoxWidth(imgW, imgH, aspect)
-  return clampPosition({ w, h: w / aspect, x: (imgW - w) / 2, y: (imgH - w / aspect) / 2 }, imgW, imgH)
-}
-
-/**
- * Confirm gate: the crop confirms only when its aspect matches the step's
- * CAPTURE aspect within the 2% frame tolerance (inclusive; the epsilon
- * absorbs float noise so a mathematically exact 2% deviation confirms).
- */
-export function cropAspectMatches(cropW: number, cropH: number, captureAspect: number): boolean {
-  return Math.abs(cropW / cropH / captureAspect - 1) <= CONFIRM_TOLERANCE + CONFIRM_FLOAT_EPSILON
+export function defaultBox(imgW: number, imgH: number): CropBox {
+  return { x: 0, y: 0, w: imgW, h: imgH }
 }
 
 export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlayProps) {
@@ -167,11 +127,10 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
   const confirmBtnRef = useRef<HTMLButtonElement>(null)
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null)
   const [box, setBox] = useState<CropBox | null>(null)
-  const [fitError, setFitError] = useState(false)
   const dragRef = useRef<null | { kind: 'move' | 'resize'; startX: number; startY: number; box: CropBox }>(null)
 
   // Draw the decoded bitmap (bytes stay on-device, T-05-11), measure the
-  // rendered size, and open with a centered 80% box at the capture aspect.
+  // rendered size, and open with the FULL image as the crop box.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -183,8 +142,8 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
     const h = canvas.clientHeight
     if (w === 0 || h === 0) return
     setImgSize({ w, h })
-    setBox(defaultBox(w, h, aspect))
-  }, [bitmap, aspect])
+    setBox(defaultBox(w, h))
+  }, [bitmap])
 
   // Focus moves to the confirm button on open (keyboard-safe primary
   // path); Escape maps to decline.
@@ -201,7 +160,6 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
     e.preventDefault()
     if (kind === 'resize') e.stopPropagation() // don't bubble into the move drag
     if (box === null) return
-    setFitError(false) // manipulating the box retries the fit
     e.currentTarget.setPointerCapture(e.pointerId)
     dragRef.current = { kind, startX: e.clientX, startY: e.clientY, box }
   }
@@ -216,8 +174,8 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
       return
     }
     // Free resize: each axis follows its pointer delta independently —
-    // the box can take any shape; the confirm gate governs what reaches
-    // the read.
+    // the box can take any shape; every shape confirms (always-confirm,
+    // 2026-10-12 ratification).
     setBox(resizeBox(drag.box, dx, dy, imgSize.w, imgSize.h, aspect))
   }
 
@@ -227,13 +185,9 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
 
   function handleConfirm(): void {
     if (box === null || imgSize === null) return
-    // Ratified confirm gate: an off-example shape never reaches the read
-    // (a wrong-frame read is parseable-but-garbage — harness E). Keep the
-    // overlay open so the player fixes the crop or cancels.
-    if (!cropAspectMatches(box.w, box.h, aspect)) {
-      setFitError(true)
-      return
-    }
+    // Always-confirm (owner-ratified 2026-10-12): the drawn box — whatever
+    // its shape — IS the read's input. The structural reader is
+    // scale/margin invariant, so there is no aspect gate to reject it.
     const scaleX = bitmap.width / imgSize.w
     const scaleY = bitmap.height / imgSize.h
     const cropped = document.createElement('canvas')
@@ -260,8 +214,6 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
     onConfirm(cropped)
   }
 
-  const ghost = imgSize === null ? null : exampleBox(imgSize.w, imgSize.h, aspect)
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
@@ -271,16 +223,8 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
     >
       <div className="flex max-h-full w-full max-w-3xl flex-col gap-4 overflow-auto rounded-lg bg-surface p-6">
         <h2 className="text-xl font-semibold text-content">{HEADING}</h2>
-        <p className="text-sm text-muted">{EXAMPLE_HINT}</p>
         <div className="relative mx-auto">
           <canvas ref={canvasRef} className="block max-h-[80vh] max-w-full" />
-          {ghost !== null && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute border-2 border-dashed border-muted"
-              style={{ left: ghost.x, top: ghost.y, width: ghost.w, height: ghost.h }}
-            />
-          )}
           {box !== null && (
             <div
               className="absolute cursor-move border-2 border-accent"
@@ -308,11 +252,6 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
             </div>
           )}
         </div>
-        {fitError && (
-          <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
-            {FIT_MESSAGE}
-          </p>
-        )}
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"

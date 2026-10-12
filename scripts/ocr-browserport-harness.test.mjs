@@ -21,7 +21,9 @@
 // Experiments (the spike proof grid F/G/H, mirrored permanently):
 //   A) needsCrop stays silent on every canonical optimal sample (D-05-UAT-1 optimal path);
 //      all 11 calibration samples decode at their recorded calibration resolutions exactly
-//      (the crop UX is pending a separate owner decision — this pins the existing gate)
+//      (the >5% gate stays; the crop UX itself was ratified separately 2026-10-12 —
+//      "Remove gate, keep crop": always-confirm + full-image default box, pinned by
+//      CropOverlay.test.ts)
 //   B) [= the spike's F: native] exact-value comparison vs expected.json on the
 //      56 shipped fields through the STRUCTURAL reader (the pivot's bar)
 //   E) crop→read contract (D-05-UAT-6, re-pointed round 3): a correct-aspect
@@ -42,8 +44,9 @@
 //   [D RETIRED (round 3): "the default centered-80% crop misaligns every
 //   region" was a mechanism claim about the region-fraction reader; the
 //   structural reader is not region-fraction-based, so the premise is gone.
-//   The crop UX itself (default box, free-form ratification) is pending a
-//   separate owner decision and is pinned by CropOverlay.test.ts.]
+//   The crop UX itself was ratified 2026-10-12 ("Remove gate, keep crop" —
+//   full-image default box, always-confirm; the centered-80% default is
+//   retired with it) and is pinned by CropOverlay.test.ts.]
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'

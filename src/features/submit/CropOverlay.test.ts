@@ -68,14 +68,19 @@ describe('CropOverlay geometry — optional isolation tool (full-image default, 
 
   it('the box takes ARBITRARY shapes and every shape confirms: resizeBox grows each axis freely — no lock ratio, no gate', () => {
     const aspect = CAPTURES.basic.aspect
+    // The realistic gesture: open at the FULL image, shrink to isolate the
+    // panel, then shape the box freely.
     const start = defaultBox(TALL_W, TALL_H)
-    // Drag the corner far off-ratio: a tall sliver.
-    const sliver = resizeBox(start, -100, 300, TALL_W, TALL_H, aspect)
-    expect(sliver.w).toBeCloseTo(start.w - 100, 6)
-    expect(sliver.h).toBeCloseTo(start.h + 300, 6)
+    const shrunk = resizeBox(start, -102, -288, TALL_W, TALL_H, aspect)
+    expect(shrunk.w).toBeCloseTo(238, 6)
+    expect(shrunk.h).toBeCloseTo(432, 6)
+    // Drag the corner far off-ratio: a tall sliver the old lock could never produce.
+    const sliver = resizeBox(shrunk, -100, 200, TALL_W, TALL_H, aspect)
+    expect(sliver.w).toBeCloseTo(shrunk.w - 100, 6)
+    expect(sliver.h).toBeCloseTo(shrunk.h + 200, 6)
     expect(sliver.w / sliver.h).not.toBeCloseTo(aspect, 2)
     // A square is equally reachable — and equally confirmable (always-confirm).
-    const square = resizeBox(start, 0, start.w - start.h, TALL_W, TALL_H, aspect)
+    const square = resizeBox(shrunk, 102, -92, TALL_W, TALL_H, aspect)
     expect(square.w).toBeCloseTo(square.h, 6)
   })
 

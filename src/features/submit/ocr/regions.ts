@@ -5,8 +5,9 @@
 // grammar, ported from the proven spike scripts/ocr-spike-structural.mjs;
 // see structure.ts/locate.ts/recognize.ts). This module keeps ONLY what the
 // non-read consumers need: the per-capture reference ASPECTS consumed by
-// OcrCapture's needsCrop gate and the crop overlay's example rectangle
-// (both pending a separate owner decision on the crop UX — consumed as-is).
+// OcrCapture's needsCrop gate and the crop overlay's resize floor (the
+// isolation-tool sanity minimum — owner-ratified crop UX 2026-10-12:
+// "Remove gate, keep crop"; no example rectangle, no confirm gate).
 // Recalibration of the READER (D-19, amended) now happens in the structural
 // reader's visual grammar (structure.ts), never here.
 //
