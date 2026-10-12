@@ -3,18 +3,23 @@
 // Behavior source: 05-01-PLAN <behavior> + 05-RESEARCH §3.4 (D-03/D-20:
 // hardcoded ranges that reject absurd parses and accept every spike-plausible
 // value; calibration-friendly constants, never admin-tweakable).
+import * as sanityModule from './sanity'
 import { describe, expect, it } from 'vitest'
 import {
   FLAT_DEFAULT,
-  OCR_ACCEPT_CONFIDENCE,
   PERCENTUAL_DEFAULT,
   SANITY_OVERRIDES,
   sanityAccepts,
 } from './sanity'
 
-describe('sanity constants (D-16/D-20)', () => {
-  it('ships the internal accept-confidence gate at 85 (D-16)', () => {
-    expect(OCR_ACCEPT_CONFIDENCE).toBe(85)
+describe('sanity constants (D-20 + 05-01 gate calibration)', () => {
+  it('ships NO confidence accept threshold — the gate is spike-parity parse+sanity (calibrated on the real samples)', () => {
+    // Calibration (debug session d05-uat-ocr-defects, 2026-10-12): the 85
+    // seed rejected 5 CORRECT reads (confs 0.0/63/70/79/82) on the spike-aced
+    // canonical samples — Tesseract confidence is unreliable on short reads.
+    // The harness (scripts/ocr-browserport-harness.test.mjs) pins 56/56 exact
+    // with parse+sanity alone; confidence stays the pickBestRead tiebreak.
+    expect('OCR_ACCEPT_CONFIDENCE' in sanityModule).toBe(false)
   })
 
   it('ships the flat and percentual defaults (05-RESEARCH §3.4)', () => {

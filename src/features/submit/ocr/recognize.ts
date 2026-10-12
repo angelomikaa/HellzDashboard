@@ -3,7 +3,8 @@
 // A thin browser port of the spike's createOcrWorker + region loop
 // (scripts/ocr-spike.mjs): crop -> grayscale -> 3x upscale -> normalize ->
 // binarize -> optional dual polarity -> whitelisted Tesseract read ->
-// pickBestRead -> parseStatValue -> confidence >= 85 && sanity range.
+// pickBestRead -> parseStatValue -> sanity range (spike-parity accept gate —
+// see the calibration note in sanity.ts).
 //
 // D-10/T-05-01: the player's image bytes are decoded and read ENTIRELY on
 // this device — this module performs no image network transfer of any kind.
@@ -23,7 +24,7 @@ import {
   toGrayscale,
   type ImageDataLike,
 } from './preprocess'
-import { OCR_ACCEPT_CONFIDENCE, sanityAccepts } from './sanity'
+import { sanityAccepts } from './sanity'
 
 /** One region's read outcome: machine-generated pre-fill for the wizard. */
 export type OcrFieldOutcome =
@@ -148,14 +149,15 @@ export async function readScreenshot(
       reads.push({ text: data.text || '', confidence: Number(data.confidence ?? 0) })
     }
     const best = pickBestRead(reads)
-    // Confidence of the winning read (pickBestRead keeps first on ties, so
-    // find() mirrors the same winner).
-    const bestConfidence = reads.find((r) => r.text === best)?.confidence ?? 0
+    // Accept gate = spike parity (calibration: see sanity.ts header): the
+    // best parseable read that passes sanity pre-fills. The spike's
+    // recognizeBest scoring (pickBestRead) already uses confidence as the
+    // tiebreak among parseable candidates — a separate confidence threshold
+    // rejected CORRECT short reads on the spike-aced samples (confs 0.0-82).
     const parsed = parseStatValue(best)
     if (
       parsed.ok &&
       parsed.value !== null &&
-      bestConfidence >= OCR_ACCEPT_CONFIDENCE &&
       sanityAccepts(parsed.value, parsed.isPercentual, region.stat_key)
     ) {
       outcomes.push({ stat_key: region.stat_key, status: 'filled', raw: best.trim(), value: parsed.value })

@@ -7,11 +7,18 @@
 // human verification and the create_submission re-validation remain the
 // real gates. Recalibration = edit here + normal deploy.
 //
-// D-16: OCR_ACCEPT_CONFIDENCE is the internal accept/reject gate — never a
-// UI flag (confidence surfacing stays a v2 item).
-
-/** Internal accept gate: a read is pre-filled only at/above this confidence (D-16). */
-export const OCR_ACCEPT_CONFIDENCE = 85
+// CALIBRATION (debug session d05-uat-ocr-defects, 2026-10-12): the 05-01 seed
+// OCR_ACCEPT_CONFIDENCE=85 was measured against the real spike samples and
+// REMOVED. The offline harness (scripts/ocr-browserport-harness.test.mjs)
+// proved the engine's reads are 56/56 exact on the canonical samples, yet 5
+// CORRECT reads carried confidences 0.0/63/70/79/82 (Tesseract's mean-word
+// confidence is unreliable on 1-6 glyph reads; a correct single-"0" read
+// scored 0.0) — no threshold > 0 preserves the spike's 222/222 bar. The
+// accept gate is therefore spike-parity: parseStatValue ok + sanityAccepts.
+// Confidence remains ONLY the pickBestRead tiebreak among polarity
+// candidates (spike recognizeBest scoring, verbatim). Safety stays layered:
+// sanity ranges (below), dual-polarity scoring, mandatory per-step human
+// verification (D-08/D-22), server-side re-validation (INPT-03).
 
 export interface SanityRange {
   min: number
