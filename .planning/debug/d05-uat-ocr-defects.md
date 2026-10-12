@@ -293,3 +293,39 @@ files_changed:
   - scripts/ocr-browserport-harness.test.mjs (offline exact-value proof harness, new)
   - .planning/phases/05-ocr-auto-read-layer/05-UAT.md (defect dispositions appended)
   - .planning/debug/d05-uat-ocr-defects.md (this record)
+
+## Owner-Ratified Calibration Change — 5% Crop Trigger (2026-10-11)
+
+decision_checkpoint_answered: The ratified-call proposal in the resolution above (tighten the
+  12% crop trigger so aspect-close-but-differently-framed uploads route to the crop overlay
+  instead of reading garbage uncropped) was answered by the owner on 2026-10-11: RATIFIED —
+  tighten to 5% aspect deviation (exclusive boundary; the 1e-9 epsilon semantics kept).
+rationale: The D-05-UAT-2 mechanism showed frames in the 5-12% band (e.g. samp2 vs quasi =
+  9.4%) passing the old gate uncropped and producing parseable-but-wrong pre-fills. At 5%,
+  those misaligned uploads reach the crop overlay instead. The 11 exact calibration samples
+  deviate at most 0.01% from their calibration aspects — they remain no-crop (re-proven
+  below through the shipped needsCrop).
+threshold_changed:
+  - src/features/submit/OcrCapture.tsx: CROP_DEVIATION_MAX 0.12 -> 0.05 (comments updated;
+    exclusive + epsilon semantics unchanged)
+  - src/features/submit/OcrCapture.test.ts: boundary tests re-pinned to the 5% gate (TDD:
+    RED 4-failed against the 12% implementation, then GREEN) — exactly 0.05 -> false;
+    0.0501 -> true; 9.4% (samp2 vs quasi) -> true; the old 0.12 cases -> true; the exact
+    calibration frames (<=0.01%) -> false
+  - src/features/submit/CropOverlay.tsx: doc comment aligned (>12% -> >5%)
+  - harness test A needed no change: it pins needsCrop=false on the canonical samples
+    against the shipped CAPTURES aspects, which holds at 5% (it never asserted the literal
+    12% formula)
+evidence (re-run 2026-10-12 post-change):
+  - full suite `npx vitest run`: 13 files, 187/187 green (includes harness A-D on the real
+    samples; A re-proves no-crop on all four canonical optimal samples through the ACTUAL
+    shipped 5% needsCrop; B re-proves 56/56 exact; D re-proves the full screenshot still
+    fires the crop)
+  - all 11 samples (sharp metadata vs recorded calibration resolutions): deviation 0.0000%
+    each — needsCrop=false at the 5% gate for every sample on its own calibration frame
+  - `npx tsc -b` clean; `npm run build` green; entry chunk createWorker 0 matches (lazy
+    ocr-joxhRLpY.js holds the 1); FormData 0 matches in src/features/submit;
+    dist/ocr/worker.min.js + dist/ocr/core/tesseract-core-simd-lstm.{wasm,wasm.js} present;
+    dist entry formula compiles as `Math.abs(e/t-1)>.050000001` (epsilon convention
+    consistent with the prior `.120000001` fold)
+
