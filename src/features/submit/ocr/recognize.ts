@@ -1,10 +1,29 @@
-// Worker lifecycle + readScreenshot for the OCR auto-read layer (plan 05-01).
+// Worker lifecycle + readScreenshot for the OCR auto-read layer.
 //
-// A thin browser port of the spike's createOcrWorker + region loop
-// (scripts/ocr-spike.mjs): crop -> grayscale -> 3x upscale -> normalize ->
-// binarize -> optional dual polarity -> whitelisted Tesseract read ->
-// pickBestRead -> parseStatValue -> sanity range (spike-parity accept gate —
-// see the calibration note in sanity.ts).
+// ARCHITECTURE PIVOT (D-05-UAT round 3, owner directive 2026-10-12 verbatim
+// in 05-UAT.md: "screenshots will vary in size inevitably... we need a
+// reading model that actually can read data from an image without relying on
+// a pixel map"): the reading strategy is STRUCTURAL. Values are located by
+// the panel's visual grammar — value pills by color saturation on the Basic
+// screen, text-band row profiles with chroma-separated value clusters on the
+// Details screens, panel paper localization for margin tolerance — ported
+// verbatim from the PROVEN spike scripts/ocr-spike-structural.mjs (commit
+// 012956f: native 4/4 canonical samples exact on the 56 shipped fields,
+// rescales 0.6-1.5x 16/16, white/gray/dark margin pads 20/20). The pure
+// detection lives in structure.ts/locate.ts; this module owns the browser
+// plumbing only.
+//
+// Per-value recognition core: the proven 05-01 recipe (grayscale -> adaptive
+// upscale (2..6x to ~72px) -> normalize/fixed threshold -> binarize ->
+// background-matched margin pad -> dual polarity -> digits whitelist ->
+// pickBestRead scoring), plus the spike's pill path (fixed 180 threshold, NO
+// normalize — the pill gradient binarizes to hollow outlines under the
+// normalize recipe; white glyphs isolated at 210+).
+//
+// Public contract UNCHANGED: readScreenshot(capture, image) ->
+// OcrFieldOutcome[]; the accept gate stays parse + sanity with confidence as
+// the pickBestRead tiebreak only; dual polarity kept; the wizard consumer
+// needs zero changes.
 //
 // D-10/T-05-01: the player's image bytes are decoded and read ENTIRELY on
 // this device — this module performs no image network transfer of any kind.
@@ -14,16 +33,35 @@
 // rejects the read, and the wizard falls back to manual entry, D-18).
 import { createWorker, PSM, type Worker } from 'tesseract.js'
 import { parseStatValue } from '../../../lib/parseStatValue'
-import { CAPTURES, rectToPixels, type CaptureKey } from './regions'
+import type { CaptureKey } from './regions'
 import {
   binarize,
+  meanLuma,
   negate,
   needsDualPolarity,
   normalizeContrast,
+  padBinarized,
   pickBestRead,
   toGrayscale,
   type ImageDataLike,
 } from './preprocess'
+import { computePanelRect } from './locate'
+import {
+  DIGITS_WHITELIST,
+  LABELS_WHITELIST,
+  PILL_DIGITS_WHITELIST,
+  PILL_THRESHOLD,
+  SCREENS,
+  assignByOrder,
+  detectPillRects,
+  detectRowCells,
+  fieldKeysFor,
+  matchLabel,
+  resolveConflicts,
+  upscaleForHeight,
+  type Rect,
+  type RowGrammar,
+} from './structure'
 import { sanityAccepts } from './sanity'
 
 /** One region's read outcome: machine-generated pre-fill for the wizard. */
@@ -45,10 +83,10 @@ function getWorker(): Promise<Worker> {
         workerPath: '/ocr/worker.min.js',
         corePath: '/ocr/core',
       })
-      // Spike tuning, verbatim: numeric whitelist (pt-BR separators, %, minus
-      // — Variable/Fixed CT and Global CD read negative), fixed DPI, block PSM.
+      // Spike tuning, verbatim: fixed DPI, block PSM. The whitelist is set
+      // per read below (digits for values, letters for labels, digits+/ for
+      // pills — the structural reader OCRs labels too).
       await worker.setParameters({
-        tessedit_char_whitelist: '0123456789.,%-',
         user_defined_dpi: '300',
         tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
       })
@@ -78,52 +116,182 @@ function toCanvas(image: ImageDataLike): HTMLCanvasElement {
   return canvas
 }
 
-/**
- * Crop one region and preprocess it into one or two candidate canvases
- * (dual polarity when the binarized crop is mostly dark — §6 pitfall 1).
- */
-function prepareCandidates(
-  image: ImageBitmap | HTMLCanvasElement,
-  rect: { x: number; y: number; w: number; h: number },
-): HTMLCanvasElement[] {
-  // 1. Crop (top-left-origin rect semantics, same as the spike maps).
+/** Draw the uploaded image onto a canvas and read its pixels (one full-image
+ * ImageData for detection; the same canvas backs all value crops). */
+function imageToData(image: ImageBitmap | HTMLCanvasElement): { canvas: HTMLCanvasElement; data: ImageDataLike } {
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width
+  canvas.height = image.height
+  const ctx = ctx2d(canvas, true)
+  // explicit 5-arg form (the 3-arg convenience overload is outside the
+  // drawImage contract the offline harness pins)
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+  const raw = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  return { canvas, data: { data: raw.data, width: raw.width, height: raw.height } }
+}
+
+/** Crop one rect off a source canvas (top-left-origin pixel semantics). */
+function cropCanvas(source: HTMLCanvasElement, rect: Rect): ImageDataLike {
+  const x = Math.max(0, Math.min(Math.round(rect.left), source.width - 1))
+  const y = Math.max(0, Math.min(Math.round(rect.top), source.height - 1))
+  const w = Math.min(Math.max(Math.round(rect.width), 1), source.width - x)
+  const h = Math.min(Math.max(Math.round(rect.height), 1), source.height - y)
   const crop = document.createElement('canvas')
-  crop.width = rect.w
-  crop.height = rect.h
+  crop.width = w
+  crop.height = h
   const cropCtx = ctx2d(crop, true)
-  cropCtx.drawImage(image, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h)
-
-  // 2. Grayscale (pure pixel math from here on).
-  const gray = toGrayscale(cropCtx.getImageData(0, 0, rect.w, rect.h))
-
-  // 3. 3x upscale. The spike used sharp's cubic kernel; the browser exposes
-  // no kernel choice, so drawImage with high smoothing quality is the accepted
-  // deviation (05-RESEARCH §3.1) — residual risk is absorbed by the dual
-  // polarity read, the confidence gate, and the mandatory manual fix-up.
-  const grayCanvas = toCanvas(gray)
-  const up = document.createElement('canvas')
-  up.width = rect.w * 3
-  up.height = rect.h * 3
-  const upCtx = ctx2d(up, true)
-  upCtx.imageSmoothingEnabled = true
-  upCtx.imageSmoothingQuality = 'high'
-  upCtx.drawImage(grayCanvas, 0, 0, rect.w * 3, rect.h * 3)
-
-  // 4. Contrast-stretch, then binarize at the spike threshold.
-  const binarized = binarize(normalizeContrast(upCtx.getImageData(0, 0, rect.w * 3, rect.h * 3)))
-
-  // 5. Dual polarity when the binarized crop is mostly dark.
-  const candidates = [toCanvas(binarized)]
-  if (needsDualPolarity(binarized)) {
-    candidates.push(toCanvas(negate(binarized)))
-  }
-  return candidates
+  cropCtx.drawImage(source, x, y, w, h, 0, 0, w, h)
+  const raw = cropCtx.getImageData(0, 0, w, h)
+  return { data: raw.data, width: raw.width, height: raw.height }
 }
 
 /**
- * Read every calibrated region of one capture off an on-device image and
- * produce per-field pre-fill outcomes (never a silent authority — the wizard
- * human-verifies every value, D-08).
+ * OCR one rect of the source canvas with the proven recognition core:
+ * grayscale -> adaptive upscale (2..6x to ~72px) -> binarize (normalize+140
+ * for panel text; fixed threshold for white-on-fill pill text) ->
+ * background-matched margin pad -> dual polarity when mostly dark ->
+ * whitelisted Tesseract -> pickBestRead (parseable > non-empty > confidence).
+ * Returns the best raw text.
+ */
+async function ocrRect(
+  worker: Worker,
+  source: HTMLCanvasElement,
+  rect: Rect,
+  { whitelist, threshold = 'normalize' }: { whitelist: string; threshold?: number | 'normalize' },
+): Promise<string> {
+  // 1. Crop (clamped) + grayscale (pure pixel math).
+  const cropped = cropCanvas(source, rect)
+  const gray = toGrayscale(cropped)
+
+  // 2. Adaptive upscale — land the crop at ~72px tall (2x..6x). The spike
+  // used sharp's cubic kernel; the browser exposes no kernel choice, so
+  // drawImage with high smoothing quality is the accepted deviation
+  // (05-RESEARCH §3.1) — residual risk is absorbed by the dual polarity
+  // read, the parse+sanity gate, and the mandatory manual fix-up.
+  const f = upscaleForHeight(cropped.height)
+  const grayCanvas = toCanvas(gray)
+  const up = document.createElement('canvas')
+  up.width = cropped.width * f
+  up.height = cropped.height * f
+  const upCtx = ctx2d(up, true)
+  upCtx.imageSmoothingEnabled = true
+  upCtx.imageSmoothingQuality = 'high'
+  upCtx.drawImage(grayCanvas, 0, 0, up.width, up.height)
+
+  // 3. Binarize: normalize+140 (the 05-01 recipe for dark text on the light
+  // panel) or a fixed threshold (pill white-text path).
+  const upData = upCtx.getImageData(0, 0, up.width, up.height)
+  const binarized = threshold === 'normalize' ? binarize(normalizeContrast(upData), 140) : binarize(upData, threshold)
+
+  // 4. Margin pad — Tesseract's LSTM misclassifies lone glyphs on a tight
+  // canvas (spike-measured: a clean isolated "0" reads "9" with conf 0
+  // unpadded). The pad color must MATCH the binarized background: dark
+  // crops pad black, light crops pad white — a mismatched pad is itself a
+  // feature Tesseract misreads (the Power pill read collapsed when padded
+  // white).
+  const padValue = meanLuma(binarized) < 128 ? 0 : 255
+  const padX = Math.max(8, Math.round(0.15 * binarized.width))
+  const padY = Math.max(8, Math.round(0.15 * binarized.height))
+  const padded = padBinarized(binarized, padX, padY, padValue)
+
+  // 5. Dual polarity when the padded binarized crop is mostly dark.
+  const paddedCanvas = toCanvas(padded)
+  const variants: HTMLCanvasElement[] = [paddedCanvas]
+  if (needsDualPolarity(padded)) {
+    variants.push(toCanvas(negate(padded)))
+  }
+
+  const reads: Array<{ text: string; confidence: number }> = []
+  for (const variant of variants) {
+    await worker.setParameters({ tessedit_char_whitelist: whitelist })
+    const { data } = await worker.recognize(variant)
+    reads.push({ text: data.text || '', confidence: Number(data.confidence ?? 0) })
+  }
+  // pickBestRead semantics (05-01): parseable (+1000) > non-empty (+100) >
+  // confidence. Production polarity semantics: parseable reads win — never a
+  // bare confidence tiebreak between polarities.
+  return pickBestRead(reads)
+}
+
+/** Vocab side helper: the label vocabulary of one cell side. */
+function vocabFor(grammar: RowGrammar, side: 'L' | 'R'): string[] {
+  return grammar.columns === 2 ? (side === 'L' ? grammar.left : grammar.right) : grammar.left
+}
+
+/**
+ * Read a Details screen (rows grammar): detect cells, assign keys (fixed row
+ * order when band counts match exactly — skips label OCR; label OCR +
+ * fuzzy match otherwise) and OCR every assigned value crop.
+ * Returns Map<stat_key, raw read>.
+ */
+async function readRowsScreen(
+  worker: Worker,
+  source: HTMLCanvasElement,
+  img: ImageDataLike,
+  grammar: RowGrammar,
+): Promise<Map<string, string>> {
+  const values = new Map<string, string>()
+  const cells = detectRowCells(img, grammar)
+  if (cells.length === 0) return values
+
+  const ordered = assignByOrder(cells, grammar)
+  let assignments
+  if (ordered) {
+    assignments = ordered
+  } else {
+    // Label mode: OCR each cell's label and fuzzy-match it against the
+    // capture's vocabulary (scroll mixtures, extra sections and truncated
+    // labels handled there).
+    assignments = []
+    for (const cell of cells) {
+      if (!cell.labelRect) continue
+      const observed = await ocrRect(worker, source, cell.labelRect, {
+        whitelist: LABELS_WHITELIST,
+      })
+      const match = matchLabel(observed, vocabFor(grammar, cell.side))
+      if (match) assignments.push({ key: match.key, cell, labelScore: match.score })
+    }
+  }
+
+  const byKey = resolveConflicts(assignments)
+  for (const [key, a] of byKey) {
+    const raw = await ocrRect(worker, source, a.cell.valueRect, { whitelist: DIGITS_WHITELIST })
+    values.set(key, raw)
+  }
+  return values
+}
+
+/**
+ * Read the Basic screen (pills grammar): OCR every detected pill crop
+ * (bottom-most first, digits + '/' whitelist, fixed 180 threshold);
+ * combat_power = the first pill whose read parses as a flat number inside
+ * sanity (content gating: HP/SP pills read "N/N" and unparseable under the
+ * digits rules; Base reads "MAX/MAX"; only Power yields a sane plain number,
+ * 0..100_000_000 — the shipped combat_power sanity range).
+ */
+async function readBasicScreen(
+  worker: Worker,
+  source: HTMLCanvasElement,
+  img: ImageDataLike,
+): Promise<Map<string, string>> {
+  const values = new Map<string, string>()
+  for (const rect of detectPillRects(img)) {
+    const raw = await ocrRect(worker, source, rect, { whitelist: PILL_DIGITS_WHITELIST, threshold: PILL_THRESHOLD })
+    const parsed = parseStatValue(raw)
+    if (parsed.ok && parsed.value !== null && !parsed.isPercentual && sanityAccepts(parsed.value, false, 'combat_power')) {
+      values.set('combat_power', raw)
+      break
+    }
+  }
+  return values
+}
+
+/**
+ * Read one capture off an on-device image and produce per-field pre-fill
+ * outcomes (never a silent authority — the wizard human-verifies every
+ * value, D-08). STRUCTURAL: values are located by the panel's visual
+ * grammar, invariant to image scale, panel translation, and extra margins
+ * (white/gray/dark) — the round-3 pivot.
  *
  * ANY worker or canvas error rejects the whole promise: the 05-04 UI turns
  * rejection into the designed graceful degradation (D-18 — fields stay blank
@@ -133,36 +301,44 @@ export async function readScreenshot(
   capture: CaptureKey,
   image: ImageBitmap | HTMLCanvasElement,
 ): Promise<OcrFieldOutcome[]> {
-  const map = CAPTURES[capture]
-  if (!map || map.regions.length === 0) {
-    throw new Error(`[ocr] no calibrated regions for capture "${capture}"`)
+  const grammar = SCREENS[capture]
+  if (!grammar) {
+    throw new Error(`[ocr] no screen grammar for capture "${capture}"`)
   }
   const worker = await getWorker()
-  const imgW = image.width
-  const imgH = image.height
-  const outcomes: OcrFieldOutcome[] = []
-  for (const region of map.regions) {
-    const rect = rectToPixels(region.rect, imgW, imgH)
-    const reads: Array<{ text: string; confidence: number }> = []
-    for (const canvas of prepareCandidates(image, rect)) {
-      const { data } = await worker.recognize(canvas)
-      reads.push({ text: data.text || '', confidence: Number(data.confidence ?? 0) })
+  const { canvas, data } = imageToData(image)
+
+  const values = new Map<string, string>()
+  if (grammar.kind === 'pills') {
+    const pillValues = await readBasicScreen(worker, canvas, data)
+    for (const [k, v] of pillValues) values.set(k, v)
+  } else {
+    // Rows screens profile dark pixels: a gray/dark surrounding margin IS
+    // dark and collapses detection — locate and crop to the panel first
+    // (background-independent localization; white margins profile clean).
+    const panelRect = computePanelRect(data)
+    let source = canvas
+    let img: ImageDataLike = data
+    if (panelRect) {
+      source = toCanvas(cropCanvas(canvas, panelRect))
+      const raw = ctx2d(source, true).getImageData(0, 0, source.width, source.height)
+      img = { data: raw.data, width: raw.width, height: raw.height }
     }
-    const best = pickBestRead(reads)
+    const rowValues = await readRowsScreen(worker, source, img, grammar)
+    for (const [k, v] of rowValues) values.set(k, v)
+  }
+
+  const outcomes: OcrFieldOutcome[] = []
+  for (const stat_key of fieldKeysFor(capture)) {
+    const raw = values.get(stat_key)
     // Accept gate = spike parity (calibration: see sanity.ts header): the
-    // best parseable read that passes sanity pre-fills. The spike's
-    // recognizeBest scoring (pickBestRead) already uses confidence as the
-    // tiebreak among parseable candidates — a separate confidence threshold
-    // rejected CORRECT short reads on the spike-aced samples (confs 0.0-82).
-    const parsed = parseStatValue(best)
-    if (
-      parsed.ok &&
-      parsed.value !== null &&
-      sanityAccepts(parsed.value, parsed.isPercentual, region.stat_key)
-    ) {
-      outcomes.push({ stat_key: region.stat_key, status: 'filled', raw: best.trim(), value: parsed.value })
+    // best parseable read that passes sanity pre-fills. Confidence stays the
+    // pickBestRead tiebreak among polarity candidates only.
+    const parsed = raw !== undefined ? parseStatValue(raw) : { ok: false, value: null, isPercentual: false }
+    if (parsed.ok && parsed.value !== null && sanityAccepts(parsed.value, parsed.isPercentual, stat_key)) {
+      outcomes.push({ stat_key, status: 'filled', raw: (raw as string).trim(), value: parsed.value })
     } else {
-      outcomes.push({ stat_key: region.stat_key, status: 'failed' })
+      outcomes.push({ stat_key, status: 'failed' })
     }
   }
   return outcomes

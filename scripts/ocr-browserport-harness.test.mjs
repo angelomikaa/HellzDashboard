@@ -1,35 +1,49 @@
 // ocr-browserport-harness.test.mjs — offline exact-value proof harness for the
-// browser OCR pipeline (debug session d05-uat-ocr-defects, defects D-05-UAT-1/2/3).
+// browser OCR pipeline (debug session d05-uat-ocr-defects; architecture pivot,
+// round 3: the reading strategy is the STRUCTURAL reader ported from
+// scripts/ocr-spike-structural.mjs — commit 012956f).
 //
-// Runs the ACTUAL ported production pipeline — readScreenshot, rectToPixels, the
-// preprocess pure functions, pickBestRead, the confidence/sanity gates — against the
-// REAL spike-calibrated samples in .secrets/ocr-samples/ (gitignored, D-09/D-10:
-// they never enter git or the network; this file contains no image data and is
-// skipped when the samples folder is absent).
+// Runs the ACTUAL production pipeline — readScreenshot, the structural
+// detection (structure.ts/locate.ts), the preprocess pure functions, the
+// parse+sanity accept gate — against the REAL samples in .secrets/ocr-samples/
+// (gitignored, D-09/D-10: they never enter git or the network; this file
+// contains no image data and is skipped when the samples folder is absent).
 //
 // Environment-boundary adaptation (the ONLY deviation from production, sanctioned by
 // the debug-session method): production creates the Tesseract worker with browser
 // transport (blob worker + self-hosted /ocr/* URLs + canvas.toBlob PNG handoff). In
 // Node there is no DOM worker, so vi.mock('tesseract.js') re-creates the worker with
 // the Node transport (worker_threads + node_modules core, spike's tmp cachePath) and
-// converts the pipeline's region canvases to PNG buffers at the recognize boundary —
-// exactly what browser loadImage does via canvas.toBlob. Geometry, preprocessing,
-// scoring, gates, and readScreenshot itself run VERBATIM from src.
+// converts the pipeline's canvases to PNG buffers at the recognize boundary —
+// exactly what browser loadImage does via canvas.toBlob. Geometry, detection,
+// preprocessing, scoring, gates, and readScreenshot itself run VERBATIM from src.
 //
-// Experiments:
+// Experiments (the spike proof grid F/G/H, mirrored permanently):
 //   A) needsCrop stays silent on every canonical optimal sample (D-05-UAT-1 optimal path);
 //      all 11 calibration samples decode at their recorded calibration resolutions exactly
-//   B) exact-value comparison vs expected.json on the 56 shipped fields (the spike's
-//      222/222 bar restricted to the shipped region maps)
-//   C) diagnostic replica: per-field raw reads, confidences, and gate
-//      decomposition (parse / sanity — the recalibrated spike-parity accept
-//      gate; confidence logged for calibration evidence)
-//   D) owner-flow reproduction: a full-phone-screenshot upload fires the crop, and the
-//      crop overlay's DEFAULT centered-80% confirm box produces a misaligned frame
-//      (mechanism candidate for D-05-UAT-2/3)
-//   E) crop→read contract (D-05-UAT-6, round 2): a correct-aspect frame-exact crop of
-//      a full screenshot reads 14/14 exact; a forced-square (1:1) crop containing the
-//      panel reads near-zero — the expected consequence of a wrong-aspect frame
+//      (the crop UX is pending a separate owner decision — this pins the existing gate)
+//   B) [= the spike's F: native] exact-value comparison vs expected.json on the
+//      56 shipped fields through the STRUCTURAL reader (the pivot's bar)
+//   E) crop→read contract (D-05-UAT-6, re-pointed round 3): a correct-aspect
+//      frame-exact crop of a full screenshot reads exact — crop + structural
+//      read compose. [E2 RETIRED: it pinned the OLD region-fraction contract
+//      ("a forced-square crop reads near-zero" via region displacement); under
+//      the structural reader margin tolerance is the pinned behavior instead —
+//      see H. Beyond-grid margin sizes are deliberately not asserted.]
+//   G) [= the spike's G] rescale invariance: the 4 canonical samples at
+//      0.6x / 0.75x / 1.25x / 1.5x (simulating other window sizes) — exact
+//   H) [= the spike's H] loose crops: the 4 canonical samples padded with
+//      synthetic plain margins (white/gray/dark) — exact (the reader must
+//      locate the panel grammar, not assume full-bleed)
+//   [C RETIRED (round 3): the per-field diagnostic replica pinned the OLD
+//   region-map read path (rectToPixels + prepareCandidates); the structural
+//   reader has no per-region replica to mirror. Gate decomposition evidence
+//   lives in the debug session records.]
+//   [D RETIRED (round 3): "the default centered-80% crop misaligns every
+//   region" was a mechanism claim about the region-fraction reader; the
+//   structural reader is not region-fraction-based, so the premise is gone.
+//   The crop UX itself (default box, free-form ratification) is pending a
+//   separate owner decision and is pinned by CropOverlay.test.ts.]
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -78,19 +92,9 @@ vi.mock('tesseract.js', async () => {
 
 // --- production pipeline (verbatim) -------------------------------------------------
 import { readScreenshot } from '../src/features/submit/ocr/recognize'
-import { CAPTURES, rectToPixels } from '../src/features/submit/ocr/regions'
-import {
-  binarize,
-  negate,
-  needsDualPolarity,
-  normalizeContrast,
-  pickBestRead,
-  toGrayscale,
-} from '../src/features/submit/ocr/preprocess'
-import { sanityAccepts } from '../src/features/submit/ocr/sanity'
+import { CAPTURES } from '../src/features/submit/ocr/regions'
 import { needsCrop } from '../src/features/submit/OcrCapture'
 import { parseStatValue } from '../src/lib/parseStatValue'
-import { createWorker, PSM } from 'tesseract.js' // the mocked (node-transport) worker factory
 
 // --- minimal DOM shim (only what recognize.ts touches) ------------------------------
 class FakeImageData {
@@ -215,9 +219,37 @@ async function loadSampleCanvas(file) {
   return canvas
 }
 
-function canvasFromImageData(image) {
-  const canvas = new FakeCanvas(image.width, image.height)
-  canvas.getContext().putImageData(image, 0, 0)
+/** Rescale a sample by `factor` (sharp cubic — the spike's rescale fixture). */
+async function rescaledSample(file, factor) {
+  const src = await sharp(path.join(SAMPLES_DIR, file)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const w = Math.max(1, Math.round(src.info.width * factor))
+  const h = Math.max(1, Math.round(src.info.height * factor))
+  const { data, info } = await sharp(src.data, { raw: { width: src.info.width, height: src.info.height, channels: 4 } })
+    .resize(w, h, { kernel: 'cubic' })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  const canvas = new FakeCanvas(info.width, info.height)
+  canvas._buf = new Uint8ClampedArray(data)
+  return canvas
+}
+
+/** Pad a sample with synthetic plain margins (the spike's loose-crop fixture). */
+async function paddedSample(file, margins, bg) {
+  const src = await sharp(path.join(SAMPLES_DIR, file)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const { data, info } = await sharp(src.data, { raw: { width: src.info.width, height: src.info.height, channels: 4 } })
+    .extend({
+      top: Math.round(src.info.height * (margins.top ?? 0)),
+      bottom: Math.round(src.info.height * (margins.bottom ?? 0)),
+      left: Math.round(src.info.width * (margins.left ?? 0)),
+      right: Math.round(src.info.width * (margins.right ?? 0)),
+      background: bg,
+    })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  const canvas = new FakeCanvas(info.width, info.height)
+  canvas._buf = new Uint8ClampedArray(data)
   return canvas
 }
 
@@ -281,7 +313,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
   )
 
   it(
-    'B) readScreenshot reproduces the spike bar: exact values on the 56 shipped fields',
+    'B) [= spike F: native] readScreenshot reproduces the spike bar through the STRUCTURAL reader: exact values on the 56 shipped fields',
     { timeout: 30 * 60_000 },
     async () => {
       const expected = JSON.parse(readFileSync(EXPECTED_PATH, 'utf8'))
@@ -306,120 +338,122 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       }
       console.log(`[harness B] fields=${total} filled=${filled} correct=${correct}`)
       if (misses.length > 0) console.log(`[harness B] misses:\n${misses.join('\n')}`)
+      expect(total).toBe(56)
       expect(correct).toBe(total)
     },
   )
 
   it(
-    'C) diagnostic replica: per-field reads, confidences, and gate decomposition',
+    'G) [= spike G] rescale invariance: 0.6x/0.75x/1.25x/1.5x rescales read the 56 shipped fields exactly',
     { timeout: 30 * 60_000 },
     async () => {
       const expected = JSON.parse(readFileSync(EXPECTED_PATH, 'utf8'))
-      const worker = await createWorker('eng', 1, {})
-      await worker.setParameters({
-        tessedit_char_whitelist: '0123456789.,%-',
-        user_defined_dpi: '300',
-        tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
-      })
-      const rows = []
-      let correct = 0
-      let total = 0
-      for (const { capture, file } of CANONICAL) {
-        const canvas = await loadSampleCanvas(file)
-        const map = CAPTURES[capture]
-        for (const region of map.regions) {
-          const rect = rectToPixels(region.rect, canvas.width, canvas.height)
-          // prepareCandidates replica (recognize.ts lines 84-120, verbatim stages)
-          const crop = new FakeCanvas(rect.w, rect.h)
-          crop.getContext().drawImage(canvas, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h)
-          const gray = toGrayscale(crop.getContext().getImageData(0, 0, rect.w, rect.h))
-          const grayCanvas = canvasFromImageData(gray)
-          const up = new FakeCanvas(rect.w * 3, rect.h * 3)
-          const upCtx = up.getContext()
-          upCtx.imageSmoothingEnabled = true
-          upCtx.imageSmoothingQuality = 'high'
-          upCtx.drawImage(grayCanvas, 0, 0, rect.w * 3, rect.h * 3)
-          const binarized = binarize(
-            normalizeContrast(upCtx.getImageData(0, 0, rect.w * 3, rect.h * 3)),
-          )
-          const candidates = [canvasFromImageData(binarized)]
-          const dual = needsDualPolarity(binarized)
-          if (dual) candidates.push(canvasFromImageData(negate(binarized)))
-          const reads = []
-          for (const c of candidates) {
-            const { data } = await worker.recognize(c)
-            reads.push({ text: data.text || '', confidence: Number(data.confidence ?? 0) })
+      const factors = [0.6, 0.75, 1.25, 1.5]
+      let variants = 0
+      let failing = 0
+      for (const factor of factors) {
+        for (const { capture, file } of CANONICAL) {
+          const canvas = await rescaledSample(file, factor)
+          const outcomes = await readScreenshot(capture, canvas)
+          const exp = expected[file]
+          const lines = []
+          let correct = 0
+          let total = 0
+          for (const o of outcomes) {
+            total += 1
+            if (o.status === 'filled' && matchesExpected(o.raw, exp[o.stat_key])) correct += 1
+            else
+              lines.push(
+                `    MISS ${o.stat_key}: got=${o.status === 'filled' ? JSON.stringify(o.raw) : '<failed>'} expected="${exp[o.stat_key]}"`,
+              )
           }
-          const best = pickBestRead(reads)
-          const bestConfidence = reads.find((r) => r.text === best)?.confidence ?? 0
-          const parsed = parseStatValue(best)
-          const expRaw = expected[file][region.stat_key]
-          const gateParse = parsed.ok && parsed.value !== null
-          const gateSanity = gateParse && sanityAccepts(parsed.value, parsed.isPercentual, region.stat_key)
-          // Recalibrated accept gate (spike parity, see sanity.ts header):
-          // parse + sanity; confidence stays the pickBestRead tiebreak only.
-          const accepted = gateParse && gateSanity
-          const exact = parsed.ok && matchesExpected(best, expRaw)
-          if (exact) correct += 1
-          total += 1
-          rows.push(
-            `${file}:${region.stat_key} dual=${dual ? 'Y' : 'N'} best="${best.trim()}" conf=${bestConfidence.toFixed(1)} ` +
-              `parse=${gateParse ? 'ok' : 'FAIL'} sanity=${gateSanity ? 'ok' : 'FAIL'} ` +
-              `accepted=${accepted ? 'Y' : 'N'} exact=${exact ? 'Y' : 'N'} expected="${expRaw}" all=${JSON.stringify(reads.map((r) => [r.text.trim(), r.confidence.toFixed(0)]))}`,
-          )
+          variants += 1
+          const ok = correct === total
+          if (!ok) {
+            failing += 1
+            console.log(`[harness G] x${factor} ${file}: ${correct}/${total}\n${lines.join('\n')}`)
+          } else {
+            console.log(`[harness G] x${factor} ${file}: ${correct}/${total} PASS`)
+          }
         }
       }
-      await worker.terminate()
-      console.log(`[harness C] ${correct}/${total} exact through the replica`)
-      console.log(`[harness C] per-field:\n${rows.join('\n')}`)
-      expect(total).toBe(56)
+      expect(variants).toBe(16)
+      expect(failing).toBe(0)
     },
   )
 
   it(
-    'D) owner-flow reproduction: full screenshot fires the crop; the DEFAULT centered-80% confirm box misaligns every region',
+    'H) [= spike H] loose crops: white/gray/dark synthetic margin pads read the 56 shipped fields exactly',
     { timeout: 30 * 60_000 },
     async () => {
-      // Synthesize a full phone screenshot: 1080x2280 device frame with the sampideal1
-      // panel (648x759) placed inside it (game screens sit offset inside a phone shot).
-      // 5-arg drawImage: draw the panel AT (216,420) at natural size (source rect is
-      // the whole panel). The 9-arg form would read source rect (216,420,648,759) OFF
-      // the 648x759 panel itself — out of bounds, stamping black (harness bug caught
-      // when E1's frame-exact crop read a black canvas).
-      const panel = await loadSampleCanvas('sampideal1.png')
-      const full = new FakeCanvas(1080, 2280)
-      full.getContext().drawImage(panel, 216, 420, 648, 759)
-      const fullAspect = full.width / full.height
-      expect(needsCrop(fullAspect, CAPTURES.general.aspect)).toBe(true) // crop fires (D-05-UAT-1 for full screenshots)
+      const expected = JSON.parse(readFileSync(EXPECTED_PATH, 'utf8'))
+      const PADS = [
+        { name: 'white T15% L10%', margins: { top: 0.15, left: 0.1 }, bg: { r: 255, g: 255, b: 255, alpha: 1 } },
+        { name: 'white R20% B5%', margins: { right: 0.2, bottom: 0.05 }, bg: { r: 255, g: 255, b: 255, alpha: 1 } },
+        { name: 'gray all8%', margins: { top: 0.08, bottom: 0.08, left: 0.08, right: 0.08 }, bg: { r: 128, g: 128, b: 128, alpha: 1 } },
+        { name: 'gray L20% R5% T5% B15%', margins: { left: 0.2, right: 0.05, top: 0.05, bottom: 0.15 }, bg: { r: 128, g: 128, b: 128, alpha: 1 } },
+        { name: 'dark all12% (game-bg-like)', margins: { top: 0.12, bottom: 0.12, left: 0.12, right: 0.12 }, bg: { r: 34, g: 34, b: 34, alpha: 1 } },
+      ]
+      let variants = 0
+      let failing = 0
+      for (const pad of PADS) {
+        for (const { capture, file } of CANONICAL) {
+          const canvas = await paddedSample(file, pad.margins, pad.bg)
+          const outcomes = await readScreenshot(capture, canvas)
+          const exp = expected[file]
+          const lines = []
+          let correct = 0
+          let total = 0
+          for (const o of outcomes) {
+            total += 1
+            if (o.status === 'filled' && matchesExpected(o.raw, exp[o.stat_key])) correct += 1
+            else
+              lines.push(
+                `    MISS ${o.stat_key}: got=${o.status === 'filled' ? JSON.stringify(o.raw) : '<failed>'} expected="${exp[o.stat_key]}"`,
+              )
+          }
+          variants += 1
+          const ok = correct === total
+          if (!ok) {
+            failing += 1
+            console.log(`[harness H] ${pad.name} ${file}: ${correct}/${total}\n${lines.join('\n')}`)
+          } else {
+            console.log(`[harness H] ${pad.name} ${file}: ${correct}/${total} PASS`)
+          }
+        }
+      }
+      expect(variants).toBe(20)
+      expect(failing).toBe(0)
+    },
+  )
 
-      // CropOverlay.handleConfirm with the DEFAULT box (no drag): 80% of maxBoxWidth, centered.
-      const aspect = CAPTURES.general.aspect
-      const maxW = Math.min(full.width, full.height * aspect)
-      const boxW = 0.8 * maxW
-      const boxX = (full.width - boxW) / 2
-      const boxH = boxW / aspect
-      const boxY = (full.height - boxH) / 2
-      const cropped = new FakeCanvas(
-        Math.max(1, Math.round(boxW)),
-        Math.max(1, Math.round(boxH)),
-      )
-      cropped.getContext().drawImage(
-        full,
-        boxX,
-        boxY,
-        boxW,
-        boxH,
-        0,
-        0,
-        cropped.width,
-        cropped.height,
-      )
-
+  it(
+    'E) crop→read contract (D-05-UAT-6, re-pointed round 3): a correct-aspect frame-exact crop of a full screenshot reads exactly through the structural reader',
+    { timeout: 30 * 60_000 },
+    async () => {
+      // Synthesize the owner's upload: a 1080x2280 full phone screenshot with
+      // the sampideal1 panel (648x759) at (216,420) — the free-form crop
+      // ratified at D-05-UAT-4 then composes with the structural read.
       const expected = JSON.parse(readFileSync(EXPECTED_PATH, 'utf8'))
       const exp = expected['sampideal1.png']
+      const panel = await loadSampleCanvas('sampideal1.png')
+      const full = new FakeCanvas(1080, 2280)
+      // 5-arg form: panel drawn AT (216,420) at natural size (see the harness-bug
+      // note in the round-2 E experiment — the 9-arg form reads an out-of-bounds
+      // source rect off the panel itself).
+      full.getContext().drawImage(panel, 216, 420, 648, 759)
+      expect(needsCrop(full.width / full.height, CAPTURES.general.aspect)).toBe(true)
+
+      // CropOverlay.handleConfirm replica: draw a panel-exact box off the full
+      // frame and read it. Box width = the panel's exact width; the capture-
+      // aspect lock derives the height (648/0.8538 = 758.04 — the stored aspect
+      // is 4-dp rounded vs the panel's true 759, a 0.13% shortfall well inside
+      // the ~2% frame tolerance).
+      const aspect = CAPTURES.general.aspect
+      const cropped = new FakeCanvas(648, Math.round(648 / aspect))
+      cropped.getContext().drawImage(full, 216, 420, 648, 648 / aspect, 0, 0, cropped.width, cropped.height)
       const outcomes = await readScreenshot('general', cropped)
       let correct = 0
-      let failedFields = 0
       const lines = []
       for (const o of outcomes) {
         if (o.status === 'filled') {
@@ -427,72 +461,11 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
           if (ok) correct += 1
           lines.push(`${o.stat_key}: filled raw="${o.raw}" expected="${exp[o.stat_key]}" ${ok ? 'OK' : 'WRONG'}`)
         } else {
-          failedFields += 1
           lines.push(`${o.stat_key}: FAILED expected="${exp[o.stat_key]}"`)
         }
       }
-      console.log(
-        `[harness D] default-crop read: correct=${correct}/${outcomes.length} failedFields=${failedFields}\n${lines.join('\n')}`,
-      )
-      // Documents the defect mechanism: a one-click default crop cannot reproduce the
-      // spike bar (regions are displaced far beyond the ~2% frame tolerance).
-      expect(correct).toBeLessThan(outcomes.length)
-    },
-  )
-
-  it(
-    'E) crop→read contract (D-05-UAT-6): correct-aspect frame-exact crop of a full screenshot reads exactly; a forced-square crop reads near-zero',
-    { timeout: 30 * 60_000 },
-    async () => {
-      // Synthesize the owner's upload: a 1080x2280 full phone screenshot with
-      // the sampideal1 panel (648x759) at (216,420) — same construction as D.
-      const expected = JSON.parse(readFileSync(EXPECTED_PATH, 'utf8'))
-      const exp = expected['sampideal1.png']
-      const panel = await loadSampleCanvas('sampideal1.png')
-      const full = new FakeCanvas(1080, 2280)
-      // 5-arg form: panel drawn AT (216,420) at natural size (see the harness-bug
-      // note in experiment D — the 9-arg form reads an out-of-bounds source rect).
-      full.getContext().drawImage(panel, 216, 420, 648, 759)
-      expect(needsCrop(full.width / full.height, CAPTURES.general.aspect)).toBe(true)
-
-      /** CropOverlay.handleConfirm replica: draw a lock-shaped box off the full frame and read it. */
-      async function readCropped(boxW, boxH, boxX, boxY, label) {
-        const cropped = new FakeCanvas(Math.max(1, Math.round(boxW)), Math.max(1, Math.round(boxH)))
-        cropped.getContext().drawImage(full, boxX, boxY, boxW, boxH, 0, 0, cropped.width, cropped.height)
-        const outcomes = await readScreenshot('general', cropped)
-        let correct = 0
-        const lines = []
-        for (const o of outcomes) {
-          if (o.status === 'filled') {
-            const ok = matchesExpected(o.raw, exp[o.stat_key])
-            if (ok) correct += 1
-            lines.push(`${o.stat_key}: filled raw="${o.raw}" expected="${exp[o.stat_key]}" ${ok ? 'OK' : 'WRONG'}`)
-          } else {
-            lines.push(`${o.stat_key}: FAILED expected="${exp[o.stat_key]}"`)
-          }
-        }
-        console.log(`[harness E-${label}] ${correct}/${outcomes.length} correct\n${lines.join('\n')}`)
-        return { correct, total: outcomes.length }
-      }
-
-      // E1 — the lock at its target: box width = the panel's exact width; the
-      // capture-aspect lock derives the height (648/0.8538 = 758.04 — the
-      // stored aspect is 4-dp rounded vs the panel's true 759, a 0.13%
-      // shortfall well inside the ~2% frame tolerance). The crop is
-      // frame-exact, so the contract MUST reproduce the uncropped 14/14 read.
-      const aspect = CAPTURES.general.aspect
-      const exact = await readCropped(648, 648 / aspect, 216, 420, 'exact')
-      expect(exact.correct).toBe(exact.total)
-
-      // E2 — the owner's claimed tool behavior: a 1:1 square crop (the largest
-      // square the image fits, positioned to fully contain the panel). The
-      // region fractions then scale to the square frame and displace off every
-      // value row: near-zero reads — the EXPECTED consequence if a square
-      // were ever forced (the shipped lock never forces one; see
-      // CropOverlay.test.ts pins).
-      const side = Math.min(full.width, full.height)
-      const square = await readCropped(side, side, 0, 420, 'square')
-      expect(square.correct).toBeLessThan(square.total)
+      console.log(`[harness E] frame-exact crop: ${correct}/${outcomes.length} correct\n${lines.join('\n')}`)
+      expect(correct).toBe(outcomes.length)
     },
   )
 })
