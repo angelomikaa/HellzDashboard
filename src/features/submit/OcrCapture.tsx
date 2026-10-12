@@ -15,9 +15,12 @@
 // CAPTURES is imported STATICALLY from the data-only regions module (no
 // tesseract reachable through it).
 //
-// Declining the optional aspect-locked crop (D-05) cancels the read
-// entirely: no outcomes, no failure claims — fields stay as they are for
-// manual entry (05-RESEARCH §6 pitfall 7).
+// Declining the optional crop (D-05) cancels the read entirely: no
+// outcomes, no failure claims — fields stay as they are for manual
+// entry (05-RESEARCH §6 pitfall 7). Owner-ratified deviation
+// (2026-10-12, D-05-UAT-5): the cancel is no longer silent — the step
+// surfaces a cancelled-feedback status line (and the overlay's decline
+// button is relabelled accordingly) that clears on the next upload.
 import { useRef, useState } from 'react'
 import { CropOverlay } from './CropOverlay'
 import type { CaptureKey, OcrFieldOutcome } from './ocr'
@@ -52,8 +55,37 @@ const STATUS_READING = 'Lendo captura…'
 const STATUS_DONE = 'Leitura concluída — confira os valores abaixo.'
 const STATUS_FAILED =
   'Não foi possível ler a captura automaticamente. Preencha os valores manualmente.'
+// Ratified deviation (D-05-UAT-5): the cancelled-read feedback line.
+const STATUS_CANCELLED = 'Leitura cancelada'
 
-type OcrStatus = 'idle' | 'reading' | 'done' | 'failed'
+type OcrStatus = 'idle' | 'reading' | 'done' | 'failed' | 'cancelled'
+
+/** The single status line a step renders for its OCR state (null = none). */
+export interface StatusLine {
+  text: string
+  tone: 'muted' | 'success'
+}
+
+/**
+ * The status-slot mapping: each OCR state renders exactly one line (idle
+ * renders none). Because the step keeps ONE status slot, any state
+ * transition replaces the visible line — e.g. the cancelled feedback is
+ * cleared the moment the next upload starts (reading state).
+ */
+export function statusMessage(status: OcrStatus): StatusLine | null {
+  switch (status) {
+    case 'idle':
+      return null
+    case 'reading':
+      return { text: STATUS_READING, tone: 'muted' }
+    case 'done':
+      return { text: STATUS_DONE, tone: 'success' }
+    case 'failed':
+      return { text: STATUS_FAILED, tone: 'muted' }
+    case 'cancelled':
+      return { text: STATUS_CANCELLED, tone: 'muted' }
+  }
+}
 
 interface OcrCaptureProps {
   capture: CaptureKey
@@ -74,6 +106,7 @@ export function OcrCapture({
   const [cropBitmap, setCropBitmap] = useState<ImageBitmap | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const running = status === 'reading'
+  const line = statusMessage(status)
 
   /** THE lazy boundary (criterion 3): tesseract enters the app only here. */
   async function runRead(image: ImageBitmap | HTMLCanvasElement): Promise<void> {
@@ -129,11 +162,13 @@ export function OcrCapture({
 
   function handleCropCancel(): void {
     // Declining the crop CANCELS the read entirely (D-05): no outcomes, no
-    // failure spam — the step returns to idle with fields untouched.
+    // failure spam — fields stay untouched. Ratified deviation: the return
+    // is no longer silent; the cancelled status line stays visible until
+    // the next upload transitions the slot to the reading state.
     const bitmap = cropBitmap
     setCropBitmap(null)
     if (bitmap) bitmap.close()
-    setStatus('idle')
+    setStatus('cancelled')
     onRunStateChange(false)
   }
 
@@ -176,19 +211,13 @@ export function OcrCapture({
           if (file) void handleFile(file)
         }}
       />
-      {status === 'reading' && (
-        <p role="status" aria-live="polite" className="text-sm font-semibold text-muted">
-          {STATUS_READING}
-        </p>
-      )}
-      {status === 'done' && (
-        <p role="status" aria-live="polite" className="text-sm font-semibold text-success">
-          {STATUS_DONE}
-        </p>
-      )}
-      {status === 'failed' && (
-        <p role="status" aria-live="polite" className="text-sm font-semibold text-muted">
-          {STATUS_FAILED}
+      {line !== null && (
+        <p
+          role="status"
+          aria-live="polite"
+          className={`text-sm font-semibold ${line.tone === 'success' ? 'text-success' : 'text-muted'}`}
+        >
+          {line.text}
         </p>
       )}
       {cropBitmap !== null && (
