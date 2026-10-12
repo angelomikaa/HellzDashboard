@@ -101,6 +101,7 @@ describe('rowProfile', () => {
 describe('columnProfileInRange', () => {
   it('counts masked pixels per column within the band rows', () => {
     const img = makeImg(4, 2)
+    fillRect(img, 0, 4, 0, 2, [240, 236, 220]) // paper background (light — excluded)
     setPx(img, 1, 0, 20, 24, 58)
     setPx(img, 1, 1, 20, 24, 58)
     setPx(img, 3, 0, 20, 24, 58)
@@ -224,8 +225,9 @@ describe('label matching (fuzzy, spike semantics)', () => {
     expect(scoreLabelPair('HP', 'HP')).toBe(100)
     // left-truncated label: observed ⊂ expected (measured spike case)
     expect(scoreLabelPair('vE DMG Redu', 'PvE DMG Reduction')).toBe(90 - (15 - 9))
-    // OCR noise: one insertion away (measured spike case)
-    expect(scoreLabelPair('ritdmgres', 'CRIT DMG RES')).toBe(80 - 1 * 5)
+    // OCR noise: one insertion away (measured spike case) — containment
+    // ("critdmgres".includes("ritdmgres")) wins over the distance path
+    expect(scoreLabelPair('ritdmgres', 'CRIT DMG RES')).toBe(90 - 1)
     expect(scoreLabelPair('xyz', 'HP')).toBe(-Infinity)
   })
   it('matchLabel picks the best vocabulary key above the floor', () => {
@@ -276,8 +278,10 @@ describe('detectRowCells (text-band + chroma-separated value clusters)', () => {
     // the left value cluster (center 48 < midX 63) must never land in a right cell
     for (const c of right) expect(c.valueRect.left).toBeGreaterThanOrEqual(63)
   })
-  it('returns no cells on a blank image', () => {
-    expect(detectRowCells(makeImg(60, 30), ROWS_GRAMMAR)).toEqual([])
+  it('returns no cells on a blank (paper) image', () => {
+    const blank = makeImg(60, 30)
+    fillRect(blank, 0, 60, 0, 30, [240, 236, 220])
+    expect(detectRowCells(blank, ROWS_GRAMMAR)).toEqual([])
   })
 })
 

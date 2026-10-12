@@ -23,6 +23,68 @@ function copy(image: ImageDataLike): ImageDataLike {
   return { data: new Uint8ClampedArray(image.data), width: image.width, height: image.height }
 }
 
+/** ITU-R 601 luma of one pixel (float, spike semantics — detection thresholds
+ * in structure.ts/locate.ts are calibrated against the unrounded values). */
+export function luma(r: number, g: number, b: number): number {
+  return 0.299 * r + 0.587 * g + 0.114 * b
+}
+
+/** Chroma (max-min channel spread) of one pixel — separates value clusters
+ * from label rendering on the game panel (architecture pivot, round 3). */
+export function chroma(r: number, g: number, b: number): number {
+  return Math.max(r, g, b) - Math.min(r, g, b)
+}
+
+/**
+ * Pad a (binarized, grayscale) image with a constant-value border — the spike
+ * ocrRect margin: Tesseract's LSTM misclassifies lone glyphs on a tight
+ * canvas. The pad color must MATCH the binarized background (dark crops pad
+ * black, light crops pad white — a mismatched pad is itself a feature
+ * Tesseract misreads). Pure: fresh buffer out, input never mutated.
+ */
+export function padBinarized(image: ImageDataLike, padX: number, padY: number, padValue: number): ImageDataLike {
+  const width = image.width + 2 * padX
+  const height = image.height + 2 * padY
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4
+      const inside =
+        x >= padX && x < padX + image.width && y >= padY && y < padY + image.height
+      const v = inside ? image.data[((y - padY) * image.width + (x - padX)) * 4] : padValue
+      data[i] = v
+      data[i + 1] = v
+      data[i + 2] = v
+      data[i + 3] = 255
+    }
+  }
+  return { data, width, height }
+}
+
+export interface CropRect {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+/**
+ * Extract a sub-rect (spike crop semantics: round/clamp left/top into
+ * [0, dim-1], keep w/h at least 1 and inside the image). Pure.
+ */
+export function cropImageData(image: ImageDataLike, rect: CropRect): ImageDataLike {
+  const left = Math.min(Math.max(Math.round(rect.left), 0), image.width - 1)
+  const top = Math.min(Math.max(Math.round(rect.top), 0), image.height - 1)
+  const width = Math.min(Math.max(Math.round(rect.width), 1), image.width - left)
+  const height = Math.min(Math.max(Math.round(rect.height), 1), image.height - top)
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let row = 0; row < height; row++) {
+    const src = ((top + row) * image.width + left) * 4
+    data.set(image.data.subarray(src, src + width * 4), row * width * 4)
+  }
+  return { data, width, height }
+}
+
 /** ITU-R 601 luma of one pixel, rounded to a byte. */
 function lumaByte(r: number, g: number, b: number): number {
   return Math.round(0.299 * r + 0.587 * g + 0.114 * b)

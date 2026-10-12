@@ -138,7 +138,7 @@ describe('pickBestRead (spike recognizeBest semantics)', () => {
 
 describe('luma/chroma (float pixel statistics — structural detection thresholds)', () => {
   it('computes ITU-R 601 luma without rounding', () => {
-    expect(luma(20, 24, 58)).toBeCloseTo(26.66, 2)
+    expect(luma(20, 24, 58)).toBeCloseTo(26.68, 2)
     expect(luma(255, 255, 255)).toBe(255)
   })
   it('computes the max-min channel spread', () => {
