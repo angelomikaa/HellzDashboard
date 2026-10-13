@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-10-13T00:18:55.792Z"
+last_updated: "2026-10-13T00:44:29.574Z"
 last_activity: 2026-10-13
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 26
-  completed_plans: 24
-  percent: 92
+  completed_plans: 25
+  percent: 96
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 06 (trust-celebration-officer-tools-promotion-page) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
 Last activity: 2026-10-13
 
-Progress: [█████████░] 92%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Progress: [█████████░] 92%
 | Phase 06 P02 | 18min | 3 tasks | 3 files |
 | Phase 06 P04 | 16min | 3 tasks | 4 files |
 | Phase 06 P05 | 9min | 2 tasks | 2 files |
+| Phase 06 P06 | 11min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -170,10 +171,11 @@ Recent decisions affecting current work:
 - [Phase 06-04]: task-2 tsc gate unsatisfiable in isolation (App.tsx imports task-3's ValidacoesPage) - 04-01/05-01 precedent; verified with npm test at task 2, full tsc+test gate green after task 3
 - [Phase 06-05]: PromotionCard pins the RPC's non-null contract with tier assertions (ovr always present on cards, points always present on highlights) instead of unreachable dashboard-style null fallbacks
 - [Phase 06-05]: HighlightsPage ships role-free (D-12) rendering the closed PromotionHighlight payload verbatim in server order - SHWC-02 UI-side complete; RNK-02 now demonstrable end-to-end with the 06-02 server smoke proof
+- [Phase 06-06]: Personagens Controles column implements the D-08 matrix with UX-only gating: owner rows em-dash for every viewer, officer viewers em-dash on officer/owner rows, role buttons owner-only; every write flows exclusively through the 0011 RPC wrappers (no PATCH path added). Reativar confirm body was spec-silent - added the inverse of the locked removal copy. Pending todo owner-only-class-management resolved (0011 server + this UI gate). — Locked Surface-3 copy + D-08/D-09/D-10 from 06-UI-SPEC; enforcement stays server-side per AGENTS.md
 
 ### Pending Todos
 
-- [owner-only-class-management](todos/pending/owner-only-class-management.md) — restrict class creation to the owner handle only (officers must not add classes — structural change); sourced from the 03-04 owner UAT; planner to place in a future phase
+*(none — owner-only-class-management resolved 2026-10-12: server policy 0011 in 06-01 (smoke-proven 06-02) + owner-only UI gate in 06-06 task 2; moved to todos/completed/)*
 
 ### Blockers/Concerns
 
@@ -198,8 +200,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-13T00:16:59.049Z
-Stopped at: Phase 6 UI-SPEC approved
+Last session: 2026-10-13T00:44:07.322Z
+Stopped at: Completed 06-06-PLAN.md (Personagens staff controls + owner-only add-class) — next: 06-07 (phase UAT)
 Resume file: None
 
 ---
