@@ -29,10 +29,46 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 - [ ] **SCALE-02**: Formula updated in ONE migration across all three rank RPCs (`my_report`, `class_top5`, `get_promotion`), with `rankMath.ts` + locked test values + `smoke-rank.mjs` + `smoke-promotion.mjs` re-baselined in the same phase
 - [ ] **SCALE-03**: Tier bands (D-01/D-02 in `presentation.ts`) recalibrated against realistic seeded cohorts before being locked; the improvement-screen percentile phrase ("entre os X% piores/melhores") is dropped — owner decision 2026-10-13 (points are no longer percentile positions)
 
+### Role-Differentiated Key Stats
+
+- [ ] **ROLE-01**: Key-stat config is keyed per (class, build-role); each combo holds an independent set of exactly 6 key stats (block-at-7 per combo, advisory-lock race-proof)
+- [ ] **ROLE-02**: `set_key_stat` v2 accepts the build-role param (validated server-side, error vocabulary unchanged, old signature dropped in the same migration)
+- [ ] **ROLE-03**: OVR in `my_report`, `class_top5`, `get_promotion` reads the member's own (class, build-role) config, and per-stat percentile cohorts become class+build-role (D-06/D-07 superseded)
+- [ ] **ROLE-04**: Migration backfills every existing class config into all build-role values → zero OVR change or null on deploy day
+- [ ] **ROLE-05**: `members.char_function` carries exactly ONE of three build roles — Dano Físico (physical DPS), Dano Mágico (magical DPS), or Suporte (the tank role, renamed per owner nomenclature decision); no character holds more than one role (hard design motto: a focused character fills one role properly)
+- [ ] **ROLE-06**: Members with no configured (class, build-role) combo get OVR = null via the existing data-insufficient rendering — never a silent class-defaults fallback
+- [ ] **ROLE-07**: Build-role assignment stays staff-only (Personagens path); RNK-02 closed-payload discipline verbatim (zero new key-stat-derived fields)
+- [ ] **ROLE-08**: Stats-Chave admin page gains a role selector (class → role → stat chips) with per-combo count display and block-at-7 copy
+- [ ] **ROLE-09**: Dummy seed covers ≥3 dummies per populated (class, build-role) combo, following the owner-provided roster (see Seed Roster below)
+- [ ] **ROLE-10**: Staff audit pass re-assigns existing members' build-roles before any per-role key-stat differentiation is applied
+- [ ] **ROLE-11**: Officer-visible per-(class, role) key-stat config coverage indicator (staff-only, never member-visible)
+- [ ] **ROLE-12**: Class catalog aligned with the official job tree (https://roocamer.gnjoy.game/home#job-intro): unreleased jobs excluded (Super Novice, Ninja), catalog additions needed by the seed roster (e.g., Summoner, Gunslinger), advanced-job naming reconciled (High Wizard/Professor, Biochemist/Smith, Dancer/Gypsy)
+
 ### Dummy-Data Seed
 
-- [ ] **SEED-01**: Reversible dummy seed (~5 players per class across both functions, validated submissions, realistic value shapes derived from live data or owner-supplied samples — incl. a clear leader, a ~98.5% runner-up, ties, and submitted_at spread) applied via the existing `apply-seed.mjs` tooling, files kept out of `seeds/` direct children
+- [ ] **SEED-01**: Reversible dummy seed following the owner-provided guild roster (see below), with validated submissions, realistic value shapes derived from live data or owner-supplied samples — incl. a clear leader, a ~98.5% runner-up, ties, and submitted_at spread — applied via the existing `apply-seed.mjs` tooling, files kept out of `seeds/` direct children. **Ships FIRST in v1.1** (owner decision: see how v1.0 wraps around data while v1.1 is developed)
 - [ ] **SEED-02**: Purge by sentinel prefix is FK-safe (submissions before members), idempotent, and a hard pre-release checklist gate
+
+#### Seed Roster (owner, 2026-10-13 — rough guild shape, ~80 members)
+
+| Group | Slots | Classes |
+|-------|-------|---------|
+| Support core | 32 | 16 Priest, 8 Gypsy, 8 Bard |
+| Swordsman tree | 8 | Knight or Crusader (shared) |
+| Mage tree | 8 | High Wizard or Professor (shared) |
+| Merchant tree | 8 | Biochemist or Smith (shared) |
+| Ranged | 8 | Hunter + Gunslinger (shared) |
+| Apprentice tree | 8 | Summoner only (3 build roles) |
+| Wildcard | 1 | any other class — at least one sample of each job |
+| **Total** | **72–80** | (owner: "even the 72 are already a valid roster") |
+
+**Known problems to observe during calibration (owner directive — decisions follow observations):**
+1. Wildcard/1-slot classes → cohort n=1 < 3 → data-insufficient: no points, no OVR (expected, documented)
+2. Shared-slot groups (Knight/Crusader, High Wizard/Professor, Biochemist/Smith, Hunter/Gunslinger) — per-class cohorts starve depending on the split
+3. Summoner's 8 slots split across up to 3 build roles → per-role cohorts may fall under n≥3 (e.g., 3/3/2)
+4. Catalog mismatch: roster uses advanced job names (High Wizard, Professor, Biochemist, Smith, Gunslinger, Summoner) that don't exist in the current 15-class catalog — catalog work (ROLE-12) must precede seeding
+5. Priest (16, single Suporte role) is the only class guaranteed to satisfy n≥3 under role-scoped cohorts
+6. Key-stat config workload is now per populated (class, build-role) combo — lazy configuration expected
 
 ## v2 Requirements
 
@@ -71,6 +107,17 @@ Explicitly excluded. Documented to prevent scope creep.
 | Faker library for seed data | Hand-authored SQL gives full control of cohort shapes |
 | Client-side points recomputation | Rank math stays in Postgres (AGENTS.md non-negotiable) |
 
+## Milestone Decisions (2026-10-13, owner)
+
+1. **Percentile phrase dropped** under the value-proportional scale (SCALE-03) — the improvement screen no longer claims percentile position.
+2. **Forgotten PIN → owner RPC** (WHIT-06) shipped this milestone, not just an ops runbook.
+3. **Removed-member re-add → reactivate** (WHIT-07) — add_member on an inactive handle flips `active` back on, preserving submission history.
+4. **Build-role vocabulary → 3 values, "Suporte" nomenclature** — the tank role is referred to as Suporte from now on (same role, new name); roles: Dano Físico / Dano Mágico / Suporte. A character is always exactly one role — "trying to do all at once leads to an unoptimal character that fits none of the three roles properly."
+5. **Cohorts split by class+build-role** (percentile comparison is only meaningful against same-build peers).
+6. **Key-stat backfill at migration** — every (class, role) combo starts with the class's current 6 stats; zero deploy-day OVR change; staff differentiates at leisure.
+7. **Seed ships FIRST in v1.1** — owner wants to see how v1.0 wraps around realistic data while developing the rest of the milestone; seed follows the rough roster above and calibration observations drive follow-up decisions.
+8. **Role-differentiated key stats fold into the SAME migration as the value-proportional scale** — both rewrite the same three RPCs; one tripod re-lock instead of two (research recommendation, ROLES.md §3.6).
+
 ## Traceability
 
 Which phases cover which requirements. Updated during roadmap creation.
@@ -80,16 +127,6 @@ Which phases cover which requirements. Updated during roadmap creation.
 | (pending roadmap) | | |
 
 **Coverage:**
-- v1.1 requirements: 15 total
+- v1.1 requirements: 27 total
 - Mapped to phases: 0
-- Unmapped: 15 ⚠️ (populated by roadmap creation)
-
-## Milestone Decisions (2026-10-13, owner)
-
-1. **Percentile phrase dropped** under the value-proportional scale (SCALE-03) — the improvement screen no longer claims percentile position.
-2. **Forgotten PIN → owner RPC** (WHIT-06) shipped this milestone, not just an ops runbook.
-3. **Removed-member re-add → reactivate** (WHIT-07) — add_member on an inactive handle flips `active` back on, preserving submission history.
-
----
-*Requirements defined: 2026-10-13*
-*Last updated: 2026-10-13 after initial definition*
+- Unmapped: 27 ⚠️ (populated by roadmap creation)

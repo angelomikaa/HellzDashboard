@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-10-13T04:30:55.366Z"
 last_activity: 2026-10-13
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 **Core value:** Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
-**Current focus:** v1.0 shipped and archived (Phases 1–6) — planning next milestone (v1.1); candidate items in PROJECT.md Active section
+**Current focus:** v1.1 Phase 7 — Whitelist Lifecycle & First-Login PIN Setup
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 7. Whitelist Lifecycle & First-Login PIN Setup (v1.1 — first of 3 phases)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-13 — Milestone v1.1 started
+Status: Not started (v1.1 roadmap created — ready for `/gsd-plan-phase 7`)
+Last activity: 2026-10-13 — v1.1 roadmap created (Phases 7–9, 15/15 requirements mapped)
 
 ## Accumulated Context
 
