@@ -1,180 +1,146 @@
-# Project Research Summary
+# Research Summary — v1.1 Home, Whitelist & Fine Ranks
 
-**Project:** NeoFoot — Ragnarok Origin guild stats web panel
-**Domain:** Internal guild tool — OCR data entry + percentile ranking, single guild, EAFC-style cards
-**Researched:** 2026-10-07
-**Confidence:** MEDIUM-HIGH (stack/architecture verified against official docs; OCR accuracy and auth wiring flagged for early spikes)
+**Project:** Hellz / NeoFoot — single-guild Ragnarok Origin stats panel (React 19 SPA + Supabase free tier)
+**Milestone:** v1.1 — Home, Whitelist & Fine Ranks (4 additive features on a LIVE system)
+**Researched:** 2026-10-13
+**Confidence:** HIGH overall — every recommendation extends a pattern already proven live in v1.0 (11 migrations, 5 smoke matrices, owner DevTools leak proofs); all integration points verified against the shipped codebase. Design-choice items are marked MEDIUM; game-value realism sourcing is LOW (resolved by deriving seed values from the live DB).
+
+**Scope note:** v1.0 is SHIPPED and owner-validated (2026-10-13; 20/20 requirements validated). This research covers ONLY the four additive v1.1 features — whitelist lifecycle + first-login PIN setup, personalized home landing tab with stale-data CTA, value-proportional 99 scale, and the reversible dummy-data seed workflow. The v1.0 stack, architecture, and pitfall set are validated ground truth, not re-researched. Detailed findings: [.planning/research/STACK.md](STACK.md) · [FEATURES.md](FEATURES.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [PITFALLS.md](PITFALLS.md).
 
 ## Executive Summary
 
-NeoFoot is a single-guild stat-tracking panel for Ragnarok Origin: members submit 3 screenshots of their stat screens (General / Quasi / Special), OCR pre-fills the values, a mandatory manual fix-up gate guarantees correctness, and Postgres computes EAFC-style percentiles and an OVR from 6 admin-tweakable, member-hidden key stats. Expert consensus for this product family (EAFC card sites, WoW guild trackers, MMO dashboards) converges on the simplest possible shape: **a thin React SPA + Supabase (Postgres + RLS + Storage + one Edge Function), with all rank math in Postgres and all security in RLS** — no custom backend, no servers to manage.
+v1.1 adds four features to a live, owner-used panel, and the research verdict across all four dimensions is unusually clean: **ZERO new runtime dependencies**. Whitelist = migration 0012 (nullable `pin_hash` + `add_member` SECURITY DEFINER RPC, 0011 pattern, role forced to `'member'`, no new RLS policy). PIN setup = one null-hash branch in `verify-pin` (returning `pin_setup_required`) plus one sibling `setup-pin` Edge Function that clones it byte-for-byte (same pinned imports `npm:bcryptjs@3` / `npm:jose@4`, same secrets, same 7-day JWT) with an atomic conditional claim (`update ... where pin_hash is null`, trust the returned count). Home = `'inicio'` in the existing `Tab` union + ONE additive field (`last_validated_at`) on the closed `my_report` payload — closed-payload discipline and RNK-02 anti-leak invariants hold untouched. Fine ranks = one formula swap (`points = round(own_value / nullif(max_v,0) * 99, 2)`) across three RPCs in ONE migration, compute-on-read so no backfill; OVR inherits the finer scale with zero formula change. Seed = hand-authored idempotent SQL via the existing `apply-seed.mjs`, reversible by a `dummy-%` sentinel prefix — never a migration, never a direct child of `seeds/`.
 
-The recommended stack is React 19 + TypeScript + Vite + Tailwind v4 + Supabase free tier (limits verified: 500 MB DB, 1 GB storage, 50k MAU, 500k Edge Function invocations), with Tesseract.js v7 running client-side in a Web Worker (zero server cost — Supabase Edge Functions' 2s CPU cap rules out server-side OCR), TanStack Query for server state, and zod for OCR-output validation. Percentiles and OVR are computed **on-read** in Postgres RPCs so admin key-stat changes apply instantly and the key-stat config never crosses the API boundary to members.
+The two structural hazards both come from landing on live data. First, the **rank contract is a three-way locked tripod** — `src/lib/rankMath.ts` (+ `rankMath.test.ts` locked values 74.25/49.5/99…), `scripts/smoke-rank.mjs` (27/27 exact-value matrix), and the SQL bodies of `my_report`/`class_top5`/`get_promotion` — and the scale change invalidates ALL of it at once, plus `smoke-promotion.mjs` ordering and the D-01/D-02 tier bands. Re-locking every leg must be an in-phase must-have, or red suites become permanent noise and the "SQL agrees to the decimal" guarantee dies. Second, the **dummy seed pollutes real members' ranks by construction** (it must enter the same cohorts the rank math reads), and the new value-proportional formula AMPLIFIES the damage: a seeded leader drags every real member's points down proportionally. The seed window must be a scheduled, announced, tightly-bounded session with a rehearsed purge (submissions BEFORE members — `submissions → members` has no FK cascade) and "zero dummy rows" as a hard release gate.
 
-The two biggest risks are (1) **OCR accuracy collapse** on stylized game-UI screenshots — mitigated by region-based recognition (never whole-image), digit whitelisting, canvas preprocessing, confidence-triggered fix-up, and an early spike: if field accuracy is below ~70% on real guild screenshots, pivot to manual entry (the fix-up form ships identically either way, so the launch is never bet on OCR); and (2) **the PIN auth model** — Pitfall research strongly recommends **per-player PINs** (hashed, rate-limited server-side) for identity and anti-forgery, while PROJECT.md's model describes a single shared panel PIN + officer elevation. This conflict must be resolved at requirements time; whichever is chosen, RLS-ready schema and rate limiting are day-one concerns. Secondary risks: percentile math degenerating at guild sample sizes (n=15–40) and Supabase free-tier pausing/limits.
+Third, the auth surface has one discovered breaking constraint and several accepted-and-bounded leaks: **`bcryptjs.compareSync(pin, null)` throws**, so the moment 0012 lands, `verify-pin` will 500 on every pinless member unless the null branch precedes the compare (line 148) — and the branch ordering must keep inactive members at uniform 401 while ACTIVE-unclaimed gets `pin_setup_required`. The pre-existing placeholder-PIN whitelist rows (known hashes from git history, WR-06) must be converted to null IN the same phase or the claim flow silently never applies to them. The `pin_setup_required` enumeration leak and the pre-claim handle-squatting window are accepted design constraints — narrower than what they replace, mitigated operationally (immediate officer notification, small claim window) and mechanically (shared lockout, uniform latency, atomic claim). All owner-decision items are consolidated in the Open Questions table below; phase planning should resolve them explicitly, not by drift.
 
 ## Key Findings
 
-### Recommended Stack
+### Stack (→ [STACK.md](STACK.md))
 
-All versions verified against the npm registry and official Supabase/Tesseract.js docs (2026-10-07). Full detail in [STACK.md](./STACK.md).
+The headline decision is disciplined reuse. Phase planners must carry:
 
-**Core technologies:**
-- **React 19.3 + Vite 8 + TypeScript** — standard SPA toolchain; no SSR needed (no SEO, everything behind a PIN). Fallback: pin `typescript@5.9` if the TS 7 native-compiler line causes tooling friction.
-- **Tailwind CSS 4.3** — CSS-first config (`@import "tailwindcss"`, no config file); ideal for iterating on EAFC card visuals.
-- **Supabase free tier (supabase-js 2.x)** — Postgres (window functions for percentiles) + Storage (officer audit trail) + Edge Function (PIN gate). Exceeds the free-tier storage constraint.
-- **Tesseract.js 7.0** — in-browser OCR in a Web Worker. Requires `tessedit_char_whitelist` (digits/percent), `user_defined_dpi`, region cropping, and canvas preprocessing (grayscale → 2-3x upscale → binarize). Test production worker bundling (`workerPath`/`corePath`) early.
-- **TanStack Query 5 + zod 4 + motion + lucide-react** — server-state cache, OCR-output validation, card animations, icons. shadcn/ui optional for forms/admin dialogs.
+- **No new npm package, dev dependency, or runner** — everything is SQL migrations + one new Edge Function + React components in established patterns. Verified current pins (2026-10-13): react 19.3.0 in range, vite 8.3.4, tailwind 4.3.3, supabase-js 2.117.3, react-query 5.104.2, vitest 5.0.4, bcryptjs 3.0.3.
+- **`setup-pin` pins the SAME majors as `verify-pin`** (`npm:jose@4`, not current-major 6.2.12) — the two functions must mint token-for-token identical sessions; a joint major bump is dedicated tech debt, not a drive-by.
+- **Reuse the existing lockout machinery** (`pin_login_attempts` + `_shared/lockout.ts` + `record_pin_failure`) for PIN setup — never a second rate-limit mechanism.
+- **Migration 0012 is mandatory schema change** (`pin_hash` currently NOT NULL, `0001_schema.sql:5-6`) and is the milestone's ONLY one; no direct INSERT policy on `members` — the RPC stays the narrow write surface.
+- **Explicit non-recommendations to enforce in review:** no router for one tab, no date-fns/dayjs for one comparison, no supabase-js in the client data layer (foreign-JWT session), no faker for the seed, no client-side points recomputation (AGENTS.md non-negotiable — all rank math in Postgres).
+- **Seed placement constraint:** `config.toml` `db.seed sql_paths = ["./seeds/*.sql"]` is a flat non-recursive glob — dummy files MUST live in a `seeds/dummy/` subfolder or every local `db reset` auto-applies them (trivially verified once during implementation).
 
-**Auth design:** Edge Function `verify-pin` compares a bcrypt/PBKDF2 hash, applies server-side rate limiting (4-digit PIN = 10k combos, brute-forceable without it), and returns a custom JWT with claims `{ member_id, role: member|officer|owner }`; RLS policies read claims via `auth.jwt()`. **This is the one stack piece to spike before building anything on top.**
+### Features (→ [FEATURES.md](FEATURES.md))
 
-**Computation:** Percentile + OVR live entirely in Postgres (compute-on-read RPCs). Never recompute in JS — it duplicates logic, risks drift, and leaks key stats to the client.
+Four features with MUST-level behaviors, proposed IDs WHIT-/HOME-/SCALE-/SEED- (final IDs owned by REQUIREMENTS.md):
 
-### Expected Features
+- **Whitelist (WHIT-):** officer/owner handle-only registration via `add_member` (role forced `'member'`, `pin_hash` NULL); player picks own PIN at first login (double-entry client-side, `^\d{4}$` server-side); removal semantics UNCHANGED (`set_member_active`). Should-haves: reject `dummy-%` handles in the RPC; officer-visible unclaimed indicator (derived, staff-only, never the hash). Anti-gaming posture unchanged — weak PINs are accepted by design; the whitelist is the trust boundary.
+- **Home (HOME-):** `'inicio'` as DEFAULT tab after login; own OVR via OvrHero verbatim; best-stats strip (top-3 by points, rendered from fields the payload already returns — client sorts, never recomputes); stale CTA when `> 7 days` since last VALIDATED submission (strictly greater — lock the boundary in a test); CTA navigates to Enviar Status. Fresh data renders NO banner — silence is the success state. Never-submitted members get the evergreen variant + existing empty-state guidance.
+- **Scale (SCALE-):** leader(s at max) hold exactly 99; everyone below scales by value distance; top-end cuts at 98/97/96/95 emerge naturally. Keep `n ≥ 3` data_sufficient unchanged. Semantic consequences to carry: bottom-end compression (worst no longer gets 0), OVR floor-51 becomes near-unreachable (RNK-03 stays trivially satisfied but D-02 bands need recalibration), tie machinery in 0009 becomes dead code, and the CMP-02 percentile phrase becomes literally false under a value-based scale (owner decision — see Open Questions).
+- **Seed (SEED-):** ~5 players per class, both `char_function` values and both `value_type`s per cohort (function-scoped cohorts starve below n≥3 otherwise), owner-reviewed values DERIVED FROM LIVE validated submissions (never invented from training data — LOW confidence otherwise); value shapes must include a clear leader, a near-best runner-up (~98.5–99% of leader), ties, `submitted_at` spread (fresh / 8–30 days / one never-submitted), and one PENDING submission for the officer queue. Sizing note: ~75 dummy members across 15 starter classes.
+- **Explicitly out of scope (v2+):** delta badges, history view, officer guild-health dashboard (the `last_validated_at` field is exactly its future primitive — don't let it creep in), catalog self-service, OCR confidence surfacing, PNG export, PIN-change self-service.
 
-Full detail in [FEATURES.md](./FEATURES.md). The core loop: register → submit → see standing → improve → resubmit.
+### Architecture (→ [ARCHITECTURE.md](ARCHITECTURE.md))
 
-**Must have (table stakes, all P1):**
-- PIN auth + guild-member whitelist + officer elevation — the trust boundary
-- Class/function definitions + character registry — foundation for all comparisons
-- Stat catalog (3 groups, FLAT/PERCENTUAL value types) — foundation for OCR + key-stat config
-- Guided 3-screenshot upload with example shots + wider "Special" shot option
-- OCR auto-read (region-based) + **mandatory manual fix-up gate** before acceptance
-- Immutable stat storage per submission — the source of truth
-- Per-stat percentile within class+function (top 1% = 99 pts, with "insufficient data" state)
-- OVR from 6 admin-tweakable key stats per class, floor of 51, **keys hidden server-side**
-- Own dashboard (mobile-first stat cards) + improvement screen (player vs class average vs best, aggregates only)
-- Delta badges vs last submission (with "first submission" baseline state)
-- Tiered stat cards (bronze/silver/gold/platinum) + officer validation queue
+**Zero structural change to v1.0** — all four features slot into existing seams. What phase planners must carry:
 
-**Should have (v1.x, after validation):** shareable card image export (PNG), submission history/progression trends, officer guild-health dashboard, OCR confidence surfacing, admin self-service catalog additions.
+- **`add_member` = the ONLY officer write surface on `members`** — no new RLS policy in any direction (the 42P17 recursion minefield is never entered). Staff gate inside the function, role forced, `search_path = public`, EXECUTE hygiene (`revoke from public, anon; grant to authenticated`). Unique-handle violation (23505) must be caught and raised as a named exception (`handle_exists`), with re-add of a removed handle directed to `set_member_active(true)` — two verbs, two intents, no overlapping upsert.
+- **`setup-pin` is a deliberate near-verbatim clone of `verify-pin`:** same imports, CORS, validation, WR-05 env fail-fast, WR-03 infra-error discipline; write via the service-role admin client ONLY (`pin_hash` stays column-ungranted, 0005); one-way atomic claim; the only safe cosmetic delta is `setIssuer('nefoot-setup-pin')`. Null-hash branch order in `verify-pin`: lockout → lookup → **active check (inactive → uniform 401)** → **null-hash → `pin_setup_required`** → dummy compare for timing equality → compare.
+- **Formula change is five sites across three RPCs** (`my_report` stats + OVR lateral, `class_top5` OVR lateral with a `cmp` CTE gaining `max(b.value) as max_v`, `get_promotion` OVR lateral + highlights) — all in ONE migration (0013), full-copy create-or-replace (0011 style). The RNK-02 anti-leak property survives structurally because the formula stays identical for all 57 stats. Side benefit: points stop encoding cohort-count information, so the T-03-10 accepted leak SHRINKS.
+- **Fold `last_validated_at` into the same 0013 `my_report` rewrite** — avoids two full-body rewrites of the same ~120-line function in one milestone. Optionally also `has_pending` (see Open Questions #12). The stale threshold comparison stays client-side (it's a nudge on the caller's own data, not enforcement) — threshold changes are client-only deploys.
+- **What does NOT change:** RLS on every table, JWT claims `{role:'authenticated', member_id, member_role}` HS256+kid 7-day, key 6f7657c3 never revoked, append-only submissions, aggregates-only member surface, `pin_hash`/`role` column-ungranted, SECURITY DEFINER gates, closed `my_report`/`get_promotion` payloads (additive scalar only).
 
-**Defer (v2+) / anti-features:** multi-guild tenancy, chat/announcements, real-time game sync (no RO Origin API; scraping violates ToS), fully automatic OCR with zero review, full account system, public leaderboards, formula-builder UI. Deploy a second instance instead of building multi-tenancy if demand appears.
+### Pitfalls (→ [PITFALLS.md](PITFALLS.md))
 
-**Landscape takeaway:** No existing product combines personalized improvement coaching + admin-tweakable rating math + a guild-internal privacy model. NeoFoot's moat is the **improvement screen + hidden key stats**; EAFC cards and shareable exports are the spread mechanism. (Competitor rows are training-data-derived, LOW confidence.)
+The operating regime changed: everything lands on a LIVE system with real members, real sessions in the wild, and a locked rank contract. Critical five:
 
-### Architecture Approach
+1. **Seed pollution of real ranks (CRITICAL, amplified by the new scale)** — seeded leaders drag real members' points down proportionally; Destaques shows dummy names. Mitigate: announced tight calibration window, rehearse seed+purge locally first, scripted zero-dummy-rows verification, purge as a release-checklist gate, explicit owner decision on cohort exclusion (Open Questions #5).
+2. **Stale rank tripod (CRITICAL)** — `rankMath.test.ts` + `smoke-rank.mjs` + SQL RPC bodies all go red BY DESIGN; re-lock all three legs + both smokes + tier bands IN-PHASE as a must-have, then run the full smoke battery to prove no collateral breakage.
+3. **`verify-pin` 500 on pinless members (CRITICAL)** — `compareSync(pin, null)` throws; null branch must precede line 148, with WR-01 timing equalization on the pinless path; new smoke probes: pinless-active → `pin_setup_required`, pinless-inactive → uniform 401, double-setup → `already_set`.
+4. **Placeholder-PIN legacy rows (CRITICAL)** — known hashes from git history bypass the claim flow forever unless 0012 (or an owner SQL step in the same phase) nulls them and clears their `pin_login_attempts` rows; after conversion the WR-06 exposure is moot.
+5. **Purge failure modes (CRITICAL)** — FK order (submissions before members), forgotten purge, non-idempotent seed re-runs, and no wrapping transaction unless the SQL provides one. Mitigate: begin-with-delete transactional seed file, single-file seed + single-file purge, verify token freshness before the session (STATE.md rotation pending).
 
-Full detail in [ARCHITECTURE.md](./ARCHITECTURE.md). A thin client-side SPA talking directly to Supabase; security enforced by Postgres RLS; rank math in Postgres functions; OCR runs entirely in the player's browser.
+High-severity to carry: PIN-claim squatting window (operational teeth needed); `pin_setup_required` enumeration bounds (inactive must NEVER get it); double-set race (conditional UPDATE + trust the count, per CR-01 and the 0011 `not_pending` precedent); lockout on setup must check `isLocked` AND must not let attackers weaponize `record_pin_failure` to lock a fresh handle out of its own claim (decide the failure-counting policy explicitly — Open Questions #4); formula edges (all-equal → all 99, max=0, n-gate retention); tier-band/phrase drift; deploy ordering with old JWTs in the wild.
 
-**Major components:**
-1. **PIN Gate / Session** — Edge Function verifies hashed PIN, mints custom-claim JWT; RLS reads claims. Route guards are UX only; real enforcement is RLS.
-2. **OCR Pipeline (client-side, under `features/submit/ocr/`)** — image → preprocess → region-based `recognize` with whitelist → parse → fix-up form. Isolated so game UI updates only touch `regions.ts`/`parse.ts`.
-3. **Rank Engine (Postgres RPCs)** — `compute_ranks()`/`compute_overall()` over latest validated submissions per class; `SECURITY DEFINER` with internal role checks so key stats never leave the DB.
-4. **Officer Panel** — validation queue, player removal, key-stat editor; the only feature touching submission status and `class_key_stats`.
+## Cross-Cutting Risks
 
-**Key anti-patterns to avoid:** OCR in an Edge Function (2s CPU cap — will fail); materializing ranks at submit time (goes stale on key-stat tweaks); exposing `class_key_stats` to members or computing OVR client-side; one wide table per screenshot type (use `submission_stats` keyed by `stat_key` against a `stat_catalog`); trusting OCR output silently.
+Consolidated and deduplicated across the four research files:
 
-### Critical Pitfalls
+| # | Risk | Severity | Converged mitigation | Sources |
+|---|------|----------|----------------------|---------|
+| R1 | Seed rows pollute real members' ranks/OVR/Destaques; new scale amplifies it | CRITICAL | Announced tight window; rehearse locally; scripted zero-dummy-rows check; purge = release gate; cohort-exclusion decision (#5) | PIT-CL1, FEAT-∩2, ARCH-R7 |
+| R2 | Scale migration invalidates all locked contract values; red suites become noise | CRITICAL | Re-lock tripod (rankMath.ts + smoke-rank.mjs + SQL) + smoke-promotion + bands in-phase; full smoke battery after | PIT-CL2, FEAT-∩3, STACK-VC, ARCH-R6 |
+| R3 | `verify-pin` 500s on pinless member (`compareSync` throws on null) | CRITICAL | Null branch BEFORE compare (:148); deploy before any pinless row exists; pinless smoke probes | PIT-CL3, STACK-§1, ARCH-R1 |
+| R4 | Placeholder-PIN rows: known hashes bypass claim flow; claim flow never applies to legacy members | CRITICAL | Null the hashes in 0012's phase + clear lockout rows; record conversion; moots WR-06 | PIT-CL4, STATE pre-launch |
+| R5 | Purge fails on FK order / forgotten purge / partial re-run (no transaction) | CRITICAL | Submissions-then-members order; begin-delete transactional seed; single seed file + single purge file; release-checklist gate | PIT-CL5, STACK-§4, ARCH-§5 |
+| R6 | PIN-claim squatting (handle knowledge binds attacker's PIN pre-claim) | HIGH | Accepted constraint + operational teeth: immediate officer DM, prominent unclaimed indicator, small window, uniform post-claim 401s | PIT-H1, STACK-§1, ARCH-§2 |
+| R7 | `pin_setup_required` enumeration (exists-and-unclaimed oracle); inactive members must not get it | HIGH (bounded) | Branch order: active check before null-hash; WR-01 dummy-compare on pinless path; document as accepted leak (T-03-10 discipline) | PIT-H2, STACK-§1, ARCH-R9, FEAT-∩6 |
+| R8 | Double-set PIN race (TOCTOU) → last writer silently wins | HIGH | Atomic `where pin_hash is null` + trust returned count; 0 rows → `already_set` (uniform shape) | PIT-H3, STACK-§1, ARCH-R3 |
+| R9 | Lockout on setup: bypass (no `isLocked` check) or weaponization (attacker burns a fresh handle's attempts) | HIGH | Gate ordering mirrors verify-pin:88-100; decide failure-counting policy (#4); reset counter on success | PIT-H4, ARCH-R4 |
+| R10 | Formula edges: all-equal cohorts, max=0, co-leader ties at top, MIN_COHORT_SIZE gate | HIGH | Lock explicit decisions + smoke vectors for each edge (#7, #8); clamp assertion points ≤ 99 | PIT-H5, FEAT-§3, ARCH-§4 |
+| R11 | Tier bands + percentile phrase calibrated to the OLD distribution → platinum saturation, phrase lies | HIGH | Sequence migration → tripod re-lock → seed → owner calibrates D-01/D-02 → purge; explicit phrase decision (#1) | PIT-H6, FEAT-§3/∩4/∩5 |
+| R12 | Deploy ordering + old JWTs in the wild; `setup-pin` JWT drift | HIGH | Both functions live BEFORE first `add_member`; clone SignJWT block byte-for-byte; smoke: setup-token passes fetchMe → my_report → create_submission → get_promotion; never revoke key 6f7657c3 | PIT-H7, ARCH-R2, STACK-§1 |
+| R13 | `add_member` race/error surface: raw 23505 in UI; mangled duplicate handles on re-add | HIGH (UX/security seam) | Catch unique violation → `handle_exists`; client directs to reactivation; role/active forced server-side | PIT-H8, FEAT-§1, ARCH-§1 |
+| R14 | Stale-CTA timestamp semantics: rejected counted fresh, pending-while-queued nagging, null-date NaN | MEDIUM | Server-computed `last_validated_at` (+ optionally `has_pending`); three explicit client states; epoch-diff arithmetic on ISO string | PIT-M1, FEAT-§2 |
+| R15 | "Cleaner" DELETE removal breaks append-only + FK reality | MEDIUM | `set_member_active` unchanged; surface as "removal" in UI; no new remove RPC, no FK cascade | PIT-M2, FEAT-§1 |
+| R16 | `apply-seed.mjs` ops: `/api/v1` HTML trap, rotated-token 401 mid-purge, PowerShell JSON corruption | MEDIUM | Single-file transactional seed+purge; verify token freshness first; run from Node only | PIT-M3, STATE blocker |
+| R17 | Stale-scale window: new-scale values served while cached SPA renders old bands | MEDIUM (minutes) | Single release: migration + frontend deploy together; verify promotion payload post-deploy; announce skew for a 15-person guild | PIT-M4 |
 
-Full detail in [PITFALLS.md](./PITFALLS.md).
+## Open Questions (owner / phase-planning decisions — consolidated)
 
-1. **OCR accuracy collapse on game screenshots** — never OCR full images; crop rectangles, preprocess, whitelist digits, confidence-threshold (~85) auto-flagging, sanity-range validation per stat. **Validate with a Phase 1 spike: round-trip test on 10 real guild screenshots; pivot to manual entry if field accuracy < ~70%.**
-2. **Percentile math meaningless at guild sample sizes (n=15–40)** — use rank-based percentile `(count_below / (n-1)) × 99`, explicit tie handling, show rank ("7th of 15") alongside percentile, and make delta badges compare **raw stat values** between a player's own submissions, never percentile positions. Define the formula in one pure function with unit tests.
-3. **PIN auth: identity + brute force** — per-player PINs (hashed, never plaintext), server-side rate limiting (5 attempts → lockout), RLS on every table; never trust client-supplied player identity. ⚠️ *Conflicts with PROJECT.md's shared-PIN model — resolve at requirements time.*
-4. **Hidden key stats enforced only in UI** — enforce server-side (RLS/views omitting key-stat values); OVR computed in DB; accept and document the known aggregate leak ("best in guild" in a tiny guild ≈ identifying the top player).
-5. **Free-tier limits** — don't store full screenshots (compressed thumbnails only, latest-only, ~30–80 KB); weekly keep-alive cron or documented restore ritual; handle HTTP 540 (project paused) gracefully in the UI.
+| # | Decision | Options | Research direction | Owner |
+|---|----------|---------|--------------------|-------|
+| 1 | **Percentile phrase fate** under value-proportional points (CMP-02 copy becomes literally false; touches the core-value sentence) | (a) RPC also returns true rank-position field, (b) reword to value-relative copy, (c) drop the phrase | Must be explicit — do not let the phrase silently lie; if (a), evaluate the `my_report` contract change against RNK-02 leak-probes | Owner |
+| 2 | **OVR floor-51 narrative** under bottom-end compression (floor near-unreachable; D-02 bands 65/75/85 will mis-tier) | Confirm 51-floor normalization story; recalibrate bands with sign-off | RNK-03 stays satisfied trivially; bands recalibrated AFTER seed (R11 sequencing) | Owner |
+| 3 | **Forgotten-PIN fallback** (player-picked PINs remove the officer-known safety net → permanent lockout) | Documented owner-side SQL runbook vs. small owner-only `set_member_pin_hash` RPC | Minimum = runbook entry this milestone; PIN self-service stays out of scope | Owner / phase |
+| 4 | **Lockout policy on setup-pin** (bypass vs. weaponization trap — R9) | Record failures only on genuine abuse signals vs. coarse per-handle rate vs. no failure recording on setup | Decide explicitly; wrong default either way is a live incident | Phase |
+| 5 | **Dummy-handle exclusion from cohorts** during the calibration window (R1) | Temporary sentinel filter inside the three RPCs (added then removed) vs. accept polluted ranks | Exclusion = more migration churn, zero member-visible distortion; acceptance = simpler, owner-signed-off. Either is fine — decide, don't drift | Owner |
+| 6 | **Seed window policy** — may the dummy seed touch the live project at all? | Live (announced window) vs. local `db reset` + staging only | Either works; if live, never resident overnight | Owner |
+| 7 | **max_v = 0 / all-tie rendering** | null points (data-insufficient style) vs. everyone-99 on ties | Slight divergence in research (ARCH suggests case→99 when own=max; PITFALLS suggests null, matching `data_sufficient` pattern) — pick ONE, lock in spec + smoke | Phase |
+| 8 | **MIN_COHORT_SIZE = 3 retention** | Keep (recommended) vs. drop | Retain — live contract; dropping makes singleton classes score 99-everything; keep in the re-locked spec | Phase (confirm) |
+| 9 | **Re-adding a removed member** | Reactivate via `set_member_active(true)` vs. `add_member` rejects | Research converges: `add_member` = new rows only; reactivation = existing RPC; catch 23505 → `handle_exists` with reactivation guidance | Phase |
+| 10 | **Catalog lower-is-better check** — formula assumes higher-is-better for all 57 stats | Verify against live catalog + real values | Cheap check before the scale migration; no evidence of a lower-better stat, but unverified (LOW) | Phase |
+| 11 | **Sentinel mechanism** for seed reversibility | `dummy-%` handle prefix + RPC rejection (recommended) vs. `seeded` boolean column in 0012 | Prefix + rejection is simpler, greppable, zero migration; define the prefix constant ONCE (used by add_member guard AND purge scope) | Phase |
+| 12 | **Home pending-variant** ("aguardando validação" CTA) | Fold `has_pending` into the `my_report` rewrite (PITFALLS recommends) vs. skip to keep the contract lean (FEATURES NICE) | Only if it stays one closed field; harmless either way — decide with the 0013 rewrite | Phase |
 
 ## Implications for Roadmap
 
-Based on the dependency chains (ARCHITECTURE.md build order + FEATURES.md MVP recommendation), suggested phase structure:
+Only sequencing hints where the research files CONVERGE — the full phase plan belongs to the roadmapper:
 
-### Phase 1: Foundation — Supabase schema, RLS, and PIN auth
-**Rationale:** Auth-first: RLS shapes every later query; retrofitting security is the classic rewrite cause. The data model must set up RLS-ready schema and per-player identity from day one.
-**Delivers:** Migrations for `members`/`submissions`/`submission_stats`/`stat_catalog`/`class_key_stats` (EAV-style, append-only submissions), RLS policies, `verify-pin` Edge Function + custom JWT, rate limiting. Plus the **OCR feasibility spike** (round-trip test on 10 real screenshots → go/no-go decision documented).
-**Addresses:** PIN auth + whitelist + officer elevation (FEATURES P1)
-**Avoids:** Pitfalls 3 (PIN identity/brute force), 4 (partly — server-side enforcement foundation), and de-risks Pitfall 1 early
-
-### Phase 2: Data ingestion, manual-only — registry, catalog, submit wizard
-**Rationale:** Ranks need real submissions to compute against; the ingestion data model and fix-up form must exist and be correct before OCR is layered on. This is the project's explicit de-risking strategy: the panel is usable even on days OCR fails.
-**Delivers:** Character registry, class/function definitions, stat catalog, guided 3-screenshot upload with examples, manual entry + fix-up form (no OCR yet), image upload to Storage (compressed, latest-only).
-**Addresses:** Character registry, stat catalog, guided upload (P1)
-**Avoids:** Pitfall 5 (storage bloat), EAV debt pattern
-
-### Phase 3: Rank engine — percentile + OVR Postgres RPCs
-**Rationale:** Cards and badges are pure presentations of RPC outputs; building them first means mocking data by hand. Formula spec + unit tests before any UI shows points.
-**Delivers:** `compute_ranks()` (rank-based percentile, top 1% = 99), `compute_overall()` (mean of 6 key stats, floor 51, read from `class_key_stats`), guild averages — all compute-on-read `SECURITY DEFINER` RPCs with internal role checks.
-**Addresses:** Per-stat percentile, OVR (P1)
-**Avoids:** Pitfall 2 (small-n percentile), Pitfall 4 (key-stat exposure)
-
-### Phase 4: Member-facing value loop — dashboard, improvement screen, delta badges, tier cards
-**Rationale:** Core value delivered here ("my standing" + "what to fix"); everything hangs off Phase 3 RPCs.
-**Delivers:** Mobile-first own dashboard with stat cards, improvement screen (player vs class average vs best, aggregates only), delta badges with first-submission baseline state, bronze→platinum tiered cards.
-**Addresses:** Own dashboard, improvement screen, delta badges, tier cards (P1)
-**Avoids:** Pitfall 2 (delta badges compare raw values), UX pitfalls (baseline handling)
-
-### Phase 5: OCR pipeline layered onto the submit wizard
-**Rationale:** OCR is a pre-fill accelerator bolted onto an already-working form — the highest-friction, most-iterated component, de-risked by Phase 1's spike and by shipping manual entry first.
-**Delivers:** Tesseract.js worker setup (lazy-loaded, cached, session singleton), region maps per screenshot type, canvas preprocessing, confidence-triggered fix-up integration, production-build bundling test.
-**Addresses:** OCR auto-read + manual fix-up gate (P1)
-**Avoids:** Pitfall 1 (accuracy collapse — full mitigation), performance traps (lazy-load WASM)
-
-### Phase 6: Trust + celebration — officer panel, promotion page, owner tooling
-**Rationale:** Officer tools need the full submission lifecycle to exist; the promotion page rides the same rank RPCs from Phase 3.
-**Delivers:** Officer validation queue (approve/reject, remove players, block non-guild members), key-stat editor (exactly 6 per class), owner role elevation, promotion page with EAFC-style top-player cards, free-tier ops (keep-alive, HTTP 540 handling).
-**Addresses:** Officer validation queue, promotion page (P1)
-**Avoids:** Pitfall 5 (free-tier ops), security mistakes (RLS-gated officer actions)
-
-### Phase Ordering Rationale
-
-- **Auth/security before everything:** every table, query, and policy depends on the JWT-claims + RLS model; the custom-JWT wiring is the one stack piece to spike day one.
-- **Manual ingestion before OCR:** both STACK and ARCHITECTURE research independently recommend this ordering — the fix-up form and data model are identical with or without OCR, so the launch is never bet on OCR accuracy.
-- **Rank engine before dashboards:** cards/badges/promotion are all pure presentations of RPC outputs.
-- **Officer panel last:** it requires pending submissions to exist and completes the validation loop that makes ranks trustworthy.
+- **The research files converge on one hard deploy invariant (R3/R12):** both Edge Functions (patched `verify-pin`, new `setup-pin`) must be live BEFORE the first pinless row exists. The migration itself is inert until `add_member` is first called, so 0012-before-functions or functions-before-0012 are both safe — the non-negotiable is functions-before-first-`add_member` (ARCHITECTURE.md High-7 states it strictest: functions → 0012 → officer UI enabled). The whitelist phase must also fold in the placeholder-row conversion (R4) and the new pinless smoke probes.
+- **The research files converge on the scale→seed→calibrate ordering (R1/R2/R11):** 0013 (formula swap in all three RPCs + `last_validated_at` folded into the same `my_report` rewrite) ships TOGETHER with the tripod re-lock (`rankMath.ts` + tests, `smoke-rank.mjs`, `smoke-promotion.mjs`, provisional D-01/D-02 bands) and the frontend bundle (R17); THEN the seed runs, the owner calibrates final band edges against realistic spreads, and the purge is a hard pre-release gate. The seed must never be a migration and must live in `seeds/dummy/`.
+- **The home tab UI is the one genuinely independent workstream** (FEATURES ∩1): `'inicio'` + OvrHero + best-stats strip + CTA can land anytime; it only consumes fields the payload already returns (plus the one additive scalar). Its null-points-rendering behavior post-purge (High-5d) is the only coupling to the scale work.
+- **Phase cohesion rule from ARCHITECTURE.md:** never split a migration from its re-locked baselines — "any split between SQL and spec/smoke baselines = red smokes by design."
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 1:** Custom JWT + PostgREST/RLS-claims wiring — documented pattern but MEDIUM confidence; day-one spike required. Also: resolve the shared-PIN vs per-player-PIN conflict before schema design.
-- **Phase 5:** OCR region maps need real guild screenshots (same client/language as members, Portuguese locale with `1.234.567` thousand separators); production worker bundling on Vite needs a build test. Inherits Phase 1's spike results.
-- **Phase 3:** Percentile formula spec (rank-based, tie handling, insufficient-data states) should be written and unit-tested before UI work — niche domain, no copy-paste reference.
-
-Phases with standard patterns (skip research-phase):
-- **Phase 2:** CRUD forms + file upload + Supabase Storage — well-documented, established patterns.
-- **Phase 4:** React + TanStack Query dashboard rendering — extremely well-documented.
-- **Phase 6:** Standard moderation UI + static deploy; Supabase ops are documented.
+- **Likely needs `/gsd-research-phase` or deep phase planning:** the scale phase (five formula sites, tripod re-lock, edge-case vectors — High-5) and the whitelist/PIN phase (branch ordering, lockout policy, atomic claim, JWT cloning — the densest new surface).
+- **Standard patterns (skip research-phase):** the home tab (composition of live components + one additive field) and the seed workflow (existing tooling; the pitfalls are operational, not design).
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All versions verified against npm registry; Supabase limits against official pricing; Tesseract.js API via official docs. TS 7 line is the one MEDIUM-confidence item (fallback documented). |
-| Features | HIGH (project-internal) | Sourced from PROJECT.md + verified tooling. Competitor landscape is LOW confidence (training data only, no websearch available). |
-| Architecture | HIGH | Well-established pattern family; Supabase/Tesseract specifics verified against official docs. Pattern-family consensus itself is MEDIUM. |
-| Pitfalls | MEDIUM | Supabase free-tier limits HIGH (official docs); OCR-on-game-screenshots claims LOW/MEDIUM — needs the Phase 1 spike. |
+| Stack | HIGH | npm versions verified 2026-10-13; Edge Function patterns against current official Supabase docs; every recommendation extends a live v1.0 pattern. Only MEDIUM item: `db.seed` glob non-recursion (standard semantics, trivially verified with one `db reset`) |
+| Features | HIGH | Every integration point verified in the shipped codebase; MEDIUM on design choices (re-add semantics, lockout policy, seed window); LOW only on game-value realism — resolved by deriving seed values from live DB submissions |
+| Architecture | HIGH | Codebase read in full; all five formula sites, RPC patterns, column grants, and FK topology located precisely; aligned with authoritative STACK.md |
+| Pitfalls | HIGH | Every pitfall anchored to a specific verified file/line; MEDIUM on operational judgments (squatting-window rituals, bcryptjs null-throw behavior — re-verify with a 2-line runtime check) |
 
-**Overall confidence:** MEDIUM-HIGH
+**Overall confidence: HIGH.**
 
 ### Gaps to Address
 
-- **Shared PIN vs per-player PIN:** STACK research assumes the shared-PIN + officer-elevation model (per PROJECT.md); PITFALLS research strongly recommends per-player PINs for identity and anti-forgery. **Resolve at requirements time** — it changes the schema (identity model) and the login UX.
-- **Tesseract field accuracy on real guild screenshots:** the single biggest technical unknown. Handle via the Phase 1 spike with a documented go/no-go pivot (manual entry with side-by-side examples is the designed fallback).
-- **Custom JWT + PostgREST/RLS wiring:** documented but not independently verified end-to-end; day-one spike in Phase 1 before building on top.
-- **Storage decision nuance:** STACK/ARCHITECTURE store compressed originals (latest-only) for officer audit; PITFALLS recommends values + tiny thumbnail only. Recommend: compressed thumbnail (~30–80 KB WebP, latest-only) — decide the exact policy during Phase 2 planning.
-- **Compute trigger nuance:** STACK suggests recompute-on-submission triggers; ARCHITECTURE recommends compute-on-read. Both work at this scale; **compute-on-read is the cleaner pattern** (no invalidation bugs, instant admin tweaks) — adopt it.
-- **Competitor landscape:** stale training data, no websearch available. Only matters if a direct comparison informs a feature decision — verify during phase research if needed.
-- **OCR confidence threshold (~85) and sanity-range rules per stat:** need real-data calibration during Phase 5.
+- **Realistic stat value ranges** — training data cannot provide them; derive seed values from the live project's validated submissions (or owner-supplied samples) during seed-phase planning. This also gates the D-01/D-02 band calibration.
+- **`max_v = 0` edge divergence** between ARCHITECTURE.md (case→99 when own=max) and PITFALLS.md (null, data-insufficient pattern) — resolve in phase planning and lock in spec + smoke (Open Question #7).
+- **`db.seed` glob non-recursion** and **bcryptjs null-throw** — two cheap runtime verifications to do at the start of implementation, not assumed.
+- **Percentile-phrase contract impact** — if owner picks option (a) (true rank-position field), the RNK-02 leak-probe suite must be re-run against the changed `my_report` payload.
 
 ## Sources
 
-### Primary (HIGH confidence)
-- npm registry (`npm view <pkg> version`, 2026-10-07) — all library versions
-- https://supabase.com/pricing — free tier limits (500 MB DB, 1 GB storage, 5 GB egress, 50k MAU, 500k Edge Function invocations, 1-week inactivity pause, Custom Access Token JWT)
-- Context7 `/naptha/tesseract.js` — v7 worker API, `setParameters`, `tessedit_char_whitelist`, `user_defined_dpi`, PSM modes, `rectangle` regions, word-level confidence
-- Context7 `/supabase/supabase` — Edge Function limits (2s CPU, 256 MB RAM), Storage RLS + 50 MB file limit, RLS policy patterns (`auth.jwt()`), project pausing / HTTP 540 / database size
-- PROJECT.md — NeoFoot project context, requirements, decisions
-
-### Secondary (MEDIUM confidence)
-- TypeScript 7 native-compiler line as npm `latest` — ecosystem friction not independently verified; fallback to `typescript@5.9` documented
-- Supabase custom-JWT + RLS-claims PIN auth pattern — documented composition, MEDIUM confidence, Phase 1 spike flagged
-- Stat-tracking panel architecture family (thin SPA + BaaS + client ingestion) — training-data pattern consensus, consistent with all verified component docs
-- Tesseract accuracy on stylized game UI / small digit glyphs — known engine limitation, flagged for spike validation
-
-### Tertiary (LOW confidence)
-- EAFC Ultimate Team percentile model mechanics — community knowledge; the rank-based adaptation is a design judgment, not a copy
-- Competitor landscape (Enjin/Shivtr, Raider.IO, poe.ninja, FUTBIN, PvPoke) — training data only, no websearch tool available; establishes landscape shape, not exact parity
-- Scribe.js as an alternative OCR with improved recognition model — unverified, relevant only if Tesseract accuracy proves insufficient
+- **Primary (HIGH):** local codebase read in full — `verify-pin/index.ts` (:148 compareSync, WR-01 DUMMY_HASH, lockout gate, SignJWT block), `0001_schema.sql` (pin_hash NOT NULL :6, FK cascade asymmetry), `0009_rank_engine.sql` + `0011_officer_tools_promotion.sql` (five formula sites, RPC templates, EXECUTE hygiene), `0005_registry_catalog.sql` (column-level security), `src/lib/rankMath.ts` + tests (locked values, MIN_COHORT_SIZE), `src/features/dashboard/presentation.ts` + tests (D-01/D-02 bands, percentilePhrase), `src/App.tsx` / `api.ts` / `session.ts`, `scripts/apply-seed.mjs` / `hash-pin.mjs` / `smoke-*.mjs`, `supabase/seeds/*`, `config.toml` (db.seed glob :72, deno_version 2)
+- **Primary (HIGH):** npm registry (`npm view`, 2026-10-13) and Supabase official docs via Context7 (Edge Functions, service-role client, deploy/secrets)
+- **Primary (HIGH):** `.planning/PROJECT.md` (milestone scope, key decisions), `.planning/STATE.md` (JWT key 6f7657c3, pre-launch rotations, catalog re-seed blocker), `.planning/milestones/v1.0-REQUIREMENTS.md` + `MILESTONES.md` (ID conventions, 20/20 baseline)
+- **Secondary (MEDIUM):** bcryptjs null-input throw behavior; glob non-recursion; Brazil DST abolition (only affects a boundary already avoided by epoch-diff arithmetic)
+- **Tertiary (LOW):** Ragnarok Origin realistic stat ranges (training-data only — superseded by live-DB derivation)
 
 ---
-*Research completed: 2026-10-07*
-*Ready for roadmap: yes*
+*Research summary for: NeoFoot v1.1 — Home, Whitelist & Fine Ranks*
+*Researched: 2026-10-13*

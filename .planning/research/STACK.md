@@ -1,153 +1,114 @@
-# Stack Research
+# Stack Research — v1.1 Home, Whitelist & Fine Ranks
 
-**Domain:** Guild stats web panel (OCR data entry + percentile ranking, single guild, EAFC-style cards)
-**Project:** NeoFoot — Ragnarok Origin guild stats panel
-**Researched:** 2026-10-07
-**Overall confidence:** HIGH (versions verified against npm registry + official Supabase pricing page + Context7 for Tesseract.js)
+**Domain:** Additive features on a LIVE single-guild stats panel (Supabase free tier + React 19 SPA)
+**Project:** Hellz / NeoFoot — Ragnarok Origin guild stats panel
+**Researched:** 2026-10-13 (v1.1 milestone definition)
+**Overall confidence:** HIGH — every recommendation is an extension of a pattern already proven live in v1.0; versions verified against the npm registry (2026-10-13); Edge Function patterns verified against current official Supabase docs via Context7.
 
-## Recommended Stack
+**Scope note:** The v1.0 stack (React 19 + Vite 8 + Tailwind v4 + TypeScript, Supabase free tier, Tesseract.js, custom-claim JWTs, SECURITY DEFINER RPCs, vitest, Node .mjs smoke scripts) is validated and NOT re-researched. This file covers only what the four NEW v1.1 features need.
 
-### Core Technologies
+## Headline Finding
 
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| React | 19.3.0 | UI framework | User requirement; also the ecosystem default for component-heavy dashboard UIs. React 19 is current stable. | HIGH |
-| TypeScript | 7.0.2 (latest tag) | Type safety | npm `latest` is now the TS 7 (native compiler) line. Vite only uses `tsc` for typechecking, so adoption risk is low. **Fallback:** if tooling/type-package friction appears, pin `typescript@5.9` — the JS-based line remains fully supported. | MEDIUM-HIGH |
-| Vite + @vitejs/plugin-react | 8.3.3 / 6.1.2 | Build & dev server | The standard React SPA toolchain. Instant HMR, zero-config, static output deployable anywhere. No SSR needed for this app (no SEO, all behind a PIN). | HIGH |
-| Tailwind CSS | 4.3.3 | Styling | Card-heavy, tiered-badge UI is exactly what utility CSS excels at. v4 is CSS-first config (`@import "tailwindcss"` in CSS, no `tailwind.config.js`). Fast to iterate on the EAFC card visuals. | HIGH |
-| Supabase (supabase-js) | 2.117.2 | Postgres DB + Auth + Storage + Edge Functions | Validated against official pricing: Free tier includes **500 MB DB, 1 GB file storage, 5 GB egress, 50k MAU, 500k Edge Function invocations, unlimited API requests**. Postgres gives us window functions for percentiles; Storage holds the screenshots; Edge Functions host the PIN gate. This satisfies and exceeds the "free-tier storage like Supabase" constraint. | HIGH |
+**ZERO new runtime dependencies.** All four v1.1 features are SQL migrations + one new Edge Function (reusing the exact imports and secrets of `verify-pin`) + React components in the established patterns. The right stack decision for this milestone is disciplined reuse — every new npm package would add surface area without solving anything the existing platform can't already do.
 
-### OCR Approach (the critical domain decision)
+## Recommended Stack (per feature)
+
+### 1. Whitelist lifecycle + first-login PIN setup
 
 | Technology | Version | Purpose | Why Recommended | Confidence |
 |------------|---------|---------|-----------------|------------|
-| Tesseract.js | 7.0.0 | In-browser OCR of the 3 screenshots | Runs entirely in a Web Worker in the player's browser (WASM port of Tesseract). **Zero server cost, zero API keys, no upload latency for OCR** — only the corrected values get saved. Verified via Context7: v7 API is `createWorker('eng', oem, options)` + `worker.setParameters()` + `worker.recognize()`. | HIGH (capability) / MEDIUM (accuracy) |
+| SQL migration 0012 (`members.pin_hash` → nullable + `add_member` RPC) | Postgres 17 (live project) | Handle-only registration by staff | `pin_hash` is currently `NOT NULL` (0001_schema.sql:5) — the schema change is mandatory. `add_member` follows the 0011 SECURITY DEFINER RPC pattern (`set_member_role`/`set_member_active`): officer/owner gate inside the function, role forced to `'member'`, unique-handle violation surfaces naturally. No direct INSERT policy on `members` is added — the RPC stays the narrow write surface | HIGH |
+| New Edge Function `setup-pin` | Deno 2 (current Edge Runtime; `deno_version = 2` in config.toml) | Player picks own 4-digit PIN on first login; mints the session | Verified against current official docs: `Deno.serve` + `Deno.env.get` + pinned `npm:` specifier imports remain the standard Edge Function pattern (official examples still use exactly this, e.g. `npm:@upstash/redis@^1`). Reuses `npm:bcryptjs@3`, `npm:jose@4`, `npm:@supabase/supabase-js@2` — identical pins to `verify-pin` | HIGH |
+| `verify-pin` modification (branch before bcrypt) | existing function | Route pinless members to setup | **Discovered integration constraint:** `bcryptjs.compareSync(pin, null)` throws on a null hash — today's `verify-pin` would 500 on a pinless member. The function must branch on `pin_hash is null` BEFORE the compare and return a distinct `pin_setup_required` response. This also preserves the WR-01 timing-equalization pattern (dummy compare on the pinless path too) | HIGH |
+| Existing lockout machinery (`pin_login_attempts` + `_shared/lockout.ts` + `record_pin_failure` RPC) | existing | Rate-limit PIN-setup attempts | PIN setup is a brute-forceable surface (same 10k keyspace as login). Reuse the proven per-handle counter — do NOT build a second rate-limit mechanism | HIGH |
+| Existing JWT minting (HS256, `NEFOOT_JWT_SECRET` + `NEFOOT_JWT_KEY_ID` kid) | existing | Session for freshly-PINned member | `setup-pin` mints the SAME 7-day custom-claim JWT (`role: 'authenticated'`, `member_id`, `member_role`) with the same `SignJWT` code — the player lands in the panel directly, no second login. No new secrets: project-level function secrets are visible to all functions. PostgREST verifies HS256 identically regardless of jose version | HIGH |
+| Atomic conditional write (in `setup-pin`) | SQL pattern | Prevent double-set race | `update members set pin_hash = <bcrypt> where discord_handle = <h> and pin_hash is null` with a returned-row count — if 0 rows, another request claimed the PIN first → `already_set` error. This is the same "trust only the returned count" discipline as CR-01 | HIGH |
 
-**OCR tuning that matters (verified from official docs):**
-- `tessedit_char_whitelist: '0123456789,.%'` — stat values are only digits, separators, and `%`; whitelisting dramatically reduces garbage reads.
-- `user_defined_dpi` — set it (e.g. `'300'`) to silence the "Invalid resolution 0 dpi" warning and improve accuracy on mobile screenshots.
-- `tessedit_pageseg_mode` — use `SINGLE_BLOCK` (default) for cropped stat rows; consider `SINGLE_LINE` if you crop per-row client-side.
-- Init-only params (e.g. `load_number_dawg`) go in the `createWorker` config argument, **not** `setParameters`.
-- **Preprocessing in canvas before `recognize()`:** grayscale → 2-3x upscale → binarize/contrast boost. Ragnarok Origin's stat screens use large clean fonts; this preprocessing + whitelist + the project's existing "manual fix-up before registration" requirement makes accuracy a solvable problem. The manual fix-up step is the safety net — OCR is a friction reducer, not the source of truth (the screenshots are).
-- **Known friction:** Vite + tesseract.js worker bundling in production builds occasionally needs `workerPath`/`corePath` pointed at self-hosted or CDN copies. Do a production build test in the OCR phase early, not at the end.
+**Auth-flow shape (recommended):** `verify-pin` returns `{ pin_setup_required: true }` for an ACTIVE member with null `pin_hash` → client swaps the login form to a choose-your-PIN mode (enter twice) → `POST /functions/v1/setup-pin { discord_handle, pin }` → on success returns the standard `{ session }` shape → existing `session.ts` stores it unchanged.
 
-### Supporting Libraries
+**Accepted design constraint (flag for PITFALLS, not solvable by stack):** between officer add and player claim, handle knowledge alone identifies the member — anyone who learns a freshly added handle can squat its PIN. The whitelist model already trusts handle+PIN knowledge; the mitigation is operational (officer notifies the player immediately, small claim window), and once claimed, uniform 401s return. The `pin_setup_required` response also reveals that a handle exists-and-is-unclaimed — an accepted, narrower enumeration leak than the v1.0 uniform-401 rule, unavoidable if the player must learn they need to set a PIN.
 
-| Library | Version | Purpose | When to Use | Confidence |
-|---------|---------|---------|-------------|------------|
-| @tanstack/react-query | 5.104.1 | Server-state cache | All Supabase reads (rankings, aggregates, profiles). Handles loading/error states, refetch after submissions, and cache invalidation when admins toggle key stats. | HIGH |
-| zod | 4.6.5 | Validate OCR output | Every OCR-read value passes through a per-stat zod schema (range checks, type FLAT vs PERCENTUAL) before it's allowed into the fix-up form or the DB. | HIGH |
-| motion | 14.0.0 | Card animations | The EAFC card shine/flip/tier-reveal moments. (This is framer-motion's successor package — import as `motion/react`.) | HIGH |
-| lucide-react | 1.52.0 | Icons | Delta badges (▲/▼ can be lucide arrows), nav, tier icons. | HIGH |
-| shadcn/ui (optional) | current (Tailwind v4 compatible) | Inputs, dialogs, selects, toasts | Copy-paste components, not a dependency. The EAFC cards themselves are custom-built either way. Use it to save time on forms/admin dialogs; skip if the team prefers bespoke styling. | MEDIUM |
-| Supabase CLI | latest | Local dev + DB migrations | Schema migrations as SQL files, `supabase db push`. Keeps the schema reproducible for a greenfield project. | HIGH |
+### 2. Personalized home (new landing tab)
 
-### Development Tools
+| Technology | Version | Purpose | Why Recommended | Confidence |
+|------------|---------|---------|-----------------|------------|
+| Existing React 19 + Tailwind v4 + tab-state navigation | 19.2.8 / 4.3.3 (both current: react latest 19.3.0, tailwind exact-latest 4.3.3) | New `inicio` tab as landing view | App.tsx already routes via a `Tab` union type + `useState` — add `'inicio'` to the union, change the default from `'painel'`, done. NO router library is needed or justified for one more conditional tab | HIGH |
+| `my_report` RPC extension (add `last_validated_at`) | SQL migration | Stale-data CTA input | The stale check needs "days since last validated submission" — `select max(submitted_at) from submissions where member_id = caller and status = 'validated'` folded into the existing member contract. Pure SQL; the RPC is already the single member read surface (RNK-02 closed-payload discipline continues) | HIGH |
+| Native `Date` + `Intl.NumberFormat('pt-BR')` | browser built-ins | Stale threshold + value formatting | The stale CTA is ONE comparison (`now - last_validated_at > 7 days`) on ISO timestamptz strings the RPC already returns. Do NOT add date-fns/dayjs for this. `Intl.NumberFormat` is the established formatting path — zero bundle cost | HIGH |
+| Existing raw-fetch data layer (`api.ts` `restFetch`) + TanStack Query patterns | 5.104.x (current 5.104.2) | Fetch own report | One new `fetchMyReport`-shaped call (or the extended existing one). api.ts deliberately avoids supabase-js for data (foreign-JWT session); new fields are additive to `MyReport`, rendered verbatim | HIGH |
 
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| Supabase CLI | Local Postgres + migrations + Edge Function dev | Run `supabase init` day one; commit the `supabase/migrations/` folder |
-| ESLint (typescript-eslint) + Prettier | Code quality | Standard Vite React-TS template ships both |
-| Vercel CLI / Git integration | Deploys | Auto-deploy on push to main |
+**No new rendering capability is needed.** The home tab composes the ALREADY-LIVE pieces: OvrHero (member-visible since Phase 4), StatCard, tier bands from `presentation.ts` — plus a best-stats strip (top-N by the new points) and the stale CTA banner. Destaques keeps its guild-wide get_promotion payload untouched.
 
-## Auth Design: 4-Digit PIN (recommended pattern)
+### 3. Value-proportional 99 scale
 
-Supabase has no native PIN auth, so pick one of two patterns:
+| Technology | Version | Purpose | Why Recommended | Confidence |
+|------------|---------|---------|-----------------|------------|
+| Pure Postgres numeric arithmetic | built-ins (`round`, `nullif`, `greatest`, `ln`/`power` if curved) | points = value relative to best | **Verified: no library needed or warranted.** The scale is `points = round(own_value / nullif(max_v, 0) * 99, 2)` — leader(s at max) hold 99, everyone below scales by real value distance (the 98/97/96/95 top-end cuts emerge naturally). Division-by-zero guarded via `nullif`; `numeric` (not double) keeps the exact-decimal discipline the smoke matrix relies on. If the owner later wants a compressed top-end curve, `ln()`/`power()` are Postgres built-ins — still no dep | HIGH |
+| Migration updating `my_report` v4, `class_top5`, `get_promotion` | SQL migration | Single rank-math definition | The rank formula lives in three RPCs (0009 + 0011) and must change in ONE migration so all consumers stay consistent — the compute-on-read design means no backfill, no triggers, nothing else to touch | HIGH |
+| `src/lib/rankMath.ts` + vitest re-baseline | existing (vitest 5.0.3, current 5.0.4) | Executable spec mirror | The TS spec module and its locked test values (74.25, 49.5, 99…) change to the new formula; SQL must agree to the decimal (proven via `smoke-rank.mjs`). Also re-baseline: `smoke-promotion.mjs` (top-6-by-points ordering can shift) and tier bands D-01/D-02 in `presentation.ts` — which is exactly what the dummy seed (feature 4) calibrates | HIGH |
+| OVR formula | unchanged | Inherit the finer scale | `OVR = 51 + mean(6 key-stat points) * 48/99` is points-agnostic — finer points automatically produce finer OVR. Floor-51 and all-6-or-nothing semantics carry over untouched | HIGH |
 
-**Recommended — Edge Function gate + custom JWT (fits the "one shared panel PIN + officer elevation" model):**
-1. PIN stored as a PBKDF2/bcrypt hash in a private table (owner sets it once).
-2. Edge Function `verify-pin` compares hash, applies rate limiting (attempt counter table — 4-digit PIN = 10k combos, brute-forceable without it), and on success returns a JWT signed with the project's `SUPABASE_JWT_SECRET` carrying claims `{ role: "member" | "officer", exp }`.
-3. Client stores the JWT (memory + localStorage with short exp), sends `Authorization: Bearer` on PostgREST calls; **RLS policies read the claims via `auth.jwt()->>'role'`**.
-4. Officer grant = update the claim row / a second officer PIN. Owner manages via service-role admin screen.
-- Supabase free tier explicitly includes Custom Access Token (JWT) support — verified on the official pricing page.
-- **Confidence: MEDIUM** — the pattern is documented, but the exact PostgREST-accepts-custom-JWT + RLS-claims wiring should be a day-one spike in Phase 1. It's the one piece of the stack to validate before building anything on top.
+### 4. Dummy-data seed workflow (reversible)
 
-**Fallback — Supabase Auth with synthetic identities:** one auth user per member (`nickname@guild.local`, password = per-player PIN), RLS via `auth.uid()`. More natural Supabase usage, but awkward to present as a single PIN gate, and only worth it if per-player login identity becomes a requirement later.
+| Technology | Version | Purpose | Why Recommended | Confidence |
+|------------|---------|---------|-----------------|------------|
+| Seed + purge SQL files, applied via existing `apply-seed.mjs` | existing script (Management API Run Query, proven live 01-01) | Reversible ~5-players-per-class calibration cohort | `apply-seed.mjs` takes ANY SQL file — seed (multi-statement upserts: members + `status='validated'` submissions + submission_stats) and purge both go through it. Service-level SQL bypasses RLS exactly like every existing seed. No new script, no new dep, no runner | HIGH |
+| Sentinel handle prefix (e.g. `dummy-`) for seed rows | convention | Reversibility key | Purge = `where discord_handle like 'dummy-%'`. Zero migration, greppable, and the `add_member` RPC can reject real registrations matching the sentinel. (Alternative: a `seeded boolean` marker column in migration 0012 — more robust, but prefix + RPC rejection is simpler; decide in phase planning) | MEDIUM (design choice, both work) |
+| Ordered deletes in the purge file | SQL, verified against 0001_schema.sql | FK-safe cleanup | **Discovered constraint:** `submission_stats → submissions` is `on delete cascade`, but `submissions → members` has NO cascade (default NO ACTION). The purge MUST delete submissions before members (deleting submissions cascades their stats; then members delete cleanly). Get the order wrong and the purge fails on FK violations | HIGH |
+| Existing `hash-pin.mjs` | existing | bcrypt hashes for seed members | Seed members are ordinary members (they log in during calibration); the proven hash generator covers them | HIGH |
+| `supabase/seeds/dummy/` subfolder (NOT `supabase/seeds/`) | placement detail | Keep dummy data opt-in | **Discovered pitfall:** config.toml sets `db.seed sql_paths = ["./seeds/*.sql"]` — a flat glob that auto-applies every direct child of `seeds/` on each local `db reset`. Placing the dummy seed at `seeds/dummy-players.sql` would silently auto-seed every local reset. A `dummy/` subfolder is outside the non-recursive glob (verify with one local `db reset` during implementation) and stays a deliberate `node scripts/apply-seed.mjs supabase/seeds/dummy/seed.sql` action | MEDIUM (glob non-recursion is standard behavior, trivially verified) |
 
-## Percentile & OVR Computation (where it lives)
+## What NOT to Add (explicit non-recommendations)
 
-**Compute in Postgres, read from the client.** Do not recompute in JS.
-
-- Small dataset (single guild, ~15–30 players per class) makes window functions trivial: `rank() OVER (PARTITION BY class ORDER BY stat_value)` per stat → percentile points (top 1% = 99 mapping is a pure function of rank/n — EAFC-style).
-- Overall rating (mean of 6 key stats, floor 51) computed in the same Postgres function, reading the admin-tweakable `key_stats` config table — so **key stats never leave the DB for members**, which is also the anti-gaming requirement.
-- A `recompute_ranks()` Postgres function runs on new submissions (trigger) and on admin key-stat changes (admin-invoked RPC). Frontend stores only the snapshot; TanStack Query refetches.
-- Delta badges = comparison against the player's previous submission row (keep submission history; deltas read the prior row).
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| Any new npm package at all | Every v1.1 need is met by SQL + the existing Edge Function imports + React patterns already in the repo. New deps add bundle, audit, and upgrade surface for zero capability gain | The tables above — exclusively existing tech |
+| `jose@6` (current major, 6.2.12) in the new function | `verify-pin` pins `npm:jose@4` (resolves ≤4.15.9) and is proven live; the two functions must mint token-for-token identical sessions. Mixing majors gains nothing (the SignJWT HS256 API is unchanged) and risks subtle behavioral drift | Pin `npm:jose@4` in `setup-pin` to match; revisit a joint major bump only as dedicated tech debt |
+| A router library (react-router etc.) for the new landing tab | App.tsx's `Tab` union + conditional render is the established, tested pattern (6 tabs already); a router would rewrite navigation mid-milestone for one additional tab | Add `'inicio'` to the union, change the default tab |
+| date-fns / dayjs | The stale CTA is one `Date` comparison against an ISO timestamptz; there is no timezone arithmetic, no formatting edge the native APIs don't cover | Native `Date` + `Intl` |
+| supabase-js in the client data layer | api.ts deliberately uses raw fetch because the session is a foreign (verify-pin) JWT — supabase-js session handling would fight it (documented plan-02-01 decision) | Extend `restFetch` with the new RPC/response fields |
+| A faker library for dummy data | The seed's whole purpose is REALISTIC cohort shapes to calibrate displays; faker emits plausible-but-wrong distributions and adds a dev dep. Hand-authored SQL (~5 rows per class) gives full control of spread and outliers | Hand-authored seed SQL with owner-reviewed values |
+| Seeding via Supabase Auth / local `db reset` for the LIVE project | Live-project writes are Management-API-only in this repo (01-01 proven; the /api/v1/* HTML-page trap is documented in apply-seed.mjs); `db reset` touches only local | `apply-seed.mjs` for both seed and purge |
+| A second rate-limit mechanism for PIN setup | Duplicates the proven lockout (5 attempts / 15 min, DB-backed, atomic) with a new, unproven one | Reuse `pin_login_attempts` + `record_pin_failure` + `_shared/lockout.ts` |
+| Client-side points recomputation for the new scale | Would duplicate the SQL math and violate the AGENTS.md non-negotiable (all rank math in Postgres) — and risks leaking key-stat reasoning | Compute-on-read in the RPCs, as today |
 
 ## Installation
 
 ```bash
-# Scaffold
-npm create vite@latest neofoot -- --template react-ts
+# NOTHING. No new dependencies, no new dev dependencies.
+# Verify existing pins resolve to current (they do, checked 2026-10-13):
+#   react ^19.2.8        -> 19.3.0 available in range ✓
+#   vite ^8.3.0          -> 8.3.4 ✓
+#   tailwindcss 4.3.3    -> exact latest ✓
+#   @supabase/supabase-js ^2.117.3 -> exact latest ✓
+#   @tanstack/react-query ^5.104.1 -> 5.104.2 ✓
+#   vitest ^5.0.3        -> 5.0.4 ✓
+#   bcryptjs 3.0.3       -> exact latest ✓ (Edge Function pin npm:bcryptjs@3 matches)
 
-# Core
-npm install react react-dom
-npm install @supabase/supabase-js @tanstack/react-query tesseract.js zod
-
-# UI
-npm install tailwindcss @tailwindcss/vite motion lucide-react
-
-# Dev dependencies
-npm install -D typescript @vitejs/plugin-react @types/react @types/react-dom
-npm install -D supabase eslint prettier
+# The only "install-class" actions in v1.1 are deployments:
+supabase functions deploy setup-pin   # after writing supabase/functions/setup-pin/
+# migrations 0012+ applied via the established live-migration path
 ```
-
-## Alternatives Considered
-
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| Supabase free tier | Cloudflare (Pages + D1 + Workers) | D1 is SQLite, not Postgres — no native window functions in the same way, and you'd hand-roll auth/storage. More moving parts for zero cost gain at this scale. Only if Supabase's free-tier pause policy becomes intolerable (see Pitfall below). |
-| Supabase free tier | Firebase | Firestore's percentiles/aggregates require client-side computation or Cloud Functions for everything; SQL fits this domain better. |
-| Vite SPA on Vercel | Next.js | Only if SSR/SEO or a Node backend were needed — they aren't. Next adds build complexity and server coupling that Supabase already covers. |
-| Vercel Hobby (free) | Cloudflare Pages (free) | Cloudflare Pages has unlimited bandwidth; use it if Vercel's Hobby limits bite. Both are zero-config for Vite SPAs. Guild panel is non-commercial, satisfying Vercel Hobby's terms. |
-| Tesseract.js (client-side) | Google Cloud Vision / AWS Textract | Higher accuracy, but API keys, paid-tier management (free tiers are small), upload latency, and cost tracking — unnecessary when manual fix-up is already required. Revisit only if OCR accuracy proves unacceptable after preprocessing. |
-| Tesseract.js | PaddleOCR (server-side, Python) | Best-in-class accuracy but introduces a whole non-TypeScript server to host and pay for. Wrong tradeoff for this project. |
-| Postgres computation | Client-side JS percentile recompute | Never — duplicates the OVR/percentile logic, risks divergence from the DB, and would leak key stats to the client. |
-| Tailwind v4 | Tailwind v3 | Only if following old tutorials — v3 config style is outdated; all current docs assume v4 CSS-first. |
-
-## What NOT to Use
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| Create React App | Deprecated, unmaintained; officially superseded by framework tooling | Vite 8 |
-| RLS-less tables + exposed anon key | The anon key ships in the client bundle; without RLS anyone can read/write all guild data (including individual player values, violating the privacy requirement) | RLS policies keyed on JWT claims from the PIN gate |
-| OCR without whitelist/preprocessing | Raw Tesseract on busy game UI screenshots produces garbage; teams then blame OCR and switch stacks unnecessarily | `tessedit_char_whitelist` + `user_defined_dpi` + canvas preprocessing + manual fix-up |
-| Storing every screenshot forever in Supabase Storage | 1 GB free cap; 3 images × resubmissions × 30 players adds up fast | Client-side resize/compress to ~200 KB JPEG, overwrite fixed per-player paths (keep only latest submission's shots) |
-| Full account system (email+password per player) | Violates the low-friction PIN constraint; guild members won't register accounts | PIN gate + role claims |
-| Storing the PIN in plaintext or in the client bundle | Trivially extractable | PBKDF2/bcrypt hash in a private table, verified only in an Edge Function |
-| Node/Express custom backend | Supabase (PostgREST + Edge Functions) already provides the API layer; a custom server adds hosting cost and auth plumbing for zero benefit | Supabase client + RLS + Edge Functions |
-
-## Stack Patterns by Variant
-
-**If OCR accuracy proves too low after preprocessing:**
-- Add per-stat-region cropping client-side (crop each stat line before OCR — massively boosts accuracy vs whole-screen reads)
-- Then, only if still failing, add a server-side OCR Edge Function fallback — but keep Tesseract.js as the primary
-
-**If per-player identity is needed later (e.g. officer-validated rosters by login):**
-- Switch from shared-PIN JWT claims to Supabase Auth with synthetic identities; RLS moves from claims to `auth.uid()`
-
-**If the free-tier pause (1 week inactivity) becomes a real problem:**
-- A GitHub Actions cron hitting a cheap endpoint keeps the project warm, or upgrade to Pro ($25/mo); or migrate to Cloudflare
 
 ## Version Compatibility
 
 | Package A | Compatible With | Notes |
 |-----------|-----------------|-------|
-| react@19.3 | vite@8 + @vitejs/plugin-react@6 | Current stable trio; the `react-ts` Vite template wires it correctly |
-| tailwindcss@4.3 | vite@8 | Use `@tailwindcss/vite` plugin + `@import "tailwindcss"` in CSS; no `tailwind.config.js` |
-| tesseract.js@7 | vite@8 | v6/v7 simplified API (`createWorker` replaces v4's `createWorker`+`loadLanguage`+`initialize` chain). Test production worker bundling early; may need explicit `workerPath`/`corePath` |
-| typescript@7.0 | @types/* packages, vite@8 | `tsc` used only for typechecking under Vite; if friction appears, pin `typescript@5.9` |
-| @tanstack/react-query@5 | react@19 | v5 supports React 19 |
-| zod@4 | — | v4 API differs from v3 tutorials (e.g. `z.string().min()` mostly same, error handling changed) — use v4 docs |
-| supabase-js@2.x | supabase CLI latest | Match CLI-project pairing during `supabase init` |
+| `npm:jose@4` (Edge Functions) | `npm:jose@4` (both functions) | HS256 + kid header is version-agnostic to PostgREST verification, but keep both functions on the same major for behavioral parity. jose current major is 6.2.12 — deliberately not adopted |
+| `npm:bcryptjs@3` (Edge Functions) | bcryptjs 3.0.3 (devDep, `hash-pin.mjs`) | Same major on both sides of the hash — hashes produced by `hash-pin.mjs` verify inside `setup-pin`/`verify-pin`. **Note:** `compareSync` throws on a null hash — the pinless-member branch must come first |
+| Migration 0012 (nullable `pin_hash`) | `verify-pin`, `fetchMe` projections, RLS (0002/0004/0005), column grants | `fetchMe`/`fetchMembers` never select `pin_hash` (explicit projections) and column grants don't include it — a nullable pin_hash changes nothing for any existing reader. Only `verify-pin` touches the column |
+| Value-proportional migration | `smoke-rank.mjs`, `smoke-promotion.mjs`, `rankMath.test.ts`, tier bands D-01/D-02 | The locked contract values (74.25, 49.5…) and possibly tier band edges CHANGE — all baselines must be re-locked in the same phase, or the smoke matrices go red by design |
+| Dummy seed SQL | `config.toml` `[db.seed] sql_paths` | Keep dummy files OUT of `supabase/seeds/` direct children (auto-applied on local `db reset`); a subfolder stays opt-in |
+| React 19.2.8 / Vite 8.3 / Tailwind 4.3.3 / TS ~6.0.2 | unchanged from v1.0 | TypeScript npm latest is 7.0.2; the project deliberately pins the 6.x line (v1.0 decision) — no reason to touch it mid-milestone. oxlint ^1.81 → 1.87 available in caret range; irrelevant churn |
 
 ## Sources
 
-- npm registry (`npm view <pkg> version`, 2026-10-07) — all library versions — **HIGH**
-- https://supabase.com/pricing (official, fetched 2026-10-07) — Free tier limits (500 MB DB, 1 GB storage, 5 GB egress, 50k MAU, 500k Edge Function invocations, 1-week inactivity pause, Custom Access Token JWT included) — **HIGH**
-- Context7 `/naptha/tesseract.js` (official repo docs) — v7 worker API, `setParameters`, `tessedit_char_whitelist`, `user_defined_dpi`, PSM modes, init-only params — **HIGH**
-- TypeScript dist-tags via npm (`latest: 7.0.2`, `rc: 7.0.1-rc`) — TS 7 native line is current stable — **MEDIUM** (ecosystem-wide TS 7 friction not independently verified; fallback documented)
-- Supabase custom-JWT + RLS-claims auth pattern — documented pattern, **MEDIUM** — flag: verify with a Phase 1 spike
+- npm registry (`npm view <pkg> version`, 2026-10-13) — react 19.3.0, vite 8.3.4, tailwindcss 4.3.3, @supabase/supabase-js 2.117.3, @tanstack/react-query 5.104.2, tesseract.js 7.0.0, vitest 5.0.4, oxlint 1.87.0, bcryptjs 3.0.3, jose 6.2.12 (latest) / 4.15.9 (v4 line), @vitejs/plugin-react 6.1.2 — **HIGH**
+- Context7 `/supabase/supabase` (official docs/examples) — Edge Functions still standard on `Deno.serve` + `Deno.env.get` + pinned `npm:` imports; `supabase functions deploy` + project-level secrets; per-function secrets via dashboard — **HIGH**
+- Local codebase (authoritative for integration points): `verify-pin/index.ts` (jose@4 SignJWT + kid, DUMMY_HASH timing pattern, lockout flow), `0001_schema.sql` (pin_hash NOT NULL; FK cascade asymmetry), `0009_rank_engine.sql`/`0011` (rank formula in 3 RPCs), `config.toml` (`db.seed` glob, `deno_version = 2`), `apply-seed.mjs`/`hash-pin.mjs` (seed tooling), `App.tsx` (Tab union), `api.ts` (raw-fetch contract), `session.ts` (localStorage session shape) — **HIGH**
+- Project validated-capability list (milestone context) — Supabase free tier, Management API smoke scripts, bcrypt PIN hashing, custom-claim JWTs, SECURITY DEFINER RPCs: treated as ground truth, not re-researched — **HIGH**
+- `db.seed` glob non-recursion (subfolder exclusion) — standard glob semantics, not independently doc-verified — **MEDIUM**, trivially verified with one local `supabase db reset` during implementation
 
 ---
-*Stack research for: NeoFoot guild stats panel (Ragnarok Origin)*
-*Researched: 2026-10-07*
+*Stack research for: NeoFoot v1.1 — Home, Whitelist & Fine Ranks*
+*Researched: 2026-10-13*
