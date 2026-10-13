@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-10-13T00:03:06.525Z"
-last_activity: 2026-10-12
+last_updated: "2026-10-13T00:18:55.792Z"
+last_activity: 2026-10-13
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 26
-  completed_plans: 23
-  percent: 88
+  completed_plans: 24
+  percent: 92
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 06 (trust-celebration-officer-tools-promotion-page) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
-Last activity: 2026-10-12
+Last activity: 2026-10-13
 
-Progress: [█████████░] 88%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Progress: [█████████░] 88%
 | Phase 06 P03 | 4min | 1 tasks | 1 files |
 | Phase 06 P02 | 18min | 3 tasks | 3 files |
 | Phase 06 P04 | 16min | 3 tasks | 4 files |
+| Phase 06 P05 | 9min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -167,6 +168,8 @@ Recent decisions affecting current work:
 - [Phase 06-04]: Validações staff queue code-complete (AUTH-05) - shared ConfirmDialog + tab wiring + read-only 57-value review grouped Geral/Quasi/Especial; Rejeitar is modal-gated and the destructive color is reserved for the modal; not_pending maps to stale-row copy + queue refetch (T-06-11); tsc clean, 284/284 tests green
 - [Phase 06-04]: HighlightsPage ships as the plan-mandated placeholder stub - plan 06-05 (next wave) owns the real implementation to avoid a same-wave race on App.tsx
 - [Phase 06-04]: task-2 tsc gate unsatisfiable in isolation (App.tsx imports task-3's ValidacoesPage) - 04-01/05-01 precedent; verified with npm test at task 2, full tsc+test gate green after task 3
+- [Phase 06-05]: PromotionCard pins the RPC's non-null contract with tier assertions (ovr always present on cards, points always present on highlights) instead of unreachable dashboard-style null fallbacks
+- [Phase 06-05]: HighlightsPage ships role-free (D-12) rendering the closed PromotionHighlight payload verbatim in server order - SHWC-02 UI-side complete; RNK-02 now demonstrable end-to-end with the 06-02 server smoke proof
 
 ### Pending Todos
 
@@ -195,7 +198,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-12T23:59:27.577Z
+Last session: 2026-10-13T00:16:59.049Z
 Stopped at: Phase 6 UI-SPEC approved
 Resume file: None
 

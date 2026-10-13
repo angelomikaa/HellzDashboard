@@ -147,7 +147,7 @@ Plans:
 - [x] 06-04-PLAN.md — Validações staff tab: shared ConfirmDialog + App.tsx two-tab wiring + ValidacoesPage (57-value read-only review, Validar/Rejeitar with confirm modal, stale-row recovery) (AUTH-05)
 
 **Wave 4** *(blocked on 06-03 + 06-04 — HighlightsPage placeholder handoff + ConfirmDialog reuse)*
-- [ ] 06-05-PLAN.md — Destaques promotion page: PromotionCard (EAFC card, tier palette, 6 facets) + HighlightsPage (per-class top-5 sections) (SHWC-02)
+- [x] 06-05-PLAN.md — Destaques promotion page: PromotionCard (EAFC card, tier palette, 6 facets) + HighlightsPage (per-class top-5 sections) (SHWC-02)
 - [ ] 06-06-PLAN.md — Personagens owner controls: role grant/revoke + removal/reactivation via RPCs (role-differentiated per D-08: officers remove member rows, owner removes officers + grants roles), owner-only add-class gate (folded todo) (AUTH-03/AUTH-04)
 
 **Wave 5** *(blocked on all — owner gate)*
