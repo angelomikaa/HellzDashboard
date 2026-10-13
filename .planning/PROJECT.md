@@ -24,15 +24,15 @@ Each player can see, through their stat cards, exactly where they stand compared
 - [x] Members see aggregates only on their own improvement screen (never individual players' values) — Validated in Phase 4: CMP-03 owner DevTools-verified (one /rpc/my_report request, aggregates only)
 - [x] Fully functional dashboard for all members — Validated in Phase 4: CMP-01 owner browser-verified (Painel tab, mobile-first 1→2→3 column grid)
 - [x] Frontend written in TypeScript using React — Validated in Phases 1–4: React 19 + TypeScript, live and owner-used
+- [x] Stat data input: screenshots per character (Basic header + General Stats + Quasi-Stats + Special) with example shots shown beside input boxes — Validated in Phase 5: capture count reconciled in Phase 2 (combat_power manual on intro step), example shots beside inputs, no screenshot storage (D-10)
+- [x] OCR auto-reads screenshots; failed OCR captures are manually fixed before a successful registration — Validated in Phase 5: structural reader (owner-directed pivot), INPT-02's 3 success criteria verified 10/10, owner UAT APPROVED after a 4-round defect cycle
+- [x] Separate promotion page showing key stats as "EAFC cards" to promote the best players in the guild — Validated in Phase 6: get_promotion RPC (member-invocable, closed payload, zero key-stat leak-diff) + Destaques page with tier-styled cards, owner UAT step 6–8 (SHWC-02)
+- [x] Officers have elevated role: validate and remove players and registers, blocking access to players from other guilds — Validated in Phase 6: officer queue + status transitions + role-differentiated removal (0011 RPCs live smoke-proven; owner UAT steps 1–5, 11–12) (AUTH-05, AUTH-04)
+- [x] Officer role granted manually by the owner — Validated in Phase 6: owner-only set_member_role RPC (no path grants owner; next-login JWT claim), owner UAT steps 9–10 (AUTH-03)
 
 ### Active
 
-- [ ] Stat data input: screenshots per character (Basic header + General Stats + Quasi-Stats + Special) with example shots shown beside input boxes — Phase 1 OCR spike added the "basic" character header screen (job, nickname, combat power) as the first capture; reconcile capture count in Phase 2 planning
-- [ ] OCR auto-reads screenshots; failed OCR captures are manually fixed before a successful registration
 - [ ] Delta badges: track changes since the player's last submission (e.g. ▲ 5,00%)
-- [ ] Separate promotion page showing key stats as "EAFC cards" to promote the best players in the guild
-- [ ] Officers have elevated role: validate and remove players and registers, blocking access to players from other guilds
-- [ ] Officer role granted manually by the owner
 
 ### Out of Scope
 
@@ -72,7 +72,7 @@ Each player can see, through their stat cards, exactly where they stand compared
 | Key stats admin-tweakable, exactly 6 per class | Flexibility; independent set per class | — Live (Phase 3: set_key_stat block-at-7 + Stats-Chave owner-UAT) |
 | Key stats hidden from members | Avoid stat skewing for artificial rank gains | — Live (Phase 3 leak-probes; Phase 4 DevTools-verified by owner) |
 | Card tiers: bronze/silver/gold/platinum | Own improved pattern instead of reference's orange/green borders | — Live (Phase 4: D-01/D-02 bands + legend, owner UAT) |
-| Members see aggregates only; promotion page shows top players as EAFC cards | Promote best players; protect individual data | — Split: aggregates-only live (Phase 4, CMP-03 owner-verified); promotion page Phase 6 |
+| Members see aggregates only; promotion page shows top players as EAFC cards | Promote best players; protect individual data | — Live: aggregates-only (Phase 4, CMP-03 owner-verified) + promotion page (Phase 6, SHWC-02 owner-verified) |
 | 4-digit PIN auth with officer elevation by owner | Simple access; officers validate/remove players and registers | — Phase 1: live (verify-pin + lockout + 7-day custom-claim JWT); follow-up hardening applied 2026-10-09 via code-review-fix (CR-01 atomic lockout RPC, CR-02 session hardening, WR-01..09) — see 01-REVIEW-FIX.md |
 | Dedicated HS256 signing key for custom-claim JWTs (NEFOOT_JWT_SECRET) | Platform redacts the legacy JWT secret; key 6f7657c3 must never be revoked | — Phase 1 |
 | Panel branded "Hellz" (subtitle "Painel Geral") | "NeoFoot" was an abandoned folder name reused for the repo; UI shows Hellz — internal identifiers (repo, storage key, JWT issuer) unchanged | — Phase 1 |
@@ -98,4 +98,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-12 — Phase 5 complete (OCR Auto-Read Layer, owner UAT APPROVED after a 4-round defect cycle): the engine pivoted (owner-directed) from pixel-fraction region maps to a STRUCTURAL reader — values located by the panel's visual grammar (pill colors on Basic, label/value row bands on Details screens), exact on native + 0.6-1.5× rescales + white/gray/dark margins (harness runs the ACTUAL readScreenshot on real samples: 56/56 native, 16/16 rescales, 20/20 margins, 14/14 frame-exact crop); crop tool = optional isolation full-image-default always-confirm; per-step verification checkboxes with validation parity for OCR pre-fills; discard lifecycle live (0010); INPT-02's three success criteria verified 10/10 (05-VERIFICATION.md). Advisory 05-REVIEW: 1 critical (create_submission numeric blind-cast — server-side finite/bounds validation) + 4 warnings + 7 info — run /gsd-code-review-fix 5. 284/284 tests, build, lazy-chunk and no-upload gates green. Phase 6 (Officer Tools & Promotion Page) next.*
+*Last updated: 2026-10-13 — Phase 6 complete (Trust, Celebration & Officer Tools, verification PASSED 4/4, owner UAT 14/14): migration 0011 shipped every officer/promotion server surface (officer queue + status transitions AUTH-05, owner-only role RPC AUTH-03, role-differentiated removal AUTH-04, member-invocable get_promotion SHWC-02, active-cohort filtering D-07, owner-only class creation D-09), live smoke matrices green twice (officer 39/39, promotion 21/21 incl. zero key-stat leak-diff), Validações + Destaques + Personagens staff controls owner-approved in browser. v1 milestone (Phases 1–6) execution-complete — all requirements validated except delta badges (deferred to v2). Advisory 06-REVIEW: 4 warnings (WR-01..04) — run /gsd-code-review-fix 6. Next: /gsd-verify-work then /gsd-complete-milestone.*
