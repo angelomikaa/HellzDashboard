@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-10-13T00:44:29.574Z"
+status: verifying
+stopped_at: Completed 06-07-PLAN.md (consolidated gate + owner UAT APPROVED 14/14; D-06 kept 'Rejeitado') - Phase 6 complete, ready for /gsd-verify-work
+last_updated: "2026-10-13T01:28:23.897Z"
 last_activity: 2026-10-13
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 26
-  completed_plans: 25
-  percent: 96
+  completed_plans: 26
+  percent: 100
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 
 Phase: 06 (trust-celebration-officer-tools-promotion-page) — EXECUTING
 Plan: 7 of 7
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-13
 
-Progress: [██████████] 96%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Progress: [██████████] 96%
 | Phase 06 P04 | 16min | 3 tasks | 4 files |
 | Phase 06 P05 | 9min | 2 tasks | 2 files |
 | Phase 06 P06 | 11min | 2 tasks | 3 files |
+| Phase 06 P07 | 12min (continuation: UAT record + plan close) | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -172,6 +173,8 @@ Recent decisions affecting current work:
 - [Phase 06-05]: PromotionCard pins the RPC's non-null contract with tier assertions (ovr always present on cards, points always present on highlights) instead of unreachable dashboard-style null fallbacks
 - [Phase 06-05]: HighlightsPage ships role-free (D-12) rendering the closed PromotionHighlight payload verbatim in server order - SHWC-02 UI-side complete; RNK-02 now demonstrable end-to-end with the 06-02 server smoke proof
 - [Phase 06-06]: Personagens Controles column implements the D-08 matrix with UX-only gating: owner rows em-dash for every viewer, officer viewers em-dash on officer/owner rows, role buttons owner-only; every write flows exclusively through the 0011 RPC wrappers (no PATCH path added). Reativar confirm body was spec-silent - added the inverse of the locked removal copy. Pending todo owner-only-class-management resolved (0011 server + this UI gate). — Locked Surface-3 copy + D-08/D-09/D-10 from 06-UI-SPEC; enforcement stays server-side per AGENTS.md
+- [Phase 06-07]: Owner UAT APPROVED (2026-10-13, verbatim: "all approved - lets procede") - all 14 steps PASS on the first fresh-build pass (zero defects, zero fix rounds); D-06 wording ratified KEEP 'Rejeitado' as shipped (grammatical agreement with 'Envio de ...', owner did not request the flip to 'Rejeitada') - no code change; AUTH-03/AUTH-04/AUTH-05/SHWC-02 closed end-to-end (T-06-05 closed by the owner-witnessed DevTools proof complementing the 06-02 automated leak-diff)
+- [Phase 06-07]: Stale-dist lesson - Phase 6 UI plans verified via tsc/test only; `npm run preview` serves stale dist/ silently (first UAT walk attempt hit a dist built 19:20 BEFORE the Phase 6 UI plans and served the Phase 5 app) - fixed by a fresh `npm run build` (green, all Phase 6 markers present: destaques, get_promotion, Envio rejeitado, Efetivo no pr) - standing rule: ALWAYS run npm run build immediately before npm run preview for UAT walks; documented as an environment note in 06-UAT.md, not a defect
 
 ### Pending Todos
 
@@ -200,8 +203,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-13T00:44:07.322Z
-Stopped at: Completed 06-06-PLAN.md (Personagens staff controls + owner-only add-class) — next: 06-07 (phase UAT)
+Last session: 2026-10-13T01:28:23.852Z
+Stopped at: Completed 06-07-PLAN.md (consolidated gate + owner UAT APPROVED 14/14; D-06 kept 'Rejeitado') - Phase 6 complete, ready for /gsd-verify-work
 Resume file: None
 
 ---
