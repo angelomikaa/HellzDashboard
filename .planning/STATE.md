@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-10-12T23:37:23.583Z"
+last_updated: "2026-10-13T00:03:06.525Z"
 last_activity: 2026-10-12
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 26
-  completed_plans: 22
-  percent: 85
+  completed_plans: 23
+  percent: 88
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-10-07)
 ## Current Position
 
 Phase: 06 (trust-celebration-officer-tools-promotion-page) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-10-12
 
-Progress: [█████████░] 85%
+Progress: [█████████░] 88%
 
 ## Performance Metrics
 
@@ -77,6 +77,7 @@ Progress: [█████████░] 85%
 | Phase 06 P01 | 15min | 2 tasks | 2 files |
 | Phase 06 P03 | 4min | 1 tasks | 1 files |
 | Phase 06 P02 | 18min | 3 tasks | 3 files |
+| Phase 06 P04 | 16min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -163,6 +164,9 @@ Recent decisions affecting current work:
 - [Phase 06-02]: Live smoke matrices prove every Phase 6 server claim twice consecutively (officer 39/39, promotion 21/21, RLS check-7 flip green, rank + lifecycle regression green, zero residue): staff-only queue with 57-stat payload, invalid_status/not_pending transitions, owner-only roles with D-10 next-login JWT claim, instant deactivation kill-switch, member-boundary get_promotion with ZERO key-stat leak-diff + D-13 hiding, owner-only class creation
 - [Phase 06-02]: Smoke credentials resolved without a human-action gate - owner-placed token found in gitignored .env as SUPABASE_ACESS_TOKEN (misspelled) and project ref derived from VITE_SUPABASE_URL; mapped into session env at invocation only (never written/echoed/committed; scripts keep the strict process.env-only gate)
 - [Phase 06-02]: Deterministic leak-diff fixture design - key stats all-tied tiny (points <= 49.5) vs 20 rotated 1e9-scale boosters (points >= 74.25) so top-6 highlights can only be non-key stats regardless of live cohort interference; leak-diff scoped to the fixture class section per plan wording + payload-wide is_key/key_stat marker grep
+- [Phase 06-04]: Validações staff queue code-complete (AUTH-05) - shared ConfirmDialog + tab wiring + read-only 57-value review grouped Geral/Quasi/Especial; Rejeitar is modal-gated and the destructive color is reserved for the modal; not_pending maps to stale-row copy + queue refetch (T-06-11); tsc clean, 284/284 tests green
+- [Phase 06-04]: HighlightsPage ships as the plan-mandated placeholder stub - plan 06-05 (next wave) owns the real implementation to avoid a same-wave race on App.tsx
+- [Phase 06-04]: task-2 tsc gate unsatisfiable in isolation (App.tsx imports task-3's ValidacoesPage) - 04-01/05-01 precedent; verified with npm test at task 2, full tsc+test gate green after task 3
 
 ### Pending Todos
 
@@ -191,7 +195,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-12T23:37:23.513Z
+Last session: 2026-10-12T23:59:27.577Z
 Stopped at: Phase 6 UI-SPEC approved
 Resume file: None
 

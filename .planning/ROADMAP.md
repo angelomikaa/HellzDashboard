@@ -144,7 +144,7 @@ Plans:
 - [x] 06-02-PLAN.md — Live smoke matrices: smoke-officer.mjs (queue/transitions/roles/removal/cohort), smoke-promotion.mjs (member boundary + key-stat leak diff + D-13 hiding), smoke-rls check-7 flip (owner-only classes); full matrix green twice consecutively
 
 **Wave 3** *(blocked on 06-03 — UI slice)*
-- [ ] 06-04-PLAN.md — Validações staff tab: shared ConfirmDialog + App.tsx two-tab wiring + ValidacoesPage (57-value read-only review, Validar/Rejeitar with confirm modal, stale-row recovery) (AUTH-05)
+- [x] 06-04-PLAN.md — Validações staff tab: shared ConfirmDialog + App.tsx two-tab wiring + ValidacoesPage (57-value read-only review, Validar/Rejeitar with confirm modal, stale-row recovery) (AUTH-05)
 
 **Wave 4** *(blocked on 06-03 + 06-04 — HighlightsPage placeholder handoff + ConfirmDialog reuse)*
 - [ ] 06-05-PLAN.md — Destaques promotion page: PromotionCard (EAFC card, tier palette, 6 facets) + HighlightsPage (per-class top-5 sections) (SHWC-02)
