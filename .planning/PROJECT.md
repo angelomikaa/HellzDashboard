@@ -8,6 +8,16 @@ A live web panel ("Hellz — Painel Geral") for a single guild in Ragnarok Origi
 
 Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
 
+## Current Milestone: v1.1 Home, Whitelist & Fine Ranks
+
+**Goal:** Give staff full control over who can access the panel, make login land on a personalized home with the player's own status, and make the 99 scale differentiate the top end by real stat gaps.
+
+**Target features:**
+- Whitelist lifecycle: officers + owner add players (handle registration only); player picks own 4-digit PIN on first login; removal stays role-differentiated as today
+- Personalized home ("fake home"): new landing tab after login — own OVR card + best stats, and a stale-data CTA (>7 days since last validated submission); Destaques keeps the guild-wide EAFC cards
+- Value-proportional 99 scale: leader holds 99 per stat, everyone below scales by value relative to the best (OVR inherits the finer scale)
+- Dummy-data workflow: reversible seed of ~5 players per class to mold displays around realistic cohorts, deleted before release
+
 ## Requirements
 
 ### Validated
@@ -32,15 +42,22 @@ Each player can see, through their stat cards, exactly where they stand compared
 
 ### Active
 
-Candidates for the next milestone (v2 deferred list from v1.0 close):
+v1.1 milestone scope (defined 2026-10-13):
 
-- [ ] Delta badges: track changes since the player's last submission (e.g. ▲ 5,00%) (DELT-01)
-- [ ] Submission history / progression view — OVR and key stats over time (HIST-01)
-- [ ] Officer guild-health dashboard — participation %, who hasn't submitted, OCR failure rate (OFCR-01)
-- [ ] Stat catalog self-service additions by admins (CAT-01)
-- [ ] OCR confidence surfacing — auto-flag low-confidence fields for review (OCRX-01)
-- [ ] Shareable card image export — render stat card to PNG for Discord/WhatsApp (SHAR-01)
-- [ ] Power-shift significance rule — combat_power shifts flagged significant only at thousands scale between submissions (owner observation from Phase 5 UAT)
+- [ ] Whitelist control: officers and owner can add players to the whitelist (handle-only registration); player picks own PIN on first login
+- [ ] Personalized home: player's own status (OVR + best stats) as the landing view, with a stale-data CTA after 7 days without a validated submission
+- [ ] Value-proportional 99 scale: top-end cuts at 98/97/96/95 based on value distance to the best, per stat
+- [ ] Dummy-data seed workflow: ~5 seeded players per class to calibrate displays, removed before release
+
+### Future (deferred, not this milestone)
+
+- Delta badges: track changes since the player's last submission (e.g. ▲ 5,00%) (DELT-01)
+- Submission history / progression view — OVR and key stats over time (HIST-01)
+- Officer guild-health dashboard — participation %, who hasn't submitted, OCR failure rate (OFCR-01)
+- Stat catalog self-service additions by admins (CAT-01)
+- OCR confidence surfacing — auto-flag low-confidence fields for review (OCRX-01)
+- Shareable card image export — render stat card to PNG for Discord/WhatsApp (SHAR-01)
+- Power-shift significance rule — combat_power shifts flagged significant only at thousands scale between submissions (owner observation from Phase 5 UAT)
 
 ### Out of Scope
 
@@ -110,4 +127,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-13 after v1.0 milestone — MVP shipped: Phases 1–6 complete (26 plans, 60 tasks, 6 days), all 20 v1 requirements validated (INPT-02 closed via the Phase 5 verification chain), every phase verification PASSED, every owner UAT approved. Milestone archived to milestones/v1.0-*.md, tagged v1.0. Next: /gsd-new-milestone for v1.1 (candidates in Active section).*
+*Last updated: 2026-10-13 — v1.1 milestone started (Home, Whitelist & Fine Ranks): whitelist lifecycle with player-picked PINs, personalized home with stale-data CTA, value-proportional 99 scale, dummy-data seed workflow. Deferred v2 candidates moved to Future section.*
