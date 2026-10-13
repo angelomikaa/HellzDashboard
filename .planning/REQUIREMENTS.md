@@ -124,9 +124,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (pending roadmap) | | |
+| ROLE-05 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
+| ROLE-09 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
+| ROLE-12 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
+| SEED-01 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
+| SEED-02 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
+| WHIT-01 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
+| WHIT-02 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
+| WHIT-03 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
+| WHIT-04 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
+| WHIT-05 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
+| WHIT-06 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
+| WHIT-07 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
+| SCALE-01 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| SCALE-02 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| SCALE-03 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| ROLE-01 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| ROLE-02 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| ROLE-03 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| ROLE-04 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| ROLE-06 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| ROLE-07 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| ROLE-08 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| ROLE-10 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| ROLE-11 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| HOME-03 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| HOME-01 | Phase 10 — Personalized Home Landing Tab | Pending |
+| HOME-02 | Phase 10 — Personalized Home Landing Tab | Pending |
 
 **Coverage:**
 - v1.1 requirements: 27 total
-- Mapped to phases: 0
-- Unmapped: 27 ⚠️ (populated by roadmap creation)
+- Mapped to phases: 27 ✓
+- Unmapped: 0 ✓

@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: planning
-last_updated: "2026-10-13T04:30:55.366Z"
+last_updated: "2026-10-13T17:15:00.818Z"
 last_activity: 2026-10-13
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 **Core value:** Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
-**Current focus:** v1.1 Phase 7 — Whitelist Lifecycle & First-Login PIN Setup
+**Current focus:** v1.1 Phase 7 — Dummy-Data Seed & Catalog Alignment
 
 ## Current Position
 
-Phase: 7. Whitelist Lifecycle & First-Login PIN Setup (v1.1 — first of 3 phases)
+Phase: 7. Dummy-Data Seed & Catalog Alignment (v1.1 — first of 4 phases)
 Plan: —
-Status: Not started (v1.1 roadmap created — ready for `/gsd-plan-phase 7`)
-Last activity: 2026-10-13 — v1.1 roadmap created (Phases 7–9, 15/15 requirements mapped)
+Status: Not started (v1.1 roadmap revised — seed-first + role-differentiated key stats — ready for `/gsd-plan-phase 7`)
+Last activity: 2026-10-13 — v1.1 roadmap revised per owner decisions 7 and 4–6 (Phases 7–10, 27/27 requirements mapped)
 
 ## Accumulated Context
 
