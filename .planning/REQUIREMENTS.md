@@ -24,7 +24,7 @@ Requirements for initial release (MVP — will be escalated later). Each maps to
 ### Data Input
 
 - [x] **INPT-01**: Player can submit stats via guided 3-screenshot upload (General, Quasi, Special) with example shots shown beside input boxes *(02-03: guided 5-step wizard with example images beside every group's inputs, works with zero OCR — owner browser-verified)*
-- [ ] **INPT-02**: OCR auto-reads screenshots (client-side, region-based) and pre-fills values
+- [x] **INPT-02**: OCR auto-reads screenshots (client-side, region-based) and pre-fills values *(05-01..05-05: structural reader behind readScreenshot, permanent exact-value harness; owner UAT APPROVED 2026-10-12 — marked Complete by the Phase 5 verification chain per the 05-05 plan's key-link pin)*
 - [x] **INPT-03**: Player must review and fix OCR results before submission is accepted (mandatory fix-up gate) *(02-03: 3-checkbox review gate — Enviar disabled until all groups confirmed; server re-validates via create_submission RPC — owner browser-verified)*
 - [x] **INPT-04**: Submissions are stored immutably (append-only) as the source of truth for ranks and future deltas *(02-01: no update/delete paths exist; atomic create_submission RPC live-proven — valid → uuid, unknown key → rejected; 02-03: owner browser-verified append-only history — resubmission created a new row, oldest untouched)*
 
@@ -100,7 +100,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REG-02 | Phase 2 | Complete (02-01 + 02-02) |
 | REG-03 | Phase 2 | Complete (02-01) |
 | INPT-01 | Phase 2 | Complete (02-03) |
-| INPT-02 | Phase 5 | Pending |
+| INPT-02 | Phase 5 | Complete (05-VERIFICATION passed: structural reader, harness exact-value proof, owner UAT APPROVED 2026-10-12) |
 | INPT-03 | Phase 2 | Complete (02-03) |
 | INPT-04 | Phase 2 | Complete (02-01 + 02-03) |
 | RNK-01 | Phase 3 | Complete |
@@ -121,4 +121,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-10-07*
-*Last updated: 2026-10-11 after 04-03 execution (CMP-01, CMP-02, CMP-03, SHWC-01 complete — Phase 4 requirements all done)*
+*Last updated: 2026-10-13 at v1.0 milestone close (INPT-02 marked Complete via Phase 5 verification chain — all 20/20 v1 requirements complete)*

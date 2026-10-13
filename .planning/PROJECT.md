@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A web panel for a single guild in Ragnarok Origin that stores all status data of the guild's players. Players submit their stats via screenshots (OCR auto-read with manual fix-up), and the panel compares them against guild standards, generates ranks, and points out where each player must improve to catch up. It uses an EAFC Ultimate Team feel — percentile-based points, tiered stat cards, and a promotion page celebrating the best players in the guild.
+A live web panel ("Hellz — Painel Geral") for a single guild in Ragnarok Origin that stores all status data of the guild's players. Players submit their stats via screenshots (OCR auto-read with mandatory manual fix-up), and the panel compares them against guild standards, generates ranks, and points out where each player must improve to catch up. It uses an EAFC Ultimate Team feel — percentile-based points, tiered stat cards, and a promotion page celebrating the best players in the guild. Shipped as v1.0 MVP on 2026-10-13: PIN login, manual+OCR ingestion, Postgres rank engine, member dashboard, officer trust tools, and the Destaques promotion page are all live and owner-approved.
 
 ## Core Value
 
@@ -32,7 +32,15 @@ Each player can see, through their stat cards, exactly where they stand compared
 
 ### Active
 
-- [ ] Delta badges: track changes since the player's last submission (e.g. ▲ 5,00%)
+Candidates for the next milestone (v2 deferred list from v1.0 close):
+
+- [ ] Delta badges: track changes since the player's last submission (e.g. ▲ 5,00%) (DELT-01)
+- [ ] Submission history / progression view — OVR and key stats over time (HIST-01)
+- [ ] Officer guild-health dashboard — participation %, who hasn't submitted, OCR failure rate (OFCR-01)
+- [ ] Stat catalog self-service additions by admins (CAT-01)
+- [ ] OCR confidence surfacing — auto-flag low-confidence fields for review (OCRX-01)
+- [ ] Shareable card image export — render stat card to PNG for Discord/WhatsApp (SHAR-01)
+- [ ] Power-shift significance rule — combat_power shifts flagged significant only at thousands scale between submissions (owner observation from Phase 5 UAT)
 
 ### Out of Scope
 
@@ -43,6 +51,8 @@ Each player can see, through their stat cards, exactly where they stand compared
 ## Context
 
 - Game: Ragnarok Origin (mobile, Ragnarok-family stat layout)
+- **Current state (v1.0 shipped 2026-10-13):** ~7,700 LOC TypeScript/React 19 + Tailwind v4 (284 tests green), 11 Supabase migrations (1,658 LOC SQL), 5 live smoke matrices (RLS, rank, lifecycle, officer 39-check, promotion 21-check incl. leak-diff), live on Supabase free tier; OCR is a structural reader (scale/margin-invariant) with a permanent exact-value harness
+- **Known tech debt / advisories:** 06-REVIEW WR-01..04 (misleading "Salvo." feedback, Shift+Tab trap in ConfirmDialog, non-unique React key on HighlightsPage, one duplicate officer smoke probe) — advisory only, no must-have impacted; pre-launch owner actions: rotate Supabase deploy token + placeholder whitelist PINs, replace `public/examples/*.svg` with real screenshots before inviting real members
 - Stat structure from screenshots:
   - **General Stats**: HP, SP, PATK, PDEF, MATK, MDEF, Refine PATK/PDEF/MATK/MDEF, HP recover, SP Recovery, HIT, FLEE
   - **Quasi-Stats**: ASPD, MSPD, Variable CT (flat + %), Fixed CT (flat + %), Healing Done/Taken, CRIT, CRIT RES, CRIT DMG, CRIT DMG RES, PDMG, PDMG.R, MDMG, MDMG.R, Ignore PDEF (flat + %), Ignore MDEF (flat + %), PDMG Bonus, MDMG Bonus, PvE DMG Reduction, PvE DMG Bonus, PvP DMG Reduction, PvP DMG Bonus
@@ -76,9 +86,11 @@ Each player can see, through their stat cards, exactly where they stand compared
 | 4-digit PIN auth with officer elevation by owner | Simple access; officers validate/remove players and registers | — Phase 1: live (verify-pin + lockout + 7-day custom-claim JWT); follow-up hardening applied 2026-10-09 via code-review-fix (CR-01 atomic lockout RPC, CR-02 session hardening, WR-01..09) — see 01-REVIEW-FIX.md |
 | Dedicated HS256 signing key for custom-claim JWTs (NEFOOT_JWT_SECRET) | Platform redacts the legacy JWT secret; key 6f7657c3 must never be revoked | — Phase 1 |
 | Panel branded "Hellz" (subtitle "Painel Geral") | "NeoFoot" was an abandoned folder name reused for the repo; UI shows Hellz — internal identifiers (repo, storage key, JWT issuer) unchanged | — Phase 1 |
-| Delta badges track changes since last submission | Show progress over time | — Pending |
-| TypeScript + React frontend | User requirement | — Pending |
-| Free-tier backend (Supabase or superior) | User requirement | — Pending |
+| Delta badges track changes since last submission | Show progress over time | — Deferred to v2 (DELT-01) |
+| TypeScript + React frontend | User requirement | — ✓ Good: live, owner-used daily (v1.0) |
+| Free-tier backend (Supabase or superior) | User requirement | — ✓ Good: Supabase free tier, 11 migrations live (v1.0) |
+| Structural OCR reader (color-pill/label-anchor based), not pixel-fraction region maps | Owner directive 2026-10-12: "screenshots will vary in size inevitably... we need a reading model that actually can read data from an image without relying on a pixel map" — invariant to crop size, translation, margins | — ✓ Good: harness grid exact on native/rescale/margin/crop variants; recalibration = visual grammar, not pixel fractions |
+| All rank/role math in Postgres SECURITY DEFINER RPCs reading `auth.jwt()->>'member_role'` | Enforcement never UI-only; RLS policies on every table; append-only submissions (status marks, never deletes) | — ✓ Good: held across 6 phases, proven by live smoke matrices + owner DevTools leak proofs |
 
 ## Evolution
 
@@ -98,4 +110,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-13 — Phase 6 complete (Trust, Celebration & Officer Tools, verification PASSED 4/4, owner UAT 14/14): migration 0011 shipped every officer/promotion server surface (officer queue + status transitions AUTH-05, owner-only role RPC AUTH-03, role-differentiated removal AUTH-04, member-invocable get_promotion SHWC-02, active-cohort filtering D-07, owner-only class creation D-09), live smoke matrices green twice (officer 39/39, promotion 21/21 incl. zero key-stat leak-diff), Validações + Destaques + Personagens staff controls owner-approved in browser. v1 milestone (Phases 1–6) execution-complete — all requirements validated except delta badges (deferred to v2). Advisory 06-REVIEW: 4 warnings (WR-01..04) — run /gsd-code-review-fix 6. Next: /gsd-verify-work then /gsd-complete-milestone.*
+*Last updated: 2026-10-13 after v1.0 milestone — MVP shipped: Phases 1–6 complete (26 plans, 60 tasks, 6 days), all 20 v1 requirements validated (INPT-02 closed via the Phase 5 verification chain), every phase verification PASSED, every owner UAT approved. Milestone archived to milestones/v1.0-*.md, tagged v1.0. Next: /gsd-new-milestone for v1.1 (candidates in Active section).*
