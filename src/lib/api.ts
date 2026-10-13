@@ -140,7 +140,8 @@ export async function updateCharacter(
 }
 
 export async function createClass(session: NeoFootSession, className: string): Promise<void> {
-  // RLS: staff-only insert (staff_insert_classes).
+  // RLS: owner-only insert (staff_insert_classes, 0011) — structural changes
+  // are owner territory (D-09); officers are refused server-side.
   await restFetch(session, '/classes', { method: 'POST', body: JSON.stringify({ class_name: className }) })
 }
 

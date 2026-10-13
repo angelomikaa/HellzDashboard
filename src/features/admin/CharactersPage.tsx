@@ -308,41 +308,53 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
         <p className="mt-6 text-base text-muted">Carregando…</p>
       ) : (
         <>
-          {/* Add-class form (REG-02) */}
-          <form onSubmit={handleAddClass} noValidate className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex flex-1 flex-col gap-2">
-              <label htmlFor="new-class" className="text-sm font-semibold text-content">
-                Nova classe
-              </label>
-              <input
-                id="new-class"
-                type="text"
-                autoComplete="off"
-                value={newClassName}
-                onChange={(e) => setNewClassName(e.target.value)}
-                disabled={busy}
-                className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={busy || newClassName.trim() === ''}
-              className="h-11 shrink-0 rounded-md border border-line px-4 text-base font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Adicionar Classe
-            </button>
-          </form>
-          {addClassState.kind === 'saved' && (
-            <p className="mt-2 text-sm font-semibold text-success">{`Classe "${addClassState.name}" adicionada.`}</p>
-          )}
-          {addClassState.kind === 'error' && (
-            <p
-              role="alert"
-              aria-live="polite"
-              className="mt-2 text-sm font-semibold text-destructive"
-            >
-              {ADD_CLASS_ERROR}
-            </p>
+          {/* Add-class form (REG-02) — OWNER-only (D-09, folded todo
+              owner-only-class-management): server policy staff_insert_classes
+              is owner-only (0011) — this gate is UX-only per the house
+              pattern. Officers get no form, no placeholder: the section
+              simply doesn't exist in their DOM. */}
+          {isOwner && (
+            <>
+              <form
+                onSubmit={handleAddClass}
+                noValidate
+                className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end"
+              >
+                <div className="flex flex-1 flex-col gap-2">
+                  <label htmlFor="new-class" className="text-sm font-semibold text-content">
+                    Nova classe
+                  </label>
+                  <input
+                    id="new-class"
+                    type="text"
+                    autoComplete="off"
+                    value={newClassName}
+                    onChange={(e) => setNewClassName(e.target.value)}
+                    disabled={busy}
+                    className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={busy || newClassName.trim() === ''}
+                  className="h-11 shrink-0 rounded-md border border-line px-4 text-base font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Adicionar Classe
+                </button>
+              </form>
+              {addClassState.kind === 'saved' && (
+                <p className="mt-2 text-sm font-semibold text-success">{`Classe "${addClassState.name}" adicionada.`}</p>
+              )}
+              {addClassState.kind === 'error' && (
+                <p
+                  role="alert"
+                  aria-live="polite"
+                  className="mt-2 text-sm font-semibold text-destructive"
+                >
+                  {ADD_CLASS_ERROR}
+                </p>
+              )}
+            </>
           )}
 
           {data.members.length === 0 ? (

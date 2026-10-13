@@ -3,7 +3,8 @@ id: owner-only-class-management
 title: Restrict class creation to the owner handle only
 source: 03-04 owner UAT (2026-10-10)
 target_phase: 04+ (admin/registry hardening pass — planner to place)
-status: pending
+status: completed
+completed: 2026-10-12 (server side 06-01 migration 0011 + smoke-proof 06-02; UI side 06-06 task 2)
 ---
 
 # Restrict adding new classes to the owner handle only
