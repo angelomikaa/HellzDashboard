@@ -17,7 +17,7 @@ export function OvrHero({
   ovr: MyReport['ovr']
   displayName: string
   charClass: string | null
-  charFunction: 'tank' | 'dps'
+  charFunction: 'dps' | 'mdps' | 'suporte'
 }) {
   const sufficient = ovr.data_sufficient && ovr.value !== null
   // Tier from the ROUNDED displayed number (D-02 bands on the 51–99 scale).

@@ -29,6 +29,7 @@ import {
   type MemberRow,
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
+import { FUNCTION_LABELS } from '../../lib/groups'
 import { ConfirmDialog } from './ConfirmDialog'
 
 // Enumeration-safe pt-BR copy (UI contract): never expose HTTP codes, gateway
@@ -50,18 +51,13 @@ const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   owner: 'Proprietário',
 }
 
-const FUNCTION_LABELS: Record<'dps' | 'tank', string> = {
-  dps: 'DPS',
-  tank: 'Tank',
-}
-
 // In-edit draft for one member row (REG-01). charClass '' is the display-only
 // '—' option: saving is blocked client-side — a character must have a class.
 interface Draft {
   memberId: string
   displayName: string
   charClass: string
-  charFunction: 'dps' | 'tank'
+  charFunction: 'dps' | 'mdps' | 'suporte'
 }
 
 type AddClassState =
@@ -466,14 +462,26 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                                 onChange={(e) =>
                                   setDraft({
                                     ...draft,
-                                    charFunction: e.target.value === 'tank' ? 'tank' : 'dps',
+                                    // The three <option> values below are
+                                    // exactly the union — the cast is total.
+                                    // Values mirror the DB CHECK (migration
+                                    // 0012: char_function in ('dps','mdps',
+                                    // 'suporte')); the server CHECK is the
+                                    // real boundary (T-07-05), this is
+                                    // UX-only.
+                                    charFunction: e.target.value as Draft['charFunction'],
                                   })
                                 }
                                 disabled={saving}
                                 className="h-11 w-full min-w-24 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                <option value="dps">DPS</option>
-                                <option value="tank">Tank</option>
+                                {(Object.keys(FUNCTION_LABELS) as Array<
+                                  keyof typeof FUNCTION_LABELS
+                                >).map((role) => (
+                                  <option key={role} value={role}>
+                                    {FUNCTION_LABELS[role]}
+                                  </option>
+                                ))}
                               </select>
                             </>
                           ) : (

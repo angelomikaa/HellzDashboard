@@ -27,6 +27,7 @@ import {
   type StatCatalogEntry,
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
+import { FUNCTION_LABELS } from '../../lib/groups'
 import { HistoryList } from './HistoryList'
 import { OcrCapture } from './OcrCapture'
 import { ReviewStep } from './ReviewStep'
@@ -54,11 +55,6 @@ const BLOCKED_MEMBER_COPY =
   'Seu personagem ainda não foi registrado. Peça a um oficial para registrá-lo na aba Personagens.'
 const BLOCKED_STAFF_COPY =
   'Seu personagem ainda não foi registrado. Registre-o na aba Personagens.'
-
-const FUNCTION_LABELS: Record<'dps' | 'tank', string> = {
-  dps: 'DPS',
-  tank: 'Tank',
-}
 
 // Step 1 = Personagem, 2-4 = Geral/Quasi/Especial, 5 = Revisão.
 const STEP_GROUP: Record<2 | 3 | 4, WizardGroup> = { 2: 'general', 3: 'quasi', 4: 'special' }
