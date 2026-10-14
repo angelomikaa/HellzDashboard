@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: "07-04 CHECKPOINT (human-action): task 1 pre-flight done (smoke fixtures edited + local checks green); awaiting FRESH SUPABASE_ACCESS_TOKEN session env to push 0012 live"
-last_updated: "2026-10-14T08:20:00.000Z"
+stopped_at: "07-04 CHECKPOINT (human-verify): 0012 live + parity proven + battery 5/5 green + 73-dummy cohort resident and verified; awaiting owner observation pass before the SEED-02 gate record"
+last_updated: "2026-10-14T20:30:00.000Z"
 last_activity: 2026-10-14
 progress:
   total_phases: 4
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 07 (Dummy-Data Seed & Catalog Alignment) — EXECUTING
-Plan: 4 of 4 — 07-04 IN PROGRESS: task 1 checkpoint — awaiting fresh SUPABASE_ACCESS_TOKEN (+SUPABASE_PROJECT_REF) as session env; smoke fixture edits staged uncommitted (commit lands only after push + 5/5 green smokes, per plan step 8)
-Status: BLOCKED on owner human-action (token)
+Plan: 4 of 4 — 07-04 tasks 1-2 COMPLETE (commit 9fae564): 0012 applied live via apply-seed.mjs (pre-push parity snapshot 11 classes x 6, post-push parity exact, vocab suporte-only, schema_migrations bookkeeping row recorded), smoke battery 5/5 green, dummy seed APPLIED (73 dummies, cohort matrix exact incl. dummy-hp-16 pending-only, 57-stats invariant, age spread 32/40, starvation probes green via self-cleaning throwaways, real members untouched)
+Status: CHECKPOINT — owner observation pass (plan task 3) before task 4 records the SEED-02 gate
 Last activity: 2026-10-14
 
 ## Accumulated Context
@@ -44,6 +44,7 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 07]: D-12 gate CLOSED (owner, 2026-10-14): Sniper (not Ranger) confirmed, authored splits as rehearsed, Stalker wildcard x1, live residency (D-13) approved; ZERO live writes in 07-03 - plan 07-04 owns the live apply via apply-seed.mjs and the SEED-02 pre-release gate
 - [Phase 07]: 07-04 live-push path adapted (no supabase CLI/Docker in this environment, 07-01 precedent): migration 0012 applies via scripts/apply-seed.mjs (legacy Management API /database/query - the sanctioned live-write path), replacing the unavailable `supabase db push`; gates preserved as live-query equivalents (pre-push parity snapshot, pending-migration check against supabase_migrations, post-push parity + vocabulary checks); a schema_migrations bookkeeping row for 0012 is recorded post-apply so a future CLI push never re-runs it
 - [Phase 07]: smoke fixture vocabulary update includes one plan-external line (Rule 3): smoke-rls.mjs classes-read probe checked `classList.includes('Assassin')` - post-rename that class no longer exists, so the probe now asserts 'Assassin Cross'; without it the battery would sit red after the push
+- [Phase 07]: 07-04 task-2 starvation probes adapted (Rule 3): the uniform dummy PIN is hash-only in the repo (T-07-08) and was handed off out-of-band to the OWNER only, so the server-side n<3 contract was probed with self-cleaning throwaway members placed in the starved cohorts (Stalker/dps -> n=2, Biochemist/mdps -> n=2) - my_report returned HTTP 200 with OVR null/data_sufficient false and all 57 stats points null (never a 500); the real dummy logins (dummy-wild-01, dummy-hp-01) are covered by the owner observation pass (attempting them with an unknown PIN would burn rate-limited login attempts)
 
 ### Blockers/Concerns (open — carry to next milestone)
 
@@ -64,8 +65,8 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-14T08:20:00.000Z
-Stopped at: 07-04 CHECKPOINT (human-action): task 1 pre-flight done (smoke fixtures edited + local checks green); awaiting FRESH SUPABASE_ACCESS_TOKEN session env to push 0012 live
+Last session: 2026-10-14T20:30:00.000Z
+Stopped at: 07-04 CHECKPOINT (human-verify): tasks 1-2 complete (0012 live, battery 5/5, 73 dummies resident + verified); awaiting owner observation pass
 Resume file: .planning/phases/07-dummy-data-seed-catalog-alignment/07-04-PLAN.md
 
 ## Performance Metrics
