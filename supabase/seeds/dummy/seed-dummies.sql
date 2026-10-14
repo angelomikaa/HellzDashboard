@@ -9,11 +9,19 @@
 -- (Stalker wildcard, n=1), D-15 (all 57 stats per validated submission,
 -- one pending-only dummy, both value_types covered per cohort).
 --
--- Base values (dummy_stat_base) are OWNER-SUPPLIED SAMPLES pending the live
--- distribution report (scripts/dummy-value-report.mjs was env-gated out of
--- this session): SEED-01 allows "live data or owner-supplied samples". Every
--- stat is flagged low-confidence in SEED-NOTES.md until the owner refreshes
--- the bases from the live report or approves these samples at the D-12 gate.
+-- Base values (dummy_stat_base) are LIVE-DERIVED (D-11 honest, owner decision
+-- at the D-12 gate, 2026-10-14): base = live median from
+-- supabase/seeds/dummy/value-bases.json (live validated submissions, n=3,
+-- cohorts Assassin/tank + Priest/tank), rounded per value_type (flat ->
+-- integer, percentual -> 1 decimal). EXCEPT the 4 degenerate all-zero live
+-- stats (refine_mdef, crit_dmg, fixed_ct, variable_ct) which keep the
+-- owner-supplied samples - live data cannot shape them. Negative live ranges
+-- (fixed_ct_pct -49.4, global_cd_pct -10, variable_ct_pct -60) are preserved
+-- as-is: the ladder multiplies the signed base, so every profile value keeps
+-- the live sign (never clamped to positive). Stats whose live values are ALL
+-- zero but which were not in the owner's degenerate list (ignore_pdef_pct,
+-- ignore_mdef_pct, dmg_vs_demi_human) take base 0.0 honestly from the live
+-- median.
 --
 -- Apply to LIVE (plan 07-04, after owner approval): node scripts/apply-seed.mjs supabase/seeds/dummy/seed-dummies.sql
 
@@ -136,30 +144,45 @@ insert into dummy_profiles (profile, factor) values
   ('mid3',     0.740),
   ('low',      0.610);
 
--- Per-stat base values: one row per catalog stat, base = live median
--- (D-11) or flagged owner-supplied sample (SEED-01 fallback). Flat stats
+-- Per-stat base values: one row per catalog stat. Live-derived median from
+-- value-bases.json (D-11) for 53 stats; the 4 degenerate all-zero live stats
+-- keep the flagged owner-supplied samples (SEED-01 fallback). Flat stats
 -- integer-scaled, percentual 1-decimal-scaled by the insert below.
 create temp table dummy_stat_base (stat_key text, base_value numeric) on commit drop;
 insert into dummy_stat_base (stat_key, base_value) values
-  ('hp', 285000), ('sp', 12000), ('patk', 15800), ('pdef', 9200),
-  ('matk', 16400), ('mdef', 8800), ('refine_patk', 320), ('refine_pdef', 260),
-  ('refine_matk', 340), ('refine_mdef', 280), ('hp_recover', 2400),
-  ('sp_recover', 900), ('hit', 640), ('flee', 610), ('combat_power', 265000),
-  ('aspd', 482), ('mspd', 148), ('variable_ct', -35), ('variable_ct_pct', -18.0),
-  ('fixed_ct', -90), ('fixed_ct_pct', -12.0), ('healing_done', 5200),
-  ('healing_taken', 3100), ('crit', 420), ('crit_res', 260), ('crit_dmg', 155.0),
-  ('crit_dmg_res', 45.0), ('pdmg', 12500), ('pdmg_r', 42.0), ('mdmg', 12800),
-  ('mdmg_r', 42.0), ('ignore_pdef', 210), ('ignore_pdef_pct', 22.0),
-  ('ignore_mdef', 210), ('ignore_mdef_pct', 22.0), ('pdmg_bonus', 850),
-  ('mdmg_bonus', 850), ('pve_dmg_reduction', 620), ('pve_dmg_bonus', 900),
-  ('pvp_dmg_reduction', 380), ('pvp_dmg_bonus', 450),
-  ('max_sp_pct', 25.0), ('equip_patk_pct', 38.0), ('equip_matk_pct', 38.0),
-  ('equip_pdef_pct', 30.0), ('equip_mdef_pct', 30.0), ('global_cd_pct', -8.0),
-  ('dmg_vs_small', 30.0), ('dmg_vs_medium', 35.0), ('dmg_vs_large', 28.0),
-  ('dmg_vs_brute', 32.0), ('dmg_vs_demi_human', 40.0),
-  ('dmg_reduction_vs_small', 18.0), ('dmg_reduction_vs_medium', 20.0),
-  ('dmg_reduction_vs_large', 16.0), ('dmg_reduction_vs_brute', 15.0),
-  ('dmg_reduction_vs_demi_human', 22.0);
+  -- general (flat): live medians, n=3
+  ('hp', 100670), ('sp', 1008), ('patk', 2933), ('pdef', 4605),
+  ('matk', 5839), ('mdef', 1664), ('refine_patk', 623), ('refine_pdef', 200),
+  ('refine_matk', 887),
+  -- degenerate (live all-zero): owner-supplied sample kept
+  ('refine_mdef', 280),
+  ('hp_recover', 530), ('sp_recover', 73), ('hit', 264), ('flee', 148),
+  ('combat_power', 288216),
+  -- quasi (flat): live medians, n=3
+  ('aspd', 110), ('mspd', 155),
+  -- degenerate (live all-zero): owner-supplied samples kept
+  ('variable_ct', -35), ('fixed_ct', -90),
+  ('healing_done', 32), ('healing_taken', 32), ('crit', 40), ('crit_res', 140),
+  ('pdmg', 34), ('pdmg_bonus', 245), ('mdmg', 40), ('mdmg_bonus', 735),
+  ('ignore_pdef', 843), ('ignore_mdef', 190),
+  ('pve_dmg_reduction', 1219), ('pve_dmg_bonus', 673),
+  ('pvp_dmg_reduction', 1730), ('pvp_dmg_bonus', 1300),
+  -- quasi (percentual): live medians, n=3 - negatives preserved
+  ('crit_dmg_res', 14.0), ('pdmg_r', 154.5), ('mdmg_r', 94.1),
+  ('fixed_ct_pct', -49.4), ('variable_ct_pct', -60.0),
+  ('global_cd_pct', -10.0),
+  -- live all-zero (not in owner's degenerate list): live median = 0.0
+  ('ignore_pdef_pct', 0.0), ('ignore_mdef_pct', 0.0),
+  -- degenerate (live all-zero): owner-supplied sample kept
+  ('crit_dmg', 155.0),
+  -- special (percentual): live medians, n=3
+  ('max_sp_pct', 21.2), ('equip_patk_pct', 19.4), ('equip_matk_pct', 69.9),
+  ('equip_pdef_pct', 25.4), ('equip_mdef_pct', 13.4),
+  ('dmg_vs_small', 2.0), ('dmg_vs_medium', 4.0), ('dmg_vs_large', 4.0),
+  ('dmg_vs_brute', 1.0), ('dmg_vs_demi_human', 0.0),
+  ('dmg_reduction_vs_small', 4.0), ('dmg_reduction_vs_medium', 17.0),
+  ('dmg_reduction_vs_large', 4.0), ('dmg_reduction_vs_brute', 2.0),
+  ('dmg_reduction_vs_demi_human', 4.0);
 
 -- Hard invariant guards: exactly 57 bases, one per catalog stat key.
 do $$
