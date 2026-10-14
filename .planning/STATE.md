@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: "07-03 COMPLETE (D-12 gate closed): seed live-derived + rehearsed 21/21; next = 07-04 live apply (requirements SEED-01/SEED-02 close there)"
-last_updated: "2026-10-14T07:35:17.823Z"
+stopped_at: "07-04 CHECKPOINT (human-action): task 1 pre-flight done (smoke fixtures edited + local checks green); awaiting FRESH SUPABASE_ACCESS_TOKEN session env to push 0012 live"
+last_updated: "2026-10-14T08:20:00.000Z"
 last_activity: 2026-10-14
 progress:
   total_phases: 4
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 07 (Dummy-Data Seed & Catalog Alignment) — EXECUTING
-Plan: 4 of 4 — 07-03 complete (D-12 gate closed); ready to execute 07-04 (live apply)
-Status: Ready to execute
+Plan: 4 of 4 — 07-04 IN PROGRESS: task 1 checkpoint — awaiting fresh SUPABASE_ACCESS_TOKEN (+SUPABASE_PROJECT_REF) as session env; smoke fixture edits staged uncommitted (commit lands only after push + 5/5 green smokes, per plan step 8)
+Status: BLOCKED on owner human-action (token)
 Last activity: 2026-10-14
 
 ## Accumulated Context
@@ -42,6 +42,8 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 07]: Dummy seed roster splits authored per D-08 (LK/Paladin 3/1 dps:suporte, Biochemist 2/1/1, Mastersmith 1/2/1, Summoner 3/3/2, Sniper+Rebellion 4+4, Stalker wildcard n=1) — CONFIRMED by owner at the D-12 gate 2026-10-14; uniform dummy PIN is hash-only in the repo, plaintext handed off out-of-band (never committed)
 - [Phase 07]: Dummy seed value bases REBUILT from live medians (D-11 honest, owner D-12 decision): base = live median from value-bases.json (n=3, Assassin/tank + Priest/tank), 53/57 bases changed; the 4 degenerate all-zero live stats (refine_mdef, crit_dmg, fixed_ct, variable_ct) keep owner samples; negative live ranges (fixed_ct_pct -49.4, global_cd_pct -10, variable_ct_pct -60) preserved unclamped across the whole ladder; 3 further live-zero stats (ignore_pdef_pct, ignore_mdef_pct, dmg_vs_demi_human) take base 0.0
 - [Phase 07]: D-12 gate CLOSED (owner, 2026-10-14): Sniper (not Ranger) confirmed, authored splits as rehearsed, Stalker wildcard x1, live residency (D-13) approved; ZERO live writes in 07-03 - plan 07-04 owns the live apply via apply-seed.mjs and the SEED-02 pre-release gate
+- [Phase 07]: 07-04 live-push path adapted (no supabase CLI/Docker in this environment, 07-01 precedent): migration 0012 applies via scripts/apply-seed.mjs (legacy Management API /database/query - the sanctioned live-write path), replacing the unavailable `supabase db push`; gates preserved as live-query equivalents (pre-push parity snapshot, pending-migration check against supabase_migrations, post-push parity + vocabulary checks); a schema_migrations bookkeeping row for 0012 is recorded post-apply so a future CLI push never re-runs it
+- [Phase 07]: smoke fixture vocabulary update includes one plan-external line (Rule 3): smoke-rls.mjs classes-read probe checked `classList.includes('Assassin')` - post-rename that class no longer exists, so the probe now asserts 'Assassin Cross'; without it the battery would sit red after the push
 
 ### Blockers/Concerns (open — carry to next milestone)
 
@@ -62,8 +64,8 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-14T07:35:17.789Z
-Stopped at: 07-03 COMPLETE (D-12 gate closed): seed live-derived + rehearsed 21/21; next = 07-04 live apply (requirements SEED-01/SEED-02 close there)
+Last session: 2026-10-14T08:20:00.000Z
+Stopped at: 07-04 CHECKPOINT (human-action): task 1 pre-flight done (smoke fixtures edited + local checks green); awaiting FRESH SUPABASE_ACCESS_TOKEN session env to push 0012 live
 Resume file: .planning/phases/07-dummy-data-seed-catalog-alignment/07-04-PLAN.md
 
 ## Performance Metrics
