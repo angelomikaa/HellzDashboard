@@ -42,12 +42,12 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 - [x] **ROLE-09**: Dummy seed covers ≥3 dummies per populated (class, build-role) combo, following the owner-provided roster (see Seed Roster below)
 - [ ] **ROLE-10**: Staff audit pass re-assigns existing members' build-roles before any per-role key-stat differentiation is applied
 - [ ] **ROLE-11**: Officer-visible per-(class, role) key-stat config coverage indicator (staff-only, never member-visible)
-- [ ] **ROLE-12**: Class catalog aligned with the official job tree (https://roocamer.gnjoy.game/home#job-intro): unreleased jobs excluded (Super Novice, Ninja), catalog additions needed by the seed roster (e.g., Summoner, Gunslinger), advanced-job naming reconciled (High Wizard/Professor, Biochemist/Smith, Dancer/Gypsy)
+- [x] **ROLE-12**: Class catalog aligned with the official job tree (https://roocamer.gnjoy.game/home#job-intro): unreleased jobs excluded (Super Novice, Ninja), catalog additions needed by the seed roster (e.g., Summoner, Gunslinger), advanced-job naming reconciled (High Wizard/Professor, Biochemist/Smith, Dancer/Gypsy)
 
 ### Dummy-Data Seed
 
-- [ ] **SEED-01**: Reversible dummy seed following the owner-provided guild roster (see below), with validated submissions, realistic value shapes derived from live data or owner-supplied samples — incl. a clear leader, a ~98.5% runner-up, ties, and submitted_at spread — applied via the existing `apply-seed.mjs` tooling, files kept out of `seeds/` direct children. **Ships FIRST in v1.1** (owner decision: see how v1.0 wraps around data while v1.1 is developed)
-- [ ] **SEED-02**: Purge by sentinel prefix is FK-safe (submissions before members), idempotent, and a hard pre-release checklist gate
+- [x] **SEED-01**: Reversible dummy seed following the owner-provided guild roster (see below), with validated submissions, realistic value shapes derived from live data or owner-supplied samples — incl. a clear leader, a ~98.5% runner-up, ties, and submitted_at spread — applied via the existing `apply-seed.mjs` tooling, files kept out of `seeds/` direct children. **Ships FIRST in v1.1** (owner decision: see how v1.0 wraps around data while v1.1 is developed)
+- [x] **SEED-02**: Purge by sentinel prefix is FK-safe (submissions before members), idempotent, and a hard pre-release checklist gate
 
 #### Seed Roster (owner, 2026-10-13 — rough guild shape, ~80 members)
 
@@ -126,9 +126,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | ROLE-05 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
 | ROLE-09 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
-| ROLE-12 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
-| SEED-01 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
-| SEED-02 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
+| ROLE-12 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
+| SEED-01 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
+| SEED-02 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
 | WHIT-01 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
 | WHIT-02 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
 | WHIT-03 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |

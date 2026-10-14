@@ -22,7 +22,7 @@
 <details open>
 <summary>🚧 v1.1 Home, Whitelist & Fine Ranks (Phases 7–10) — IN PROGRESS</summary>
 
-- [ ] Phase 7: Dummy-Data Seed & Catalog Alignment — owner-roster seed ships FIRST (owner decision 7: see how v1.0 wraps around data while v1.1 is developed), build-role vocabulary (ROLE-05) + official job-tree catalog (ROLE-12) aligned so dummies carry correct roles from day one (1/4 plans)
+- [x] Phase 7: Dummy-Data Seed & Catalog Alignment — owner-roster seed ships FIRST (owner decision 7: see how v1.0 wraps around data while v1.1 is developed), build-role vocabulary (ROLE-05) + official job-tree catalog (ROLE-12) aligned so dummies carry correct roles from day one (4/4 plans) — completed 2026-10-14
 - [ ] Phase 8: Whitelist Lifecycle & First-Login PIN Setup — handle-only registration, player-picked PIN on first login, owner PIN reset, reactivation (0/0 plans)
 - [ ] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0014; renumbered +1 by Phase 7 taking 0012 and Phase 8 taking 0013): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (0/0 plans)
 - [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (0/0 plans)
@@ -41,12 +41,12 @@
   3. The class catalog matches the official job tree: Super Novice excluded (unreleased), Summoner and Gunslinger added, advanced-job naming reconciled (High Wizard/Professor, Biochemist/Smith, Dancer/Gypsy) — every roster class name resolves in the catalog
   4. v1.0 renders the populated cohorts under the CURRENT scale without error — and the documented starvation cases (n=1 wildcard classes, shared-slot splits like Knight/Crusader, thin Summoner role splits like 3/3/2) render the data-insufficient state rather than erroring
   5. The purge is scripted, FK-safe (submissions before members), idempotent, leaves zero dummy rows, and stands as a hard pre-release checklist gate
-**Plans**: 4 plans (see `.planning/phases/07-dummy-data-seed-catalog-alignment/`)
+**Plans**: 4/4 plans complete (see `.planning/phases/07-dummy-data-seed-catalog-alignment/`)
 Plans:
 - [x] 07-01-PLAN.md — Catalog alignment migration 0012 (official job tree, OVR continuity) — Wave 1
 - [x] 07-02-PLAN.md — Build-role vocabulary propagation (labels, types, staff form) — Wave 1
 - [x] 07-03-PLAN.md — Dummy seed + purge authoring, local rehearsal, D-12 owner gate — Wave 2
-- [ ] 07-04-PLAN.md — Live push + seed apply + starvation verification + release gate — Wave 3
+- [x] 07-04-PLAN.md — Live push + seed apply + starvation verification + release gate — Wave 3
 
 Cross-cutting constraints: catalog work (ROLE-12) precedes seeding — roster uses advanced job names that don't exist in the current 15-class catalog (documented problem 4); the seed is NEVER a migration and never a direct child of `seeds/` (flat `db.seed` glob auto-applies it); dummy rows stay resident for the milestone duration BY OWNER DECISION 7 (observing v1.0 on realistic cohorts — no overnight-window ritual anymore), but rank pollution of real members during the window is owner-accepted and the purge-before-release gate is non-negotiable; this phase touches NO rank RPC — the seed purpose here is observation, band calibration moves to Phase 9.
 **UI hint**: yes
@@ -107,7 +107,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 (8 is independent and coul
 | 4. Member Dashboard & Improvement Screen | v1.0 | 3/3 | Complete | 2026-10-11 |
 | 5. OCR Auto-Read Layer | v1.0 | 5/5 | Complete | 2026-10-12 |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | v1.0 | 7/7 | Complete | 2026-10-13 |
-| 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 3/4 | In Progress|  |
+| 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 4/4 | Complete   | 2026-10-14 |
 | 8. Whitelist Lifecycle & First-Login PIN Setup | v1.1 | 0/0 | Not started | - |
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 0/0 | Not started | - |
 | 10. Personalized Home Landing Tab | v1.1 | 0/0 | Not started | - |
