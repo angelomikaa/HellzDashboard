@@ -24,7 +24,7 @@
 
 - [ ] Phase 7: Dummy-Data Seed & Catalog Alignment — owner-roster seed ships FIRST (owner decision 7: see how v1.0 wraps around data while v1.1 is developed), build-role vocabulary (ROLE-05) + official job-tree catalog (ROLE-12) aligned so dummies carry correct roles from day one (0/0 plans)
 - [ ] Phase 8: Whitelist Lifecycle & First-Login PIN Setup — handle-only registration, player-picked PIN on first login, owner PIN reset, reactivation (0/0 plans)
-- [ ] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0013): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (0/0 plans)
+- [ ] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0014; renumbered +1 by Phase 7 taking 0012 and Phase 8 taking 0013): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (0/0 plans)
 - [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (0/0 plans)
 
 </details>
@@ -41,7 +41,12 @@
   3. The class catalog matches the official job tree: Super Novice excluded (unreleased), Summoner and Gunslinger added, advanced-job naming reconciled (High Wizard/Professor, Biochemist/Smith, Dancer/Gypsy) — every roster class name resolves in the catalog
   4. v1.0 renders the populated cohorts under the CURRENT scale without error — and the documented starvation cases (n=1 wildcard classes, shared-slot splits like Knight/Crusader, thin Summoner role splits like 3/3/2) render the data-insufficient state rather than erroring
   5. The purge is scripted, FK-safe (submissions before members), idempotent, leaves zero dummy rows, and stands as a hard pre-release checklist gate
-**Plans**: TBD
+**Plans**: 4 plans (see `.planning/phases/07-dummy-data-seed-catalog-alignment/`)
+Plans:
+- [ ] 07-01-PLAN.md — Catalog alignment migration 0012 (official job tree, OVR continuity) — Wave 1
+- [ ] 07-02-PLAN.md — Build-role vocabulary propagation (labels, types, staff form) — Wave 1
+- [ ] 07-03-PLAN.md — Dummy seed + purge authoring, local rehearsal, D-12 owner gate — Wave 2
+- [ ] 07-04-PLAN.md — Live push + seed apply + starvation verification + release gate — Wave 3
 
 Cross-cutting constraints: catalog work (ROLE-12) precedes seeding — roster uses advanced job names that don't exist in the current 15-class catalog (documented problem 4); the seed is NEVER a migration and never a direct child of `seeds/` (flat `db.seed` glob auto-applies it); dummy rows stay resident for the milestone duration BY OWNER DECISION 7 (observing v1.0 on realistic cohorts — no overnight-window ritual anymore), but rank pollution of real members during the window is owner-accepted and the purge-before-release gate is non-negotiable; this phase touches NO rank RPC — the seed purpose here is observation, band calibration moves to Phase 9.
 **UI hint**: yes
@@ -58,7 +63,7 @@ Cross-cutting constraints: catalog work (ROLE-12) precedes seeding — roster us
   5. Trust-boundary hygiene holds: handles with the dummy sentinel prefix are rejected at add time, and legacy placeholder-PIN whitelist rows are converted to the claim flow (their next login routes to first-login PIN setup, and their lockout rows are cleared)
 **Plans**: TBD
 
-Cross-cutting constraints: deploy order invariant — migration 0012 (nullable `pin_hash`) → patched `verify-pin` + new `setup-pin` Edge Functions live → first `add_member` use (the null-hash branch must precede the bcrypt compare or pinless members 500); `add_member` stays the ONLY write surface on `members` (no new RLS policy, no direct INSERT); inactive members must NEVER receive `pin_setup_required` (uniform 401 — branch ordering is a smoke-probed must-have).
+Cross-cutting constraints: deploy order invariant — migration 0013 (nullable `pin_hash`; renumbered: Phase 7's catalog migration took 0012) → patched `verify-pin` + new `setup-pin` Edge Functions live → first `add_member` use (the null-hash branch must precede the bcrypt compare or pinless members 500); `add_member` stays the ONLY write surface on `members` (no new RLS policy, no direct INSERT); inactive members must NEVER receive `pin_setup_required` (uniform 401 — branch ordering is a smoke-probed must-have).
 **UI hint**: yes
 
 ### Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats
@@ -67,7 +72,7 @@ Cross-cutting constraints: deploy order invariant — migration 0012 (nullable `
 **Requirements**: SCALE-01, SCALE-02, SCALE-03, ROLE-01, ROLE-02, ROLE-03, ROLE-04, ROLE-06, ROLE-07, ROLE-08, ROLE-10, ROLE-11, HOME-03
 **Success Criteria** (what must be TRUE):
   1. Per-stat points are value-proportional within class+build-role cohorts: the leader(s) at the max value hold exactly 99, everyone below scales by `own/max × 99` (top-end cuts at 98/97/96/95 emerge naturally), and OVR inherits the finer scale with zero formula change and the floor of 51 preserved — proven by exact-value smoke on live data
-  2. ONE migration (0013) swaps the formula across all three rank RPCs (`my_report`, `class_top5`, `get_promotion`), rebuilds `class_key_stats` to key per (class, build-role) with block-at-7 per combo, backfills every existing class config into all build-role values (pre/post-migration OVR parity smoke: zero OVR change or null on deploy day), ships `set_key_stat` v2 with the old signature dropped, and folds in the single additive `last_validated_at` scalar on `my_report` — zero new per-stat fields
+  2. ONE migration (0014; renumbered: Phase 7 took 0012, Phase 8 takes 0013) swaps the formula across all three rank RPCs (`my_report`, `class_top5`, `get_promotion`), rebuilds `class_key_stats` to key per (class, build-role) with block-at-7 per combo, backfills every existing class config into all build-role values (pre/post-migration OVR parity smoke: zero OVR change or null on deploy day), ships `set_key_stat` v2 with the old signature dropped, and folds in the single additive `last_validated_at` scalar on `my_report` — zero new per-stat fields
   3. OVR in all three RPCs reads the member's own (class, build-role) config, per-stat cohorts become class+build-role, and a member with no configured combo gets OVR = null via the existing data-insufficient rendering — never a silent class-defaults fallback
   4. Every re-locked baseline is green in the same phase: `rankMath.ts` locked test values, `smoke-rank.mjs` exact-value matrix, and `smoke-promotion.mjs` ordering (fixtures carry build roles and per-combo 6-row key-stat inserts); tier bands (D-01/D-02) are recalibrated by the owner against the resident seeded cohorts before being locked, and the improvement-screen percentile phrase is gone — stat cards no longer claim percentile position
   5. The admin surface works and the governance holds: Stats-Chave gains the role selector (class → role → stat chips, per-combo count display, block-at-7 copy), build-role assignment stays staff-only (Personagens path), the staff audit pass re-assigns existing members' build roles before any per-role differentiation applies, officers see the per-(class, role) config coverage indicator (staff-only) — and RNK-02 closed-payload discipline holds (leak probes stay green, no member-visible sign that role configs differ)
@@ -78,7 +83,7 @@ Cross-cutting constraints: ONE migration, ONE tripod re-lock — both features r
 
 ### Phase 10: Personalized Home Landing Tab
 **Goal**: Login lands players on a personalized home — their own OVR and best stats at a glance, with a clear nudge when their data is stale — while Destaques keeps the guild-wide EAFC celebration.
-**Depends on**: Phase 9 (`my_report` gains `last_validated_at` in migration 0013 — shipped there, consumed here)
+**Depends on**: Phase 9 (`my_report` gains `last_validated_at` in migration 0014 — shipped there, consumed here)
 **Requirements**: HOME-01, HOME-02
 **Success Criteria** (what must be TRUE):
   1. After login, members land on a new Início tab showing their own OVR card (reused OvrHero) and a top-3 best-stats strip (value + points + tier badge), sorted client-side from fields the payload already returns
