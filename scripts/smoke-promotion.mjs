@@ -354,12 +354,12 @@ async function main() {
     const shapeOk = promoCards.every(
       (c) =>
         typeof c.display_name === 'string' &&
-        (c.char_function === 'tank' || c.char_function === 'dps') &&
+        (c.char_function === 'dps' || c.char_function === 'mdps' || c.char_function === 'suporte') &&
         typeof c.ovr === 'number' &&
         c.ovr >= 51,
     )
     check(
-      "3a. every card: display_name, char_function in (tank,dps), numeric ovr >= 51",
+      "3a. every card: display_name, char_function in (dps,mdps,suporte), numeric ovr >= 51",
       shapeOk,
       `ovrs=${JSON.stringify(promoCards.map((c) => c.ovr))}`,
     )

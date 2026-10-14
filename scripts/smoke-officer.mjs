@@ -88,12 +88,12 @@ const DISPLAY = {
   [HANDLES.b]: 'SMOKE Member B',
   [HANDLES.c]: 'SMOKE Member C',
 }
-// Roles: staff (owner/officer) tank, ordinary members dps — same class, so
+// Roles: staff (owner/officer) suporte, ordinary members dps — same class, so
 // the dps trio a/b/c forms an n>=3 cohort for my_report points (probe 6)
 // while staff rows never join the dps cohort.
 const ROLES = {
-  [HANDLES.owner]: ['owner', 'tank'],
-  [HANDLES.officer]: ['officer', 'tank'],
+  [HANDLES.owner]: ['owner', 'suporte'],
+  [HANDLES.officer]: ['officer', 'suporte'],
   [HANDLES.a]: ['member', 'dps'],
   [HANDLES.b]: ['member', 'dps'],
   [HANDLES.c]: ['member', 'dps'],

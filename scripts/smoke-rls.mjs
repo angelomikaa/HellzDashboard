@@ -179,8 +179,8 @@ async function main() {
   const classes = await rest('/classes?select=class_name', { token: member.access_token })
   const classList = Array.isArray(classes.json) ? classes.json.map((r) => r.class_name) : []
   check(
-    'member GET /classes -> 200 with Assassin present',
-    classes.status === 200 && classList.includes('Assassin'),
+    'member GET /classes -> 200 with Assassin Cross present',
+    classes.status === 200 && classList.includes('Assassin Cross'),
     `HTTP ${classes.status}`,
   )
 
@@ -243,7 +243,7 @@ async function main() {
   const charPatch = await rest(`/members?id=eq.${member.member_id}`, {
     method: 'PATCH',
     token: officer.access_token,
-    body: { char_class: 'Assassin', char_function: 'tank' },
+    body: { char_class: 'Assassin Cross', char_function: 'suporte' },
   })
   const charVerify = await rest(
     `/members?id=eq.${member.member_id}&select=char_class,char_function`,
@@ -255,8 +255,8 @@ async function main() {
     charPatch.ok &&
       charVerify.status === 200 &&
       charRow &&
-      charRow.char_class === 'Assassin' &&
-      charRow.char_function === 'tank',
+      charRow.char_class === 'Assassin Cross' &&
+      charRow.char_function === 'suporte',
     `HTTP ${charPatch.status}, re-read: ${JSON.stringify(charRow)}`,
   )
 
