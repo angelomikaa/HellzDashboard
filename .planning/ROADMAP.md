@@ -22,7 +22,7 @@
 <details open>
 <summary>🚧 v1.1 Home, Whitelist & Fine Ranks (Phases 7–10) — IN PROGRESS</summary>
 
-- [ ] Phase 7: Dummy-Data Seed & Catalog Alignment — owner-roster seed ships FIRST (owner decision 7: see how v1.0 wraps around data while v1.1 is developed), build-role vocabulary (ROLE-05) + official job-tree catalog (ROLE-12) aligned so dummies carry correct roles from day one (0/0 plans)
+- [ ] Phase 7: Dummy-Data Seed & Catalog Alignment — owner-roster seed ships FIRST (owner decision 7: see how v1.0 wraps around data while v1.1 is developed), build-role vocabulary (ROLE-05) + official job-tree catalog (ROLE-12) aligned so dummies carry correct roles from day one (1/4 plans)
 - [ ] Phase 8: Whitelist Lifecycle & First-Login PIN Setup — handle-only registration, player-picked PIN on first login, owner PIN reset, reactivation (0/0 plans)
 - [ ] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0014; renumbered +1 by Phase 7 taking 0012 and Phase 8 taking 0013): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (0/0 plans)
 - [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (0/0 plans)
@@ -43,7 +43,7 @@
   5. The purge is scripted, FK-safe (submissions before members), idempotent, leaves zero dummy rows, and stands as a hard pre-release checklist gate
 **Plans**: 4 plans (see `.planning/phases/07-dummy-data-seed-catalog-alignment/`)
 Plans:
-- [ ] 07-01-PLAN.md — Catalog alignment migration 0012 (official job tree, OVR continuity) — Wave 1
+- [x] 07-01-PLAN.md — Catalog alignment migration 0012 (official job tree, OVR continuity) — Wave 1
 - [ ] 07-02-PLAN.md — Build-role vocabulary propagation (labels, types, staff form) — Wave 1
 - [ ] 07-03-PLAN.md — Dummy seed + purge authoring, local rehearsal, D-12 owner gate — Wave 2
 - [ ] 07-04-PLAN.md — Live push + seed apply + starvation verification + release gate — Wave 3
