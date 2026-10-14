@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: CHECKPOINT 07-03 (D-12 owner review gate): dummy seed package (73-member roster, value bases, purge) authored + rehearsed 20/20 green locally; awaiting owner approval of value tables, Sniper correction, splits, wildcard + PIN handoff before 07-04 live apply
-last_updated: "2026-10-14T03:33:00.000Z"
+stopped_at: "07-03 COMPLETE (D-12 gate closed): seed live-derived + rehearsed 21/21; next = 07-04 live apply (requirements SEED-01/SEED-02 close there)"
+last_updated: "2026-10-14T07:35:17.823Z"
 last_activity: 2026-10-14
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 07 (Dummy-Data Seed & Catalog Alignment) — EXECUTING
-Plan: 3 of 4 — tasks 1-2 complete; task 3 = D-12 checkpoint (owner review), OPEN
-Status: Blocked on owner (human-verify gate)
+Plan: 4 of 4 — 07-03 complete (D-12 gate closed); ready to execute 07-04 (live apply)
+Status: Ready to execute
 Last activity: 2026-10-14
 
 ## Accumulated Context
@@ -39,8 +39,9 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 07]: Hunter line catalog entry = Sniper (not Ranger): live-API verification 2026-10-13 confirmed the Archer line's released top job is Sniper (second_advanced_transfer); Ranger is third_transfer/unreleased, same rule as Grand Summoner/Nightwatch. Surfaced at the D-12 review gate.
 - [Phase 07]: Migration 0012 ships catalog alignment (11 renames, guarded Dancer/Super Novice removals, Summoner/Rebellion additions) + char_function CHECK widen (tank->suporte, mdps added) in one append-only corrective migration. Local rehearsal ran against real Postgres 18.4 via embedded binaries (no supabase CLI/Docker in this environment); live key-stat count parity re-check owned by 07-04.
 - [Phase 07]: Client role vocabulary lives in ONE shared map (src/lib/groups.ts FUNCTION_LABELS, dps/mdps/suporte with locked pt-BR copy); the staff form renders its three options from the map so options can never drift from the vocabulary
-- [Phase 07]: Dummy seed (07-03) uses OWNER-SUPPLIED-SAMPLE base values for all 57 stats (SEED-01 fallback) — the live value report (scripts/dummy-value-report.mjs) was env-gated out of the authoring session; every stat flagged low-confidence in SEED-NOTES.md; owner should run `node scripts/dummy-value-report.mjs` (env-gated) to refresh bases or approve the samples at the D-12 gate before 07-04 applies live
-- [Phase 07]: Dummy seed roster splits authored per D-08 (LK/Paladin 3/1 dps:suporte, Biochemist 2/1/1, Mastersmith 1/2/1, Summoner 3/3/2, Sniper+Rebellion 4+4, Stalker wildcard n=1) — owner-correctable at the D-12 gate; uniform dummy PIN is hash-only in the repo, plaintext handed off out-of-band (never committed)
+- [Phase 07]: Dummy seed roster splits authored per D-08 (LK/Paladin 3/1 dps:suporte, Biochemist 2/1/1, Mastersmith 1/2/1, Summoner 3/3/2, Sniper+Rebellion 4+4, Stalker wildcard n=1) — CONFIRMED by owner at the D-12 gate 2026-10-14; uniform dummy PIN is hash-only in the repo, plaintext handed off out-of-band (never committed)
+- [Phase 07]: Dummy seed value bases REBUILT from live medians (D-11 honest, owner D-12 decision): base = live median from value-bases.json (n=3, Assassin/tank + Priest/tank), 53/57 bases changed; the 4 degenerate all-zero live stats (refine_mdef, crit_dmg, fixed_ct, variable_ct) keep owner samples; negative live ranges (fixed_ct_pct -49.4, global_cd_pct -10, variable_ct_pct -60) preserved unclamped across the whole ladder; 3 further live-zero stats (ignore_pdef_pct, ignore_mdef_pct, dmg_vs_demi_human) take base 0.0
+- [Phase 07]: D-12 gate CLOSED (owner, 2026-10-14): Sniper (not Ranger) confirmed, authored splits as rehearsed, Stalker wildcard x1, live residency (D-13) approved; ZERO live writes in 07-03 - plan 07-04 owns the live apply via apply-seed.mjs and the SEED-02 pre-release gate
 
 ### Blockers/Concerns (open — carry to next milestone)
 
@@ -61,9 +62,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-14T03:33:00.000Z
-Stopped at: CHECKPOINT 07-03 (D-12 owner review gate): dummy seed authored + rehearsed 20/20 green locally; awaiting owner approval (values / Sniper / splits / wildcard) + PIN handoff before 07-04 live apply
-Resume file: .planning/phases/07-dummy-data-seed-catalog-alignment/07-03-SUMMARY.md
+Last session: 2026-10-14T07:35:17.789Z
+Stopped at: 07-03 COMPLETE (D-12 gate closed): seed live-derived + rehearsed 21/21; next = 07-04 live apply (requirements SEED-01/SEED-02 close there)
+Resume file: .planning/phases/07-dummy-data-seed-catalog-alignment/07-04-PLAN.md
 
 ## Performance Metrics
 
@@ -71,7 +72,7 @@ Resume file: .planning/phases/07-dummy-data-seed-catalog-alignment/07-03-SUMMARY
 |-------|------|----------|-------|-------|-----------|
 | 07 | 07-01 | ~62 min | 2 | 2 | 2026-10-14 |
 | 07 | 07-02 | ~15 min | 2 | 6 | 2026-10-14 |
-| 07 | 07-03 | ~61 min (tasks 1-2, checkpoint open) | 2/3 | 4 | 2026-10-14 |
+| 07 | 07-03 | ~96 min (tasks 1-2 + gate close) | 3 | 5 | 2026-10-14 |
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*

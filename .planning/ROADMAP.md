@@ -45,7 +45,7 @@
 Plans:
 - [x] 07-01-PLAN.md — Catalog alignment migration 0012 (official job tree, OVR continuity) — Wave 1
 - [x] 07-02-PLAN.md — Build-role vocabulary propagation (labels, types, staff form) — Wave 1
-- [ ] 07-03-PLAN.md — Dummy seed + purge authoring, local rehearsal, D-12 owner gate — Wave 2
+- [x] 07-03-PLAN.md — Dummy seed + purge authoring, local rehearsal, D-12 owner gate — Wave 2
 - [ ] 07-04-PLAN.md — Live push + seed apply + starvation verification + release gate — Wave 3
 
 Cross-cutting constraints: catalog work (ROLE-12) precedes seeding — roster uses advanced job names that don't exist in the current 15-class catalog (documented problem 4); the seed is NEVER a migration and never a direct child of `seeds/` (flat `db.seed` glob auto-applies it); dummy rows stay resident for the milestone duration BY OWNER DECISION 7 (observing v1.0 on realistic cohorts — no overnight-window ritual anymore), but rank pollution of real members during the window is owner-accepted and the purge-before-release gate is non-negotiable; this phase touches NO rank RPC — the seed purpose here is observation, band calibration moves to Phase 9.
@@ -107,7 +107,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 (8 is independent and coul
 | 4. Member Dashboard & Improvement Screen | v1.0 | 3/3 | Complete | 2026-10-11 |
 | 5. OCR Auto-Read Layer | v1.0 | 5/5 | Complete | 2026-10-12 |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | v1.0 | 7/7 | Complete | 2026-10-13 |
-| 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 0/0 | Not started | - |
+| 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 3/4 | In Progress|  |
 | 8. Whitelist Lifecycle & First-Login PIN Setup | v1.1 | 0/0 | Not started | - |
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 0/0 | Not started | - |
 | 10. Personalized Home Landing Tab | v1.1 | 0/0 | Not started | - |

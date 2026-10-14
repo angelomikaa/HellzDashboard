@@ -39,7 +39,7 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 - [ ] **ROLE-06**: Members with no configured (class, build-role) combo get OVR = null via the existing data-insufficient rendering — never a silent class-defaults fallback
 - [ ] **ROLE-07**: Build-role assignment stays staff-only (Personagens path); RNK-02 closed-payload discipline verbatim (zero new key-stat-derived fields)
 - [ ] **ROLE-08**: Stats-Chave admin page gains a role selector (class → role → stat chips) with per-combo count display and block-at-7 copy
-- [ ] **ROLE-09**: Dummy seed covers ≥3 dummies per populated (class, build-role) combo, following the owner-provided roster (see Seed Roster below)
+- [x] **ROLE-09**: Dummy seed covers ≥3 dummies per populated (class, build-role) combo, following the owner-provided roster (see Seed Roster below)
 - [ ] **ROLE-10**: Staff audit pass re-assigns existing members' build-roles before any per-role key-stat differentiation is applied
 - [ ] **ROLE-11**: Officer-visible per-(class, role) key-stat config coverage indicator (staff-only, never member-visible)
 - [ ] **ROLE-12**: Class catalog aligned with the official job tree (https://roocamer.gnjoy.game/home#job-intro): unreleased jobs excluded (Super Novice, Ninja), catalog additions needed by the seed roster (e.g., Summoner, Gunslinger), advanced-job naming reconciled (High Wizard/Professor, Biochemist/Smith, Dancer/Gypsy)
@@ -125,7 +125,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | ROLE-05 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
-| ROLE-09 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
+| ROLE-09 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
 | ROLE-12 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
 | SEED-01 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
 | SEED-02 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
