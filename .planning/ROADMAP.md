@@ -44,7 +44,7 @@
 **Plans**: 4 plans (see `.planning/phases/07-dummy-data-seed-catalog-alignment/`)
 Plans:
 - [x] 07-01-PLAN.md — Catalog alignment migration 0012 (official job tree, OVR continuity) — Wave 1
-- [ ] 07-02-PLAN.md — Build-role vocabulary propagation (labels, types, staff form) — Wave 1
+- [x] 07-02-PLAN.md — Build-role vocabulary propagation (labels, types, staff form) — Wave 1
 - [ ] 07-03-PLAN.md — Dummy seed + purge authoring, local rehearsal, D-12 owner gate — Wave 2
 - [ ] 07-04-PLAN.md — Live push + seed apply + starvation verification + release gate — Wave 3
 

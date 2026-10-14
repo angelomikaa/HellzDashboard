@@ -35,7 +35,7 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 - [ ] **ROLE-02**: `set_key_stat` v2 accepts the build-role param (validated server-side, error vocabulary unchanged, old signature dropped in the same migration)
 - [ ] **ROLE-03**: OVR in `my_report`, `class_top5`, `get_promotion` reads the member's own (class, build-role) config, and per-stat percentile cohorts become class+build-role (D-06/D-07 superseded)
 - [ ] **ROLE-04**: Migration backfills every existing class config into all build-role values → zero OVR change or null on deploy day
-- [ ] **ROLE-05**: `members.char_function` carries exactly ONE of three build roles — Dano Físico (physical DPS), Dano Mágico (magical DPS), or Suporte (the tank role, renamed per owner nomenclature decision); no character holds more than one role (hard design motto: a focused character fills one role properly)
+- [x] **ROLE-05**: `members.char_function` carries exactly ONE of three build roles — Dano Físico (physical DPS), Dano Mágico (magical DPS), or Suporte (the tank role, renamed per owner nomenclature decision); no character holds more than one role (hard design motto: a focused character fills one role properly)
 - [ ] **ROLE-06**: Members with no configured (class, build-role) combo get OVR = null via the existing data-insufficient rendering — never a silent class-defaults fallback
 - [ ] **ROLE-07**: Build-role assignment stays staff-only (Personagens path); RNK-02 closed-payload discipline verbatim (zero new key-stat-derived fields)
 - [ ] **ROLE-08**: Stats-Chave admin page gains a role selector (class → role → stat chips) with per-combo count display and block-at-7 copy
@@ -124,7 +124,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ROLE-05 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
+| ROLE-05 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
 | ROLE-09 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
 | ROLE-12 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
 | SEED-01 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Pending |
