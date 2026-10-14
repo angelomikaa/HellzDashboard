@@ -8,7 +8,10 @@ export const GROUP_LABELS: Record<GroupKey, string> = {
   quasi: 'Quasi',
   special: 'Especial',
 }
-export const FUNCTION_LABELS: Record<'dps' | 'tank', string> = {
-  dps: 'DPS',
-  tank: 'Tank',
+// Build-role labels (ROLE-05, 07-UI-SPEC): one source for the staff form,
+// dashboard, submit header and highlights.
+export const FUNCTION_LABELS: Record<'dps' | 'mdps' | 'suporte', string> = {
+  dps: 'Dano Físico',
+  mdps: 'Dano Mágico',
+  suporte: 'Suporte',
 }

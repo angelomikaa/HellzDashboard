@@ -205,7 +205,7 @@ describe('rank engine client functions (03-03 RPC contracts)', () => {
   it('fetchClassTop5 posts p_class and returns the row shape', async () => {
     const rows = [
       { display_name: 'Alpha', char_function: 'dps', ovr: 87 },
-      { display_name: 'Beta', char_function: 'tank', ovr: null },
+      { display_name: 'Beta', char_function: 'suporte', ovr: null },
     ]
     nextResponse = () => res(200, JSON.stringify(rows))
     const top5 = await fetchClassTop5(session, 'Assassin')

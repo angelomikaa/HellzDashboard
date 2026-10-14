@@ -34,7 +34,7 @@ export interface MemberRow {
   role: 'member' | 'officer' | 'owner'
   active: boolean // added in Phase 6 — owner Remover/Reativar controls (set_member_active)
   char_class: string | null
-  char_function: 'tank' | 'dps'
+  char_function: 'dps' | 'mdps' | 'suporte'
 }
 
 export interface SubmissionRow {
@@ -195,7 +195,7 @@ export async function setKeyStat(
 
 export interface ClassTop5Row {
   display_name: string
-  char_function: 'tank' | 'dps'
+  char_function: 'dps' | 'mdps' | 'suporte'
   ovr: number | null
 }
 
@@ -226,7 +226,7 @@ export interface MyReportStat {
 
 export interface MyReport {
   char_class: string | null
-  char_function: 'tank' | 'dps'
+  char_function: 'dps' | 'mdps' | 'suporte'
   stats: MyReportStat[] // always all 57 catalog entries, ordered group_name, label
   ovr: { value: number | null; data_sufficient: boolean }
 }
@@ -272,7 +272,7 @@ export interface OfficerQueueRow {
   display_name: string
   discord_handle: string
   char_class: string | null
-  char_function: 'tank' | 'dps'
+  char_function: 'dps' | 'mdps' | 'suporte'
   stats: QueueStat[] // all 57 catalog entries, ordered group_name, label
 }
 
@@ -339,7 +339,7 @@ export interface PromotionHighlight {
 
 export interface PromotionCardRow {
   display_name: string
-  char_function: 'tank' | 'dps'
+  char_function: 'dps' | 'mdps' | 'suporte'
   ovr: number // floor-51 value; tier band derived client-side via tierForOvr
   highlights: PromotionHighlight[] // top 6 by points desc — CLOSED field list (RNK-02)
 }
