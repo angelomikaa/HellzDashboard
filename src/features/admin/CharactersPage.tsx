@@ -358,7 +358,17 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
               Nenhum membro na lista branca ainda.
             </p>
           ) : (
-            <div className="mt-6 overflow-x-auto">
+            <div className="-mx-2 mt-6 overflow-x-auto px-2">
+              {/* Owner gate round 3 (07.1-02) crop fix: overflow-x-auto makes
+                  this wrapper a clip container on BOTH axes (overflow-y
+                  computes to auto), and edge-column controls (Editar/Salvar
+                  flush right, edit inputs flush left) sat exactly on its
+                  boundary — their focus-visible rings (box-shadow, which never
+                  contributes to scrollable overflow) were hard-cropped. -mx-2 +
+                  px-2 pushes the clip boundary 8px outward into the section's
+                  padding while keeping the table's visual position unchanged.
+                  Vertical clearance already exists (cells have py-3/py-4, more
+                  than a 2px ring needs). */}
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-sm font-semibold text-muted">
