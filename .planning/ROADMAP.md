@@ -52,14 +52,21 @@ Cross-cutting constraints: catalog work (ROLE-12) precedes seeding — roster us
 **UI hint**: yes
 
 ### Phase 07.1: Visual ID implementation (INSERTED)
-
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
-**Depends on:** Phase 7
-**Plans:** 0 plans
+**Goal**: The Hellz mark (sharp, red neon, dark, sci-fi) becomes the product's visual system: full red accent swap (gold retired from UI chrome, survives only as tier-gold), logo-anchored near-black surfaces with red-tinted hairlines, moderate static neon on key moments, the mark as favicon + login hero + compact header mark, and one self-hosted display font for hero elements — all inside the existing Tailwind v4 `@theme` token architecture, zero functional changes.
+**Depends on**: Phase 7 (shipped — seeded cohorts resident, so the visual pass happens on realistic data)
+**Requirements**: VIS-01, VIS-02, VIS-03, VIS-04, VIS-05, VIS-06, VIS-07
+**Success Criteria** (what must be TRUE):
+  1. The logo red family is THE interactive accent everywhere (focus rings, active tab, buttons, checkbox, links); no gold remains on UI chrome (`#E3B341` absent from src) — gold survives only as the `--color-tier-gold` token (D-01/D-02)
+  2. Surfaces are logo-anchored near-black (#141414/#1E1E1E) with red-tinted hairlines; the 60/30/10 surface discipline and text contrast (AA) hold (D-03)
+  3. Neon is moderate and STATIC: glows only on active tab, OVR hero number, Destaques tier accents, login hero, focus rings; grid/gradient backdrop only on login + Destaques; zero animations; `prefers-reduced-motion` respected (D-04/D-05)
+  4. The mark appears as favicon (replacing the Vite icon), login hero lockup ("Hellz — Painel Geral"), and compact header mark left of "Olá, {name}" — nowhere else (D-06)
+  5. One display font (Orbitron, OFL) serves wordmark/lockup, page h1s, and OVR/points hero numbers via a self-hosted subset woff2 with pt-BR diacritics, system fallback, and preload; body text stays on the system stack (D-07)
+  6. Tier tokens stay semantically distinct from each other and from the brand red; `presentation.ts` band logic untouched; all existing tests green; no API/RPC/behavior change (VIS-07)
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 07.1 to break down)
+- [ ] 07.1-01-PLAN.md — Neon token system rewrite + display font infrastructure (Wave 1)
+- [ ] 07.1-02-PLAN.md — Logo placement + neon moments + owner visual gate (Wave 2)
 
 ### Phase 8: Whitelist Lifecycle & First-Login PIN Setup
 **Goal**: Staff control exactly who can access the panel — officers add players by handle only, players choose their own PIN at first login, and a forgotten PIN is resolvable by the owner — with the whitelist as the trust boundary and no second rate-limit mechanism.
