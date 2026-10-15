@@ -44,10 +44,12 @@ Each player can see, through their stat cards, exactly where they stand compared
 
 v1.1 milestone scope (defined 2026-10-13):
 
+- [x] Dummy-data seed workflow: reversible roster-based seed (~73 members, live-median values) applied to live for milestone-long calibration; purge is a hard pre-release gate — Validated in Phase 7: SEED-01/02 + ROLE-09 (34/34 must-haves; purge → four zeros → re-seed proven)
+- [x] Class catalog aligned to the official job tree (transcendent names, currently-released jobs only: Sniper not Ranger, Summoner, Rebellion; Super Novice/Dancer removed) + build-role vocabulary (dps/mdps/suporte, 'tank' retired) — Validated in Phase 7: ROLE-05/12, migration 0012 live with OVR parity, 5/5 smokes green
 - [ ] Whitelist control: officers and owner can add players to the whitelist (handle-only registration); player picks own PIN on first login
 - [ ] Personalized home: player's own status (OVR + best stats) as the landing view, with a stale-data CTA after 7 days without a validated submission
-- [ ] Value-proportional 99 scale: top-end cuts at 98/97/96/95 based on value distance to the best, per stat
-- [ ] Dummy-data seed workflow: ~5 seeded players per class to calibrate displays, removed before release
+- [ ] Value-proportional 99 scale: top-end cuts at 98/97/96/95 based on value distance to the best, per stat — **live-data caveat:** Fixed CT %, Global CD %, Variable CT % are negative in real submissions (lower-is-better); the scale formula must invert these (recorded 2026-10-14 from the Phase 7 live value report)
+- [ ] Role-differentiated key stats: key-stat config per (class, build-role) with migration backfill — cohort semantics class+build-role confirmed by owner
 
 ### Future (deferred, not this milestone)
 
@@ -68,7 +70,7 @@ v1.1 milestone scope (defined 2026-10-13):
 ## Context
 
 - Game: Ragnarok Origin (mobile, Ragnarok-family stat layout)
-- **Current state (v1.0 shipped 2026-10-13):** ~7,700 LOC TypeScript/React 19 + Tailwind v4 (284 tests green), 11 Supabase migrations (1,658 LOC SQL), 5 live smoke matrices (RLS, rank, lifecycle, officer 39-check, promotion 21-check incl. leak-diff), live on Supabase free tier; OCR is a structural reader (scale/margin-invariant) with a permanent exact-value harness
+- **Current state (Phase 7 complete, 2026-10-14):** v1.1 in progress — migration 0012 live (15 transcendent classes, dps/mdps/suporte vocabulary, OVR continuity proven), 73-dummy roster resident live (21/21 cohorts, starvation cases render data-insufficient), 12 migrations, 5 live smoke matrices green, 284 tests green; the dummy purge is a recorded hard pre-release gate (STATE.md)
 - **Known tech debt / advisories:** 06-REVIEW WR-01..04 (misleading "Salvo." feedback, Shift+Tab trap in ConfirmDialog, non-unique React key on HighlightsPage, one duplicate officer smoke probe) — advisory only, no must-have impacted; pre-launch owner actions: rotate Supabase deploy token + placeholder whitelist PINs, replace `public/examples/*.svg` with real screenshots before inviting real members
 - Stat structure from screenshots:
   - **General Stats**: HP, SP, PATK, PDEF, MATK, MDEF, Refine PATK/PDEF/MATK/MDEF, HP recover, SP Recovery, HIT, FLEE
@@ -127,4 +129,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-13 — v1.1 milestone started (Home, Whitelist & Fine Ranks): whitelist lifecycle with player-picked PINs, personalized home with stale-data CTA, value-proportional 99 scale, dummy-data seed workflow. Deferred v2 candidates moved to Future section.*
+*Last updated: 2026-10-14 - Phase 7 complete (seed + catalog + role vocabulary live; v1.1 continues with whitelist/home/scale)*
