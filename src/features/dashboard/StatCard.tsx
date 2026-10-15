@@ -4,18 +4,19 @@
 // points badge, percentile phrase, and the muted Média/Melhor aggregate line.
 // Points/OVR arrive opaque from the RPC — the badge only rounds the given
 // number for display, nothing is recomputed here. Tier is communicated by
-// COLOR only (D-03) and all tier classes flow through the literal TIER_*
-// maps from presentation.ts (Tailwind v4 JIT never sees interpolated names).
+// COLOR only (D-03) and all tier classes flow through the render-layer
+// display maps in tierDisplay.ts (wrapping the literal presentation.ts maps).
 import type { ReactNode } from 'react'
 import type { MyReportStat } from '../../lib/api'
 import { formatStatValue } from '../../lib/parseStatValue'
-import { TIER_BORDER, TIER_TEXT, percentilePhrase, tierForPoints } from './presentation'
+import { TIER_BORDER_DISPLAY, TIER_TEXT_DISPLAY } from './tierDisplay'
+import { percentilePhrase, tierForPoints } from './presentation'
 
 export function StatCard({ stat }: { stat: MyReportStat }) {
   // State matrix (locked order): missing > insufficient > tiered.
   const missing = stat.own_value === null
   const tier = stat.points !== null ? tierForPoints(stat.points) : null
-  const borderClass = !missing && tier !== null ? TIER_BORDER[tier] : 'border-line'
+  const borderClass = !missing && tier !== null ? TIER_BORDER_DISPLAY[tier] : 'border-line'
   const phrase =
     !missing && stat.points !== null ? percentilePhrase(stat.points, stat.label) : null
 
@@ -31,7 +32,7 @@ export function StatCard({ stat }: { stat: MyReportStat }) {
         </span>
       ) : tier !== null ? (
         <span
-          className={`rounded-full border px-2 py-1 text-sm font-semibold ${TIER_BORDER[tier]} ${TIER_TEXT[tier]}`}
+          className={`rounded-full border px-2 py-1 text-sm font-semibold ${TIER_BORDER_DISPLAY[tier]} ${TIER_TEXT_DISPLAY[tier]}`}
         >
           {Math.round(stat.points)}
         </span>

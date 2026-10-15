@@ -12,12 +12,15 @@
 // PromotionHighlight contract (06-03) blocks unknown payload fields at
 // compile time (T-06-05).
 //
-// All tier styling flows through the literal TIER_* maps from the Phase 4
-// presentation module (Tailwind v4 JIT never sees interpolated class names).
+// All tier styling flows through the render-layer display maps in
+// ../dashboard/tierDisplay.ts (which wraps the literal TIER_* maps from the
+// Phase 4 presentation module — untouched, VIS-07; the top band displays as
+// "Impecável" with a static rainbow treatment per the 07.1-02 owner gate).
 // No interactive elements inside the card (SHAR-01 deferred) — flat-border
 // language only: no icons, shadows, gradients, avatars.
 import type { PromotionCardRow } from '../../lib/api'
-import { TIER_BORDER, TIER_TEXT, tierForOvr, tierForPoints } from '../dashboard/presentation'
+import { tierForOvr, tierForPoints } from '../dashboard/presentation'
+import { TIER_BORDER_DISPLAY, TIER_TEXT_DISPLAY, TIER_TEXT_GLOW } from '../dashboard/tierDisplay'
 import { FUNCTION_LABELS } from '../../lib/groups'
 import { formatStatValue } from '../../lib/parseStatValue'
 
@@ -29,11 +32,11 @@ export function PromotionCard({ card, charClass }: { card: PromotionCardRow; cha
   const ovrTier = tierForOvr(Math.round(card.ovr)) as NonNullable<ReturnType<typeof tierForOvr>>
 
   return (
-    <article aria-label={`${card.display_name} — ${charClass}`} className={`rounded-lg border-2 bg-surface p-6 ${TIER_BORDER[ovrTier]}`}>
+    <article aria-label={`${card.display_name} — ${charClass}`} className={`rounded-lg border-2 bg-surface p-6 ${TIER_BORDER_DISPLAY[ovrTier]}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-sm text-muted">OVR</p>
-          <p className={`text-5xl font-semibold leading-none font-display glow-text-current ${TIER_TEXT[ovrTier]}`}>
+          <p className={`text-5xl font-semibold leading-none font-display ${TIER_TEXT_GLOW[ovrTier]}`}>
             {Math.round(card.ovr)}
           </p>
         </div>
@@ -57,7 +60,7 @@ export function PromotionCard({ card, charClass }: { card: PromotionCardRow; cha
                 <span className="text-sm text-content">{formatStatValue(h.value, h.value_type)}</span>
                 <span
                   aria-label={`${Math.round(h.points)} pontos em ${h.label}`}
-                  className={`rounded-full border px-2 py-1 text-sm font-semibold ${TIER_BORDER[facetTier]} ${TIER_TEXT[facetTier]}`}
+                  className={`rounded-full border px-2 py-1 text-sm font-semibold ${TIER_BORDER_DISPLAY[facetTier]} ${TIER_TEXT_DISPLAY[facetTier]}`}
                 >
                   {Math.round(h.points)}
                 </span>

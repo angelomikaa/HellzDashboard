@@ -10,7 +10,8 @@
 // (interaction red #DC3538 — a different token from tier gold #E9B44C).
 import type { MyReportStat } from '../../lib/api'
 import type { GroupKey } from '../../lib/groups'
-import { TIER_TEXT, focusCandidates, tierForPoints } from './presentation'
+import { focusCandidates, tierForPoints } from './presentation'
+import { TIER_TEXT_DISPLAY } from './tierDisplay'
 
 export function FocusStrip({
   stats,
@@ -36,7 +37,7 @@ export function FocusStrip({
               className="flex h-11 items-center gap-2 rounded-md border border-line bg-surface px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <span className="text-sm text-content">{stat.label}</span>
-              <span className={`text-sm font-semibold ${tier ? TIER_TEXT[tier] : ''}`}>
+              <span className={`text-sm font-semibold ${tier ? TIER_TEXT_DISPLAY[tier] : ''}`}>
                 {Math.round(stat.points as number)}
               </span>
             </button>

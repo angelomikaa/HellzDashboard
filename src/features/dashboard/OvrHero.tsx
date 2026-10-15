@@ -6,7 +6,8 @@
 // pt-BR copy (cohort n < 3, or no class registered).
 import type { MyReport } from '../../lib/api'
 import { FUNCTION_LABELS } from '../../lib/groups'
-import { TIER_BORDER, TIER_TEXT, tierForOvr } from './presentation'
+import { tierForOvr } from './presentation'
+import { TIER_BORDER_DISPLAY, TIER_TEXT_GLOW } from './tierDisplay'
 
 export function OvrHero({
   ovr,
@@ -35,11 +36,11 @@ export function OvrHero({
 
   return (
     <section
-      className={`rounded-lg border-2 bg-surface p-6 ${tier !== null ? TIER_BORDER[tier] : 'border-line'}`}
+      className={`rounded-lg border-2 bg-surface p-6 ${tier !== null ? TIER_BORDER_DISPLAY[tier] : 'border-line'}`}
     >
       <p className="text-sm text-muted">OVR</p>
       <p
-        className={`text-5xl font-semibold leading-none ${tier !== null ? `font-display glow-text-current ${TIER_TEXT[tier]}` : 'text-muted'}`}
+        className={`text-5xl font-semibold leading-none ${tier !== null ? `font-display ${TIER_TEXT_GLOW[tier]}` : 'text-muted'}`}
       >
         {display}
       </p>

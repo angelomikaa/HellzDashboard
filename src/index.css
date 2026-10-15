@@ -70,6 +70,32 @@
     repeating-linear-gradient(90deg, rgb(220 53 56 / 0.03) 0 1px, transparent 1px 48px);
 }
 
+/* Impecável — the top tier, renamed per owner decision at the 07.1-02 gate
+   (platinum read too close to silver). Premium static rainbow treatment,
+   unmistakably distinct from bronze/silver/gold (D-02 revision). Static
+   only (D-05): gradients + shadows, nothing animates. Text color #FFFFFF
+   on #1E1E1E ≈ 16.7:1 (AAA); border/glow colors are decorative. */
+@utility tier-impecavel-border {
+  border-color: transparent;
+  /* double-background gradient border (respects border-radius, unlike
+     border-image); the padding-box layer matches bg-surface cards */
+  background-image:
+    linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+    linear-gradient(120deg, #f26d6f, #e9b44c, #3fb950, #58a6ff, #b8c0cc) border-box;
+}
+
+@utility tier-impecavel-text {
+  color: #ffffff;
+  text-shadow:
+    0 0 18px rgb(242 109 111 / 0.45),
+    0 0 18px rgb(233 180 76 / 0.3),
+    0 0 18px rgb(88 166 255 / 0.3);
+}
+
+@utility tier-impecavel-dot {
+  background-image: linear-gradient(135deg, #f26d6f, #e9b44c, #3fb950, #58a6ff);
+}
+
 /* page headings inherit the display font (D-07) — one rule, zero component churn */
 @layer base {
   h1 {
