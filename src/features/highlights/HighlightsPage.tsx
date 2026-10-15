@@ -77,7 +77,9 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
       {sections.map((section) => (
         <section key={section.class_name} className="rounded-lg border border-line bg-surface p-6">
           <h2 className="text-xl font-semibold text-content">{section.class_name}</h2>
-          <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Owner gate fix (07.1-02): promotion cards cap at 2 columns —
+              3-up squished the cards on desktop (07.2 owns any rework). */}
+          <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
             {section.cards.map((card) => (
               <PromotionCard
                 key={card.display_name}

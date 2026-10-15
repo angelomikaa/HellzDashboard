@@ -44,7 +44,10 @@ export function PromotionCard({ card, charClass }: { card: PromotionCardRow; cha
       <h3 className="mt-2 text-xl font-semibold text-content">{card.display_name}</h3>
       <p className="text-sm text-muted">{charClass}</p>
       <div className="my-4 border-t border-line" />
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {/* Owner gate fix (07.1-02): single-column highlight rows — the old
+          sm:grid-cols-2 collapsed to ~80px cells inside desktop cards,
+          wrapping label/value/chip into ragged misaligned stacks. */}
+      <div className="mt-2 grid grid-cols-1 gap-2">
         {card.highlights.map((h) => {
           const facetTier = tierForPoints(h.points) as NonNullable<ReturnType<typeof tierForPoints>>
           return (
