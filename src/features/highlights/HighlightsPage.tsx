@@ -7,12 +7,19 @@
 // empty state. Sections and cards render in SERVER order — no client
 // reordering anywhere.
 //
+// Owner gate round 2 (07.1-02): the page now shows ONLY Impecável-tier
+// players ("the best" showcase) — a DISPLAY-layer tier filter over the
+// fetched sections (cards whose OVR band is the top tier), dropping
+// sections left empty. No redesign: the bolder premium showcase is
+// explicitly deferred to phase 07.2.
+//
 // The payload is rendered verbatim: no rank computation in TS (T-06-13) —
 // tier banding happens only via the unit-locked tierForOvr/tierForPoints
-// presentation functions inside PromotionCard.
+// presentation functions.
 import { useEffect, useState } from 'react'
 import { ApiError, fetchPromotion, type PromotionSection } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
+import { tierForOvr } from '../dashboard/presentation'
 import { PromotionCard } from './PromotionCard'
 
 // Enumeration-safe pt-BR copy (shared UI contract, copied verbatim from
@@ -61,12 +68,25 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
     )
   }
 
-  if (sections.length === 0) {
+  // Owner gate round 2 (07.1-02): Destaques is the premium showcase — only
+  // Impecável (top-band) cards appear. Display-layer filter over the fetched
+  // payload: same server order preserved (filter, never sort), sections with
+  // no Impecável player are dropped entirely. tierForOvr is the unit-locked
+  // banding function (65/75/85 OVR bands) — same one PromotionCard uses.
+  const impecavelSections =
+    sections?.flatMap((section) => {
+      const cards = section.cards.filter(
+        (card) => tierForOvr(Math.round(card.ovr)) === 'platinum',
+      )
+      return cards.length > 0 ? [{ ...section, cards }] : []
+    }) ?? []
+
+  if (impecavelSections.length === 0) {
     return (
       <section className="rounded-lg border border-line bg-surface p-6">
         <p className="text-sm text-muted">
-          Ainda não há destaques — cada classe precisa de pelo menos 3 jogadores com status
-          enviados e 6 stats-chave configurados.
+          Ainda não há jogadores Impecáveis — o topo do ranking de cada classe aparecerá aqui
+          assim que alguém alcançar a faixa máxima.
         </p>
       </section>
     )
@@ -74,7 +94,7 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
 
   return (
     <div className="backdrop-neon-grid flex flex-col gap-6">
-      {sections.map((section) => (
+      {impecavelSections.map((section) => (
         <section key={section.class_name} className="rounded-lg border border-line bg-surface p-6">
           <h2 className="text-xl font-semibold text-content">{section.class_name}</h2>
           {/* Owner gate fix (07.1-02): promotion cards cap at 2 columns —
