@@ -292,7 +292,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
   }
 
   return (
-    <section className="rounded-lg border border-line bg-surface p-6">
+    <section className="rounded-lg border border-line bg-surface p-6 lg:p-8">
       <h2 className="text-xl font-semibold text-content">Personagens</h2>
       <p className="mt-1 text-sm text-muted">Registre nome, classe e função de cada membro.</p>
 
@@ -362,25 +362,25 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-sm font-semibold text-muted">
-                    <th scope="col" className="py-2 pr-4">
+                    <th scope="col" className="py-3 pr-4">
                       Personagem
                     </th>
-                    <th scope="col" className="py-2 pr-4">
+                    <th scope="col" className="py-3 pr-4">
                       Discord
                     </th>
-                    <th scope="col" className="py-2 pr-4">
+                    <th scope="col" className="py-3 pr-4">
                       Papel
                     </th>
-                    <th scope="col" className="py-2 pr-4">
+                    <th scope="col" className="py-3 pr-4">
                       Classe
                     </th>
-                    <th scope="col" className="py-2 pr-4">
+                    <th scope="col" className="py-3 pr-4">
                       Função
                     </th>
-                    <th scope="col" className="py-2 pr-4">
+                    <th scope="col" className="py-3 pr-4">
                       Controles
                     </th>
-                    <th scope="col" className="py-2">
+                    <th scope="col" className="py-3">
                       <span className="sr-only">Ações</span>
                     </th>
                   </tr>
@@ -395,7 +395,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                         className={`border-t border-line${member.active ? '' : ' opacity-60'}`}
                         aria-busy={saving}
                       >
-                        <td className="py-3 pr-4 text-base text-content">
+                        <td className="py-4 pr-4 text-base text-content">
                           {editing && draft ? (
                             <>
                               <label htmlFor={`edit-name-${member.id}`} className="sr-only">
@@ -417,13 +417,13 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                             member.display_name
                           )}
                         </td>
-                        <td className="py-3 pr-4 text-sm text-muted">{member.discord_handle}</td>
-                        <td className="py-3 pr-4">
+                        <td className="py-4 pr-4 text-sm text-muted">{member.discord_handle}</td>
+                        <td className="py-4 pr-4">
                           <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
                             {ROLE_LABELS[member.role]}
                           </span>
                         </td>
-                        <td className="py-3 pr-4 text-base text-content">
+                        <td className="py-4 pr-4 text-base text-content">
                           {editing && draft ? (
                             <>
                               <label htmlFor={`edit-class-${member.id}`} className="sr-only">
@@ -450,7 +450,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                             member.char_class ?? '—'
                           )}
                         </td>
-                        <td className="py-3 pr-4 text-base text-content">
+                        <td className="py-4 pr-4 text-base text-content">
                           {editing && draft ? (
                             <>
                               <label htmlFor={`edit-function-${member.id}`} className="sr-only">
@@ -494,60 +494,63 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                             rows only; member-viewer sessions (tampered
                             client) also land on '—'. The RPCs re-check all
                             target rules server-side — this is UX-only. */}
-                        <td className="py-3 pr-4">
+                        <td className="py-4 pr-4">
                           {member.role === 'owner' ? (
                             <span className="text-sm text-muted">—</span>
                           ) : !isStaff || (!isOwner && member.role !== 'member') ? (
                             <span className="text-sm text-muted">—</span>
                           ) : (
-                            <div className="flex flex-col items-start gap-1">
-                              <div className="flex flex-wrap gap-1">
-                                {/* Role buttons — OWNER viewer only
-                                    (AUTH-03/D-08); the RPC re-checks the
-                                    owner-only gate server-side. */}
-                                {isOwner && member.role === 'member' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => openConfirm({ kind: 'promote', member })}
-                                    disabled={busy}
-                                    className="h-11 rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    Conceder oficial
-                                  </button>
-                                )}
-                                {isOwner && member.role === 'officer' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => openConfirm({ kind: 'demote', member })}
-                                    disabled={busy}
-                                    className="h-11 rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    Revogar oficial
-                                  </button>
-                                )}
-                                {/* Removal/reactivation — owner sees it on
-                                    member + officer targets, officers on
-                                    member targets only (AUTH-04/D-08). */}
-                                {member.active ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => openConfirm({ kind: 'deactivate', member })}
-                                    disabled={busy}
-                                    className="h-11 rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    Remover
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => openConfirm({ kind: 'activate', member })}
-                                    disabled={busy}
-                                    className="h-11 rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    Reativar
-                                  </button>
-                                )}
-                              </div>
+                            <div className="grid w-full min-w-36 grid-cols-1 gap-2">
+                              {/* Owner gate round 2 (07.1-02): equal-width
+                                  action buttons in a single-column grid — the
+                                  old flex-wrap produced ragged widths
+                                  ("Conceder oficial" vs "Remover") and ugly
+                                  wraps. gap-1 -> gap-2 for breathing room.
+                                  Role buttons — OWNER viewer only (AUTH-03/
+                                  D-08); the RPC re-checks the owner-only gate
+                                  server-side. */}
+                              {isOwner && member.role === 'member' && (
+                                <button
+                                  type="button"
+                                  onClick={() => openConfirm({ kind: 'promote', member })}
+                                  disabled={busy}
+                                  className="h-11 w-full rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Conceder oficial
+                                </button>
+                              )}
+                              {isOwner && member.role === 'officer' && (
+                                <button
+                                  type="button"
+                                  onClick={() => openConfirm({ kind: 'demote', member })}
+                                  disabled={busy}
+                                  className="h-11 w-full rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Revogar oficial
+                                </button>
+                              )}
+                              {/* Removal/reactivation — owner sees it on
+                                  member + officer targets, officers on
+                                  member targets only (AUTH-04/D-08). */}
+                              {member.active ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openConfirm({ kind: 'deactivate', member })}
+                                  disabled={busy}
+                                  className="h-11 w-full rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Remover
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openConfirm({ kind: 'activate', member })}
+                                  disabled={busy}
+                                  className="h-11 w-full rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Reativar
+                                </button>
+                              )}
                               {savedRow?.id === member.id && (
                                 <span aria-live="polite" className="text-sm font-semibold text-success">
                                   {savedRow.text}
@@ -565,7 +568,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                             </div>
                           )}
                         </td>
-                        <td className="py-3 text-right">
+                        <td className="py-4 text-right">
                           {editing && draft ? (
                             <div className="flex flex-col items-end gap-1">
                               <button
@@ -595,7 +598,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                               type="button"
                               onClick={() => startEdit(member)}
                               disabled={busy}
-                              className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                              className="h-11 min-w-28 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Editar
                             </button>
