@@ -73,7 +73,7 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="backdrop-neon-grid flex flex-col gap-6">
       {sections.map((section) => (
         <section key={section.class_name} className="rounded-lg border border-line bg-surface p-6">
           <h2 className="text-xl font-semibold text-content">{section.class_name}</h2>

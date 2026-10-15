@@ -84,7 +84,7 @@ function App() {
                   onClick={() => setTab('painel')}
                   aria-current={tab === 'painel' ? 'page' : undefined}
                   className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                    tab === 'painel' ? 'border-accent text-content' : 'border-transparent text-muted'
+                    tab === 'painel' ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
                   }`}
                 >
                   Painel
@@ -94,7 +94,7 @@ function App() {
                   onClick={() => setTab('submit')}
                   aria-current={showSubmit ? 'page' : undefined}
                   className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                    showSubmit ? 'border-accent text-content' : 'border-transparent text-muted'
+                    showSubmit ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
                   }`}
                 >
                   Enviar Status
@@ -104,7 +104,7 @@ function App() {
                   onClick={() => setTab('destaques')}
                   aria-current={showHighlights ? 'page' : undefined}
                   className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                    showHighlights ? 'border-accent text-content' : 'border-transparent text-muted'
+                    showHighlights ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
                   }`}
                 >
                   Destaques
@@ -115,7 +115,7 @@ function App() {
                     onClick={() => setTab('validacoes')}
                     aria-current={showValidacoes ? 'page' : undefined}
                     className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      showValidacoes ? 'border-accent text-content' : 'border-transparent text-muted'
+                      showValidacoes ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
                     }`}
                   >
                     Validações
@@ -127,7 +127,7 @@ function App() {
                     onClick={() => setTab('characters')}
                     aria-current={showCharacters ? 'page' : undefined}
                     className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      showCharacters ? 'border-accent text-content' : 'border-transparent text-muted'
+                      showCharacters ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
                     }`}
                   >
                     Personagens
@@ -139,7 +139,7 @@ function App() {
                     onClick={() => setTab('keystats')}
                     aria-current={showKeyStats ? 'page' : undefined}
                     className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      showKeyStats ? 'border-accent text-content' : 'border-transparent text-muted'
+                      showKeyStats ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
                     }`}
                   >
                     Stats-Chave

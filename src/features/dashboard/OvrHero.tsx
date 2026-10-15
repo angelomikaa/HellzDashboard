@@ -39,7 +39,7 @@ export function OvrHero({
     >
       <p className="text-sm text-muted">OVR</p>
       <p
-        className={`text-5xl font-semibold leading-none ${tier !== null ? TIER_TEXT[tier] : 'text-muted'}`}
+        className={`text-5xl font-semibold leading-none ${tier !== null ? `font-display glow-text-current ${TIER_TEXT[tier]}` : 'text-muted'}`}
       >
         {display}
       </p>

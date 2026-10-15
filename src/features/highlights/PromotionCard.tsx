@@ -33,7 +33,7 @@ export function PromotionCard({ card, charClass }: { card: PromotionCardRow; cha
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-sm text-muted">OVR</p>
-          <p className={`text-5xl font-semibold leading-none ${TIER_TEXT[ovrTier]}`}>
+          <p className={`text-5xl font-semibold leading-none font-display glow-text-current ${TIER_TEXT[ovrTier]}`}>
             {Math.round(card.ovr)}
           </p>
         </div>
