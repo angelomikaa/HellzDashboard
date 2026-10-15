@@ -231,7 +231,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
       try {
         await load()
       } catch {
-        /* stale table; Salvo. still shown */
+        /* stale list; Salvo. still shown */
       }
     } catch {
       setSaveError({ id: memberId, text: SAVE_ERROR })
@@ -277,7 +277,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
       try {
         await load()
       } catch {
-        /* stale table; success copy still shown */
+        /* stale list; success copy still shown */
       }
     } catch (err) {
       setPendingAction(null)
@@ -358,267 +358,236 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
               Nenhum membro na lista branca ainda.
             </p>
           ) : (
-            <div className="-mx-2 mt-6 overflow-x-auto px-2">
-              {/* Owner gate round 3 (07.1-02) crop fix: overflow-x-auto makes
-                  this wrapper a clip container on BOTH axes (overflow-y
-                  computes to auto), and edge-column controls (Editar/Salvar
-                  flush right, edit inputs flush left) sat exactly on its
-                  boundary — their focus-visible rings (box-shadow, which never
-                  contributes to scrollable overflow) were hard-cropped. -mx-2 +
-                  px-2 pushes the clip boundary 8px outward into the section's
-                  padding while keeping the table's visual position unchanged.
-                  Vertical clearance already exists (cells have py-3/py-4, more
-                  than a 2px ring needs). */}
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="text-sm font-semibold text-muted">
-                    <th scope="col" className="py-3 pr-4">
-                      Personagem
-                    </th>
-                    <th scope="col" className="py-3 pr-4">
-                      Discord
-                    </th>
-                    <th scope="col" className="py-3 pr-4">
-                      Papel
-                    </th>
-                    <th scope="col" className="py-3 pr-4">
-                      Classe
-                    </th>
-                    <th scope="col" className="py-3 pr-4">
-                      Função
-                    </th>
-                    <th scope="col" className="py-3 pr-4">
-                      Controles
-                    </th>
-                    <th scope="col" className="py-3">
-                      <span className="sr-only">Ações</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.members.map((member) => {
-                    const editing = draft?.memberId === member.id
-                    const saving = savingRowId === member.id
-                    return (
-                      <tr
-                        key={member.id}
-                        className={`border-t border-line${member.active ? '' : ' opacity-60'}`}
-                        aria-busy={saving}
-                      >
-                        <td className="py-4 pr-4 text-base text-content">
-                          {editing && draft ? (
-                            <>
-                              <label htmlFor={`edit-name-${member.id}`} className="sr-only">
-                                Nome do personagem
-                              </label>
-                              <input
-                                id={`edit-name-${member.id}`}
-                                type="text"
-                                autoComplete="off"
-                                value={draft.displayName}
-                                onChange={(e) =>
-                                  setDraft({ ...draft, displayName: e.target.value })
-                                }
-                                disabled={saving}
-                                className="h-11 w-full min-w-32 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                              />
-                            </>
-                          ) : (
-                            member.display_name
-                          )}
-                        </td>
-                        <td className="py-4 pr-4 text-sm text-muted">{member.discord_handle}</td>
-                        <td className="py-4 pr-4">
+            <div className="mt-6 flex flex-col gap-4">
+              {/* Owner gate round 4 (07.1-02): per-character card list. The
+                  old 7-column table needed horizontal expansion (scroll or
+                  negative-margin) to keep the edge controls' focus rings from
+                  clipping — the owner rejected both as "ruining the
+                  aesthetic" and asked to "move the content of the controles
+                  column to below each character, freeing up space without
+                  actually expanding the box". So: character info on top, ALL
+                  controls (Editar + staff actions) in a row below the card's
+                  divider. No overflow container anywhere — nothing can scroll
+                  or clip, and focus-visible rings (box-shadow, which never
+                  contributes to scrollable overflow) always have clearance
+                  inside the card's own padding. DOM order = character info
+                  first, then its controls: the focus order follows the visual
+                  reading order. */}
+              {data.members.map((member) => {
+                const editing = draft?.memberId === member.id
+                const saving = savingRowId === member.id
+                // Staff controls (06-UI-SPEC Surface 3, D-08 matrix): owner
+                // rows are untouchable for every viewer; officer viewers get
+                // controls on member rows only; member-viewer sessions
+                // (tampered client) get none. The RPCs re-check all target
+                // rules server-side — this is UX-only.
+                const hasStaffControls =
+                  isStaff && member.role !== 'owner' && (isOwner || member.role === 'member')
+                return (
+                  <article
+                    key={member.id}
+                    aria-busy={saving}
+                    className={`rounded-lg border border-line bg-surface p-4 sm:p-5${
+                      member.active ? '' : ' opacity-60'
+                    }`}
+                  >
+                    {editing && draft ? (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
                             {ROLE_LABELS[member.role]}
                           </span>
-                        </td>
-                        <td className="py-4 pr-4 text-base text-content">
-                          {editing && draft ? (
-                            <>
-                              <label htmlFor={`edit-class-${member.id}`} className="sr-only">
-                                Classe
-                              </label>
-                              <select
-                                id={`edit-class-${member.id}`}
-                                value={draft.charClass}
-                                onChange={(e) => setDraft({ ...draft, charClass: e.target.value })}
-                                disabled={saving}
-                                className="h-11 w-full min-w-32 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {/* Display-only '—' (maps to null); saving with it
-                                    selected is blocked client-side above. */}
-                                <option value="">—</option>
-                                {data.classes.map((className) => (
-                                  <option key={className} value={className}>
-                                    {className}
-                                  </option>
-                                ))}
-                              </select>
-                            </>
-                          ) : (
-                            member.char_class ?? '—'
+                          <span className="text-sm text-muted">{member.discord_handle}</span>
+                        </div>
+                        <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                          <div className="flex flex-col gap-1">
+                            <label
+                              htmlFor={`edit-name-${member.id}`}
+                              className="text-sm font-semibold text-content"
+                            >
+                              Nome do personagem
+                            </label>
+                            <input
+                              id={`edit-name-${member.id}`}
+                              type="text"
+                              autoComplete="off"
+                              value={draft.displayName}
+                              onChange={(e) => setDraft({ ...draft, displayName: e.target.value })}
+                              disabled={saving}
+                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label
+                              htmlFor={`edit-class-${member.id}`}
+                              className="text-sm font-semibold text-content"
+                            >
+                              Classe
+                            </label>
+                            <select
+                              id={`edit-class-${member.id}`}
+                              value={draft.charClass}
+                              onChange={(e) => setDraft({ ...draft, charClass: e.target.value })}
+                              disabled={saving}
+                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {/* Display-only '—' (maps to null); saving with it
+                                  selected is blocked client-side below. */}
+                              <option value="">—</option>
+                              {data.classes.map((className) => (
+                                <option key={className} value={className}>
+                                  {className}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label
+                              htmlFor={`edit-function-${member.id}`}
+                              className="text-sm font-semibold text-content"
+                            >
+                              Função
+                            </label>
+                            <select
+                              id={`edit-function-${member.id}`}
+                              value={draft.charFunction}
+                              onChange={(e) =>
+                                setDraft({
+                                  ...draft,
+                                  // The three <option> values below are
+                                  // exactly the union — the cast is total.
+                                  // Values mirror the DB CHECK (migration
+                                  // 0012: char_function in ('dps','mdps',
+                                  // 'suporte')); the server CHECK is the
+                                  // real boundary (T-07-05), this is
+                                  // UX-only.
+                                  charFunction: e.target.value as Draft['charFunction'],
+                                })
+                              }
+                              disabled={saving}
+                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {(Object.keys(FUNCTION_LABELS) as Array<
+                                keyof typeof FUNCTION_LABELS
+                              >).map((role) => (
+                                <option key={role} value={role}>
+                                  {FUNCTION_LABELS[role]}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <span className="text-base font-semibold text-content">
+                          {member.display_name}
+                        </span>
+                        <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
+                          {ROLE_LABELS[member.role]}
+                        </span>
+                        <span className="text-sm text-muted">{member.discord_handle}</span>
+                        <span className="text-sm text-muted">
+                          Classe: <span className="text-content">{member.char_class ?? '—'}</span>
+                        </span>
+                        <span className="text-sm text-muted">
+                          Função: <span className="text-content">{FUNCTION_LABELS[member.char_function]}</span>
+                        </span>
+                      </div>
+                    )}
+                    {/* Controls BELOW the character (owner round 4 request),
+                        kept out of the info's way by the card divider. Role
+                        buttons — OWNER viewer only (AUTH-03/D-08); the RPC
+                        re-checks the owner-only gate server-side. */}
+                    <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+                      {editing && draft ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleSave()}
+                          disabled={
+                            saving || busy || draft.charClass === '' || draft.displayName.trim() === ''
+                          }
+                          className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Salvar
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(member)}
+                          disabled={busy}
+                          className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Editar
+                        </button>
+                      )}
+                      {!editing && hasStaffControls && (
+                        <>
+                          {isOwner && member.role === 'member' && (
+                            <button
+                              type="button"
+                              onClick={() => openConfirm({ kind: 'promote', member })}
+                              disabled={busy}
+                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Conceder oficial
+                            </button>
                           )}
-                        </td>
-                        <td className="py-4 pr-4 text-base text-content">
-                          {editing && draft ? (
-                            <>
-                              <label htmlFor={`edit-function-${member.id}`} className="sr-only">
-                                Função
-                              </label>
-                              <select
-                                id={`edit-function-${member.id}`}
-                                value={draft.charFunction}
-                                onChange={(e) =>
-                                  setDraft({
-                                    ...draft,
-                                    // The three <option> values below are
-                                    // exactly the union — the cast is total.
-                                    // Values mirror the DB CHECK (migration
-                                    // 0012: char_function in ('dps','mdps',
-                                    // 'suporte')); the server CHECK is the
-                                    // real boundary (T-07-05), this is
-                                    // UX-only.
-                                    charFunction: e.target.value as Draft['charFunction'],
-                                  })
-                                }
-                                disabled={saving}
-                                className="h-11 w-full min-w-24 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {(Object.keys(FUNCTION_LABELS) as Array<
-                                  keyof typeof FUNCTION_LABELS
-                                >).map((role) => (
-                                  <option key={role} value={role}>
-                                    {FUNCTION_LABELS[role]}
-                                  </option>
-                                ))}
-                              </select>
-                            </>
-                          ) : (
-                            FUNCTION_LABELS[member.char_function]
+                          {isOwner && member.role === 'officer' && (
+                            <button
+                              type="button"
+                              onClick={() => openConfirm({ kind: 'demote', member })}
+                              disabled={busy}
+                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Revogar oficial
+                            </button>
                           )}
-                        </td>
-                        {/* Staff Controles column (06-UI-SPEC Surface 3, D-08
-                            matrix): owner rows are untouchable for every
-                            viewer; officer viewers get controls on member
-                            rows only; member-viewer sessions (tampered
-                            client) also land on '—'. The RPCs re-check all
-                            target rules server-side — this is UX-only. */}
-                        <td className="py-4 pr-4">
-                          {member.role === 'owner' ? (
-                            <span className="text-sm text-muted">—</span>
-                          ) : !isStaff || (!isOwner && member.role !== 'member') ? (
-                            <span className="text-sm text-muted">—</span>
-                          ) : (
-                            <div className="grid w-full min-w-36 grid-cols-1 gap-2">
-                              {/* Owner gate round 2 (07.1-02): equal-width
-                                  action buttons in a single-column grid — the
-                                  old flex-wrap produced ragged widths
-                                  ("Conceder oficial" vs "Remover") and ugly
-                                  wraps. gap-1 -> gap-2 for breathing room.
-                                  Role buttons — OWNER viewer only (AUTH-03/
-                                  D-08); the RPC re-checks the owner-only gate
-                                  server-side. */}
-                              {isOwner && member.role === 'member' && (
-                                <button
-                                  type="button"
-                                  onClick={() => openConfirm({ kind: 'promote', member })}
-                                  disabled={busy}
-                                  className="h-11 w-full rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  Conceder oficial
-                                </button>
-                              )}
-                              {isOwner && member.role === 'officer' && (
-                                <button
-                                  type="button"
-                                  onClick={() => openConfirm({ kind: 'demote', member })}
-                                  disabled={busy}
-                                  className="h-11 w-full rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  Revogar oficial
-                                </button>
-                              )}
-                              {/* Removal/reactivation — owner sees it on
-                                  member + officer targets, officers on
-                                  member targets only (AUTH-04/D-08). */}
-                              {member.active ? (
-                                <button
-                                  type="button"
-                                  onClick={() => openConfirm({ kind: 'deactivate', member })}
-                                  disabled={busy}
-                                  className="h-11 w-full rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  Remover
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => openConfirm({ kind: 'activate', member })}
-                                  disabled={busy}
-                                  className="h-11 w-full rounded-md border border-line px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  Reativar
-                                </button>
-                              )}
-                              {savedRow?.id === member.id && (
-                                <span aria-live="polite" className="text-sm font-semibold text-success">
-                                  {savedRow.text}
-                                </span>
-                              )}
-                              {saveError?.id === member.id && (
-                                <span
-                                  role="alert"
-                                  aria-live="polite"
-                                  className="text-sm font-semibold text-destructive"
-                                >
-                                  {saveError.text}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-4 text-right">
-                          {editing && draft ? (
-                            <div className="flex flex-col items-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => void handleSave()}
-                                disabled={
-                                  saving || busy || draft.charClass === '' || draft.displayName.trim() === ''
-                                }
-                                className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                Salvar
-                              </button>
-                              {saveError?.id === member.id && (
-                                <span
-                                  role="alert"
-                                  aria-live="polite"
-                                  className="text-sm font-semibold text-destructive"
-                                >
-                                  {saveError.text}
-                                </span>
-                              )}
-                            </div>
-                          ) : savedRow?.id === member.id ? (
-                            <span className="text-sm font-semibold text-success">Salvo.</span>
+                          {/* Removal/reactivation — owner sees it on
+                              member + officer targets, officers on
+                              member targets only (AUTH-04/D-08). */}
+                          {member.active ? (
+                            <button
+                              type="button"
+                              onClick={() => openConfirm({ kind: 'deactivate', member })}
+                              disabled={busy}
+                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Remover
+                            </button>
                           ) : (
                             <button
                               type="button"
-                              onClick={() => startEdit(member)}
+                              onClick={() => openConfirm({ kind: 'activate', member })}
                               disabled={busy}
-                              className="h-11 min-w-28 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                              Editar
+                              Reativar
                             </button>
                           )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                        </>
+                      )}
+                      {/* Per-row feedback for the shared state machine (edit
+                          save, role change, removal/reactivation) — one place
+                          now that Controles/Ações are merged. */}
+                      {savedRow?.id === member.id && (
+                        <span aria-live="polite" className="text-sm font-semibold text-success">
+                          {savedRow.text}
+                        </span>
+                      )}
+                      {saveError?.id === member.id && (
+                        <span
+                          role="alert"
+                          aria-live="polite"
+                          className="text-sm font-semibold text-destructive"
+                        >
+                          {saveError.text}
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                )
+              })}
             </div>
           )}
         </>
