@@ -1,24 +1,86 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Orbitron";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/orbitron-latin-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Orbitron";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/orbitron-latin-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Orbitron";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("/fonts/orbitron-latin-900.woff2") format("woff2");
+}
+
 @theme {
-  /* surfaces (60/30/10) */
-  --color-dominant: #0D1117;   /* page background — 60% */
-  --color-surface: #161B22;    /* cards, login panel — 30% */
-  --color-line: #30363D;       /* borders, dividers */
-  --color-accent: #E3B341;     /* interactive gold — 10% */
-  --color-accent-foreground: #0D1117;
+  /* surfaces (60/30/10) — logo-anchored near-black (D-03) */
+  --color-dominant: #141414;          /* page background — 60% */
+  --color-surface: #1E1E1E;           /* cards, login panel — 30% */
+  --color-line: #3D2A2B;              /* red-tinted hairline — 10% */
+  --color-accent: #DC3538;            /* interactive red — THE accent (D-01) */
+  --color-accent-strong: #B70302;     /* brand anchor: glow cores, large fills */
+  --color-accent-bright: #F26D6F;     /* small red text on dark (6.0:1 on surface) */
+  --color-accent-foreground: #FFFFFF; /* 4.55:1 on #DC3538 (AA) */
 
   /* text */
-  --color-content: #E6EDF3;
-  --color-muted: #8B949E;
+  --color-content: #F0EDED;
+  --color-muted: #9A8F8F;
 
   /* semantic */
   --color-destructive: #F85149;
-  --color-success: #3FB950;    /* reserved: Phase 6+ */
+  --color-success: #3FB950;
 
-  /* tier tokens (FOUNDATIONAL — consumed in Phase 4+, unused in Phase 1) */
-  --color-tier-bronze: #B87333;
+  /* tier tokens (D-02: semantic identity preserved; bronze nudged for AA on #1E1E1E) */
+  --color-tier-bronze: #C97F3F;
   --color-tier-silver: #B8C0CC;
-  --color-tier-gold: #E9B44C;
+  --color-tier-gold: #E9B44C;         /* gold's ONLY surviving role (D-01) */
   --color-tier-platinum: #D7E3F0;
+
+  /* display font — hero elements only (D-07): wordmark/lockup, h1s, OVR/points numbers */
+  --font-display: "Orbitron", "Segoe UI", system-ui, sans-serif;
+}
+
+/* static neon glows (D-04/D-05) — @utility, Tailwind v4 CSS-first */
+@utility glow-accent {
+  box-shadow: 0 0 16px 1px rgb(220 53 56 / 0.35), 0 0 2px 1px rgb(220 53 56 / 0.55);
+}
+
+@utility glow-text-current {
+  /* no color = currentColor → OVR/points numbers glow in their TIER color for free */
+  text-shadow: 0 0 18px, 0 0 36px;
+}
+
+@utility backdrop-neon-grid {
+  /* sci-fi grid backdrop — login and Destaques ONLY (D-04); additive over bg-dominant */
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgb(220 53 56 / 0.08), transparent),
+    repeating-linear-gradient(0deg, rgb(220 53 56 / 0.03) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(90deg, rgb(220 53 56 / 0.03) 0 1px, transparent 1px 48px);
+}
+
+/* page headings inherit the display font (D-07) — one rule, zero component churn */
+@layer base {
+  h1 {
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
+  }
+}
+
+/* D-05: nothing auto-animates; guard any future transition */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    transition: none !important;
+  }
 }
