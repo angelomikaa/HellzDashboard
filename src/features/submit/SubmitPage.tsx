@@ -91,7 +91,7 @@ function StepVerifyCheckbox({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-5 w-5 shrink-0 accent-[#E3B341] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="h-5 w-5 shrink-0 accent-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       />
       <span>{VERIFY_COPY[stepNo]}</span>
     </label>

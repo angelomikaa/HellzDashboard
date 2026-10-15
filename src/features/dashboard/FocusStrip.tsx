@@ -6,8 +6,8 @@
 // hides itself entirely when nothing is eligible (UI-SPEC edge rule).
 // Points arrive opaque from the RPC — the item only rounds the given number
 // for display; the color comes from tierForPoints via the literal TIER_TEXT
-// map. The accent-gold heading is one of the four reserved accent uses
-// (interaction gold #E3B341 — a different token from tier gold #E9B44C).
+// map. The accent-red heading is one of the four reserved accent uses
+// (interaction red #DC3538 — a different token from tier gold #E9B44C).
 import type { MyReportStat } from '../../lib/api'
 import type { GroupKey } from '../../lib/groups'
 import { TIER_TEXT, focusCandidates, tierForPoints } from './presentation'
