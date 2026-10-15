@@ -78,10 +78,22 @@
 @utility tier-impecavel-border {
   border-color: transparent;
   /* double-background gradient border (respects border-radius, unlike
-     border-image); the padding-box layer matches bg-surface cards */
+     border-image); the padding-box layer matches bg-surface cards.
+     Owner gate round 2 BUG FIX: the padding-box/border-box keywords are
+     only valid in the `background` SHORTHAND — in the `background-image`
+     longhand the browser drops the entire declaration, leaving a
+     transparent border with NO gradient (cards looked borderless). The
+     per-layer boxes live in the background-origin/background-clip
+     longhands instead, which accept comma lists per layer. */
   background-image:
-    linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
-    linear-gradient(120deg, #f26d6f, #e9b44c, #3fb950, #58a6ff, #b8c0cc) border-box;
+    linear-gradient(var(--color-surface), var(--color-surface)),
+    linear-gradient(120deg, #f26d6f, #e9b44c, #3fb950, #58a6ff, #b8c0cc);
+  background-origin: padding-box, border-box;
+  background-clip: padding-box, border-box;
+  /* The rainbow is only as thick as the border — pin 2px so the treatment
+     reads unmistakably at every card scale (badges render with `border`,
+     cards with `border-2`; same resolved value, no visible conflict). */
+  border-width: 2px;
 }
 
 @utility tier-impecavel-text {
