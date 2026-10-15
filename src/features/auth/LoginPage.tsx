@@ -107,7 +107,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
   return (
     <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
       <div className="w-full max-w-96 rounded-lg border border-line bg-surface p-6">
-        <img src={hellzMark} alt="Hellz" className="mx-auto mt-2 h-20 w-20 glow-accent" />
+        <img src={hellzMark} alt="Hellz" className="mx-auto mb-3 mt-2 h-20 w-20 glow-accent" />
         <h1 className="text-center text-3xl font-bold leading-[1.2] text-content">Hellz</h1>
         <p className="mt-1 text-center text-sm font-medium text-muted">Painel Geral</p>
         <div aria-hidden="true" className="mx-auto mb-6 mt-4 h-px w-16 bg-line" />
