@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import hellzMark from './assets/hellz-mark.svg'
 import { clearSession } from './features/auth/session'
 import { RequireAuth } from './features/auth/RequireAuth'
 import { CharactersPage } from './features/admin/CharactersPage'
@@ -62,6 +63,7 @@ function App() {
           <div className="flex min-h-screen flex-col bg-dominant text-content">
             <header className="flex items-center justify-between border-b border-line px-4 py-3">
               <div className="flex items-center gap-2">
+                <img src={hellzMark} alt="" aria-hidden="true" className="h-7 w-7 shrink-0" />
                 <span className="text-base text-content">Olá, {session.display_name}</span>
                 <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
                   {ROLE_LABELS[session.member_role]}
