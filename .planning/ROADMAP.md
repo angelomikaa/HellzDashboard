@@ -62,11 +62,11 @@ Cross-cutting constraints: catalog work (ROLE-12) precedes seeding — roster us
   4. The mark appears as favicon (replacing the Vite icon), login hero lockup ("Hellz — Painel Geral"), and compact header mark left of "Olá, {name}" — nowhere else (D-06)
   5. One display font (Orbitron, OFL) serves wordmark/lockup, page h1s, and OVR/points hero numbers via a self-hosted subset woff2 with pt-BR diacritics, system fallback, and preload; body text stays on the system stack (D-07)
   6. Tier tokens stay semantically distinct from each other and from the brand red; `presentation.ts` band logic untouched; all existing tests green; no API/RPC/behavior change (VIS-07)
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 07.1-01-PLAN.md — Neon token system rewrite + display font infrastructure (Wave 1)
-- [ ] 07.1-02-PLAN.md — Logo placement + neon moments + owner visual gate (Wave 2)
+- [x] 07.1-02-PLAN.md — Logo placement + neon moments + owner visual gate (Wave 2)
 
 ### Phase 8: Whitelist Lifecycle & First-Login PIN Setup
 **Goal**: Staff control exactly who can access the panel — officers add players by handle only, players choose their own PIN at first login, and a forgotten PIN is resolvable by the owner — with the whitelist as the trust boundary and no second rate-limit mechanism.
