@@ -185,6 +185,59 @@
     font-family: var(--font-display);
     letter-spacing: 0.02em;
   }
+
+  /* The whole app is dark — declare it so UA-rendered native widgets match
+     (owner gate round 6): native <select> dropdown popups (Stats-Chave,
+     Personagens) render dark instead of white, and scrollbars/date pickers
+     follow. One line, covers every current and future native control. */
+  :root {
+    color-scheme: dark;
+  }
+}
+
+/* Native checkbox, fully skinned (owner gate round 6): appearance:none so
+   EVERY state is brand-controlled — never the browser-default blue. Shared
+   utility so future checkboxes reuse it instead of drifting back to UA
+   styling. D-05-safe: colors/box-shadow only, transitions on interaction,
+   killed by the global prefers-reduced-motion rule below. Checkmark is an
+   inline SVG data URI (white, 4.55:1 on the accent fill) — no extra asset.
+   Focus ring stays the standard site-wide red ring via the Tailwind
+   focus-visible:ring-2 ring-accent classes at the call site. */
+@utility checkbox-brand {
+  appearance: none;
+  border: 1px solid var(--color-line);
+  border-radius: 0.25rem;
+  background-color: var(--color-surface);
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+
+  /* unchecked hover — same surface/border ramp as hover-control */
+  &:hover:not(:disabled):not(:checked) {
+    background-color: var(--color-surface-hover);
+    border-color: var(--color-line-hover);
+  }
+
+  /* checked fill = brand red, white check drawn over it */
+  &:checked {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+    background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z'/%3e%3c/svg%3e");
+    background-size: 100% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  /* checked hover — same one-step-brighter ramp as hover-primary */
+  &:hover:not(:disabled):checked {
+    background-color: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+  }
+
+  /* disabled — muted like every other disabled control */
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
 }
 
 /* D-05: nothing auto-animates. Hover/focus transitions exist (owner gate
