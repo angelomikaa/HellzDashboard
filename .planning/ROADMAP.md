@@ -68,6 +68,20 @@ Plans:
 - [x] 07.1-01-PLAN.md — Neon token system rewrite + display font infrastructure (Wave 1)
 - [x] 07.1-02-PLAN.md — Logo placement + neon moments + owner visual gate (Wave 2)
 
+### Phase 07.2: Premium Showcase & Game-Grounding (INSERTED)
+**Goal**: Turn the panel's celebration surfaces into a premium EAFC-style showcase grounded in the game: stat cards display only the 6 class+function key stats in Ultimate Team form (short 3-letter labels, downloadable/shareable as JPEG), Destaques becomes a bolder avant-garde showcase for Impecável players only, game assets (class icons/job imagery) come from the official ROO media (roocamer.gnjoy.game), mobile-first elements get a desktop layout pass, and officials gain a full-stat OVR-based rank view — all on the 07.1 token/typography foundation.
+**Depends on**: Phase 07.1 (shipped — token layer, Orbitron, mark placement, Impecável tier live)
+**Requirements**: CARD-01, CARD-02, CARD-03, DSTQ-01, ASST-01, LAYT-01, RANK-02, RELV-01
+**Success Criteria** (what must be TRUE):
+  1. Member stat cards show ONLY the 6 key stats of the character's class+function, via a leak-safe server design — key-stat CONFIG (weights/toggles) never exposed to members; RNK-02 no-skewing rationale preserved; must be reconciled with Phase 9's role-differentiated key stats at planning time (CARD-01)
+  2. Cards use EAFC Ultimate Team styling with abbreviated stat labels (e.g. shooting → SHO) and can be downloaded as a shareable JPEG (CARD-02, CARD-03)
+  3. Destaques is redesigned bolder/avant-garde (premium showcase register, distinct from the minimal-functional rest of the site) while remaining Impecável-only (DSTQ-01)
+  4. Class/job icons and placeholder imagery from roocamer.gnjoy.game are integrated where they ground the UI in the game (ASST-01)
+  5. Desktop widths no longer squish/misalign mobile-first elements — a deliberate desktop layout pass across cards and dense screens (LAYT-01)
+  6. Officials and above see a full-stat OVR-based rank view in its own tab (all 57 stats; members never see it) (RANK-02)
+  7. A secondary "relevant" stat tier exists (unlimited count, never displayed on cards) whose sole purpose is guiding the "foco de melhoria" section (RELV-01)
+**Plans:** 0/? plans — not yet planned
+
 ### Phase 8: Whitelist Lifecycle & First-Login PIN Setup
 **Goal**: Staff control exactly who can access the panel — officers add players by handle only, players choose their own PIN at first login, and a forgotten PIN is resolvable by the owner — with the whitelist as the trust boundary and no second rate-limit mechanism.
 **Depends on**: Nothing within v1.1 (independent of Phases 7, 9, 10; builds on the shipped v1.0 auth stack)

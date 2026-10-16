@@ -50,6 +50,7 @@ v1.1 milestone scope (defined 2026-10-13):
 - [ ] Personalized home: player's own status (OVR + best stats) as the landing view, with a stale-data CTA after 7 days without a validated submission
 - [ ] Value-proportional 99 scale: top-end cuts at 98/97/96/95 based on value distance to the best, per stat — **live-data caveat:** Fixed CT %, Global CD %, Variable CT % are negative in real submissions (lower-is-better); the scale formula must invert these (recorded 2026-10-14 from the Phase 7 live value report)
 - [ ] Role-differentiated key stats: key-stat config per (class, build-role) with migration backfill — cohort semantics class+build-role confirmed by owner
+- [ ] Phase 07.2 (inserted 2026-10-16 from the 07.1 visual gate): premium showcase & game-grounding — EAFC-style downloadable JPEG cards, key-stat-only member cards (leak-safe server design required), bolder Destaques showcase, ROO game assets (roocamer.gnjoy.game), desktop layout pass, officials-only rank view, "relevant" stat tier
 
 ### Future (deferred, not this milestone)
 
@@ -129,4 +130,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-14 - Phase 7 complete (seed + catalog + role vocabulary live; v1.1 continues with whitelist/home/scale)*
+*Last updated: 2026-10-16 - Phase 07.1 complete (Hellz visual identity live, owner gate approved; Phase 07.2 inserted for premium showcase & game-grounding)*
