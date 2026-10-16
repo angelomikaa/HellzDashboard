@@ -183,7 +183,7 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                       aria-expanded={isExpanded}
                       aria-controls={regionId}
                       disabled={busy}
-                      className="flex min-h-11 w-full items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                      className="flex min-h-11 w-full items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-left hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <span aria-hidden="true" className="text-sm text-muted">
                         {isExpanded ? '▾' : '▸'}
@@ -210,7 +210,7 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                                 onClick={() => toggleGroup(group)}
                                 aria-expanded={open}
                                 aria-controls={groupRegionId}
-                                className="flex w-full items-center gap-1 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                                className="flex w-full items-center gap-1 rounded text-left transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                               >
                                 <span aria-hidden="true" className="text-sm text-muted">
                                   {open ? '▾' : '▸'}
@@ -253,7 +253,7 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                             onClick={() => void handleSetStatus(row, 'validated')}
                             disabled={busy}
                             aria-busy={busy}
-                            className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             Validar
                           </button>
@@ -262,7 +262,7 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                             onClick={() => setRejectTarget(row)}
                             disabled={busy}
                             aria-busy={busy}
-                            className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             Rejeitar
                           </button>

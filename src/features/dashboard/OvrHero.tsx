@@ -36,7 +36,7 @@ export function OvrHero({
 
   return (
     <section
-      className={`rounded-lg border-2 bg-surface p-6 ${tier !== null ? TIER_BORDER_DISPLAY[tier] : 'border-line'}`}
+      className={`rounded-lg border-2 bg-surface p-6 hover-card ${tier !== null ? TIER_BORDER_DISPLAY[tier] : 'border-line'}`}
     >
       <p className="text-sm text-muted">OVR</p>
       <p

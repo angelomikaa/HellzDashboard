@@ -32,7 +32,7 @@ export function PromotionCard({ card, charClass }: { card: PromotionCardRow; cha
   const ovrTier = tierForOvr(Math.round(card.ovr)) as NonNullable<ReturnType<typeof tierForOvr>>
 
   return (
-    <article aria-label={`${card.display_name} — ${charClass}`} className={`rounded-lg border-2 bg-surface p-6 ${TIER_BORDER_DISPLAY[ovrTier]}`}>
+    <article aria-label={`${card.display_name} — ${charClass}`} className={`rounded-lg border-2 bg-surface p-6 hover-card ${TIER_BORDER_DISPLAY[ovrTier]}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-sm text-muted">OVR</p>

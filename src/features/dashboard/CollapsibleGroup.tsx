@@ -34,7 +34,7 @@ export function CollapsibleGroup({
         onClick={() => onToggle(groupName)}
         aria-expanded={open}
         aria-controls={`dashboard-group-${groupName}`}
-        className="flex h-11 w-full items-center justify-between rounded-md border border-line bg-surface px-3 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="flex h-11 w-full items-center justify-between rounded-md border border-line bg-surface px-3 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         {label}
         <svg

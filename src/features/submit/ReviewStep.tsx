@@ -64,7 +64,7 @@ export function ReviewStep({
                     type="button"
                     onClick={() => onFixStat(entry.stat_key)}
                     disabled={submitting}
-                    className="flex h-11 w-full items-center justify-between gap-4 rounded-md border border-line bg-surface px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex h-11 w-full items-center justify-between gap-4 rounded-md border border-line bg-surface px-3 text-left hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <span className="text-sm font-semibold text-content">{entry.label}</span>
                     <span className={hasValue ? 'text-base text-content' : 'text-base text-muted'}>
@@ -95,7 +95,7 @@ export function ReviewStep({
         onClick={onSubmit}
         disabled={!allStepsVerified || submitting}
         aria-busy={submitting}
-        className="h-11 rounded-md bg-accent text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+        className="h-11 rounded-md bg-accent text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
       >
         Enviar
       </button>

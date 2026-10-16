@@ -123,7 +123,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
               value={discordHandle}
               onChange={(e) => setDiscordHandle(e.target.value)}
               disabled={locked}
-              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -141,7 +141,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
               disabled={locked}
-              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
           </div>
           {(status.kind === 'error' || status.kind === 'locked') && (
@@ -157,7 +157,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
             type="submit"
             disabled={disabled}
             aria-busy={submitting}
-            className="h-11 w-full rounded-md bg-accent text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-11 w-full rounded-md bg-accent text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
           >
             Entrar
           </button>

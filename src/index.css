@@ -33,10 +33,18 @@
   --color-accent-strong: #B70302;     /* brand anchor: glow cores, large fills */
   --color-accent-bright: #F26D6F;     /* small red text on dark (6.0:1 on surface) */
   --color-accent-foreground: #FFFFFF; /* 4.55:1 on #DC3538 (AA) */
+  --color-accent-hover: #E24346;      /* primary fill hover — one step brighter */
+
+  --color-destructive-hover: #FF7A73; /* danger border hover — one step brighter */
 
   /* text */
   --color-content: #F0EDED;
   --color-muted: #9A8F8F;
+
+  /* hover ramps (owner gate round 5) — one step up from each resting
+     token so every interactive element shares the same subtle feedback */
+  --color-surface-hover: #262626;     /* cards/controls resting #1E1E1E */
+  --color-line-hover: #573E40;        /* hairline resting #3D2A2B */
 
   /* semantic */
   --color-destructive: #F85149;
@@ -57,6 +65,13 @@
   box-shadow: 0 0 16px 1px rgb(220 53 56 / 0.35), 0 0 2px 1px rgb(220 53 56 / 0.55);
 }
 
+/* Restrained active-tab glow (owner gate round 5): half the radius and
+   intensity of glow-accent — the red underline + text color already carry
+   the indication, the glow only whispers. */
+@utility glow-accent-soft {
+  box-shadow: 0 0 8px 0 rgb(220 53 56 / 0.2), 0 0 1px 0 rgb(220 53 56 / 0.35);
+}
+
 @utility glow-text-current {
   /* no color = currentColor → OVR/points numbers glow in their TIER color for free */
   text-shadow: 0 0 18px, 0 0 36px;
@@ -68,6 +83,60 @@
     radial-gradient(ellipse 80% 50% at 50% -10%, rgb(220 53 56 / 0.08), transparent),
     repeating-linear-gradient(0deg, rgb(220 53 56 / 0.03) 0 1px, transparent 1px 48px),
     repeating-linear-gradient(90deg, rgb(220 53 56 / 0.03) 0 1px, transparent 1px 48px);
+}
+
+/* Hover feedback (owner gate round 5) — ONE shared pattern per element
+   class, centralized here so it cannot drift. D-05-safe: only color/
+   background-color/border-color/box-shadow change on hover — no
+   transforms, no keyframes, nothing auto-animates. Transitions are
+   hover/focus-only; the global prefers-reduced-motion kill-switch at the
+   bottom of this file forces instant state changes for reduce users. */
+
+/* Filled (primary) buttons: fill brightens one step + glow intensifies. */
+@utility hover-primary {
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+  &:hover:not(:disabled) {
+    background-color: var(--color-accent-hover);
+    box-shadow: 0 0 18px 1px rgb(220 53 56 / 0.4), 0 0 2px 1px rgb(220 53 56 / 0.6);
+  }
+}
+
+/* Ghost/secondary buttons + inputs/selects: surface lightens + border
+   brightens one step. Inputs whose border can turn destructive
+   conditionally keep the error border on hover via the `!` modifier on
+   border-destructive at those call sites (hover must never mask a
+   validation state). */
+@utility hover-control {
+  transition: background-color 150ms ease, border-color 150ms ease;
+  &:hover:not(:disabled) {
+    background-color: var(--color-surface-hover);
+    border-color: var(--color-line-hover);
+  }
+}
+
+/* Danger (destructive) buttons: faint red fill appears + border/text
+   brighten one step. */
+@utility hover-danger {
+  transition: background-color 150ms ease, border-color 150ms ease;
+  &:hover:not(:disabled) {
+    background-color: rgb(248 81 73 / 0.1);
+    border-color: var(--color-destructive-hover);
+  }
+}
+
+/* Cards (stat/tier/character/promotion): surface lightens + a faint
+   static aura appears. Impecável cards participate via --card-surface —
+   tier-impecavel-border's padding-box gradient consumes it, so the
+   lighten shows through the gradient border without touching the
+   transparent border-color the rainbow depends on. */
+@utility hover-card {
+  --card-surface: var(--color-surface);
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+  &:hover {
+    --card-surface: var(--color-surface-hover);
+    background-color: var(--color-surface-hover);
+    box-shadow: 0 0 14px 0 rgb(220 53 56 / 0.1);
+  }
 }
 
 /* Impecável — the top tier, renamed per owner decision at the 07.1-02 gate
@@ -86,7 +155,9 @@
      per-layer boxes live in the background-origin/background-clip
      longhands instead, which accept comma lists per layer. */
   background-image:
-    linear-gradient(var(--color-surface), var(--color-surface)),
+    /* first layer reads --card-surface (set at rest by hover-card) so the
+       owner-gate round-5 hover lighten shows through the rainbow border */
+    linear-gradient(var(--card-surface, var(--color-surface)), var(--card-surface, var(--color-surface))),
     linear-gradient(120deg, #f26d6f, #e9b44c, #3fb950, #58a6ff, #b8c0cc);
   background-origin: padding-box, border-box;
   background-clip: padding-box, border-box;
@@ -116,7 +187,9 @@
   }
 }
 
-/* D-05: nothing auto-animates; guard any future transition */
+/* D-05: nothing auto-animates. Hover/focus transitions exist (owner gate
+   round 5) but only on non-transform properties and only on user
+   interaction; reduce users get instant state changes. */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     transition: none !important;

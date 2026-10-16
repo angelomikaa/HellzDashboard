@@ -196,7 +196,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
               disabled={busy}
-              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="">—</option>
               {classes.map((className) => (
@@ -256,8 +256,8 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                             onClick={() => void handleToggle(entry.stat_key, !selected)}
                             className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
                               selected
-                                ? 'border-accent bg-accent text-accent-foreground'
-                                : 'border-line bg-surface text-content'
+                                ? 'border-accent bg-accent text-accent-foreground hover-primary'
+                                : 'border-line bg-surface text-content hover-control'
                             }`}
                           >
                             {entry.label}

@@ -421,8 +421,10 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     aria-invalid={combatPowerFeedback.invalid || undefined}
                     disabled={ocrRunningStep === 1}
                     placeholder={ocrRunningStep === 1 ? OCR_READING_PLACEHOLDER : undefined}
-                    className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      combatPowerFeedback.invalid ? 'border-destructive' : 'border-line'
+                    className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      // `!` keeps the hover border-brighten from masking the
+                      // validation border while an invalid value is hovered.
+                      combatPowerFeedback.invalid ? 'border-destructive!' : 'border-line'
                     } ${ocrRunningStep === 1 ? 'animate-pulse' : ''}`}
                   />
                   {combatPowerFeedback.ok && (
@@ -505,7 +507,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                 <button
                   type="button"
                   onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3 | 4)}
-                  className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   Voltar
                 </button>
@@ -517,7 +519,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   type="button"
                   onClick={() => setStep(2)}
                   disabled={!stepVerified[1]}
-                  className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Continuar
                 </button>
@@ -529,7 +531,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   disabled={
                     !groupComplete(catalog, STEP_GROUP[step], inputs) || !stepVerified[step]
                   }
-                  className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Continuar
                 </button>

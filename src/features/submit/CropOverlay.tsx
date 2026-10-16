@@ -256,7 +256,7 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
           <button
             type="button"
             onClick={onCancel}
-            className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {DECLINE_LABEL}
           </button>
@@ -264,7 +264,7 @@ export function CropOverlay({ bitmap, aspect, onConfirm, onCancel }: CropOverlay
             ref={confirmBtnRef}
             type="button"
             onClick={handleConfirm}
-            className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {CONFIRM_LABEL}
           </button>

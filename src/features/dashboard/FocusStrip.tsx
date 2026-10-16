@@ -34,7 +34,7 @@ export function FocusStrip({
               key={stat.stat_key}
               type="button"
               onClick={() => onJump(stat.stat_key, stat.group_name)}
-              className="flex h-11 items-center gap-2 rounded-md border border-line bg-surface px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="flex h-11 items-center gap-2 rounded-md border border-line bg-surface px-3 hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <span className="text-sm text-content">{stat.label}</span>
               <span className={`text-sm font-semibold ${tier ? TIER_TEXT_DISPLAY[tier] : ''}`}>

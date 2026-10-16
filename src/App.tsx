@@ -72,7 +72,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => handleLogout(invalidate)}
-                className="h-11 rounded-md border border-line px-4 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="h-11 rounded-md border border-line px-4 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Sair
               </button>
@@ -83,8 +83,8 @@ function App() {
                   type="button"
                   onClick={() => setTab('painel')}
                   aria-current={tab === 'painel' ? 'page' : undefined}
-                  className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                    tab === 'painel' ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
+                  className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    tab === 'painel' ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
                   }`}
                 >
                   Painel
@@ -93,8 +93,8 @@ function App() {
                   type="button"
                   onClick={() => setTab('submit')}
                   aria-current={showSubmit ? 'page' : undefined}
-                  className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                    showSubmit ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
+                  className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    showSubmit ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
                   }`}
                 >
                   Enviar Status
@@ -103,8 +103,8 @@ function App() {
                   type="button"
                   onClick={() => setTab('destaques')}
                   aria-current={showHighlights ? 'page' : undefined}
-                  className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                    showHighlights ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
+                  className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    showHighlights ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
                   }`}
                 >
                   Destaques
@@ -114,8 +114,8 @@ function App() {
                     type="button"
                     onClick={() => setTab('validacoes')}
                     aria-current={showValidacoes ? 'page' : undefined}
-                    className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      showValidacoes ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
+                    className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      showValidacoes ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
                     }`}
                   >
                     Validações
@@ -126,8 +126,8 @@ function App() {
                     type="button"
                     onClick={() => setTab('characters')}
                     aria-current={showCharacters ? 'page' : undefined}
-                    className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      showCharacters ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
+                    className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      showCharacters ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
                     }`}
                   >
                     Personagens
@@ -138,8 +138,8 @@ function App() {
                     type="button"
                     onClick={() => setTab('keystats')}
                     aria-current={showKeyStats ? 'page' : undefined}
-                    className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      showKeyStats ? 'border-accent text-content glow-accent' : 'border-transparent text-muted'
+                    className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      showKeyStats ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
                     }`}
                   >
                     Stats-Chave

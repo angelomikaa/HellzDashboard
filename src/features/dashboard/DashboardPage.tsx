@@ -104,7 +104,7 @@ export function DashboardPage({
           <button
             type="button"
             onClick={() => onNavigate('submit')}
-            className="mt-6 h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="mt-6 h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             Enviar Status
           </button>

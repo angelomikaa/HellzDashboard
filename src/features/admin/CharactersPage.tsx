@@ -327,13 +327,13 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                     value={newClassName}
                     onChange={(e) => setNewClassName(e.target.value)}
                     disabled={busy}
-                    className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                    className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={busy || newClassName.trim() === ''}
-                  className="h-11 shrink-0 rounded-md border border-line px-4 text-base font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-11 shrink-0 rounded-md border border-line px-4 text-base font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Adicionar Classe
                 </button>
@@ -387,7 +387,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                   <article
                     key={member.id}
                     aria-busy={saving}
-                    className={`rounded-lg border border-line bg-surface p-4 sm:p-5${
+                    className={`rounded-lg border border-line bg-surface p-4 sm:p-5 hover-card${
                       member.active ? '' : ' opacity-60'
                     }`}
                   >
@@ -414,7 +414,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                               value={draft.displayName}
                               onChange={(e) => setDraft({ ...draft, displayName: e.target.value })}
                               disabled={saving}
-                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                             />
                           </div>
                           <div className="flex flex-col gap-1">
@@ -429,7 +429,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                               value={draft.charClass}
                               onChange={(e) => setDraft({ ...draft, charClass: e.target.value })}
                               disabled={saving}
-                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {/* Display-only '—' (maps to null); saving with it
                                   selected is blocked client-side below. */}
@@ -465,7 +465,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                                 })
                               }
                               disabled={saving}
-                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {(Object.keys(FUNCTION_LABELS) as Array<
                                 keyof typeof FUNCTION_LABELS
@@ -507,7 +507,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                           disabled={
                             saving || busy || draft.charClass === '' || draft.displayName.trim() === ''
                           }
-                          className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                          className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           Salvar
                         </button>
@@ -516,7 +516,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                           type="button"
                           onClick={() => startEdit(member)}
                           disabled={busy}
-                          className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                          className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           Editar
                         </button>
@@ -528,7 +528,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                               type="button"
                               onClick={() => openConfirm({ kind: 'promote', member })}
                               disabled={busy}
-                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Conceder oficial
                             </button>
@@ -538,7 +538,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                               type="button"
                               onClick={() => openConfirm({ kind: 'demote', member })}
                               disabled={busy}
-                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Revogar oficial
                             </button>
@@ -551,7 +551,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                               type="button"
                               onClick={() => openConfirm({ kind: 'deactivate', member })}
                               disabled={busy}
-                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Remover
                             </button>
@@ -560,7 +560,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                               type="button"
                               onClick={() => openConfirm({ kind: 'activate', member })}
                               disabled={busy}
-                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Reativar
                             </button>

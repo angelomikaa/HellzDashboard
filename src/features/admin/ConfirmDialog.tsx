@@ -78,8 +78,8 @@ export function ConfirmDialog({
   }
 
   const confirmClasses = destructive
-    ? 'h-11 rounded-md border border-destructive px-4 text-base font-semibold text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60'
-    : 'h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60'
+    ? 'h-11 rounded-md border border-destructive px-4 text-base font-semibold text-destructive hover-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60'
+    : 'h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60'
 
   return (
     <div
@@ -106,7 +106,7 @@ export function ConfirmDialog({
             onClick={onCancel}
             disabled={busy}
             aria-busy={busy}
-            className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
           >
             Cancelar
           </button>

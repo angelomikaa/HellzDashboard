@@ -92,7 +92,7 @@ export function HistoryList({ session, onNewSubmission }: HistoryListProps) {
       <button
         type="button"
         onClick={onNewSubmission}
-        className="mt-6 h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="mt-6 h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         Enviar novos status
       </button>

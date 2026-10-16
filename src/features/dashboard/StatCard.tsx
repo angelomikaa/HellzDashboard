@@ -43,7 +43,7 @@ export function StatCard({ stat }: { stat: MyReportStat }) {
     <div
       id={`stat-${stat.stat_key}`}
       tabIndex={-1}
-      className={`rounded-lg border bg-surface p-4 focus:outline-none focus:ring-2 focus:ring-accent ${borderClass}${missing ? ' opacity-60' : ''}`}
+      className={`rounded-lg border bg-surface p-4 hover-card focus:outline-none focus:ring-2 focus:ring-accent ${borderClass}${missing ? ' opacity-60' : ''}`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-sm font-semibold text-content">{stat.label}</span>

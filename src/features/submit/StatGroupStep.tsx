@@ -106,8 +106,10 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
                   aria-invalid={feedback.invalid || undefined}
                   disabled={ocrRunning}
                   placeholder={ocrRunning ? READING_PLACEHOLDER : undefined}
-                  className={`h-11 w-full rounded-md border bg-surface text-base text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                    feedback.invalid ? 'border-destructive' : 'border-line'
+                  className={`h-11 w-full rounded-md border bg-surface text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    // `!` keeps the hover border-brighten from masking the
+                    // validation border while an invalid value is hovered.
+                    feedback.invalid ? 'border-destructive!' : 'border-line'
                   } ${percentual ? 'pr-8' : 'px-3'} ${ocrRunning ? 'animate-pulse' : ''}`}
                 />
                 {percentual && (
