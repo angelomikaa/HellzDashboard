@@ -404,7 +404,7 @@ begin
           where rs.class_name = v_class
         ), '[]'::jsonb)
       )
-    );
+    )); -- closes jsonb_build_object AND the `return (` wrapper (06 fix)
 end;
 $$;
 
