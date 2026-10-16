@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: Phase 07.2 context gathered
-last_updated: "2026-10-16T19:04:04.629Z"
-last_activity: 2026-10-16 -- Phase 07.2 execution started
+stopped_at: Phase 07.2 plan 07.2-01 complete
+last_updated: "2026-10-16T21:45:00.000Z"
+last_activity: 2026-10-16 -- 07.2-01 complete (0013 live, D-11 locked)
 progress:
   total_phases: 6
   completed_phases: 2
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 07.2 (premium-showcase-game-grounding-inserted) — EXECUTING
-Plan: 1 of 6
+Plan: 2 of 6 (07.2-01 complete)
 Status: Executing Phase 07.2
-Last activity: 2026-10-16 -- Phase 07.2 execution started
+Last activity: 2026-10-16 -- 07.2-01 complete (0013 live, D-11 locked)
 
 ## Accumulated Context
 
@@ -51,11 +51,15 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 07]: 07-04 task-2 starvation probes adapted (Rule 3): the uniform dummy PIN is hash-only in the repo (T-07-08) and was handed off out-of-band to the OWNER only, so the server-side n<3 contract was probed with self-cleaning throwaway members placed in the starved cohorts (Stalker/dps -> n=2, Biochemist/mdps -> n=2) - my_report returned HTTP 200 with OVR null/data_sufficient false and all 57 stats points null (never a 500); the real dummy logins (dummy-wild-01, dummy-hp-01) are covered by the owner observation pass (attempting them with an unknown PIN would burn rate-limited login attempts)
 - [Phase 07]: 07-04 took Phase 7 LIVE (owner-approved D-12 gate): 0012 applied via apply-seed.mjs with pre/post parity exact (11 classes x 6 key stats) and suporte-only vocabulary + schema_migrations bookkeeping row; 73 dummies resident on the LIVE panel (cohort matrix exact, 57-stats invariant, age spread 32/40, starvation probes HTTP 200 data-insufficient); smoke battery 5/5 green on the new vocabulary; owner observation pass APPROVED 2026-10-14; SEED-02 purge recorded as a HARD pre-release gate in STATE.md
 
+- [Phase 07.2]: 07.2-01 took the server foundation LIVE: migration 0013 applied via apply-seed.mjs (fresh owner token after the old one was rotated — token value never stored in any file; referenced as rotated), schema_migrations bookkeeping row recorded (0012 pattern), smoke-card.mjs PASSED 54/54 TWICE consecutively with zero residue, smoke-rank green standalone (no rank-engine regression)
+- [Phase 07.2]: D-11 gate CLOSED (owner, 2026-10-16): the 57-stat 3-letter pt-BR label mapping LOCKED AS DRAFTED — owner supplied NO corrections; live stat_catalog.label_short verified populated for all 57 rows, unique, zero empty strings; downstream 07.2 plans may consume label_short
+- [Phase 07.2]: my_card() carries the closed field list {stat_key,label,label_short,value_type,own_value,points} per key stat + relevant_stat_keys + ovr; config (weights/toggles) has no representation in any payload; my_report() untouched (existing leak probes stay green)
+
 ### Blockers/Concerns (open — carry to next milestone)
 
 - **[Pre-release] HARD GATE (SEED-02): run the dummy purge before ANY release** — `node scripts/apply-seed.mjs supabase/seeds/dummy/purge-dummies.sql` then the zero-dummy verification query (four zeros across members/submissions/submission_stats/pin_login_attempts). Dummies are LIVE and resident by owner decision 7; shipping without the purge exposes dummy names on Destaques and distorts every real member's ranks.
 - **[Operational] Do NOT revoke JWT signing key 6f7657c3** (standby) — revoking it kills every member session instantly
-- **[Pre-launch] Owner must rotate the Supabase access token** used for deploys, and rotate placeholder whitelist rows/PINs before inviting real members (credentials/hashes recoverable from git history, WR-06; standing action since 03-02)
+- **[Pre-launch] Rotate placeholder whitelist rows/PINs before inviting real members** (credentials/hashes recoverable from git history, WR-06; standing action since 03-02). Supabase access token rotation DONE 2026-10-16 (old token was revoked; owner issued a fresh one — value held in session env only, never stored)
 - **[Pre-launch] Owner must replace `public/examples/*.svg`** placeholder example shots with real game screenshots before inviting real members (acknowledged 02-03 UAT step 8)
 - **[Pending live op] Catalog re-seed of the 6 reclassified flat damage stats** (pve_dmg_bonus, pvp_dmg_bonus, mdmg_bonus, pdmg_bonus, pve_dmg_reduction, pvp_dmg_reduction → 'flat', D-05-UAT-10) via apply-seed.mjs was auth-gated and never run — live catalog still shows the superseded value_type for those six
 - **[OCR calibration] Structural reader thresholds need production-data calibration** — spike GO was 100.0% on 11 owner-device samples but device fragmentation is not covered; after a game-UI change, recalibrate the visual grammar in structure.ts (GAME_LABELS, SCREENS row order, probe thresholds) and re-run the harness grid — never pixel fractions
@@ -71,9 +75,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-16T08:33:35.047Z
-Stopped at: Phase 07.2 context gathered
-Resume file: .planning/phases/07.2-premium-showcase-game-grounding-inserted/07.2-CONTEXT.md
+Last session: 2026-10-16T21:45:00.000Z
+Stopped at: Completed 07.2-01-PLAN.md (0013 live, D-11 locked)
+Resume file: None — next plan 07.2-02
 
 ## Performance Metrics
 
@@ -83,6 +87,7 @@ Resume file: .planning/phases/07.2-premium-showcase-game-grounding-inserted/07.2
 | 07 | 07-02 | ~15 min | 2 | 6 | 2026-10-14 |
 | 07 | 07-03 | ~96 min (tasks 1-2 + gate close) | 3 | 5 | 2026-10-14 |
 | 07 | 07-04 | ~3h (incl. observation window) | 4 | 3 | 2026-10-14 |
+| 07.2 | 07.2-01 | ~55 min (across 2 sessions, incl. token rotation) | 3 | 3 | 2026-10-16 |
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*
