@@ -80,7 +80,15 @@ Plans:
   5. Desktop widths no longer squish/misalign mobile-first elements — a deliberate desktop layout pass across cards and dense screens (LAYT-01)
   6. Officials and above see a full-stat OVR-based rank view in its own tab (all 57 stats; members never see it) (RANK-02)
   7. A secondary "relevant" stat tier exists (unlimited count, never displayed on cards) whose sole purpose is guiding the "foco de melhoria" section (RELV-01)
-**Plans:** 0/? plans — not yet planned
+**Plans:** 6 plans — planned 2026-10-16
+
+Plans:
+- [ ] 07.2-01-PLAN.md — Server foundation: migration 0013 (relevant tier, my_card, role_rank, get_promotion key highlights, label_short) live + smoke matrix + D-11 owner review (Wave 1)
+- [ ] 07.2-02-PLAN.md — Client data layer: closed api.ts wrappers + D-07 foco pure function, TDD (Wave 2)
+- [ ] 07.2-05-PLAN.md — ROO assets + canvas JPEG export + Destaques full-bleed showcase rework (Wave 3)
+- [ ] 07.2-03-PLAN.md — Painel EAFC key-stat strip + member own-card download + foco rewiring + Stats-Chave relevant section (Wave 4)
+- [ ] 07.2-04-PLAN.md — Officials rank view: role-primary boards + 57-stat detail + staff tab (Wave 4)
+- [ ] 07.2-06-PLAN.md — Desktop layout pass, one breakpoint system + staff-view class icons + owner walk (Wave 5)
 
 ### Phase 8: Whitelist Lifecycle & First-Login PIN Setup
 **Goal**: Staff control exactly who can access the panel — officers add players by handle only, players choose their own PIN at first login, and a forgotten PIN is resolvable by the owner — with the whitelist as the trust boundary and no second rate-limit mechanism.
@@ -94,7 +102,7 @@ Plans:
   5. Trust-boundary hygiene holds: handles with the dummy sentinel prefix are rejected at add time, and legacy placeholder-PIN whitelist rows are converted to the claim flow (their next login routes to first-login PIN setup, and their lockout rows are cleared)
 **Plans**: TBD
 
-Cross-cutting constraints: deploy order invariant — migration 0013 (nullable `pin_hash`; renumbered: Phase 7's catalog migration took 0012) → patched `verify-pin` + new `setup-pin` Edge Functions live → first `add_member` use (the null-hash branch must precede the bcrypt compare or pinless members 500); `add_member` stays the ONLY write surface on `members` (no new RLS policy, no direct INSERT); inactive members must NEVER receive `pin_setup_required` (uniform 401 — branch ordering is a smoke-probed must-have).
+Cross-cutting constraints: deploy order invariant — migration 0014 (nullable `pin_hash`; renumbered: Phase 7's catalog migration took 0012, Phase 07.2 takes 0013) → patched `verify-pin` + new `setup-pin` Edge Functions live → first `add_member` use (the null-hash branch must precede the bcrypt compare or pinless members 500); `add_member` stays the ONLY write surface on `members` (no new RLS policy, no direct INSERT); inactive members must NEVER receive `pin_setup_required` (uniform 401 — branch ordering is a smoke-probed must-have).
 **UI hint**: yes
 
 ### Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats
@@ -103,7 +111,7 @@ Cross-cutting constraints: deploy order invariant — migration 0013 (nullable `
 **Requirements**: SCALE-01, SCALE-02, SCALE-03, ROLE-01, ROLE-02, ROLE-03, ROLE-04, ROLE-06, ROLE-07, ROLE-08, ROLE-10, ROLE-11, HOME-03
 **Success Criteria** (what must be TRUE):
   1. Per-stat points are value-proportional within class+build-role cohorts: the leader(s) at the max value hold exactly 99, everyone below scales by `own/max × 99` (top-end cuts at 98/97/96/95 emerge naturally), and OVR inherits the finer scale with zero formula change and the floor of 51 preserved — proven by exact-value smoke on live data
-  2. ONE migration (0014; renumbered: Phase 7 took 0012, Phase 8 takes 0013) swaps the formula across all three rank RPCs (`my_report`, `class_top5`, `get_promotion`), rebuilds `class_key_stats` to key per (class, build-role) with block-at-7 per combo, backfills every existing class config into all build-role values (pre/post-migration OVR parity smoke: zero OVR change or null on deploy day), ships `set_key_stat` v2 with the old signature dropped, and folds in the single additive `last_validated_at` scalar on `my_report` — zero new per-stat fields
+     2. ONE migration (0015; renumbered: Phase 7 took 0012, Phase 07.2 takes 0013, Phase 8 takes 0014) swaps the formula across all three rank RPCs (`my_report`, `class_top5`, `get_promotion`), rebuilds `class_key_stats` to key per (class, build-role) with block-at-7 per combo, backfills every existing class config into all build-role values (pre/post-migration OVR parity smoke: zero OVR change or null on deploy day), ships `set_key_stat` v2 with the old signature dropped, and folds in the single additive `last_validated_at` scalar on `my_report` — zero new per-stat fields
   3. OVR in all three RPCs reads the member's own (class, build-role) config, per-stat cohorts become class+build-role, and a member with no configured combo gets OVR = null via the existing data-insufficient rendering — never a silent class-defaults fallback
   4. Every re-locked baseline is green in the same phase: `rankMath.ts` locked test values, `smoke-rank.mjs` exact-value matrix, and `smoke-promotion.mjs` ordering (fixtures carry build roles and per-combo 6-row key-stat inserts); tier bands (D-01/D-02) are recalibrated by the owner against the resident seeded cohorts before being locked, and the improvement-screen percentile phrase is gone — stat cards no longer claim percentile position
   5. The admin surface works and the governance holds: Stats-Chave gains the role selector (class → role → stat chips, per-combo count display, block-at-7 copy), build-role assignment stays staff-only (Personagens path), the staff audit pass re-assigns existing members' build roles before any per-role differentiation applies, officers see the per-(class, role) config coverage indicator (staff-only) — and RNK-02 closed-payload discipline holds (leak probes stay green, no member-visible sign that role configs differ)
