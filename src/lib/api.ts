@@ -23,6 +23,7 @@ export class ApiError extends Error {
 export interface StatCatalogEntry {
   stat_key: string
   label: string
+  label_short: string // 3-letter pt-BR abbreviation (07.2 D-11, migration 0013)
   group_name: 'general' | 'quasi' | 'special'
   value_type: 'flat' | 'percentual'
 }
@@ -81,7 +82,7 @@ async function parseBody<T>(res: Response): Promise<T> {
 export async function fetchCatalog(session: NeoFootSession): Promise<StatCatalogEntry[]> {
   const res = await restFetch(
     session,
-    '/stat_catalog?select=stat_key,label,group_name,value_type&order=stat_key',
+    '/stat_catalog?select=stat_key,label,label_short,group_name,value_type&order=stat_key',
   )
   // parseBody maps an empty 2xx body to undefined (WR-03) — same ?? [] guard
   // as every other list wrapper; a shape the client can't control must not
@@ -356,4 +357,128 @@ export async function fetchPromotion(session: NeoFootSession): Promise<Promotion
   // POINTS over all 57 stats, fields exactly stat_key/label/value_type/value/points.
   const res = await restFetch(session, '/rpc/get_promotion', { method: 'POST', body: JSON.stringify({}) })
   return (await parseBody<PromotionSection[]>(res)) ?? []
+}
+
+// ---------------------------------------------------------------------------
+// Phase 7.2 surfaces (0013) — member card payload / staff officials rank /
+// relevant-tier governance / relevant-set read. my_card is member-invocable
+// SECURITY DEFINER (gate inside the function); role_rank and set_relevant_stat
+// are staff-only SECURITY DEFINER (gate inside the function); class_relevant_stats
+// is a staff-only RLS read. The client adds NO enforcement — payloads are
+// rendered verbatim by the 07.2-03/04 UI plans with guards as UX-only.
+// Types below are CLOSED field lists pinning the 0013 payload censuses exactly
+// (compile-time leak block, T-06-05/T-072-05 discipline): no index signatures,
+// no optional config-shaped fields — key identity is the sanctioned D-03
+// reveal, but key-stat CONFIG (weights/toggles/management data) has NO
+// representation in any payload.
+// ---------------------------------------------------------------------------
+
+export interface CardKeyStat {
+  stat_key: string
+  label: string
+  label_short: string
+  value_type: 'flat' | 'percentual'
+  own_value: number | null
+  points: number | null
+}
+
+export interface MyCard {
+  char_class: string | null
+  char_function: 'dps' | 'mdps' | 'suporte'
+  ovr: { value: number | null; data_sufficient: boolean }
+  key_stats: CardKeyStat[]
+  relevant_stat_keys: string[]
+}
+
+export interface RoleRankStat {
+  stat_key: string
+  label: string
+  label_short: string
+  value_type: 'flat' | 'percentual'
+  value: number | null
+  points: number | null
+  class_average: number | null
+}
+
+export interface RoleRankRow {
+  member_id: string
+  display_name: string
+  char_class: string
+  char_function: 'dps' | 'mdps' | 'suporte'
+  ovr: number | null
+  stats: RoleRankStat[]
+}
+
+export async function fetchMyCard(session: NeoFootSession): Promise<MyCard> {
+  // SECURITY DEFINER RPC (0013): member-invocable — identity from the JWT only,
+  // zero parameters, empty JSON body. Carries the SANCTIONED 07.2 D-03 key
+  // reveal (which stats are key) plus the relevant identity for the D-07 foco
+  // rule (zero-config census: weights/toggles/management data are never
+  // serialised — T-072-05 closed type above is the compile-time half).
+  const res = await restFetch(session, '/rpc/my_card', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  // parseBody maps an empty 2xx body to undefined (WR-03) — fetchMyReport
+  // precedent: fetchMyCard is typed non-nullable and feeds the render path
+  // directly, so a malformed shape must surface as ApiError (enumeration-safe
+  // copy) instead of a crash at card.key_stats.
+  const card = await parseBody<MyCard>(res)
+  if (!card || !Array.isArray(card.key_stats)) {
+    throw new ApiError(0, 'server', 'malformed my_card response')
+  }
+  return card
+}
+
+export async function fetchRoleRank(
+  session: NeoFootSession,
+  charFunction: 'dps' | 'mdps' | 'suporte',
+  className?: string,
+): Promise<RoleRankRow[]> {
+  // SECURITY DEFINER RPC (0013): staff-only gate INSIDE the function (member_role
+  // claim + active flag) — a member JWT raises 'forbidden' (HTTP 500); also
+  // raises 'invalid_function' (whitelist, pinned before other checks) and
+  // 'unknown_class'. D-18/D-20: per-stat value + points + class_average is the
+  // sanctioned officials visibility expansion. Rows arrive SERVER-ORDERED
+  // (ovr desc nulls last, display_name) — never re-sort client-side; filter
+  // only (HighlightsPage discipline). Composite React keys use member_id
+  // (display_name has no unique constraint).
+  const res = await restFetch(session, '/rpc/role_rank', {
+    method: 'POST',
+    body: JSON.stringify({ p_function: charFunction, p_class: className ?? null }),
+  })
+  return (await parseBody<RoleRankRow[]>(res)) ?? []
+}
+
+export async function setRelevantStat(
+  session: NeoFootSession,
+  className: string,
+  statKey: string,
+  enabled: boolean,
+): Promise<number> {
+  // SECURITY DEFINER RPC (0013): staff-only gate INSIDE the function (member_role
+  // claim + active flag) — 'forbidden' / 'unknown_class' / 'already_key'
+  // (D-05 rule 1: key XOR relevant) / 'key_set_incomplete' (D-05 rule 2:
+  // relevant selections only after the class's 6-key set is complete) raise
+  // server-side. Returns the class's current relevant count. D-05 rule 3
+  // (vacancy never demotes relevant rows) and rule 4 (promotion demotes) live
+  // in the RPC pair itself — the client just renders the outcome.
+  const res = await restFetch(session, '/rpc/set_relevant_stat', {
+    method: 'POST',
+    body: JSON.stringify({ p_class: className, p_stat_key: statKey, p_enabled: enabled }),
+  })
+  return parseBody<number>(res)
+}
+
+export async function fetchKeyRelevantStats(session: NeoFootSession, className: string): Promise<string[]> {
+  // RLS: staff-only read (staff_select_relevant_stats, 0013) — a member JWT
+  // gets [] from the policy filter, which is NOT an error. Mirrors fetchKeyStats
+  // shape; the Stats-Chave page needs the current relevant set to render chip
+  // states (D-04/D-06).
+  const res = await restFetch(
+    session,
+    `/class_relevant_stats?class_name=eq.${encodeURIComponent(className)}&select=stat_key`,
+  )
+  const rows = await parseBody<{ stat_key: string }[]>(res)
+  return (rows ?? []).map((r) => r.stat_key)
 }

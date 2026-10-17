@@ -10,14 +10,14 @@ import { buildStatsPayload, groupComplete, REQUIRED_GROUPS, type GroupInputs } f
 // Minimal fixture catalog mirroring the real 57-stat catalog's shape:
 // combat_power lives in 'general', each group mixes flat/percentual entries.
 const CATALOG: StatCatalogEntry[] = [
-  { stat_key: 'combat_power', label: 'Poder de Combate', group_name: 'general', value_type: 'flat' },
-  { stat_key: 'hp', label: 'HP', group_name: 'general', value_type: 'flat' },
-  { stat_key: 'patk', label: 'PATK', group_name: 'general', value_type: 'flat' },
-  { stat_key: 'aspd', label: 'ASPD', group_name: 'quasi', value_type: 'flat' },
-  { stat_key: 'crit', label: 'CRIT', group_name: 'quasi', value_type: 'percentual' },
-  { stat_key: 'variable_ct_pct', label: 'CT Variável', group_name: 'quasi', value_type: 'percentual' },
-  { stat_key: 'max_sp_pct', label: 'SP Máx.', group_name: 'special', value_type: 'percentual' },
-  { stat_key: 'dmg_vs_small', label: 'Dano vs Pequeno', group_name: 'special', value_type: 'percentual' },
+  { stat_key: 'combat_power', label: 'Poder de Combate', label_short: 'PCB', group_name: 'general', value_type: 'flat' },
+  { stat_key: 'hp', label: 'HP', label_short: 'HP', group_name: 'general', value_type: 'flat' },
+  { stat_key: 'patk', label: 'PATK', label_short: 'PAT', group_name: 'general', value_type: 'flat' },
+  { stat_key: 'aspd', label: 'ASPD', label_short: 'ASP', group_name: 'quasi', value_type: 'flat' },
+  { stat_key: 'crit', label: 'CRIT', label_short: 'CRT', group_name: 'quasi', value_type: 'percentual' },
+  { stat_key: 'variable_ct_pct', label: 'CT Variável', label_short: 'CVP', group_name: 'quasi', value_type: 'percentual' },
+  { stat_key: 'max_sp_pct', label: 'SP Máx.', label_short: 'SPM', group_name: 'special', value_type: 'percentual' },
+  { stat_key: 'dmg_vs_small', label: 'Dano vs Pequeno', label_short: 'DVP', group_name: 'special', value_type: 'percentual' },
 ]
 
 // Every required group filled except combat_power (the only optional stat).
