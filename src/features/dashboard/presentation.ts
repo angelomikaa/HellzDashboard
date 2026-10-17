@@ -34,12 +34,66 @@ export function percentilePhrase(points: number, label: string): string {
   return `Você está entre os ${b}% ${word} em ${label}.`
 }
 
-/** D-16: the 3 weakest stats — eligible (points !== null), stable ascending sort. */
+/** D-16: the 3 weakest stats — eligible (points !== null), stable ascending sort.
+ * @deprecated 07.2 D-07 — replaced by improvementFocus (key∪relevant, most-behind
+ * vs class average). Kept ONLY because FocusStrip.tsx still imports it; plan
+ * 07.2-03 rewires FocusStrip to improvementFocus, after which this and its
+ * tests must be deleted (zero remaining references).
+ */
 export function focusCandidates(stats: MyReportStat[]): MyReportStat[] {
   return stats
     .map((stat, index) => ({ stat, index }))
     .filter((e) => e.stat.points !== null)
     .sort((a, b) => (a.stat.points as number) - (b.stat.points as number) || a.index - b.index)
+    .slice(0, 3)
+    .map((e) => e.stat)
+}
+
+// 07.2 D-07: the three negative lower-is-better stats — a LOWER-than-average
+// value (more negative) is BETTER, not behind (owner-locked D-07 semantics).
+export const LOWER_IS_BETTER_STATS: ReadonlySet<string> = new Set([
+  'fixed_ct_pct',
+  'global_cd_pct',
+  'variable_ct_pct',
+])
+
+/**
+ * 07.2 D-07 foco de melhoria: evaluates the key∪relevant stats (priorityKeys
+ * from my_card's key_stats ∪ relevant_stat_keys) and picks the ones MOST BEHIND
+ * compared to the class average — replacing focusCandidates' 3-lowest-points
+ * rule. "There's no need for an assassin to improve his cura realizada stat":
+ * the priorityKeys filter IS the essence.
+ *
+ * - Eligible: points !== null && own_value !== null && priorityKeys.has(stat_key).
+ * - Signed gap: (own_value − class_average), flipped (× −1) for the three
+ *   lower-is-better stats — a lower-than-average negative stat is BETTER.
+ * - Scale-free (flat vs percentual): normalized = gap / |class_average| when
+ *   |class_average| ≥ 1e-9, else the raw signed gap (near-zero averages — no
+ *   division blowup). class_average ?? 0 is a defensive fallback: points !==
+ *   null implies a n ≥ 3 cohort, which implies a non-null average server-side.
+ * - Sort: ascending normalized (most-behind = most-negative first); non-behind
+ *   stats only FILL after every behind stat; stable tie-break by input index.
+ * - Returns at most 3 (existing strip rhythm). PURE: consumes my_report payload
+ *   fields only — points/OVR stay opaque, no rank math (RNK-02).
+ */
+export function improvementFocus(
+  stats: MyReportStat[],
+  priorityKeys: ReadonlySet<string>,
+  lowerIsBetter: ReadonlySet<string> = LOWER_IS_BETTER_STATS,
+): MyReportStat[] {
+  return stats
+    .map((stat, index) => {
+      if (stat.points === null || stat.own_value === null || !priorityKeys.has(stat.stat_key)) {
+        return null
+      }
+      const dir = lowerIsBetter.has(stat.stat_key) ? -1 : 1
+      const avg = stat.class_average ?? 0
+      const gap = (stat.own_value - avg) * dir
+      const normalized = Math.abs(avg) >= 1e-9 ? gap / Math.abs(avg) : gap
+      return { stat, index, normalized }
+    })
+    .filter((e): e is { stat: MyReportStat; index: number; normalized: number } => e !== null)
+    .sort((a, b) => a.normalized - b.normalized || a.index - b.index)
     .slice(0, 3)
     .map((e) => e.stat)
 }

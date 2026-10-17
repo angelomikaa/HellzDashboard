@@ -163,7 +163,7 @@ describe('improvementFocus (07.2 D-07: key∪relevant stats, most-behind vs clas
   // The key∪relevant set my_card() delivers (D-07 eligible universe). Deliberately
   // EXCLUDES healing_done — the owner's verbatim example ("no need for an assassin
   // to improve his cura realizada stat") locks the priority filter below.
-  const KEYS = new Set(['patk', 'crit', 'fixed_ct_pct', 'flat1', 'pct1', 'a', 'b', 'c', 'd'])
+  const KEYS = new Set(['patk', 'crit', 'fixed_ct_pct', 'global_cd_pct', 'flat1', 'pct1', 'a', 'b', 'c', 'd'])
 
   it('flags a higher-is-better stat behind when own < average — ordering follows the NORMALIZED gap (−1/3 < −0.2 < −1/6)', () => {
     const sixth = stat(50, { stat_key: 'a', own_value: 100, class_average: 120 }) // −0.1667

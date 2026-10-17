@@ -80,7 +80,7 @@ describe('REST client gateway contract (both headers, every call)', () => {
     nextResponse = () => res(200, '[]')
     await fetchCatalog(session)
     expect(calls[0].url).toBe(
-      'https://test-project.supabase.co/rest/v1/stat_catalog?select=stat_key,label,group_name,value_type&order=stat_key',
+      'https://test-project.supabase.co/rest/v1/stat_catalog?select=stat_key,label,label_short,group_name,value_type&order=stat_key',
     )
 
     await createSubmission(session, [{ stat_key: 'crit', value: 16 }])
