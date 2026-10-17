@@ -333,6 +333,7 @@ export async function setMemberActive(
 export interface PromotionHighlight {
   stat_key: string
   label: string
+  label_short: string // D-11 3-letter pt-BR label (07.2-01 supersession, D-13)
   value_type: 'flat' | 'percentual'
   value: number
   points: number
@@ -342,7 +343,12 @@ export interface PromotionCardRow {
   display_name: string
   char_function: 'dps' | 'mdps' | 'suporte'
   ovr: number // floor-51 value; tier band derived client-side via tierForOvr
-  highlights: PromotionHighlight[] // top 6 by points desc — CLOSED field list (RNK-02)
+  // 07.2 D-13 supersession: highlights are the class's KEY STATS (same set as
+  // the member's Painel card strip, ordered by label) — no longer top-6-by-
+  // points. CLOSED field list {stat_key,label,label_short,value_type,value,
+  // points} (RNK-02 re-baselined: key identity is the sanctioned 07.2 D-03
+  // reveal; config data is never serialised).
+  highlights: PromotionHighlight[]
 }
 
 export interface PromotionSection {
@@ -351,10 +357,12 @@ export interface PromotionSection {
 }
 
 export async function fetchPromotion(session: NeoFootSession): Promise<PromotionSection[]> {
-  // SECURITY DEFINER RPC (0011): member-invocable (any active member) — the ONE
-  // sanctioned view of top players' individual values (CMP-03 exception).
-  // Response NEVER carries key-stat identity (RNK-02): highlights are top-6-BY-
-  // POINTS over all 57 stats, fields exactly stat_key/label/value_type/value/points.
+  // SECURITY DEFINER RPC (0011; 0013 D-13 supersession): member-invocable (any
+  // active member) — the ONE sanctioned view of top players' individual values
+  // (CMP-03 exception). Highlights are the class's KEY STATS per 07.2 D-13
+  // (the sanctioned key reveal; RNK-02 re-baselined), fields exactly
+  // stat_key/label/label_short/value_type/value/points — key-stat CONFIG
+  // (weights/toggles) is never serialised (smoke-card.mjs probe 7d locks the census).
   const res = await restFetch(session, '/rpc/get_promotion', { method: 'POST', body: JSON.stringify({}) })
   return (await parseBody<PromotionSection[]>(res)) ?? []
 }

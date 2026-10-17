@@ -1,25 +1,35 @@
-// Destaques — the promotion page (06-UI-SPEC Surface 2, SHWC-02). Every
-// logged-in member sees it (D-12): there is NO role gate here — enforcement
-// is the member-invocable get_promotion RPC, which refuses anon callers
-// server-side (smoke-proven in 06-02). One fetch on mount returns ALL class
-// sections at once; classes with insufficient data are OMITTED server-side
-// (D-13 — hidden, never shown empty), so an empty array is the page-level
-// empty state. Sections and cards render in SERVER order — no client
-// reordering anywhere.
+// Destaques — the promotion page (06-UI-SPEC Surface 2, SHWC-02; 07.2-05
+// DSTQ-01 rework). Every logged-in member sees it (D-12): there is NO role
+// gate here — enforcement is the member-invocable get_promotion RPC, which
+// refuses anon callers server-side (smoke-proven in 06-02). One fetch on
+// mount returns ALL class sections at once; classes with insufficient data
+// are OMITTED server-side (D-13 — hidden, never shown empty), so an empty
+// array is the page-level empty state. Sections and cards render in SERVER
+// order — no client reordering anywhere.
 //
-// Owner gate round 2 (07.1-02): the page now shows ONLY Impecável-tier
-// players ("the best" showcase) — a DISPLAY-layer tier filter over the
-// fetched sections (cards whose OVR band is the top tier), dropping
-// sections left empty. No redesign: the bolder premium showcase is
-// explicitly deferred to phase 07.2.
+// Owner gate round 2 (07.1-02): the page shows ONLY Impecável-tier players
+// ("the best" showcase) — a DISPLAY-layer tier filter over the fetched
+// sections (cards whose OVR band is the top tier), dropping sections left
+// empty. The DATA LAYER is byte-preserved from 07.1-02: same fetch, same
+// filter, same empty state.
 //
-// The payload is rendered verbatim: no rank computation in TS (T-06-13) —
-// tier banding happens only via the unit-locked tierForOvr/tierForPoints
-// presentation functions.
+// 07.2-05 presentation rework (D-14 full-bleed immersive register): the page
+// root becomes a full-bleed dark hero — backdrop-neon-grid spanning the full
+// content width with a centered content column inside (max-w-6xl, the D-21
+// pre-pass for this surface), an oversized 'Destaques' hero with the 'Os
+// Impecáveis da Hellz' subline in a static glow-accent pill (static only,
+// 07.1 D-05 — nothing animates), and per-class sections as dramatic bordered
+// panels headed by the class crest (D-17 game grounding, D-16 monogram
+// fallback for art-less classes like Rebellion). Cards are the portrait EAFC
+// showcase cards (PromotionCard) — 1 → sm:2 → lg:3 (D-21 pre-pass; the
+// 07.1-02 2-column cap applied to the old horizontal anatomy).
+//
+// The payload is rendered verbatim: no rank computation in TS (T-06-13).
 import { useEffect, useState } from 'react'
 import { ApiError, fetchPromotion, type PromotionSection } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { tierForOvr } from '../dashboard/presentation'
+import { ClassCrest } from '../assets/ClassCrest'
 import { PromotionCard } from './PromotionCard'
 
 // Enumeration-safe pt-BR copy (shared UI contract, copied verbatim from
@@ -93,23 +103,50 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
   }
 
   return (
-    <div className="backdrop-neon-grid flex flex-col gap-6">
-      {impecavelSections.map((section) => (
-        <section key={section.class_name} className="rounded-lg border border-line bg-surface p-6">
-          <h2 className="text-xl font-semibold text-content">{section.class_name}</h2>
-          {/* Owner gate fix (07.1-02): promotion cards cap at 2 columns —
-              3-up squished the cards on desktop (07.2 owns any rework). */}
-          <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {section.cards.map((card) => (
-              <PromotionCard
-                key={card.display_name}
-                card={card}
-                charClass={section.class_name}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+    // D-14: full-bleed immersive register — the grid backdrop spans the full
+    // content width; the content itself sits in a centered column (max-w-6xl,
+    // D-21 pre-pass for this surface — plan 06 widens the app container).
+    <div className="backdrop-neon-grid flex flex-col gap-8">
+      <header className="flex flex-col items-center gap-3 pt-4 text-center sm:pt-8">
+        <h1 className="font-display text-5xl font-semibold tracking-wide text-content sm:text-6xl">
+          Destaques
+        </h1>
+        {/* Static glow-accent treatment (07.1 D-04/D-05): a box-shadow, never
+            an animation. */}
+        <p className="glow-accent rounded-full border border-line bg-surface px-4 py-1.5 font-display text-sm font-semibold text-accent-bright">
+          Os Impecáveis da Hellz
+        </p>
+      </header>
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-6">
+        {impecavelSections.map((section) => (
+          <section
+            key={section.class_name}
+            className="rounded-xl border-2 border-line bg-surface p-5 sm:p-6"
+          >
+            <div className="flex items-center gap-3">
+              {/* D-17: class imagery grounds the section in the game; D-16:
+                  classes without official art render the monogram tile —
+                  never a broken image. */}
+              <ClassCrest charClass={section.class_name} size="md" />
+              <h2 className="font-display text-2xl font-semibold text-content">
+                {section.class_name}
+              </h2>
+            </div>
+            {/* 07.2-05 (D-14/D-21 pre-pass): portrait cards re-raise the grid
+                to lg:3 — the 07.1-02 2-column cap applied to the old wide
+                horizontal cards, not the 2:3 portrait register. */}
+            <div className="mt-4 grid grid-cols-1 items-start gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {section.cards.map((card) => (
+                <PromotionCard
+                  key={card.display_name}
+                  card={card}
+                  charClass={section.class_name}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   )
 }
