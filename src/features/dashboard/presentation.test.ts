@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { MyReportStat } from '../../lib/api'
 import {
   focusCandidates,
+  improvementFocus,
+  LOWER_IS_BETTER_STATS,
   percentilePhrase,
   tierForOvr,
   tierForPoints,
@@ -153,6 +155,116 @@ describe('focusCandidates (D-16: 3 weakest eligible stats, stable ascending)', (
     const stats = [stat(50, { stat_key: 'a' }), stat(10, { stat_key: 'b' }), stat(null, { stat_key: 'c' })]
     const snapshot = JSON.parse(JSON.stringify(stats))
     focusCandidates(stats)
+    expect(stats).toEqual(snapshot)
+  })
+})
+
+describe('improvementFocus (07.2 D-07: key∪relevant stats, most-behind vs class average, scale-free)', () => {
+  // The key∪relevant set my_card() delivers (D-07 eligible universe). Deliberately
+  // EXCLUDES healing_done — the owner's verbatim example ("no need for an assassin
+  // to improve his cura realizada stat") locks the priority filter below.
+  const KEYS = new Set(['patk', 'crit', 'fixed_ct_pct', 'flat1', 'pct1', 'a', 'b', 'c', 'd'])
+
+  it('flags a higher-is-better stat behind when own < average — ordering follows the NORMALIZED gap (−1/3 < −0.2 < −1/6)', () => {
+    const sixth = stat(50, { stat_key: 'a', own_value: 100, class_average: 120 }) // −0.1667
+    const fifth = stat(50, { stat_key: 'b', own_value: 80, class_average: 100 }) // −0.2
+    const third = stat(50, { stat_key: 'c', own_value: 100, class_average: 150 }) // −0.3333
+    expect(improvementFocus([sixth, fifth, third], KEYS).map((s) => s.stat_key)).toEqual(['c', 'b', 'a'])
+  })
+
+  it('a higher-is-better stat above average is NOT behind — it only fills after every behind stat', () => {
+    const behind = stat(50, { stat_key: 'a', own_value: 100, class_average: 120 })
+    const ahead = stat(80, { stat_key: 'b', own_value: 130, class_average: 120 }) // +0.0833
+    expect(improvementFocus([ahead, behind], KEYS).map((s) => s.stat_key)).toEqual(['a', 'b'])
+  })
+
+  it('lower-is-better (D-07): a lower-than-average negative stat is BETTER (not behind); higher-than-average is behind', () => {
+    // fixed_ct_pct own −55 vs avg −49.4: LOWER than average → better → filler last.
+    const better = stat(50, {
+      stat_key: 'fixed_ct_pct',
+      value_type: 'percentual',
+      own_value: -55,
+      class_average: -49.4,
+    })
+    // global_cd_pct own −4 vs avg −10: HIGHER than average → worse → gap (−4+10)×−1 = −6, normalized −0.6 → most behind.
+    const worse = stat(50, {
+      stat_key: 'global_cd_pct',
+      value_type: 'percentual',
+      own_value: -4,
+      class_average: -10,
+    })
+    const behindHigher = stat(50, { stat_key: 'patk', own_value: 100, class_average: 120 }) // −0.1667
+    expect(improvementFocus([better, worse, behindHigher], KEYS).map((s) => s.stat_key)).toEqual([
+      'global_cd_pct',
+      'patk',
+      'fixed_ct_pct',
+    ])
+  })
+
+  it('direction comes from the lowerIsBetter set — LOWER_IS_BETTER_STATS covers exactly the three CT/CD stats', () => {
+    expect([...LOWER_IS_BETTER_STATS].sort()).toEqual(['fixed_ct_pct', 'global_cd_pct', 'variable_ct_pct'])
+    const s = stat(50, {
+      stat_key: 'fixed_ct_pct',
+      value_type: 'percentual',
+      own_value: -40, // higher than avg −49.4 → behind under the default (lower-is-better) direction
+      class_average: -49.4,
+    })
+    const companion = stat(50, { stat_key: 'patk', own_value: 100, class_average: 120 }) // −0.1667
+    // Default set: fixed_ct_pct is direction-aware behind (−0.19) → ranks before patk.
+    expect(improvementFocus([s, companion], KEYS).map((x) => x.stat_key)).toEqual(['fixed_ct_pct', 'patk'])
+    // Override with an empty set: the same stat reads as higher-is-better (+0.19) → filler after patk.
+    expect(improvementFocus([s, companion], KEYS, new Set()).map((x) => x.stat_key)).toEqual(['patk', 'fixed_ct_pct'])
+  })
+
+  it('excludes stats outside priorityKeys even with terrible points (assassin’s cura realizada)', () => {
+    const irrelevant = stat(1, { stat_key: 'healing_done', own_value: 0, class_average: 500 }) // would be −1 if eligible
+    const priority = stat(60, { stat_key: 'patk', own_value: 10, class_average: 100 })
+    expect(improvementFocus([irrelevant, priority], KEYS).map((s) => s.stat_key)).toEqual(['patk'])
+  })
+
+  it('normalization is scale-free: flat behind 20% of average outranks percentual behind 5% despite the smaller raw gap', () => {
+    const flat = stat(50, { stat_key: 'flat1', value_type: 'flat', own_value: 80, class_average: 100 }) // gap −20, normalized −0.2
+    const pct = stat(50, { stat_key: 'pct1', value_type: 'percentual', own_value: 950, class_average: 1000 }) // gap −50, normalized −0.05
+    expect(improvementFocus([pct, flat], KEYS).map((s) => s.stat_key)).toEqual(['flat1', 'pct1'])
+  })
+
+  it('falls back to the raw signed gap when |class_average| < 1e-9 — no division blowup', () => {
+    const behindRaw = stat(50, { stat_key: 'a', own_value: -5, class_average: 0 })
+    const aheadRaw = stat(50, { stat_key: 'b', own_value: 5, class_average: 1e-12 })
+    const focus = improvementFocus([aheadRaw, behindRaw], KEYS)
+    expect(focus.map((s) => s.stat_key)).toEqual(['a', 'b'])
+    expect(focus.every((s) => Number.isFinite(s.points as number))).toBe(true)
+  })
+
+  it('excludes null points (data insufficient) and null own_value', () => {
+    const noPoints = stat(null, { stat_key: 'a', own_value: 1, class_average: 2 })
+    const noOwn = stat(50, { stat_key: 'b', own_value: null, class_average: 2 })
+    const ok = stat(50, { stat_key: 'c', own_value: 1, class_average: 2 })
+    expect(improvementFocus([noPoints, noOwn, ok], KEYS).map((s) => s.stat_key)).toEqual(['c'])
+  })
+
+  it('returns at most 3, most-behind first, stable tie-break by input (catalog) order', () => {
+    const stats = ['d', 'c', 'b', 'a'].map((k) =>
+      stat(50, { stat_key: k, own_value: 90, class_average: 100 }), // identical gaps
+    )
+    expect(improvementFocus(stats, KEYS).map((s) => s.stat_key)).toEqual(['d', 'c', 'b'])
+  })
+
+  it('returns what exists when fewer than 3 are eligible, and [] when none are', () => {
+    const one = [stat(50, { stat_key: 'a', own_value: 90, class_average: 100 })]
+    expect(improvementFocus(one, KEYS).map((s) => s.stat_key)).toEqual(['a'])
+    expect(improvementFocus([], KEYS)).toEqual([])
+    const allExcluded = [stat(null, { stat_key: 'a' }), stat(1, { stat_key: 'zzz', own_value: 1, class_average: 2 })]
+    expect(improvementFocus(allExcluded, KEYS)).toEqual([])
+  })
+
+  it('does NOT mutate the input array', () => {
+    const stats = [
+      stat(50, { stat_key: 'a', own_value: 90, class_average: 100 }),
+      stat(50, { stat_key: 'b', own_value: 10, class_average: 100 }),
+    ]
+    const snapshot = JSON.parse(JSON.stringify(stats))
+    improvementFocus(stats, KEYS)
     expect(stats).toEqual(snapshot)
   })
 })
