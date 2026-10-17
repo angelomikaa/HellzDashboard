@@ -106,8 +106,14 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
     // D-14: full-bleed immersive register — the grid backdrop spans the full
     // content width; the content itself sits in a centered column (max-w-6xl,
     // D-21 pre-pass for this surface — plan 06 widens the app container).
+    //
+    // Checkpoint round 2 spacing normalization: ONE rhythm scale across the
+    // page — gap-8 between major page blocks (hero ↔ sections, section ↔
+    // section), gap-6 inside a section (header ↔ grid, grid gutters),
+    // p-6/sm:p-8 section padding, symmetric pt-8/pb-8 page framing. No more
+    // mixed mt-4/gap-5/p-5/pb-6 steps.
     <div className="backdrop-neon-grid flex flex-col gap-8">
-      <header className="flex flex-col items-center gap-3 pt-4 text-center sm:pt-8">
+      <header className="flex flex-col items-center gap-4 pt-8 text-center sm:pt-12">
         <h1 className="font-display text-5xl font-semibold tracking-wide text-content sm:text-6xl">
           Destaques
         </h1>
@@ -117,13 +123,13 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
           Os Impecáveis da Hellz
         </p>
       </header>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-8 sm:pb-12">
         {impecavelSections.map((section) => (
           <section
             key={section.class_name}
-            className="rounded-xl border-2 border-line bg-surface p-5 sm:p-6"
+            className="rounded-xl border-2 border-line bg-surface p-6 sm:p-8"
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               {/* D-17: class imagery grounds the section in the game; D-16:
                   classes without official art render the monogram tile —
                   never a broken image. */}
@@ -132,10 +138,11 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
                 {section.class_name}
               </h2>
             </div>
-            {/* 07.2-05 (D-14/D-21 pre-pass): portrait cards re-raise the grid
-                to lg:3 — the 07.1-02 2-column cap applied to the old wide
-                horizontal cards, not the 2:3 portrait register. */}
-            <div className="mt-4 grid grid-cols-1 items-start gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {/* 07.2-05 (D-14/D-21 pre-pass): portrait shield cards re-raise
+                the grid to lg:3 — the 07.1-02 2-column cap applied to the old
+                wide horizontal cards, not the 2:3 portrait register. Same
+                gap-6 rhythm as the section's internal spacing. */}
+            <div className="mt-6 grid grid-cols-1 items-start gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {section.cards.map((card) => (
                 <PromotionCard
                   key={card.display_name}
