@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: Phase 07.2 plan 07.2-01 complete
-last_updated: "2026-10-16T21:45:00.000Z"
-last_activity: 2026-10-16 -- 07.2-01 complete (0013 live, D-11 locked)
+stopped_at: Phase 07.2 plan 07.2-02 complete
+last_updated: "2026-10-17T02:27:12.151Z"
+last_activity: 2026-10-17 -- 07.2-02 complete (0013 clients typed, D-07 foco rule unit-locked)
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 12
-  completed_plans: 6
-  percent: 50
+  completed_plans: 8
+  percent: 67
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 07.2 (premium-showcase-game-grounding-inserted) — EXECUTING
-Plan: 2 of 6 (07.2-01 complete)
-Status: Executing Phase 07.2
-Last activity: 2026-10-16 -- 07.2-01 complete (0013 live, D-11 locked)
+Plan: 3 of 6 (07.2-01, 07.2-02 complete)
+Status: Ready to execute
+Last activity: 2026-10-17 -- 07.2-02 complete (0013 clients typed, D-07 foco rule unit-locked)
 
 ## Accumulated Context
 
@@ -54,6 +54,8 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 07.2]: 07.2-01 took the server foundation LIVE: migration 0013 applied via apply-seed.mjs (fresh owner token after the old one was rotated — token value never stored in any file; referenced as rotated), schema_migrations bookkeeping row recorded (0012 pattern), smoke-card.mjs PASSED 54/54 TWICE consecutively with zero residue, smoke-rank green standalone (no rank-engine regression)
 - [Phase 07.2]: D-11 gate CLOSED (owner, 2026-10-16): the 57-stat 3-letter pt-BR label mapping LOCKED AS DRAFTED — owner supplied NO corrections; live stat_catalog.label_short verified populated for all 57 rows, unique, zero empty strings; downstream 07.2 plans may consume label_short
 - [Phase 07.2]: my_card() carries the closed field list {stat_key,label,label_short,value_type,own_value,points} per key stat + relevant_stat_keys + ovr; config (weights/toggles) has no representation in any payload; my_report() untouched (existing leak probes stay green)
+- [Phase 07.2]: 07.2-02: plan behavior text had the two lower-is-better test arrows inverted vs the owner-locked D-07 rule + RESEARCH 3.4 formula + the plan's own implementation spec — resolved in favor of the authoritative sources (lower-than-average negative stat is BETTER, not behind)
+- [Phase 07.2]: 07.2-02: focusCandidates kept with @deprecated 07.2 D-07 (FocusStrip.tsx still imports it until plan 03 rewires and deletes); fetchMyCard guards malformed bodies per the fetchMyReport precedent
 
 ### Blockers/Concerns (open — carry to next milestone)
 
@@ -75,9 +77,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-16T21:45:00.000Z
-Stopped at: Completed 07.2-01-PLAN.md (0013 live, D-11 locked)
-Resume file: None — next plan 07.2-02
+Last session: 2026-10-17T02:20:19.881Z
+Stopped at: Completed 07.2-02-PLAN.md (0013 clients typed, D-07 foco rule unit-locked)
+Resume file: None — next plan 07.2-03
 
 ## Performance Metrics
 
@@ -88,6 +90,7 @@ Resume file: None — next plan 07.2-02
 | 07 | 07-03 | ~96 min (tasks 1-2 + gate close) | 3 | 5 | 2026-10-14 |
 | 07 | 07-04 | ~3h (incl. observation window) | 4 | 3 | 2026-10-14 |
 | 07.2 | 07.2-01 | ~55 min (across 2 sessions, incl. token rotation) | 3 | 3 | 2026-10-16 |
+| 07.2 | 07.2-02 | ~103 min (RED→GREEN TDD) | 2 | 5 | 2026-10-16 |
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*
