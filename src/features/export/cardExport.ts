@@ -1,11 +1,25 @@
 // cardExport.ts — the code-drawn JPEG EAFC card export (plan 07.2-05,
-// CARD-03 / D-09 / D-10 / D-12). Zero new npm dependencies (v1.1 invariant):
-// native Canvas 2D + the already self-hosted Orbitron woff2 + brand mark.
+// CARD-03 / D-09 / D-10 / D-12 + checkpoint round 2 fixes). Zero new npm
+// dependencies (v1.1 invariant): native Canvas 2D + Path2D + the already
+// self-hosted Orbitron woff2 + brand mark.
 //
 // Architecture: a TESTABLE PURE CORE (buildCardPlan — all geometry, data
 // selection and color decisions) + a thin DOM shell (drawCard/downloadCard —
 // fonts, images, pixels, blob). The unit tests lock the core; the shell only
 // transcribes the plan onto a canvas.
+//
+// Checkpoint round 2 (owner feedback "the downloaded cards look extremely
+// distorted"): the first export's stat grid had ZERO column gutter (cells
+// spanned the full card width, so every points chip sat glued to the NEXT
+// column's label — scrambled text soup) and a dead void in the lower third.
+// The composition now groups label+value+chip per cell with a real gutter,
+// balances the vertical rhythm, and — per the owner's superseding design
+// decision — frames everything in a tier-parametric SHIELD (shieldFrame.ts,
+// simple bronze/silver vs ornate gold/Impecável) drawn with the same path
+// strings the on-page SVG uses. The frame paths are scaled onto the backing
+// store via scalePath (Canvas 2D has no viewBox — unscaled paths stroked at
+// half size in the corner, with all content outside the frame). drawCard
+// also fail-fasts on any non-2:3 canvas.
 //
 // Export content contract (D-09/T-072-12 — the JPEG circulates OUTSIDE the
 // guild): full identity (name, class, build-role, OVR hero) + the 6 key stats
@@ -19,6 +33,14 @@
 import type { Tier } from '../dashboard/presentation'
 import { FUNCTION_LABELS } from '../../lib/groups'
 import markUrl from '../../assets/hellz-mark.svg'
+import {
+  buildShieldFrame,
+  PLATINUM_RAINBOW,
+  scalePath,
+  SHIELD_NEUTRALS,
+  TIER_HEX,
+  type ShieldFrame,
+} from './shieldFrame'
 
 // ---------------------------------------------------------------------------
 // Closed data contract (what callers assemble — PromotionCard from get_promotion
@@ -38,30 +60,6 @@ export interface CardExportData {
   stats: CardExportStat[]
   crestSrc: string | null // resolved same-origin asset URL, null → monogram
 }
-
-// ---------------------------------------------------------------------------
-// Tier → canvas hex, mirroring the @theme tokens (src/index.css):
-// --color-tier-bronze/silver/gold/platinum. Impecável's premium treatment is
-// the white-rainbow gradient (#D7E3F0 + white text, rainbow frame) — the same
-// palette as the tier-impecavel-* utilities.
-const TIER_HEX: Record<Tier, string> = {
-  bronze: '#C97F3F',
-  silver: '#B8C0CC',
-  gold: '#E9B44C',
-  platinum: '#D7E3F0',
-}
-
-/** The Impecável rainbow (tier-impecavel-border palette) for the frame stroke. */
-const PLATINUM_RAINBOW = ['#F26D6F', '#E9B44C', '#3FB950', '#58A6FF', '#B8C0CC'] as const
-
-// Canvas palette constants (same values as the @theme tokens).
-const CANVAS = {
-  dominant: '#141414',
-  surface: '#1E1E1E',
-  line: '#3D2A2B',
-  content: '#F0EDED',
-  muted: '#9A8F8F',
-} as const
 
 // ---------------------------------------------------------------------------
 // Layout plan. Base geometry is authored at 750×1125 (2:3) and every number
@@ -95,17 +93,28 @@ export interface CardPlanStatCell {
   chipText: string
   /** Chip stroke/text color: the stat's tier hex, or muted for the '—' slot. */
   chipColor: string
+  /** Chip box (right-aligned INSIDE this cell — never under the next column;
+   *  the checkpoint round 2 gutter bug). */
+  chipX: number
+  chipY: number
+  chipW: number
+  chipH: number
 }
 
 export interface CardPlan {
   width: number
   height: number
   tier: Tier
-  /** Tier hex driving frame/glow/wash (platinum keeps #D7E3F0 for glow/wash;
-   *  its frame uses frameGradient). */
+  /** Tier hex driving glow/wash (platinum keeps #D7E3F0 for glow/wash; its
+   *  frame stroke uses shield.rainbow). */
   tierColor: string
-  background: { base: string; wash: string }
-  frame: { x: number; y: number; w: number; h: number; color: string; gradient: readonly string[] | null }
+  background: { base: string; surface: string; wash: string }
+  /** The tier-parametric shield frame (path strings in the 750×1125 design
+   *  space — the SAME strings the on-page SVG renders). */
+  shield: ShieldFrame
+  /** Platinum (Impecável) renders the rainbow gradient stroke on the outer
+   *  silhouette; other tiers stroke shield.outer with tierColor. */
+  rainbow: readonly string[] | null
   ovr: {
     caption: string
     captionX: number
@@ -119,9 +128,10 @@ export interface CardPlan {
     glow: string
   }
   crest: CardPlanCrest
-  name: { text: string; x: number; y: number; size: number; color: string }
+  name: { text: string; x: number; y: number; size: number; color: string; maxWidth: number }
   subtitle: { text: string; x: number; y: number; size: number; color: string }
-  /** The 6 key stats in SERVER/highlight order — 2-col × 3-row, left first. */
+  /** The 6 key stats in SERVER/highlight order — 2-col × 3-row, left first,
+   *  with a real column gutter (chips never under the next column). */
   stats: CardPlanStatCell[]
   mark: { src: string; x: number; y: number; size: number }
 }
@@ -137,40 +147,53 @@ export function buildCardPlan(data: CardExportData, width = BASE_W): CardPlan {
   const tierColor = TIER_HEX[tier]
 
   const scale = (n: number) => n * s
-  const gridX = scale(70)
-  const gridY = scale(520)
-  const cellW = scale(305)
-  const cellH = scale(104)
+
+  // Stat grid — 2 cols × 3 rows with a REAL column gutter (checkpoint round
+  // 2 bug: the old grid spanned the full width, gluing each chip to the next
+  // column's label). Columns 115..340 / 395..620 (50px gutter at base scale);
+  // rows at 500/630/760 end by y≈865, inside the shield taper.
+  const colX = [scale(115), scale(395)]
+  const colW = scale(225)
+  const rowY = [scale(500), scale(630), scale(760)]
+  const cellH = scale(105)
+  const chipW = scale(76)
+  const chipH = scale(44)
 
   const stats: CardPlanStatCell[] = data.stats.map((stat, i) => {
     const row = Math.floor(i / 2)
     const col = i % 2
+    const x = colX[col]
+    const y = rowY[row]
     return {
-      x: gridX + col * cellW,
-      y: gridY + row * cellH,
-      w: cellW,
+      x,
+      y,
+      w: colW,
       h: cellH,
       label: stat.label_short,
       value: stat.value,
       points: stat.points,
       tier: stat.tier,
       chipText: stat.points === null ? '—' : String(Math.round(stat.points)),
-      chipColor: stat.points === null ? CANVAS.muted : TIER_HEX[stat.tier ?? tierOfOvrTier(stat.tier)],
+      chipColor: stat.points === null ? SHIELD_NEUTRALS.muted : TIER_HEX[stat.tier ?? tierOfOvrTier(stat.tier)],
+      chipX: x + colW - chipW,
+      chipY: y + scale(8),
+      chipW,
+      chipH,
     }
   })
 
   const crest: CardPlanCrest =
     data.crestSrc !== null
-      ? { kind: 'image', src: data.crestSrc, x: scale(496), y: scale(96), size: scale(158) }
+      ? { kind: 'image', src: data.crestSrc, x: scale(508), y: scale(88), size: scale(150) }
       : {
           kind: 'monogram',
           letter: data.charClass.charAt(0).toUpperCase(),
-          x: scale(496),
-          y: scale(96),
-          size: scale(158),
-          tile: CANVAS.surface,
-          border: CANVAS.line,
-          text: CANVAS.muted,
+          x: scale(508),
+          y: scale(88),
+          size: scale(150),
+          tile: SHIELD_NEUTRALS.surface,
+          border: SHIELD_NEUTRALS.line,
+          text: SHIELD_NEUTRALS.muted,
         }
 
   return {
@@ -178,38 +201,39 @@ export function buildCardPlan(data: CardExportData, width = BASE_W): CardPlan {
     height,
     tier,
     tierColor,
-    background: { base: CANVAS.dominant, wash: tierColor },
-    frame: {
-      x: scale(28),
-      y: scale(28),
-      w: width - scale(56),
-      h: height - scale(56),
-      color: tierColor,
-      gradient: tier === 'platinum' ? PLATINUM_RAINBOW : null,
-    },
+    background: { base: SHIELD_NEUTRALS.dominant, surface: SHIELD_NEUTRALS.surface, wash: tierColor },
+    shield: buildShieldFrame(tier),
+    rainbow: tier === 'platinum' ? PLATINUM_RAINBOW : null,
     ovr: {
       caption: 'OVR',
-      captionX: scale(96),
-      captionY: scale(168),
-      captionSize: scale(30),
+      captionX: scale(115),
+      captionY: scale(152),
+      captionSize: scale(28),
       text: String(Math.round(data.ovr)),
-      x: scale(96),
-      y: scale(296),
-      size: scale(116),
+      x: scale(115),
+      y: scale(300),
+      size: scale(124),
       color: tierColor,
       glow: tierColor,
     },
     crest,
-    name: { text: data.name, x: width / 2, y: scale(404), size: scale(56), color: CANVAS.content },
+    name: {
+      text: data.name,
+      x: width / 2,
+      y: scale(400),
+      size: scale(56),
+      color: SHIELD_NEUTRALS.content,
+      maxWidth: scale(520),
+    },
     subtitle: {
       text: `${data.charClass} · ${FUNCTION_LABELS[data.charFunction]}`,
       x: width / 2,
-      y: scale(456),
+      y: scale(452),
       size: scale(26),
-      color: CANVAS.muted,
+      color: SHIELD_NEUTRALS.muted,
     },
     stats,
-    mark: { src: markUrl, x: width / 2, y: scale(1010), size: scale(64) },
+    mark: { src: markUrl, x: width / 2, y: scale(980), size: scale(60) },
   }
 }
 
@@ -244,15 +268,19 @@ export function cardFilename(name: string): string {
 // DOM shell — everything below touches canvas/DOM only.
 
 /** Await the exact Orbitron weights the card paints with (pitfall 8: without
- *  this the first export renders the fallback font). Best-effort: a rejected
- *  load never blocks the draw. */
+ *  this the first export renders the fallback font). Also awaits
+ *  document.fonts.ready — belt-and-braces so a pending @font-face load can
+ *  never race the first draw (checkpoint round 2: a serif-fallback export is
+ *  what the owner reads as "distorted"). Best-effort: a rejected load never
+ *  blocks the draw. */
 async function loadCardFonts(): Promise<void> {
   try {
     await Promise.all([
-      document.fonts.load('900 116px Orbitron'),
+      document.fonts.load('900 124px Orbitron'),
       document.fonts.load('700 56px Orbitron'),
-      document.fonts.load('600 30px Orbitron'),
+      document.fonts.load('600 34px Orbitron'),
     ])
+    await document.fonts.ready
   } catch {
     // Font loading is progressive-enhancement; the draw proceeds with
     // whatever is available.
@@ -301,6 +329,11 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, 
  * failure degrades gracefully (monogram / omitted mark), never throws.
  */
 export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData): Promise<void> {
+  // Aspect-ratio invariant (would-have-caught distortion class #1): the plan
+  // is authored 2:3 — a non-2:3 backing store would stretch every draw.
+  if (canvas.height !== canvas.width * 1.5) {
+    throw new Error(`card canvas must be 2:3 (got ${canvas.width}x${canvas.height})`)
+  }
   await loadCardFonts()
   const plan = buildCardPlan(data, canvas.width)
   const ctx = canvas.getContext('2d')
@@ -309,38 +342,80 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   const { width, height } = plan
   const s = width / BASE_W
   const scale = (n: number) => n * s
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
 
-  // Background: dominant fill + subtle tier wash fading down (D-10).
+  // Page background outside the shield (the JPEG stays a rectangular 2:3).
   ctx.fillStyle = plan.background.base
+  ctx.fillRect(0, 0, width, height)
+
+  // --- Shield frame (same path strings the on-page SVG renders) ---
+  // The frame paths are authored in the 750×1125 DESIGN space; the on-page
+  // <svg viewBox> maps them to the element for free, but Canvas 2D has no
+  // viewBox — so every path is scaled onto the backing store here (the
+  // "extremely distorted" round-2 bug: unscaled paths stroked at half size
+  // in the canvas corner, with all content drawn outside the frame).
+  const outer = new Path2D(scalePath(plan.shield.outer, s))
+  // Interior: surface fill + tier wash fading down, clipped to the silhouette.
+  ctx.save()
+  ctx.clip(outer)
+  ctx.fillStyle = plan.background.surface
   ctx.fillRect(0, 0, width, height)
   const wash = ctx.createLinearGradient(0, 0, 0, height * 0.55)
   wash.addColorStop(0, `${plan.background.wash}26`) // ~15% alpha wash
   wash.addColorStop(1, `${plan.background.wash}00`)
   ctx.fillStyle = wash
   ctx.fillRect(0, 0, width, height * 0.55)
+  ctx.restore()
 
-  // Tier frame (Impecável gets the rainbow gradient stroke).
-  roundRectPath(ctx, plan.frame.x, plan.frame.y, plan.frame.w, plan.frame.h, 24 * (width / BASE_W))
-  const rainbow = plan.frame.gradient
-  if (rainbow !== null) {
-    const grad = ctx.createLinearGradient(plan.frame.x, plan.frame.y, plan.frame.x + plan.frame.w, plan.frame.y + plan.frame.h)
-    rainbow.forEach((c, i) => grad.addColorStop(i / (rainbow.length - 1), c))
+  // Outer silhouette — Impecável gets the rainbow gradient stroke.
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  if (plan.rainbow !== null) {
+    const grad = ctx.createLinearGradient(scale(30), scale(30), scale(720), scale(1108))
+    plan.rainbow.forEach((c, i) => grad.addColorStop(i / (plan.rainbow!.length - 1), c))
     ctx.strokeStyle = grad
   } else {
-    ctx.strokeStyle = plan.frame.color
+    ctx.strokeStyle = plan.tierColor
   }
-  ctx.lineWidth = 6 * (width / BASE_W)
-  ctx.stroke()
+  ctx.lineWidth = plan.shield.widths.outer * s
+  ctx.stroke(outer)
+
+  // Inner outline(s).
+  ctx.strokeStyle = plan.tierColor
+  ctx.globalAlpha = 0.7
+  ctx.lineWidth = plan.shield.widths.inner * s
+  ctx.stroke(new Path2D(scalePath(plan.shield.inner, s)))
+  if (plan.shield.inner2 !== null) {
+    ctx.globalAlpha = 0.45
+    ctx.lineWidth = plan.shield.widths.inner2 * s
+    ctx.stroke(new Path2D(scalePath(plan.shield.inner2, s)))
+  }
+  ctx.globalAlpha = 1
+
+  // Ornate ornaments: filled studs + stroked flourish chevrons.
+  for (const d of plan.shield.fills) {
+    ctx.globalAlpha = 0.9
+    ctx.fillStyle = plan.tierColor
+    ctx.fill(new Path2D(scalePath(d, s)))
+  }
+  for (const d of plan.shield.strokes) {
+    ctx.globalAlpha = 0.9
+    ctx.strokeStyle = plan.tierColor
+    ctx.lineWidth = plan.shield.widths.ornament * s
+    ctx.stroke(new Path2D(scalePath(d, s)))
+  }
+  ctx.globalAlpha = 1
 
   // OVR hero (Orbitron 900 + tier glow — static, like the site's glow-text-current).
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
-  ctx.font = `600 ${plan.ovr.captionSize}px Orbitron`
+  ctx.font = `700 ${plan.ovr.captionSize}px Orbitron`
   ctx.fillStyle = plan.ovr.color
   ctx.fillText(plan.ovr.caption, plan.ovr.captionX, plan.ovr.captionY)
   ctx.font = `900 ${plan.ovr.size}px Orbitron`
   ctx.shadowColor = plan.ovr.glow
-  ctx.shadowBlur = 30 * (width / BASE_W)
+  ctx.shadowBlur = 30 * s
   ctx.fillStyle = plan.ovr.color
   ctx.fillText(plan.ovr.text, plan.ovr.x, plan.ovr.y)
   ctx.shadowBlur = 0
@@ -362,43 +437,39 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   // Name + class · build-role line.
   ctx.textAlign = 'center'
   ctx.fillStyle = plan.name.color
-  fitText(ctx, plan.name.text, width * 0.86, 700, plan.name.size)
+  fitText(ctx, plan.name.text, plan.name.maxWidth, 700, plan.name.size)
   ctx.fillText(plan.name.text, plan.name.x, plan.name.y)
   ctx.font = `600 ${plan.subtitle.size}px Orbitron`
   ctx.fillStyle = plan.subtitle.color
   ctx.fillText(plan.subtitle.text, plan.subtitle.x, plan.subtitle.y)
 
-  // The 6 key stats — EAFC 2-col × 3-row arrangement (server order).
+  // The 6 key stats — EAFC 2-col × 3-row arrangement (server order), each
+  // cell a self-contained label/value/chip group with a real gutter.
   for (const cell of plan.stats) {
-    const innerW = cell.w - scale(96)
     ctx.textAlign = 'left'
-    ctx.font = `600 ${scale(26)}px Orbitron`
-    ctx.fillStyle = CANVAS.muted
-    ctx.fillText(cell.label, cell.x, cell.y + scale(34))
-    ctx.fillStyle = CANVAS.content
-    fitText(ctx, cell.value, innerW, 600, scale(34))
-    ctx.fillText(cell.value, cell.x, cell.y + scale(80))
+    ctx.font = `600 ${scale(24)}px Orbitron`
+    ctx.fillStyle = SHIELD_NEUTRALS.muted
+    ctx.fillText(cell.label, cell.x, cell.y + scale(28))
+    ctx.fillStyle = SHIELD_NEUTRALS.content
+    fitText(ctx, cell.value, cell.chipX - cell.x - scale(16), 600, scale(34))
+    ctx.fillText(cell.value, cell.x, cell.y + scale(68))
 
     // Points chip in the stat's tier color; null points → muted '—' slot.
-    const chipW = scale(84)
-    const chipH = scale(48)
-    const chipX = cell.x + cell.w - chipW
-    const chipY = cell.y + scale(10)
-    roundRectPath(ctx, chipX, chipY, chipW, chipH, chipH / 2)
+    roundRectPath(ctx, cell.chipX, cell.chipY, cell.chipW, cell.chipH, cell.chipH / 2)
     ctx.fillStyle = `${cell.chipColor}2E` // ~18% fill wash
     ctx.fill()
     ctx.strokeStyle = cell.chipColor
-    ctx.lineWidth = 2 * (width / BASE_W)
+    ctx.lineWidth = 2 * s
     ctx.stroke()
     ctx.textAlign = 'center'
-    ctx.font = `700 ${scale(28)}px Orbitron`
+    ctx.font = `700 ${scale(26)}px Orbitron`
     ctx.fillStyle = cell.chipColor
     ctx.textBaseline = 'middle'
-    ctx.fillText(cell.chipText, chipX + chipW / 2, chipY + chipH / 2 + scale(2))
+    ctx.fillText(cell.chipText, cell.chipX + cell.chipW / 2, cell.chipY + cell.chipH / 2 + scale(2))
     ctx.textBaseline = 'alphabetic'
   }
 
-  // Hellz mark bottom-center (brand anchor of the composition).
+  // Hellz mark bottom-center (brand anchor, inside the shield taper).
   const mark = await loadImage(plan.mark.src)
   if (mark !== null) {
     ctx.drawImage(mark, plan.mark.x - plan.mark.size / 2, plan.mark.y - plan.mark.size / 2, plan.mark.size, plan.mark.size)
@@ -406,16 +477,17 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
 }
 
 function drawMonogram(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, letter: string, planWidth: number): void {
-  roundRectPath(ctx, x, y, size, size, 16 * (planWidth / BASE_W))
-  ctx.fillStyle = CANVAS.surface
+  const s = planWidth / BASE_W
+  roundRectPath(ctx, x, y, size, size, 16 * s)
+  ctx.fillStyle = SHIELD_NEUTRALS.surface
   ctx.fill()
-  ctx.strokeStyle = CANVAS.line
-  ctx.lineWidth = 2 * (planWidth / BASE_W)
+  ctx.strokeStyle = SHIELD_NEUTRALS.line
+  ctx.lineWidth = 2 * s
   ctx.stroke()
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.font = `700 ${size * 0.42}px Orbitron`
-  ctx.fillStyle = CANVAS.muted
+  ctx.fillStyle = SHIELD_NEUTRALS.muted
   ctx.fillText(letter, x + size / 2, y + size / 2 + size * 0.02)
   ctx.textBaseline = 'alphabetic'
 }
