@@ -1,0 +1,250 @@
+{
+  "source_site": "https://roocamer.gnjoy.game",
+  "asset_base": "https://file.joymaker.com/game/rooc/web/assets/",
+  "discovered": "2026-10-16 � the roocamer.gnjoy.game job-intro SPA renders its imagery from the Joymaker CDN (file.joymaker.com). Each job file name comes from the official data endpoint (https://rooc-official-am-api.joymaker.com/api/rooc/job-intro: img_male/img_female per job) and the CDN URL (vite content hash) was extracted from the site bundle asset map (main-BVKl7piB.js). Hashed URLs change on site redeploys � the fetcher records 404s as designed-missing (D-16: graceful, never fatal), and the committed files under public/assets/classes/ keep the panel self-hosted (D-15).",
+  "naming": {
+    "portrait_female": "class-f-<slug>.png",
+    "portrait_male": "class-m-<slug>.png",
+    "icon": "class-icon-<slug>.png",
+    "slug": "lowercase class name, spaces -> hyphens"
+  },
+  "notes": [
+    "Portrait art exists for every transcendent job on the site EXCEPT Rebellion (the Gunslinger line p8 is completely omitted from the bundle � owner-confirmed). Rebellion portraits come from the repo research samples (assets/rebellion-f.png / assets/rebellion-m.png, byte-identical provenance to the site art) via the fetcher local-source copy.",
+    "The site only provides SEVEN base-role icons (p1..p7) � there is no per-transcendent-class icon, so classes sharing a base line share the same icon (e.g. High Wizard and Professor both use the Mage icon). That is the site reality, not a mapping error.",
+    "Bard is the male-only job of the Archer second line (site art p5_*_big_22): class-m-bard uses the male art; class-f-bard never occurs in-game (expected_missing). Gypsy is its female-only counterpart: class-f-gypsy uses the female art; class-m-gypsy never occurs in-game (expected_missing)."
+  ],
+  "classes": [
+    {
+      "class_name": "Assassin Cross",
+      "slug": "assassin-cross",
+      "files": {
+        "class-f-assassin-cross.png": {
+          "url": "p6_female_big_2s-HcfL_Etn.png"
+        },
+        "class-m-assassin-cross.png": {
+          "url": "p6_male_big_2s-DcW31H4s.png"
+        },
+        "class-icon-assassin-cross.png": {
+          "url": "p6_icon-UrY423Qj.png"
+        }
+      }
+    },
+    {
+      "class_name": "Lord Knight",
+      "slug": "lord-knight",
+      "files": {
+        "class-f-lord-knight.png": {
+          "url": "p4_female_big_2s-Dr2jNxCJ.png"
+        },
+        "class-m-lord-knight.png": {
+          "url": "p4_male_big_2s-4yTnSfXC.png"
+        },
+        "class-icon-lord-knight.png": {
+          "url": "p4_icon-Dnfdhm1Q.png"
+        }
+      }
+    },
+    {
+      "class_name": "High Wizard",
+      "slug": "high-wizard",
+      "files": {
+        "class-f-high-wizard.png": {
+          "url": "p2_female_big_2s-Dvi65k6n.png"
+        },
+        "class-m-high-wizard.png": {
+          "url": "p2_male_big_2s-CMUitOaY.png"
+        },
+        "class-icon-high-wizard.png": {
+          "url": "p2_icon-DdvLkIQy.png"
+        }
+      }
+    },
+    {
+      "class_name": "Sniper",
+      "slug": "sniper",
+      "files": {
+        "class-f-sniper.png": {
+          "url": "p5_female_big_2s-B1HCtDnW.png"
+        },
+        "class-m-sniper.png": {
+          "url": "p5_male_big_2s-Dp43bfHV.png"
+        },
+        "class-icon-sniper.png": {
+          "url": "p5_icon-Cexq0XB1.png"
+        }
+      }
+    },
+    {
+      "class_name": "High Priest",
+      "slug": "high-priest",
+      "files": {
+        "class-f-high-priest.png": {
+          "url": "p3_female_big_2s-wFr-0Go0.png"
+        },
+        "class-m-high-priest.png": {
+          "url": "p3_male_big_2s-DvmVO6tU.png"
+        },
+        "class-icon-high-priest.png": {
+          "url": "p3_icon-Ci67obyD.png"
+        }
+      }
+    },
+    {
+      "class_name": "Mastersmith",
+      "slug": "mastersmith",
+      "files": {
+        "class-f-mastersmith.png": {
+          "url": "p1_female_big_2s-BtVOZ_s4.png"
+        },
+        "class-m-mastersmith.png": {
+          "url": "p1_male_big_2s-CYtx9QZZ.png"
+        },
+        "class-icon-mastersmith.png": {
+          "url": "p1_icon-BeHnHg1I.png"
+        }
+      }
+    },
+    {
+      "class_name": "Paladin",
+      "slug": "paladin",
+      "files": {
+        "class-f-paladin.png": {
+          "url": "p4_female_big_2s2-C5pA8CEG.png"
+        },
+        "class-m-paladin.png": {
+          "url": "p4_male_big_2s2-CjeMC7bv.png"
+        },
+        "class-icon-paladin.png": {
+          "url": "p4_icon-Dnfdhm1Q.png"
+        }
+      }
+    },
+    {
+      "class_name": "Professor",
+      "slug": "professor",
+      "files": {
+        "class-f-professor.png": {
+          "url": "p2_female_big_2s2-gW_S7tpr.png"
+        },
+        "class-m-professor.png": {
+          "url": "p2_male_big_2s2-BnDXivJC.png"
+        },
+        "class-icon-professor.png": {
+          "url": "p2_icon-DdvLkIQy.png"
+        }
+      }
+    },
+    {
+      "class_name": "Stalker",
+      "slug": "stalker",
+      "files": {
+        "class-f-stalker.png": {
+          "url": "p6_female_big_2s2-DDpWydMK.png"
+        },
+        "class-m-stalker.png": {
+          "url": "p6_male_big_2s2-DGiUHLbk.png"
+        },
+        "class-icon-stalker.png": {
+          "url": "p6_icon-UrY423Qj.png"
+        }
+      }
+    },
+    {
+      "class_name": "Biochemist",
+      "slug": "biochemist",
+      "files": {
+        "class-f-biochemist.png": {
+          "url": "p1_female_big_2s2-Dtr3fgEF.png"
+        },
+        "class-m-biochemist.png": {
+          "url": "p1_male_big_2s2-Bog4VmhW.png"
+        },
+        "class-icon-biochemist.png": {
+          "url": "p1_icon-BeHnHg1I.png"
+        }
+      }
+    },
+    {
+      "class_name": "Champion",
+      "slug": "champion",
+      "files": {
+        "class-f-champion.png": {
+          "url": "p3_female_big_2s2-A69myc_3.png"
+        },
+        "class-m-champion.png": {
+          "url": "p3_male_big_2s2-BiJc-QiW.png"
+        },
+        "class-icon-champion.png": {
+          "url": "p3_icon-Ci67obyD.png"
+        }
+      }
+    },
+    {
+      "class_name": "Bard",
+      "slug": "bard",
+      "files": {
+        "class-f-bard.png": {
+          "expected_missing": true,
+          "reason": "Bard is the male-only job of the Archer second line � a female Bard never occurs in-game"
+        },
+        "class-m-bard.png": {
+          "url": "p5_male_big_22-DugvF0fD.png"
+        },
+        "class-icon-bard.png": {
+          "url": "p5_icon-Cexq0XB1.png"
+        }
+      }
+    },
+    {
+      "class_name": "Gypsy",
+      "slug": "gypsy",
+      "files": {
+        "class-f-gypsy.png": {
+          "url": "p5_female_big_22-BW_y4L3d.png"
+        },
+        "class-m-gypsy.png": {
+          "expected_missing": true,
+          "reason": "Gypsy is the female-only job of the Archer second line � a male Gypsy never occurs in-game"
+        },
+        "class-icon-gypsy.png": {
+          "url": "p5_icon-Cexq0XB1.png"
+        }
+      }
+    },
+    {
+      "class_name": "Summoner",
+      "slug": "summoner",
+      "files": {
+        "class-f-summoner.png": {
+          "url": "p7_female_big_2s-CBPqBAWO.png"
+        },
+        "class-m-summoner.png": {
+          "url": "p7_male_big_2s-DIQbMsVF.png"
+        },
+        "class-icon-summoner.png": {
+          "url": "p7_icon-Cz9rZ2Ap.png"
+        }
+      }
+    },
+    {
+      "class_name": "Rebellion",
+      "slug": "rebellion",
+      "files": {
+        "class-f-rebellion.png": {
+          "local": "assets/rebellion-f.png",
+          "expected_missing": true,
+          "reason": "the Gunslinger line (p8) is completely omitted from the roocamer surface (owner-confirmed) � the repo local research sample is the source"
+        },
+        "class-m-rebellion.png": {
+          "local": "assets/rebellion-m.png",
+          "expected_missing": true,
+          "reason": "the Gunslinger line (p8) is completely omitted from the roocamer surface (owner-confirmed) � the repo local research sample is the source"
+        },
+        "class-icon-rebellion.png": {
+          "expected_missing": true,
+          "reason": "no p8 icon exists on the site (owner: 'classes like rebellion are completely omitted') � ClassCrest renders the D-16 monogram fallback"
+        }
+      }
+    }
+  ]
+}
