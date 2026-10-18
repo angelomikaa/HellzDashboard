@@ -20,9 +20,10 @@
 // Impecáveis da Hellz' subline in a static glow-accent pill (static only,
 // 07.1 D-05 — nothing animates), and per-class sections as dramatic bordered
 // panels headed by the class crest (D-17 game grounding, D-16 monogram
-// fallback for art-less classes like Rebellion). Cards are the portrait EAFC
-// showcase cards (PromotionCard) — 1 → sm:2 → lg:3 (D-21 pre-pass; the
-// 07.1-02 2-column cap applied to the old horizontal anatomy).
+// fallback for art-less classes like Rebellion). Cards are the crest showcase
+// cards (PromotionCard → the shared CrestCard, round-3 owner design) —
+// 1 → sm:2 → lg:3 (D-21 pre-pass; the 07.1-02 2-column cap applied to the
+// old horizontal anatomy).
 //
 // The payload is rendered verbatim: no rank computation in TS (T-06-13).
 import { useEffect, useState } from 'react'
@@ -138,10 +139,10 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
                 {section.class_name}
               </h2>
             </div>
-            {/* 07.2-05 (D-14/D-21 pre-pass): portrait shield cards re-raise
-                the grid to lg:3 — the 07.1-02 2-column cap applied to the old
-                wide horizontal cards, not the 2:3 portrait register. Same
-                gap-6 rhythm as the section's internal spacing. */}
+            {/* 07.2-05 (D-14/D-21 pre-pass): the round-3 crest cards are
+                square (the owner's crest SVGs are 1:1) — grid stays
+                1 → sm:2 → lg:3. Same gap-6 rhythm as the section's internal
+                spacing (round-2 spacing normalization kept). */}
             <div className="mt-6 grid grid-cols-1 items-start gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {section.cards.map((card) => (
                 <PromotionCard
