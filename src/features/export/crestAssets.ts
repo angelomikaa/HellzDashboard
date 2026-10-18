@@ -1,21 +1,30 @@
 // crestAssets.ts — SINGLE SOURCE OF GEOMETRIC TRUTH for the crest card
-// (07.2-05 checkpoint round 3, owner's superseding design: the four hand-
-// designed crest SVGs in src/assets/ REPLACE the code-drawn shield frames).
+// (07.2-05 checkpoint round 4, owner's READABILITY REDESIGN: the four crest
+// SVGs re-exported at 1080×1600 — portrait 27:40 — with a clearer content
+// layout; the round-3 verdict was "all the info was small and unreadable").
 //
-// The owner's SVGs (viewBox 0 0 1000 1000) each contain exactly the layers
-// the card needs:
-//   - a `Plate` path (cls-1) — the filled frame the card is drawn on
-//     (bronze #b58c58, silver #cccccc, gold #f9b745; the Impecável/"pristine"
-//     crest fills with the Soft_Spectrum linearGradient instead)
-//   - a photo-crop path (cls-2 — the member's character screenshot is CLIPPED
-//     into it; ids vary per file: "Photo-crop-path" / "Image-crop" /
-//     "Photo-clip-path" / "photo-crop", so access goes through the selector
-//     map below, never a hardcoded id)
-//   - a `Guidelines` group with 4 explicit placement rects (as fill:none
-//     paths): Content-safezone, OVR-number, Name-and-job, six-key-stats —
-//     the owner's "fake rectangle" contract: the code treats the card as a
-//     rectangle laid over the decorated crest frame, and EVERY content
-//     placement reads these rects.
+// ROUND-4 FILE STRUCTURE (verified identical geometry in all four files —
+// only the palette differs; files are referenced by TIER FILENAME
+// bronze/silver/gold/pristine.svg — the root group is id="Pristine" in ALL
+// FOUR, a copy-paste artifact the parser must NEVER rely on):
+//   - Plate: an unnamed group with TWO paths sharing the SAME silhouette d:
+//       · cls-1 — the solid tier fill (bronze #d1a972, silver #e6e6e6,
+//         gold #f9b745, pristine/Impecável #cf1a87)
+//       · cls-2 — the decorative border: the same path, stroked with
+//         stroke:url(#<tier gradient>) stroke-width:40, clipped by
+//         clipPath#clip-path-1 (which contains that same silhouette) so
+//         only the inner half of the stroke shows
+//   - NO separate photo-crop path anymore: the member's screenshot fills
+//     the Content-safezone rect itself.
+//   - Guidelines group — 4 rect paths (L→T coordinates):
+//       · Content-safezone   (fill:none) — NOW THE PHOTO CROP AREA
+//       · Name-only          (cls-1, SOLID tier fill) — name band, overlays
+//         the photo and guarantees name contrast on any screenshot
+//       · six-key-stats      (cls-1, SOLID tier fill) — bottom stat band,
+//         same contrast guarantee
+//       · OVR-number-and-job (fill:none) — top-left box over the photo:
+//         the big OVR number with the JOB NAME below it (round 4 dropped
+//         the "OVR" tag)
 //
 // This module parses those raw SVGs ONCE at module load (pure string
 // parsing — no DOM, so it runs in node/vitest) and exposes a normalized,
@@ -29,16 +38,18 @@
 // module load — a malformed design asset must never ship as a silently
 // broken card.
 import type { Tier } from '../dashboard/presentation'
-import bronzeRaw from '../../assets/bronze-crest.svg?raw'
-import silverRaw from '../../assets/silver-crest.svg?raw'
-import goldRaw from '../../assets/gold-crest.svg?raw'
-import pristineRaw from '../../assets/pristine-crest.svg?raw'
+import bronzeRaw from '../../assets/bronze.svg?raw'
+import silverRaw from '../../assets/silver.svg?raw'
+import goldRaw from '../../assets/gold.svg?raw'
+import pristineRaw from '../../assets/pristine.svg?raw'
 
 // ---------------------------------------------------------------------------
 // Parsed geometry contract.
 
-/** The SVGs' viewBox — the card design space (square, 1000×1000). */
-export const CREST_DESIGN_SIZE = 1000
+/** The SVGs' viewBox — the card design space is now PORTRAIT 1080×1600
+ *  (27:40, not exactly 2:3 — do not "simplify" the ratio). */
+export const CREST_DESIGN_WIDTH = 1080
+export const CREST_DESIGN_HEIGHT = 1600
 
 export interface CrestRect {
   x: number
@@ -47,14 +58,9 @@ export interface CrestRect {
   h: number
 }
 
-export interface CrestPlateSolid {
-  kind: 'solid'
-  hex: string
-}
-
-export interface CrestPlateGradient {
-  kind: 'gradient'
-  /** Gradient line in the SAME design space (userSpaceOnUse). */
+/** A linearGradient in the SAME design space (userSpaceOnUse line + stops)
+ *  — the border stroke's palette. */
+export interface CrestGradient {
   x1: number
   y1: number
   x2: number
@@ -62,26 +68,28 @@ export interface CrestPlateGradient {
   stops: { offset: number; color: string }[]
 }
 
-export type CrestPlateFill = CrestPlateSolid | CrestPlateGradient
-
 export interface CrestGuides {
+  /** The PHOTO CROP AREA: the member's screenshot fills THIS rect
+   *  (round 4 retired the dedicated photo-crop path). */
   contentSafezone: CrestRect
-  ovrNumber: CrestRect
-  nameAndJob: CrestRect
+  /** Top-left box over the photo: big OVR number + job name below. */
+  ovrBox: CrestRect
+  /** SOLID tier-fill name band (overlays the photo). */
+  nameOnly: CrestRect
+  /** SOLID tier-fill stat band (overlays the photo). */
   sixKeyStats: CrestRect
 }
 
 export interface CrestGeometry {
   tier: Tier
   platePath: string
-  plateFill: CrestPlateFill
-  /** The member's character screenshot is clipped into this path. */
-  photoCropPath: string
-  /** Optional decorative stroke ON the photo window (the owner's updated
-   *  pristine crest strokes the crop with #e6e6e6 @ 20 — clipped to the
-   *  crop path, so only the inner half shows). Parsed from the cls-2 style
-   *  block; both surfaces render it for design fidelity. */
-  photoCropStroke: { color: string; width: number } | null
+  /** Solid tier fill shared by the plate AND the solid guideline bands
+   *  (both carry cls-1 in the round-4 files). */
+  tierFillHex: string
+  /** Decorative border: the tier gradient stroked along the silhouette,
+   *  clipped to it (only the inner half shows). Required in every file —
+   *  a crest without its border is a malformed asset. */
+  borderStroke: { gradient: CrestGradient; width: number }
   guides: CrestGuides
 }
 
@@ -106,39 +114,61 @@ function pathMap(svg: string): Map<string, string> {
 }
 
 /**
- * Photo-crop selector map: the four files name their crop layer differently
- * ("Photo-crop-path" / "Image-crop" / "Photo-clip-path" / "photo-crop") —
- * access NEVER hardcodes one id.
+ * The plate path: the FIRST cls-1 path BEFORE the Guidelines group. This
+ * deliberately ignores ALL group ids — the round-4 files name their root
+ * group "Pristine" in every tier (copy-paste artifact), so ids carry no
+ * semantic weight; selection is by class + document position.
  */
-const PHOTO_CROP_IDS = ['Photo-crop-path', 'Image-crop', 'Photo-clip-path', 'photo-crop']
-
-function pickPhotoCrop(paths: Map<string, string>, svg: string): string {
-  for (const id of PHOTO_CROP_IDS) {
-    const d = paths.get(id)
-    if (d) return d
+function pickPlatePath(svg: string): string {
+  const guidelinesAt = svg.indexOf('id="Guidelines"')
+  if (guidelinesAt === -1) throw new Error('crest SVG: no Guidelines group found')
+  const head = svg.slice(0, guidelinesAt)
+  for (const m of head.matchAll(/<path\b([^>]*)>/g)) {
+    const attrs = attributes(m[1])
+    if (attrs.get('class') === 'cls-1' && attrs.get('d')) return attrs.get('d') as string
   }
-  // The updated pristine crest carries the crop path WITHOUT an id, inside
-  // a `<g id="photo-crop">` group — fall back to the group's first path.
-  const group = svg.match(/<g\b[^>]*id="photo-crop"[^>]*>[\s\S]*?<path\b[^>]*\bd="([^"]+)"/)
-  if (group) return group[1]
-  throw new Error(`crest SVG: no photo-crop path found (tried ids: ${PHOTO_CROP_IDS.join(', ')} + g#photo-crop)`)
+  throw new Error('crest SVG: no cls-1 plate path found before the Guidelines group')
 }
 
-/** cls-2 is the crop path's class: `{fill:none}` in the metal crests, but
- *  the updated pristine crest strokes the photo window
- *  (`stroke:#e6e6e6;stroke-width:20`) — captured for both surfaces. */
-function photoCropStroke(svg: string): { color: string; width: number } | null {
+/** cls-1 is the shared SOLID tier fill: plate + Name-only + six-key-stats
+ *  bands all carry it (round-4 contrast design). */
+function tierFill(svg: string): string {
+  const solid = svg.match(/\.cls-1\{fill:(#[0-9a-fA-F]{6})/)
+  if (!solid) throw new Error('crest SVG: cls-1 must be a solid #rrggbb fill (round-4 design: plate and solid bands share it)')
+  return solid[1].toLowerCase()
+}
+
+/** The border stroke: cls-2 = `stroke:url(#<gradient>) stroke-width:40`,
+ *  clipped to the silhouette by clip-path in the file (both surfaces
+ *  re-apply that clip themselves). The gradient MUST exist — fail fast. */
+function borderStroke(svg: string): { gradient: CrestGradient; width: number } {
   const cls2 = svg.match(/\.cls-2\{([^}]*)\}/)
-  if (!cls2) return null
-  const color = cls2[1].match(/stroke:(#[0-9a-fA-F]{6})/)
+  if (!cls2) throw new Error('crest SVG: no cls-2 border style found')
+  const strokeRef = cls2[1].match(/stroke:url\(#([^)]+)\)/)
   const width = cls2[1].match(/stroke-width:(\d+(?:\.\d+)?)/)
-  if (color && width) return { color: color[1].toLowerCase(), width: Number(width[1]) }
-  return null
-}
-
-function pickPlate(paths: Map<string, string>): string {
-  for (const [id, d] of paths) if (id.toLowerCase() === 'plate') return d
-  throw new Error('crest SVG: no Plate path found')
+  if (!strokeRef || !width) {
+    throw new Error('crest SVG: cls-2 must stroke:url(#gradient) with a stroke-width')
+  }
+  const grad = svg.match(new RegExp(`<linearGradient\\b[^>]*id="${strokeRef[1]}"[^>]*>([\\s\\S]*?)</linearGradient>`))
+  if (!grad) throw new Error(`crest SVG: border gradient "${strokeRef[1]}" not found`)
+  const attrs = attributes(grad[0])
+  const stops = [...grad[1].matchAll(/<stop\b([^>]*)>/g)].map((s) => {
+    const a = attributes(s[1])
+    return { offset: Number(a.get('offset') ?? '0'), color: (a.get('stop-color') ?? '#000000').toLowerCase() }
+  })
+  if (stops.length < 2 || !attrs.get('x1') || !attrs.get('x2')) {
+    throw new Error(`crest SVG: border gradient "${strokeRef[1]}" is malformed (needs a userSpaceOnUse line + ≥2 stops)`)
+  }
+  return {
+    gradient: {
+      x1: Number(attrs.get('x1')),
+      y1: Number(attrs.get('y1')),
+      x2: Number(attrs.get('x2')),
+      y2: Number(attrs.get('y2')),
+      stops,
+    },
+    width: Number(width[1]),
+  }
 }
 
 /** Guideline paths are axis-aligned rectangles authored as
@@ -161,53 +191,19 @@ function guides(paths: Map<string, string>): CrestGuides {
   }
   return {
     contentSafezone: need('Content-safezone'),
-    ovrNumber: need('OVR-number'),
-    nameAndJob: need('Name-and-job'),
+    ovrBox: need('OVR-number-and-job'),
+    nameOnly: need('Name-only'),
     sixKeyStats: need('six-key-stats'),
   }
 }
 
-function plateFill(svg: string): CrestPlateFill {
-  // Solid fill: the cls-1 class carries `fill:#rrggbb` (bronze/silver/gold);
-  // trailing declarations (stroke etc.) are tolerated.
-  const solid = svg.match(/\.cls-1\{fill:(#[0-9a-fA-F]{6})[^}]*\}/)
-  if (solid) return { kind: 'solid', hex: solid[1].toLowerCase() }
-  // Gradient fill (pristine): cls-1 references url(#id) — trailing
-  // declarations tolerated (the updated crest also strokes the plate).
-  const gradRef = svg.match(/\.cls-1\{fill:url\(#([^)]+)\)[^}]*\}/)
-  if (gradRef) {
-    const gid = gradRef[1]
-    const grad = svg.match(new RegExp(`<linearGradient\\b[^>]*id="${gid}"[^>]*>`))
-    if (grad) {
-      const attrs = attributes(grad[0])
-      const stops = [...svg.matchAll(/<stop\b([^>]*)>/g)].map((s) => {
-        const a = attributes(s[1])
-        return { offset: Number(a.get('offset') ?? '0'), color: (a.get('stop-color') ?? '#000000').toLowerCase() }
-      })
-      if (stops.length > 0 && attrs.get('x1') && attrs.get('x2')) {
-        return {
-          kind: 'gradient',
-          x1: Number(attrs.get('x1')),
-          y1: Number(attrs.get('y1')),
-          x2: Number(attrs.get('x2')),
-          y2: Number(attrs.get('y2')),
-          stops,
-        }
-      }
-    }
-  }
-  throw new Error('crest SVG: no cls-1 plate fill (solid hex or linearGradient) found')
-}
-
 function parseCrest(tier: Tier, svg: string): CrestGeometry {
-  const paths = pathMap(svg)
   return {
     tier,
-    platePath: pickPlate(paths),
-    plateFill: plateFill(svg),
-    photoCropPath: pickPhotoCrop(paths, svg),
-    photoCropStroke: photoCropStroke(svg),
-    guides: guides(paths),
+    platePath: pickPlatePath(svg),
+    tierFillHex: tierFill(svg),
+    borderStroke: borderStroke(svg),
+    guides: guides(pathMap(svg)),
   }
 }
 
@@ -226,7 +222,7 @@ export const CREST_GEOMETRY: Record<Tier, CrestGeometry> = {
 
 // ---------------------------------------------------------------------------
 // scalePath — THE CANVAS-MAPPING CONTRACT (kept from checkpoint round 2):
-// the crest paths are authored in the 1000×1000 design space; the on-page
+// the crest paths are authored in the 1080×1600 design space; the on-page
 // <svg viewBox> maps them to the element for free, but Canvas 2D has no
 // viewBox — the JPEG shell MUST transform every path onto the backing store
 // itself. Exact for our paths: every crest path uses ONLY absolute M/L/C/Z

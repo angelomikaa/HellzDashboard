@@ -89,8 +89,8 @@ export function PromotionCard({ card, charClass }: { card: PromotionCardRow; cha
         aria-label={`${card.display_name} — ${charClass}`}
         className="w-full"
       >
-        {/* Round 3: the owner's crest IS the card — square (the SVGs'
-            viewBox is 1:1), content inside the guideline rects. */}
+        {/* Round 4: the owner's crest IS the card — portrait 27:40 (the
+            SVGs' 1080×1600 viewBox), content inside the guideline rects. */}
         <CrestCard data={exportData} className="h-auto w-full" />
       </article>
       {failed && (

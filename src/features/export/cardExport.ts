@@ -1,53 +1,55 @@
 // cardExport.ts — the crest card JPEG export (plan 07.2-05, CARD-03 / D-09 /
-// D-10 / D-12; checkpoint round 3 SUPERSEDING DESIGN). Zero new npm
-// dependencies (v1.1 invariant): native Canvas 2D + Path2D + the already
+// D-10 / D-12; checkpoint round 4, owner's READABILITY REDESIGN). Zero new
+// npm dependencies (v1.1 invariant): native Canvas 2D + Path2D + the already
 // self-hosted Orbitron woff2 + brand mark.
 //
-// ROUND 3 (owner verdict on the round-2 shield cards: "chaotic in the
-// interface, generic when downloaded"): the entire code-drawn frame approach
-// is REPLACED by the owner's four hand-designed crest SVGs
-// (bronze/silver/gold/pristine — src/assets/*-crest.svg). The card is now a
-// "fake rectangle": a content rectangle (the owner's Content-safezone
-// guideline) laid over the decorated crest frame. EVERY placement — OVR
-// hero, name band, six-stat band, photo crop — reads the guideline rects
-// parsed from those SVGs (crestAssets.ts), so the design lives in the
-// owner's files, not in code.
+// ROUND 4 (owner verdict on the round-3 crest cards: "all the info was small
+// and unreadable"): the crests were re-exported at 1080×1600 with a clearer
+// layout, and the card composition follows the owner's NEW rules:
+//   1. The photo area IS the Content-safezone rect (the round-3 dedicated
+//      photo-crop path is gone) — the member's screenshot fills it.
+//   2. Name-only and six-key-stats are SOLID tier-fill bands laid OVER the
+//      photo — text contrast is guaranteed even when the screenshot is
+//      visually hostile (no more text-on-photo scrimming for the bands).
+//   3. The OVR box has NO "OVR" tag — just the big number with the JOB NAME
+//      below it (top-left, over the photo, backed by a soft top scrim).
+//   4. Type is sized for READABILITY — the entire point of this round
+//      (value type ≈ 40% larger than round 3 relative to card width).
 //
 // ONE PLAN, TWO SURFACES: buildCardPlan is the pure layout core; BOTH the
 // on-page <svg> (CrestCard.tsx) and this canvas shell consume the SAME plan
 // object — same path strings, same rects, same colors — so the downloaded
 // JPEG is the on-page card by construction.
 //
-// Round-2 lessons KEPT: fail-fast aspect gate (now 1:1 — the crest design
-// space), document.fonts.await before first draw, scalePath mapping of
+// Round-2 lessons KEPT: fail-fast aspect gate (now 27:40 — the crest design
+// space), document.fonts await before first draw, scalePath mapping of
 // design-space paths onto the backing store (Canvas 2D has no viewBox), and
 // the real stat-grid gutter discipline.
 //
 // Export content contract (D-09/T-072-12 — the JPEG circulates OUTSIDE the
-// guild): identity (name, class·função, OVR hero) + the 6 key stats
-// (3-letter label + value + points chip) + Hellz mark. NO guild-average
-// data of any kind — the stat-cell field list is closed and cannot express
-// an aggregate.
+// guild): identity (name, OVR + job name) + the 6 key stats (3-letter label
+// + value + points chip) + Hellz mark. NO guild-average data of any kind —
+// the stat-cell field list is closed and cannot express an aggregate.
 //
-// Photo crop: the member's character screenshot (self-uploaded on the
-// Painel, Supabase Storage + RLS) is clipped into the crest's photo-crop
-// path. Fallback chain (never an empty hole): screenshot → class portrait
-// (self-hosted ROO asset, D-15) → ASST-01 neutral monogram.
+// Photo fill: the member's character screenshot (self-uploaded on the
+// Painel, Supabase Storage + RLS) fills the Content-safezone rect. Fallback
+// chain (never an empty hole): screenshot → class portrait (self-hosted ROO
+// asset, D-15) → ASST-01 neutral monogram.
 //
 // Canvas-taint safety (T-072-13): every image drawn is same-origin — class
 // portraits are committed '/assets/classes/...' files, member screenshots
 // are fetched as blobs and passed as object URLs (the api.ts wrapper never
 // hands out cross-origin URLs), and the mark is the bundled hellz-mark.svg.
 import type { Tier } from '../dashboard/presentation'
-import { FUNCTION_LABELS } from '../../lib/groups'
 import markUrl from '../../assets/hellz-mark.svg'
 import {
-  CREST_DESIGN_SIZE,
+  CREST_DESIGN_HEIGHT,
+  CREST_DESIGN_WIDTH,
   CREST_GEOMETRY,
   scalePath,
   scaleRect,
   type CrestGeometry,
-  type CrestPlateFill,
+  type CrestGradient,
   type CrestRect,
 } from './crestAssets'
 
@@ -67,7 +69,7 @@ export interface CardExportData {
   charFunction: 'dps' | 'mdps' | 'suporte'
   ovr: number // rounded for display
   stats: CardExportStat[]
-  /** Image clipped into the crest's photo-crop path (member screenshot or
+  /** Image filling the Content-safezone photo area (member screenshot or
    *  class portrait — same-origin blob/asset URL), null → ASST-01 monogram. */
   photoSrc: string | null
   /** Class initial for the monogram fallback (ASST-01). */
@@ -75,20 +77,41 @@ export interface CardExportData {
 }
 
 // ---------------------------------------------------------------------------
-// Shared content palette (the owner's plates carry the color; text rides ON
-// the photo, so it is white with a dark scrim beneath — see the scrim spec).
-const TEXT_COLOR = '#FFFFFF'
+// Palette. The crest SVGs carry the tier color (plate + solid bands); text
+// contrast is a PER-TIER decision (round 4):
+//   bronze #d1a972 / silver #e6e6e6 / gold #f9b745 are light-to-mid metals
+//   → dark text; the pristine #cf1a87 deep magenta → white text.
+export const BAND_TEXT_HEX: Record<Tier, string> = {
+  bronze: '#241A10',
+  silver: '#241A10',
+  gold: '#241A10',
+  platinum: '#FFFFFF',
+}
+
+/** Site tier tokens (mirror of the @theme --color-tier-* values) — chip
+ *  fills keep the rest-of-UI tier vocabulary; the solid bands carry the
+ *  owner's own palette from the SVGs. */
+export const TIER_CHIP_HEX: Record<Tier, string> = {
+  bronze: '#C97F3F',
+  silver: '#B8C0CC',
+  gold: '#E9B44C',
+  platinum: '#D7E3F0',
+}
+
 const CHIP_TEXT_COLOR = '#241A10' // dark text on tier-hex chip fills
+const CHIP_MUTED = '#9A8F8F'
+const OVR_TEXT_COLOR = '#FFFFFF' // over the photo — white + shadow
 const MONOGRAM_TILE = '#1E1E1E'
-const MONOGRAM_BORDER = '#3D2A2B'
 const MONOGRAM_TEXT = '#9A8F8F'
-/** Legibility scrim over the photo's lower area (inside the crop): black
- *  fading in from y1 to y2 (design space) up to `alpha`. Same spec painted
- *  by BOTH surfaces (SVG gradient / canvas gradient) from the plan. */
-const SCRIM = { y1: 420, y2: 950, alpha: 0.62 } as const
+
+/** Top legibility scrim for the OVER-PHOTO OVR box: black fading out
+ *  downward from the photo's top edge (the lower bands are SOLID now — no
+ *  scrim needed there). Fractions of the photo rect; same spec painted by
+ *  BOTH surfaces from the plan. */
+const SCRIM = { heightFraction: 0.4, alpha: 0.55 } as const
 
 // ---------------------------------------------------------------------------
-// Layout plan. The design space is the crest SVGs' own 1000×1000 viewBox;
+// Layout plan. The design space is the crest SVGs' own 1080×1600 viewBox;
 // every number scales linearly with the requested width, so
 // buildCardPlan(…, w) is exact at any resolution (downloadCard paints at 2×
 // for retina crispness). Content positions are DERIVED from the tier's
@@ -132,42 +155,51 @@ export type CardPlanPhoto =
 
 export interface CardPlan {
   width: number
-  height: number // === width (the crest design space is square)
+  /** height === width × 1600/1080 — the 27:40 crest design space. */
+  height: number
   tier: Tier
   /** The tier's crest geometry — design-space path strings + parsed
-   *  guideline rects (1000×1000; scale onto the backing store via
+   *  guideline rects (1080×1600; scale onto the backing store via
    *  plan.scale). */
   crest: CrestGeometry
-  /** scale = width / CREST_DESIGN_SIZE — the one number every consumer
+  /** scale = width / CREST_DESIGN_WIDTH — the one number every consumer
    *  multiplies design-space values by. */
   scale: number
   photo: CardPlanPhoto
+  /** The photo rect = the crest's Content-safezone (scaled). */
+  photoRect: CrestRect
+  /** Top legibility scrim spec (scaled; painted INSIDE the photo rect by
+   *  both surfaces — backs the over-photo OVR box). */
   scrim: { y1: number; y2: number; alpha: number }
+  /** The SOLID name band (scaled): tier fill + contrast-aware text color. */
+  nameBand: { rect: CrestRect; fill: string; text: string }
+  /** The SOLID stat band (scaled): tier fill. */
+  statsBand: { rect: CrestRect; fill: string }
+  /** OVR block over the photo: big number + job name below, NO "OVR" tag
+   *  (round 4). White + shadow (over-photo legibility). */
   ovr: {
-    caption: string
-    captionX: number
-    captionY: number
-    captionSize: number
     text: string
     x: number
     y: number
     size: number
+    jobText: string
+    jobX: number
+    jobY: number
+    jobSize: number
+    jobMaxW: number
     color: string
   }
+  /** Player name — the ONLY content of the Name-only band (round 4). */
   name: { text: string; x: number; y: number; size: number; color: string; maxWidth: number }
-  subtitle: { text: string; x: number; y: number; size: number; color: string }
   /** The 6 key stats in SERVER/highlight order, 2-col × 3-row inside the
    *  tier's six-key-stats guideline band, with a real column gutter. */
   stats: CardPlanStatCell[]
   mark: { src: string; x: number; y: number; size: number }
   colors: {
-    text: string
     chipText: string
     monogramTile: string
-    monogramBorder: string
     monogramText: string
   }
-  plateFill: CrestPlateFill
 }
 
 function tierOf(ovr: number): Tier {
@@ -183,76 +215,68 @@ function tierOfOrCard(tier: Tier | null, cardTier: Tier): Tier {
   return tier ?? cardTier
 }
 
-/** Site tier tokens (mirror of the @theme --color-tier-* values) — chip
- *  fills keep the rest-of-UI tier vocabulary; the crest plate carries the
- *  owner's own palette from the SVGs. */
-export const TIER_CHIP_HEX: Record<Tier, string> = {
-  bronze: '#C97F3F',
-  silver: '#B8C0CC',
-  gold: '#E9B44C',
-  platinum: '#D7E3F0',
-}
-
-const CHIP_MUTED = '#9A8F8F'
-
 /**
  * Build the full card layout plan. PURE — no canvas, no DOM, no I/O. The
- * square aspect is structural: height === width at ANY width.
+ * 27:40 portrait aspect is structural: height === width × 1600/1080 at ANY
+ * width.
  */
-export function buildCardPlan(data: CardExportData, width = CREST_DESIGN_SIZE): CardPlan {
+export function buildCardPlan(data: CardExportData, width = CREST_DESIGN_WIDTH): CardPlan {
   const tier = tierOf(data.ovr)
   const crest = CREST_GEOMETRY[tier]
-  const scale = width / CREST_DESIGN_SIZE
+  const scale = width / CREST_DESIGN_WIDTH
+  const height = (width * CREST_DESIGN_HEIGHT) / CREST_DESIGN_WIDTH
 
   // --- Content placement from the tier's guideline rects (owner authority)
   // — scaled onto the requested width (the plan's numbers live on the
-  // backing store; plan.crest keeps the unscaled design-space originals for
-  // the SVG surface, which maps them via its viewBox for free).
-  const ovrRect = scaleRect(crest.guides.ovrNumber, scale)
-  const nameRect = scaleRect(crest.guides.nameAndJob, scale)
+  // requested width; plan.crest keeps the unscaled design-space originals
+  // for the SVG surface, which maps them via its viewBox for free).
+  const photoRect = scaleRect(crest.guides.contentSafezone, scale)
+  const ovrRect = scaleRect(crest.guides.ovrBox, scale)
+  const nameRect = scaleRect(crest.guides.nameOnly, scale)
   const statsRect = scaleRect(crest.guides.sixKeyStats, scale)
 
-  // OVR hero: caption above the big number, left-aligned inside the box.
-  const ovrPadX = ovrRect.w * 0.08
+  const bandFill = crest.tierFillHex
+  const bandText = BAND_TEXT_HEX[tier]
+
+  // OVR block: the big number with the JOB NAME below it — NO "OVR" tag
+  // (round 4). Left-aligned number, centered job name, both white with a
+  // shadow (they sit over the photo, backed by the top scrim).
   const ovr = {
-    caption: 'OVR',
-    captionX: ovrRect.x + ovrPadX,
-    captionY: ovrRect.y + ovrRect.h * 0.24,
-    captionSize: ovrRect.h * 0.15,
     text: String(Math.round(data.ovr)),
-    x: ovrRect.x + ovrPadX,
-    y: ovrRect.y + ovrRect.h * 0.8,
-    size: ovrRect.h * 0.6,
-    color: TEXT_COLOR,
+    x: ovrRect.x + ovrRect.w * 0.08,
+    y: ovrRect.y + ovrRect.h * 0.47,
+    size: ovrRect.h * 0.36,
+    jobText: data.charClass,
+    jobX: ovrRect.x + ovrRect.w / 2,
+    jobY: ovrRect.y + ovrRect.h * 0.8,
+    jobSize: ovrRect.h * 0.1,
+    jobMaxW: ovrRect.w * 0.92,
+    color: OVR_TEXT_COLOR,
   }
 
-  // Name band: centered name + class·função line.
+  // Name band: SOLID tier fill — the name is its ONLY content (round 4),
+  // contrast guaranteed by the per-tier band text color.
   const name = {
     text: data.name,
     x: nameRect.x + nameRect.w / 2,
-    y: nameRect.y + nameRect.h * 0.44,
-    size: nameRect.h * 0.38,
-    color: TEXT_COLOR,
-    maxWidth: nameRect.w * 0.92,
-  }
-  const subtitle = {
-    text: `${data.charClass} · ${FUNCTION_LABELS[data.charFunction]}`,
-    x: nameRect.x + nameRect.w / 2,
-    y: nameRect.y + nameRect.h * 0.82,
-    size: nameRect.h * 0.2,
-    color: TEXT_COLOR,
+    y: nameRect.y + nameRect.h / 2 + nameRect.h * 0.55 * 0.35,
+    size: nameRect.h * 0.55,
+    color: bandText,
+    maxWidth: nameRect.w * 0.94,
   }
 
-  // Stat grid — 2 cols × 3 rows inside the six-key-stats band, with a REAL
-  // column gutter (round-2 lesson: chips never underlap the next column).
-  const padX = statsRect.w * 0.025
-  const gutter = statsRect.w * 0.05
-  const padY = statsRect.h * 0.06
-  const rowGap = statsRect.h * 0.03
+  // Stat grid — 2 cols × 3 rows inside the solid six-key-stats band, with a
+  // REAL column gutter (round-2 lesson) and READABILITY-SIZED type
+  // (round-4 point: value type ≈ 40% larger than round 3 relative to the
+  // card width).
+  const padX = statsRect.w * 0.028
+  const gutter = statsRect.w * 0.056
+  const padY = statsRect.h * 0.05
+  const rowGap = statsRect.h * 0.045
   const cellW = (statsRect.w - padX * 2 - gutter) / 2
   const cellH = (statsRect.h - padY * 2 - rowGap * 2) / 3
-  const chipW = cellH * 0.72
-  const chipH = cellH * 0.66
+  const chipH = cellH * 0.6
+  const chipW = chipH * 1.5
 
   const stats: CardPlanStatCell[] = data.stats.map((stat, i) => {
     const row = Math.floor(i / 2)
@@ -270,11 +294,11 @@ export function buildCardPlan(data: CardExportData, width = CREST_DESIGN_SIZE): 
       tier: stat.tier,
       labelX: x,
       labelY: y + cellH * 0.34,
-      labelSize: cellH * 0.26,
+      labelSize: cellH * 0.3,
       valueX: x,
-      valueY: y + cellH * 0.9,
-      valueSize: cellH * 0.52,
-      valueMaxW: cellW - chipW - cellH * 0.2,
+      valueY: y + cellH * 0.95,
+      valueSize: cellH * 0.58,
+      valueMaxW: cellW - chipW - cellH * 0.22,
       chipX: x + cellW - chipW,
       chipY: y + (cellH - chipH) / 2,
       chipW,
@@ -290,31 +314,32 @@ export function buildCardPlan(data: CardExportData, width = CREST_DESIGN_SIZE): 
       ? { kind: 'image', src: data.photoSrc }
       : { kind: 'monogram', letter: data.monogramLetter }
 
-  // Hellz mark: centered in the gap between the safezone bottom and the
-  // crest's bottom tip (scaled).
-  const safezone = scaleRect(crest.guides.contentSafezone, scale)
-  const markY = safezone.y + safezone.h + (width - (safezone.y + safezone.h)) * 0.5
+  // Hellz mark: centered in the plate tip below the solid stat band.
+  const markY = statsRect.y + statsRect.h + 55 * scale
   return {
     width,
-    height: width,
+    height,
     tier,
     crest,
     scale,
     photo,
-    scrim: { ...SCRIM },
+    photoRect,
+    scrim: {
+      y1: photoRect.y,
+      y2: photoRect.y + photoRect.h * SCRIM.heightFraction,
+      alpha: SCRIM.alpha,
+    },
+    nameBand: { rect: nameRect, fill: bandFill, text: bandText },
+    statsBand: { rect: statsRect, fill: bandFill },
     ovr,
     name,
-    subtitle,
     stats,
-    mark: { src: markUrl, x: width / 2, y: markY, size: 64 * scale },
+    mark: { src: markUrl, x: width / 2, y: markY, size: 54 * scale },
     colors: {
-      text: TEXT_COLOR,
       chipText: CHIP_TEXT_COLOR,
       monogramTile: MONOGRAM_TILE,
-      monogramBorder: MONOGRAM_BORDER,
       monogramText: MONOGRAM_TEXT,
     },
-    plateFill: crest.plateFill,
   }
 }
 
@@ -364,20 +389,6 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   })
 }
 
-function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.lineTo(x + w - r, y)
-  ctx.arcTo(x + w, y, x + w, y + r, r)
-  ctx.lineTo(x + w, y + h - r)
-  ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
-  ctx.lineTo(x + r, y + h)
-  ctx.arcTo(x, y + h, x, y + h - r, r)
-  ctx.lineTo(x, y + r)
-  ctx.arcTo(x, y, x + r, y, r)
-  ctx.closePath()
-}
-
 /** Draw text shrunk-to-fit within maxWidth (names/values can be long). */
 function fitText(
   ctx: CanvasRenderingContext2D,
@@ -395,32 +406,47 @@ function fitText(
   return px
 }
 
-/** Canvas fill for the parsed plate fill spec (solid hex or the pristine
- *  gradient — same line + stops the on-page SVG renders). */
-function applyPlateFill(ctx: CanvasRenderingContext2D, fill: CrestPlateFill, s: number): string | CanvasGradient {
-  if (fill.kind === 'solid') return fill.hex
-  const grad = ctx.createLinearGradient(fill.x1 * s, fill.y1 * s, fill.x2 * s, fill.y2 * s)
-  for (const stop of fill.stops) grad.addColorStop(Math.min(1, Math.max(0, stop.offset)), stop.color)
+/** Canvas gradient for the parsed border-stroke spec (userSpaceOnUse line
+ *  + stops, scaled onto the backing store). */
+function applyBorderGradient(
+  ctx: CanvasRenderingContext2D,
+  gradient: CrestGradient,
+  s: number,
+): CanvasGradient {
+  const grad = ctx.createLinearGradient(gradient.x1 * s, gradient.y1 * s, gradient.x2 * s, gradient.y2 * s)
+  for (const stop of gradient.stops) grad.addColorStop(Math.min(1, Math.max(0, stop.offset)), stop.color)
   return grad
 }
 
-/** Solid base color of the plate (first gradient stop for the pristine
- *  crest) — painted edge-to-edge BEFORE the plate path so no background
- *  fringe shows at the frame's anti-aliased border. */
-export function plateBaseColor(fill: CrestPlateFill): string {
-  return fill.kind === 'solid' ? fill.hex : fill.stops[0].color
+function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.arcTo(x + w, y, x + w, y + r, r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
+  ctx.lineTo(x + r, y + h)
+  ctx.arcTo(x, y + h, x, y + h - r, r)
+  ctx.lineTo(x, y + r)
+  ctx.arcTo(x, y, x + r, y, r)
+  ctx.closePath()
 }
 
 /**
- * Paint the card plan onto a canvas (canvas.width drives the plan width —
- * keep the canvas square). Awaits fonts and the photo/mark images; any
- * image failure degrades gracefully (monogram / omitted mark), never throws.
+ * Paint the card plan onto a canvas (canvas dims MUST match the 27:40 crest
+ * design aspect — width : height = 1080 : 1600). Awaits fonts and the
+ * photo/mark images; any image failure degrades gracefully (monogram /
+ * omitted mark), never throws.
  */
 export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData): Promise<void> {
-  // Aspect-ratio invariant (round-2 lesson, adapted to the crest's square
-  // design space): a non-square backing store would stretch every draw.
-  if (canvas.height !== canvas.width) {
-    throw new Error(`card canvas must be square (got ${canvas.width}x${canvas.height})`)
+  // Aspect-ratio invariant (round-2 lesson, adapted to the round-4 portrait
+  // design space 1080×1600 = 27:40): a wrong-aspect backing store would
+  // stretch every draw.
+  const expectedHeight = Math.round((canvas.width * CREST_DESIGN_HEIGHT) / CREST_DESIGN_WIDTH)
+  if (canvas.height !== expectedHeight) {
+    throw new Error(
+      `card canvas must match the crest design aspect 27:40 (${canvas.width}x${expectedHeight}); got ${canvas.width}x${canvas.height}`,
+    )
   }
   await loadCardFonts()
   const plan = buildCardPlan(data, canvas.width)
@@ -432,76 +458,89 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
 
-  // Base: plate color edge-to-edge (no fringe), then the plate path itself.
-  ctx.fillStyle = plateBaseColor(plan.plateFill)
+  // Base: the tier fill edge-to-edge (no fringe at the plate path's
+  // anti-aliased border), then the plate path itself.
+  ctx.fillStyle = plan.crest.tierFillHex
   ctx.fillRect(0, 0, width, height)
   const plate = new Path2D(scalePath(plan.crest.platePath, s))
-  ctx.fillStyle = applyPlateFill(ctx, plan.plateFill, s)
   ctx.fill(plate)
 
-  // --- Photo crop: the member screenshot (or fallback) clipped into the
-  // crest's photo-crop path — the SAME path string the on-page SVG clips.
-  const crop = new Path2D(scalePath(plan.crest.photoCropPath, s))
+  // Decorative border: the tier gradient stroked along the silhouette,
+  // CLIPPED to it (only the inner half shows) — the same visual the SVG's
+  // clipPath#clip-path-1 produces.
   ctx.save()
-  ctx.clip(crop)
+  ctx.clip(plate)
+  ctx.strokeStyle = applyBorderGradient(ctx, plan.crest.borderStroke.gradient, s)
+  ctx.lineWidth = plan.crest.borderStroke.width * s
+  ctx.stroke(plate)
+  ctx.restore()
+
+  // --- Photo: the member screenshot (or fallback) fills the
+  // Content-safezone rect — the SAME rect the on-page SVG fills.
+  const r = plan.photoRect
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(r.x, r.y, r.w, r.h)
+  ctx.clip()
   if (plan.photo.kind === 'image') {
     const img = await loadImage(plan.photo.src)
     if (img !== null && img.width > 0 && img.height > 0) {
-      // Cover-fit: scale to cover the full design space, center, let the
+      // Cover-fit: scale to cover the full safezone rect, center, let the
       // clip crop the overflow (mirrors the SVG's preserveAspectRatio slice).
-      const cover = Math.max(width / img.width, height / img.height)
+      const cover = Math.max(r.w / img.width, r.h / img.height)
       const dw = img.width * cover
       const dh = img.height * cover
-      ctx.drawImage(img, (width - dw) / 2, (height - dh) / 2, dw, dh)
+      ctx.drawImage(img, r.x + (r.w - dw) / 2, r.y + (r.h - dh) / 2, dw, dh)
     } else {
-      drawMonogramFill(ctx, plan, data.monogramLetter, width)
+      drawMonogramFill(ctx, plan, data.monogramLetter)
     }
   } else {
-    drawMonogramFill(ctx, plan, plan.photo.letter, width)
+    drawMonogramFill(ctx, plan, plan.photo.letter)
   }
-  // Legibility scrim over the photo's lower area (spec shared with the SVG).
-  const scrimGrad = ctx.createLinearGradient(0, plan.scrim.y1 * s, 0, plan.scrim.y2 * s)
-  scrimGrad.addColorStop(0, 'rgba(0,0,0,0)')
-  scrimGrad.addColorStop(1, `rgba(0,0,0,${plan.scrim.alpha})`)
+  // Top legibility scrim (backs the over-photo OVR box; the lower bands are
+  // solid — no scrim needed there).
+  const scrimGrad = ctx.createLinearGradient(0, plan.scrim.y1, 0, plan.scrim.y2)
+  scrimGrad.addColorStop(0, `rgba(0,0,0,${plan.scrim.alpha})`)
+  scrimGrad.addColorStop(1, 'rgba(0,0,0,0)')
   ctx.fillStyle = scrimGrad
-  ctx.fillRect(0, 0, width, height)
-  // The owner's decorative stroke on the photo window (updated pristine
-  // crest: #e6e6e6 @ 20, clipped to the crop → only the inner half shows —
-  // the same visual the SVG paints).
-  if (plan.crest.photoCropStroke !== null) {
-    ctx.strokeStyle = plan.crest.photoCropStroke.color
-    ctx.lineWidth = plan.crest.photoCropStroke.width * s
-    ctx.stroke(crop)
-  }
+  ctx.fillRect(r.x, r.y, r.w, plan.scrim.y2 - plan.scrim.y1)
   ctx.restore()
 
-  // --- Text content, positioned by the guideline rects (design space
-  // scaled onto the backing store). White over the scrim, like game UI.
+  // --- SOLID bands over the photo (round-4 contrast design): the tier fill
+  // guarantees text legibility on any screenshot.
+  ctx.fillStyle = plan.nameBand.fill
+  ctx.fillRect(plan.nameBand.rect.x, plan.nameBand.rect.y, plan.nameBand.rect.w, plan.nameBand.rect.h)
+  ctx.fillStyle = plan.statsBand.fill
+  ctx.fillRect(plan.statsBand.rect.x, plan.statsBand.rect.y, plan.statsBand.rect.w, plan.statsBand.rect.h)
+
+  // --- OVR block (over the photo): big number + job name below, NO "OVR"
+  // tag (round 4). White with a shadow — same legibility contract the SVG's
+  // paint-order stroke delivers.
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
-  ctx.font = `700 ${plan.ovr.captionSize}px Orbitron`
-  ctx.fillStyle = plan.ovr.color
-  ctx.fillText(plan.ovr.caption, plan.ovr.captionX, plan.ovr.captionY)
-  ctx.font = `900 ${plan.ovr.size}px Orbitron`
   ctx.shadowColor = 'rgba(0,0,0,0.65)'
   ctx.shadowBlur = 14 * s
+  ctx.font = `900 ${plan.ovr.size}px Orbitron`
+  ctx.fillStyle = plan.ovr.color
   ctx.fillText(plan.ovr.text, plan.ovr.x, plan.ovr.y)
+  ctx.textAlign = 'center'
+  fitText(ctx, plan.ovr.jobText, plan.ovr.jobMaxW, 700, plan.ovr.jobSize)
+  ctx.fillText(plan.ovr.jobText, plan.ovr.jobX, plan.ovr.jobY)
   ctx.shadowBlur = 0
   ctx.shadowColor = 'transparent'
 
+  // --- Name band: the name only (round 4), solid-fill contrast — no shadow.
   ctx.textAlign = 'center'
   ctx.fillStyle = plan.name.color
   fitText(ctx, plan.name.text, plan.name.maxWidth, 700, plan.name.size)
   ctx.fillText(plan.name.text, plan.name.x, plan.name.y)
-  ctx.font = `600 ${plan.subtitle.size}px Orbitron`
-  ctx.fillText(plan.subtitle.text, plan.subtitle.x, plan.subtitle.y)
 
-  // The 6 key stats — 2-col × 3-row inside the guideline band (server
+  // --- The 6 key stats — 2-col × 3-row inside the solid stat band (server
   // order), each cell a self-contained label/value/chip group.
   ctx.textAlign = 'left'
   for (const cell of plan.stats) {
     ctx.font = `700 ${cell.labelSize}px Orbitron`
-    ctx.fillStyle = plan.colors.text
+    ctx.fillStyle = plan.nameBand.text
     ctx.fillText(cell.label, cell.labelX, cell.labelY)
     fitText(ctx, cell.value, cell.valueMaxW, 700, cell.valueSize)
     ctx.fillText(cell.value, cell.valueX, cell.valueY)
@@ -519,7 +558,7 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
     ctx.textAlign = 'left'
   }
 
-  // Hellz mark (brand anchor below the stat band).
+  // Hellz mark (brand anchor in the plate tip below the stat band).
   const mark = await loadImage(plan.mark.src)
   if (mark !== null) {
     ctx.drawImage(
@@ -532,22 +571,23 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   }
 }
 
-function drawMonogramFill(ctx: CanvasRenderingContext2D, plan: CardPlan, letter: string, size: number): void {
+function drawMonogramFill(ctx: CanvasRenderingContext2D, plan: CardPlan, letter: string): void {
   // ASST-01 neutral fallback: surface tile + class initial, centered in the
-  // crop (the clip bounds it to the photo area — never an empty hole).
+  // photo rect (the rect bounds it — never an empty hole).
+  const r = plan.photoRect
   ctx.fillStyle = plan.colors.monogramTile
-  ctx.fillRect(0, 0, size, size)
+  ctx.fillRect(r.x, r.y, r.w, r.h)
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.font = `700 ${size * 0.16}px Orbitron`
+  ctx.font = `700 ${r.h * 0.22}px Orbitron`
   ctx.fillStyle = plan.colors.monogramText
-  ctx.fillText(letter, size / 2, size * 0.38)
+  ctx.fillText(letter, r.x + r.w / 2, r.y + r.h * 0.45)
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
 }
 
 /**
- * Render the card offscreen at 2000×2000 (2× the 1000 design space for
+ * Render the card offscreen at 2160×3200 (2× the 1080×1600 design space for
  * retina crispness) and trigger a JPEG download via a temporary anchor +
  * object URL. Same-origin images only (D-15/T-072-13) — a tainted canvas
  * would make the blob step throw loudly here, which the self-hosted rule
@@ -555,8 +595,8 @@ function drawMonogramFill(ctx: CanvasRenderingContext2D, plan: CardPlan, letter:
  */
 export async function downloadCard(data: CardExportData, filename: string): Promise<void> {
   const canvas = document.createElement('canvas')
-  canvas.width = 2000
-  canvas.height = 2000
+  canvas.width = 2160
+  canvas.height = 3200
   await drawCard(canvas, data)
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
   if (blob === null) throw new Error('falha ao gerar o JPEG do card')
@@ -575,4 +615,4 @@ export async function downloadCard(data: CardExportData, filename: string): Prom
 
 // Re-exports for consumers that layout-annotate around the plan (guideline
 // rects in design space; CrestCard renders everything from the plan).
-export { CREST_DESIGN_SIZE, CREST_GEOMETRY, scaleRect, type CrestRect }
+export { CREST_DESIGN_WIDTH, CREST_DESIGN_HEIGHT, CREST_GEOMETRY, scaleRect, type CrestRect }

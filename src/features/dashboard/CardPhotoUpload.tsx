@@ -1,7 +1,8 @@
 // CardPhotoUpload — the member's character-screenshot area on the Painel
 // (07.2-05 checkpoint round 3, owner decision 1: member SELF-upload on their
-// own card area). The uploaded screenshot is clipped into the photo-crop
-// layer of the member's crest card — on the page and in the JPEG export.
+// own card area). The uploaded screenshot fills the photo area (the crest's
+// Content-safezone) of the member's crest card — on the page and in the JPEG
+// export.
 //
 // Self-contained surface: owns its own data calls (fetchMyCard for the card
 // preview + the photo read) so DashboardPage's "ONE fetch" report discipline
@@ -13,7 +14,8 @@
 //
 // Client-side compression (screenshots can be MBs): the file is decoded and
 // re-encoded as a ≤1200px JPEG (q≈0.85) BEFORE upload — the card's photo
-// crop renders at ~1000 design px, so this is lossless-in-practice at a
+// area (the Content-safezone, ~860×1076 design px) renders at most at the
+// 2160×3200 export backing store, so this is lossless-in-practice at a
 // fraction of the bytes, and it keeps the bucket's 2 MB object cap
 // unreachable through the UI.
 //

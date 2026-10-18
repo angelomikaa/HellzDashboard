@@ -1,30 +1,41 @@
-// CrestCard — the on-page crest card (07.2-05 checkpoint round 3, owner's
-// superseding design: the card is the owner's hand-designed crest SVG with
-// the content laid inside its guideline rects — the "fake rectangle").
+// CrestCard — the on-page crest card (07.2-05 checkpoint round 4, owner's
+// READABILITY REDESIGN: the crests re-exported at 1080×1600 with solid
+// content bands and bigger type, because round 3's info was "small and
+// unreadable").
 //
 // REUSABLE BY DESIGN: this is the ONE card both surfaces consume —
 //   - PromotionCard (Destaques showcase) wraps it with the download button,
-//   - the Painel card area (this plan's upload preview; plan 07.2-03's EAFC
-//     strip + own-card download) feeds it member data directly.
+//   - the Painel card area (the upload preview; plan 07.2-03's EAFC strip +
+//     own-card download) feeds it member data directly.
 //
 // SAME ARTIFACT AS THE EXPORT, BY CONSTRUCTION: the component renders
-// buildCardPlan(data, 1000) — the EXACT pure plan the canvas export paints
+// buildCardPlan(data, 1080) — the EXACT pure plan the canvas export paints
 // (cardExport.drawCard). Same path strings, same guideline-rect positions,
 // same colors: on-page card and downloaded JPEG cannot drift apart.
 //
-// Photo-crop contract: data.photoSrc (member screenshot or class portrait —
-// always a same-origin asset/blob URL, T-072-13) is clipped into the crest's
-// photo-crop layer via clipPath; null falls back to the ASST-01 monogram.
-// The dark legibility scrim spec comes from the plan (same gradient the
-// canvas paints).
+// Round-4 composition (the owner's rules):
+//   1. The photo (member screenshot or class portrait) fills the
+//      Content-safezone rect — no dedicated crop path anymore.
+//   2. Name-only + six-key-stats are SOLID tier-fill bands laid OVER the
+//      photo — text contrast is guaranteed on any screenshot (per-tier
+//      band text color: dark on the light metals, white on the pristine
+//      magenta). No scrim needed behind the bands.
+//   3. The OVR block is the big number + the JOB NAME below it — NO "OVR"
+//      tag. It sits over the photo, backed by the plan's top scrim, with
+//      the paint-order stroke as the SVG twin of the canvas shadow.
 //
-// Static neon only (07.1 D-05) — nothing animates; the svg is decorative
-// (aria-hidden) because every consumer labels the surrounding article.
+// Photo-crop contract: data.photoSrc (member screenshot or class portrait —
+// always a same-origin asset/blob URL, T-072-13); null falls back to the
+// ASST-01 monogram. Static neon only (07.1 D-05) — nothing animates; the
+// svg is decorative (aria-hidden) because every consumer labels the
+// surrounding article.
 //
 // Overflow guards: the canvas shell shrinks long text via fitText (measure
 // + shrink); SVG has no measuring, so text that would overflow its band
 // gets textLength + lengthAdjust="spacingAndGlyphs" (a condensed squeeze —
 // the same visual contract: the text stays inside the guideline rect).
+import { useId, useMemo } from 'react'
+import { buildCardPlan, type CardExportData } from '../export/cardExport'
 
 /** Orbitron's average advance ≈ 0.62em — the estimate that decides whether
  *  a string needs the squeeze (slightly conservative: squeeze a touch early
@@ -34,117 +45,120 @@ const overflows = (text: string, size: number, maxWidth: number): boolean =>
 
 const squeeze = (text: string, size: number, maxWidth: number): number | undefined =>
   overflows(text, size, maxWidth) ? maxWidth : undefined
-import { useId, useMemo } from 'react'
-import { buildCardPlan, type CardExportData } from '../export/cardExport'
 
 export function CrestCard({ data, className }: { data: CardExportData; className?: string }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
-  // The plan at the design space's own size — the <svg viewBox> does the
+  // The plan at the design space's own width — the <svg viewBox> does the
   // responsive mapping for free (canvas's scalePath job, done by the browser).
-  const plan = useMemo(() => buildCardPlan(data, 1000), [data])
-  const cropId = `crest-crop-${uid}`
+  const plan = useMemo(() => buildCardPlan(data, 1080), [data])
+  const plateClipId = `crest-plate-clip-${uid}`
+  const borderGradId = `crest-border-grad-${uid}`
   const scrimId = `crest-scrim-${uid}`
-  const plateId = `crest-plate-${uid}`
+  const photo = plan.photoRect
 
   return (
-    <svg viewBox="0 0 1000 1000" className={className} aria-hidden="true" focusable="false">
+    <svg
+      viewBox={`0 0 ${plan.width} ${plan.height}`}
+      className={className}
+      aria-hidden="true"
+      focusable="false"
+    >
       <defs>
-        {/* Impecável plate: the owner's Soft_Spectrum gradient (parsed from
-            the SVG — userSpaceOnUse line + stops) */}
-        {plan.plateFill.kind === 'gradient' && (
-          <linearGradient
-            id={plateId}
-            gradientUnits="userSpaceOnUse"
-            x1={plan.plateFill.x1}
-            y1={plan.plateFill.y1}
-            x2={plan.plateFill.x2}
-            y2={plan.plateFill.y2}
-          >
-            {plan.plateFill.stops.map((s, i) => (
-              <stop key={i} offset={s.offset} stopColor={s.color} />
-            ))}
-          </linearGradient>
-        )}
-        <clipPath id={cropId}>
-          <path d={plan.crest.photoCropPath} />
-        </clipPath>
+        {/* The tier border gradient (parsed from the SVG — userSpaceOnUse
+            line + stops) */}
         <linearGradient
-          id={scrimId}
+          id={borderGradId}
           gradientUnits="userSpaceOnUse"
-          x1="0"
-          y1={plan.scrim.y1}
-          x2="0"
-          y2={plan.scrim.y2}
+          x1={plan.crest.borderStroke.gradient.x1}
+          y1={plan.crest.borderStroke.gradient.y1}
+          x2={plan.crest.borderStroke.gradient.x2}
+          y2={plan.crest.borderStroke.gradient.y2}
         >
-          <stop offset="0" stopColor="#000000" stopOpacity="0" />
-          <stop offset="1" stopColor="#000000" stopOpacity={plan.scrim.alpha} />
+          {plan.crest.borderStroke.gradient.stops.map((s, i) => (
+            <stop key={i} offset={s.offset} stopColor={s.color} />
+          ))}
+        </linearGradient>
+        {/* Border clip: the plate silhouette itself (the SVG twin of the
+            canvas's ctx.clip(plate) — only the inner stroke half shows). */}
+        <clipPath id={plateClipId}>
+          <path d={plan.crest.platePath} />
+        </clipPath>
+        {/* Top legibility scrim (backs the over-photo OVR block) */}
+        <linearGradient id={scrimId} gradientUnits="userSpaceOnUse" x1="0" y1={plan.scrim.y1} x2="0" y2={plan.scrim.y2}>
+          <stop offset="0" stopColor="#000000" stopOpacity={plan.scrim.alpha} />
+          <stop offset="1" stopColor="#000000" stopOpacity="0" />
         </linearGradient>
       </defs>
 
-      {/* The crest frame: the owner's Plate path, the tier's palette. */}
-      <path
-        d={plan.crest.platePath}
-        fill={plan.plateFill.kind === 'solid' ? plan.plateFill.hex : `url(#${plateId})`}
-      />
+      {/* Base + plate: the tier fill edge-to-edge (no anti-aliasing fringe),
+          then the owner's Plate silhouette in the same fill. */}
+      <rect x="0" y="0" width={plan.width} height={plan.height} fill={plan.crest.tierFillHex} />
+      <path d={plan.crest.platePath} fill={plan.crest.tierFillHex} />
 
-      {/* Photo crop: member screenshot / class portrait clipped into the
-          crest's crop layer — or the ASST-01 monogram (never an empty hole). */}
-      <g clipPath={`url(#${cropId})`}>
-        {plan.photo.kind === 'image' ? (
-          <image
-            href={plan.photo.src}
-            x="0"
-            y="0"
-            width="1000"
-            height="1000"
-            preserveAspectRatio="xMidYMid slice"
-          />
-        ) : (
-          <>
-            <rect x="0" y="0" width="1000" height="1000" fill={plan.colors.monogramTile} />
-            <text
-              x="500"
-              y="380"
-              textAnchor="middle"
-              fontFamily="Orbitron, sans-serif"
-              fontWeight="700"
-              fontSize="160"
-              fill={plan.colors.monogramText}
-            >
-              {plan.photo.letter}
-            </text>
-          </>
-        )}
-        {/* Legibility scrim under the text bands (same spec the canvas paints). */}
-        <rect x="0" y="0" width="1000" height="1000" fill={`url(#${scrimId})`} />
-        {/* The owner's decorative stroke on the photo window (updated
-            pristine crest) — clipped, so only the inner half shows. */}
-        {plan.crest.photoCropStroke !== null && (
-          <path
-            d={plan.crest.photoCropPath}
-            fill="none"
-            stroke={plan.crest.photoCropStroke.color}
-            strokeWidth={plan.crest.photoCropStroke.width}
-          />
-        )}
+      {/* Decorative border: the tier gradient stroked along the silhouette,
+          clipped to it (only the inner half shows). */}
+      <g clipPath={`url(#${plateClipId})`}>
+        <path
+          d={plan.crest.platePath}
+          fill="none"
+          stroke={`url(#${borderGradId})`}
+          strokeWidth={plan.crest.borderStroke.width}
+        />
       </g>
 
-      {/* OVR hero — inside the OVR-number guideline box. The stroked
-          under-layer (paint-order) is the SVG twin of the canvas's text
-          shadow: white type stays legible over any screenshot. */}
+      {/* Photo: member screenshot / class portrait filling the
+          Content-safezone rect (preserveAspectRatio slice = cover-fit) — or
+          the ASST-01 monogram (never an empty hole). */}
+      {plan.photo.kind === 'image' ? (
+        <image
+          href={plan.photo.src}
+          x={photo.x}
+          y={photo.y}
+          width={photo.w}
+          height={photo.h}
+          preserveAspectRatio="xMidYMid slice"
+        />
+      ) : (
+        <>
+          <rect x={photo.x} y={photo.y} width={photo.w} height={photo.h} fill={plan.colors.monogramTile} />
+          <text
+            x={photo.x + photo.w / 2}
+            y={photo.y + photo.h * 0.45}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontFamily="Orbitron, sans-serif"
+            fontWeight="700"
+            fontSize={photo.h * 0.22}
+            fill={plan.colors.monogramText}
+          >
+            {plan.photo.letter}
+          </text>
+        </>
+      )}
+      {/* Top legibility scrim over the photo (OVR block sits on it). */}
+      <rect x={photo.x} y={photo.y} width={photo.w} height={plan.scrim.y2 - plan.scrim.y1} fill={`url(#${scrimId})`} />
+
+      {/* SOLID bands over the photo (round-4 contrast design): the tier fill
+          guarantees text legibility on any screenshot. */}
+      <rect
+        x={plan.nameBand.rect.x}
+        y={plan.nameBand.rect.y}
+        width={plan.nameBand.rect.w}
+        height={plan.nameBand.rect.h}
+        fill={plan.nameBand.fill}
+      />
+      <rect
+        x={plan.statsBand.rect.x}
+        y={plan.statsBand.rect.y}
+        width={plan.statsBand.rect.w}
+        height={plan.statsBand.rect.h}
+        fill={plan.statsBand.fill}
+      />
+
+      {/* OVR block — big number + JOB NAME below, NO "OVR" tag (round 4).
+          The stroked under-layer (paint-order) is the SVG twin of the
+          canvas's text shadow: white type stays legible over any screenshot. */}
       <g fontFamily="Orbitron, sans-serif" fill={plan.ovr.color}>
-        <text
-          x={plan.ovr.captionX}
-          y={plan.ovr.captionY}
-          fontSize={plan.ovr.captionSize}
-          fontWeight="700"
-          stroke="#000000"
-          strokeOpacity="0.55"
-          strokeWidth={plan.ovr.captionSize * 0.14}
-          paintOrder="stroke"
-        >
-          {plan.ovr.caption}
-        </text>
         <text
           x={plan.ovr.x}
           y={plan.ovr.y}
@@ -157,43 +171,42 @@ export function CrestCard({ data, className }: { data: CardExportData; className
         >
           {plan.ovr.text}
         </text>
-      </g>
-
-      {/* Name + class·função — inside the Name-and-job guideline band. */}
-      <g fontFamily="Orbitron, sans-serif" fill={plan.name.color} textAnchor="middle">
         <text
-          x={plan.name.x}
-          y={plan.name.y}
-          fontSize={plan.name.size}
+          x={plan.ovr.jobX}
+          y={plan.ovr.jobY}
+          textAnchor="middle"
+          fontSize={plan.ovr.jobSize}
           fontWeight="700"
-          textLength={squeeze(plan.name.text, plan.name.size, plan.name.maxWidth)}
+          textLength={squeeze(plan.ovr.jobText, plan.ovr.jobSize, plan.ovr.jobMaxW)}
           lengthAdjust="spacingAndGlyphs"
           stroke="#000000"
           strokeOpacity="0.55"
-          strokeWidth={plan.name.size * 0.1}
+          strokeWidth={plan.ovr.jobSize * 0.12}
           paintOrder="stroke"
         >
-          {plan.name.text}
-        </text>
-        <text
-          x={plan.subtitle.x}
-          y={plan.subtitle.y}
-          fontSize={plan.subtitle.size}
-          fontWeight="600"
-          textLength={squeeze(plan.subtitle.text, plan.subtitle.size, plan.name.maxWidth)}
-          lengthAdjust="spacingAndGlyphs"
-          stroke="#000000"
-          strokeOpacity="0.55"
-          strokeWidth={plan.subtitle.size * 0.12}
-          paintOrder="stroke"
-        >
-          {plan.subtitle.text}
+          {plan.ovr.jobText}
         </text>
       </g>
 
-      {/* The 6 key stats — 2-col × 3-row inside the six-key-stats guideline
+      {/* Name — the ONLY content of the Name-only band (round 4), on the
+          solid tier fill with the contrast-aware color. */}
+      <text
+        x={plan.name.x}
+        y={plan.name.y}
+        textAnchor="middle"
+        fontFamily="Orbitron, sans-serif"
+        fontSize={plan.name.size}
+        fontWeight="700"
+        fill={plan.name.color}
+        textLength={squeeze(plan.name.text, plan.name.size, plan.name.maxWidth)}
+        lengthAdjust="spacingAndGlyphs"
+      >
+        {plan.name.text}
+      </text>
+
+      {/* The 6 key stats — 2-col × 3-row inside the solid six-key-stats
           band, server order, each cell a self-contained label/value/chip
-          group (round-2 gutter discipline, derived from the owner's rects). */}
+          group (round-2 gutter discipline, round-4 readability sizes). */}
       {plan.stats.map((cell, i) => (
         <g key={i}>
           <text
@@ -202,11 +215,7 @@ export function CrestCard({ data, className }: { data: CardExportData; className
             fontFamily="Orbitron, sans-serif"
             fontSize={cell.labelSize}
             fontWeight="700"
-            fill={plan.colors.text}
-            stroke="#000000"
-            strokeOpacity="0.5"
-            strokeWidth={cell.labelSize * 0.12}
-            paintOrder="stroke"
+            fill={plan.nameBand.text}
           >
             {cell.label}
           </text>
@@ -216,13 +225,9 @@ export function CrestCard({ data, className }: { data: CardExportData; className
             fontFamily="Orbitron, sans-serif"
             fontSize={cell.valueSize}
             fontWeight="700"
+            fill={plan.nameBand.text}
             textLength={squeeze(cell.value, cell.valueSize, cell.valueMaxW)}
             lengthAdjust="spacingAndGlyphs"
-            fill={plan.colors.text}
-            stroke="#000000"
-            strokeOpacity="0.5"
-            strokeWidth={cell.valueSize * 0.1}
-            paintOrder="stroke"
           >
             {cell.value}
           </text>
@@ -249,7 +254,7 @@ export function CrestCard({ data, className }: { data: CardExportData; className
         </g>
       ))}
 
-      {/* Hellz mark — brand anchor below the stat band. */}
+      {/* Hellz mark — brand anchor in the plate tip below the stat band. */}
       <image
         href={plan.mark.src}
         x={plan.mark.x - plan.mark.size / 2}
