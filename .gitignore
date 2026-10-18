@@ -34,3 +34,5 @@ dist-ssr
 # predev/prebuild hooks (scripts/copy-ocr-assets.mjs); no binaries in git
 public/ocr/
 .preview-log.txt
+
+scripts/card-render-check/dist/
