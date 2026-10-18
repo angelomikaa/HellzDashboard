@@ -21,7 +21,7 @@
 // 07.1 D-05 — nothing animates), and per-class sections as dramatic bordered
 // panels headed by the class crest (D-17 game grounding, D-16 monogram
 // fallback for art-less classes like Rebellion). Cards are the crest showcase
-// cards (PromotionCard → the shared CrestCard, round-3 owner design) —
+// cards (PromotionCard → the shared CardSvg, round-5 single card.svg design) —
 // 1 → sm:2 → lg:3 (D-21 pre-pass; the 07.1-02 2-column cap applied to the
 // old horizontal anatomy).
 //

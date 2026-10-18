@@ -5,13 +5,13 @@
 // only in Postgres; tier banding via the unit-locked tierForOvr/tierForPoints
 // presentation functions).
 //
-// ROUND 3 (owner verdict on the round-2 shield frames: "chaotic in the
-// interface, generic when downloaded"): the card body is now CrestCard —
-// the shared component that renders the OWNER's hand-designed crest SVG
-// (bronze/silver/gold/pristine by OVR tier) with content inside its
-// guideline rects. This wrapper owns only the Destaques-specific affordance:
-// the 'Baixar card' download button (D-08/D-03/D-09) wired to the SAME
-// export module the card renders from.
+// ROUND 5 (owner supersession: "check the new card.svg — this one file
+// becomes the source of truth for card design"): the card body is now
+// CardSvg — the shared component that renders the owner's ONE card.svg
+// (placeholder text slots filled by code, photo clipped to the crop path,
+// tier colors applied via the code-driven TIER_PALETTE). This wrapper owns
+// only the Destaques-specific affordance: the 'Baixar card' download button
+// (D-08/D-03/D-09) wired to the SAME export module the card renders from.
 //
 // Photo-crop on showcase cards: the promotion payload carries no member_id,
 // so the crop falls back to the member's CLASS PORTRAIT (self-hosted ROO
@@ -21,35 +21,35 @@
 // art-less classes (Rebellion) — never an empty hole, never a broken image.
 //
 // The 6 highlights are the class's KEY STATS (07.2-01 D-13 supersession),
-// rendered by CrestCard in the owner's guideline band in SERVER order
-// (catalog label order per D-13) — never re-sorted client-side. Per RNK-02
-// the tier color of each points chip IS the entire celebration.
+// rendered by CardSvg in the owner's slot columns in SERVER order (catalog
+// label order per D-13) — never re-sorted client-side. The big points
+// number per column IS the entire celebration (round 5: the palette text
+// fill replaced the tier-colored chips).
 //
 // Export contents (D-09/T-072-12 — the JPEG circulates OUTSIDE the guild):
-// identity + the 6 key stats + points chips + Hellz mark. ZERO
+// identity + the 6 key stats + points + Hellz mark. ZERO
 // guild-average data. The button sits BELOW the card; while generating:
 // disabled + 'Gerando…'; failure → inline enumeration-safe role=alert copy,
 // never raw errors.
 import { useMemo, useState } from 'react'
 import type { PromotionCardRow } from '../../lib/api'
-import { tierForPoints } from '../dashboard/presentation'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { crestSrcFor } from '../assets/ClassCrest'
-import { CrestCard } from '../cards/CrestCard'
+import { CardSvg } from '../cards/CardSvg'
 import { cardFilename, downloadCard, type CardExportData } from '../export/cardExport'
 
 // Enumeration-safe pt-BR copy: never expose HTTP codes or internals.
 const DOWNLOAD_ERROR = 'Não foi possível gerar o card. Tente novamente.'
 
 export function PromotionCard({ card, charClass }: { card: PromotionCardRow; charClass: string }) {
-  // CrestCard derives the crest from the unit-locked tierForOvr banding; ovr
-  // is ALWAYS non-null on a card (the RPC omits OVR-incapable members), so
-  // the crest always exists — no insufficient-data variant here.
+  // CardSvg derives the tier palette from the unit-locked tierForOvr
+  // banding; ovr is ALWAYS non-null on a card (the RPC omits OVR-incapable
+  // members), so the card always exists — no insufficient-data variant here.
 
   // D-08/D-03: the download assembles the export from the SAME verbatim
-  // payload the card renders — values pre-formatted (formatStatValue), tiers
-  // via tierForPoints, photo = the class portrait (self-hosted, D-15 — the
-  // canvas can never be tainted). CrestCard consumes the identical object.
+  // payload the card renders — values pre-formatted (formatStatValue),
+  // photo = the class portrait (self-hosted, D-15 — the canvas can never be
+  // tainted). CardSvg consumes the identical object.
   const [generating, setGenerating] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -63,7 +63,6 @@ export function PromotionCard({ card, charClass }: { card: PromotionCardRow; cha
         label_short: h.label_short,
         value: formatStatValue(h.value, h.value_type),
         points: h.points,
-        tier: tierForPoints(h.points),
       })),
       photoSrc: crestSrcFor(charClass),
       monogramLetter: charClass.charAt(0).toUpperCase(),
@@ -89,9 +88,9 @@ export function PromotionCard({ card, charClass }: { card: PromotionCardRow; cha
         aria-label={`${card.display_name} — ${charClass}`}
         className="w-full"
       >
-        {/* Round 4: the owner's crest IS the card — portrait 27:40 (the
-            SVGs' 1080×1600 viewBox), content inside the guideline rects. */}
-        <CrestCard data={exportData} className="h-auto w-full" />
+        {/* Round 5: the owner's card.svg IS the card — portrait 27:40 (its
+            1080×1600 viewBox), code-filled slot positions + code palette. */}
+        <CardSvg data={exportData} className="h-auto w-full" />
       </article>
       {failed && (
         <p role="alert" aria-live="polite" className="text-xs font-semibold text-destructive">

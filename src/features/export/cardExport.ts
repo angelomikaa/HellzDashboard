@@ -1,39 +1,49 @@
-// cardExport.ts — the crest card JPEG export (plan 07.2-05, CARD-03 / D-09 /
-// D-10 / D-12; checkpoint round 4, owner's READABILITY REDESIGN). Zero new
-// npm dependencies (v1.1 invariant): native Canvas 2D + Path2D + the already
+// cardExport.ts — the card JPEG export (plan 07.2-05, CARD-03 / D-09 /
+// D-10 / D-12; checkpoint round 5, owner supersession: "this one file
+// [card.svg] becomes the source of truth for card design"). Zero new npm
+// dependencies (v1.1 invariant): native Canvas 2D + Path2D + the already
 // self-hosted Orbitron woff2 + brand mark.
 //
-// ROUND 4 (owner verdict on the round-3 crest cards: "all the info was small
-// and unreadable"): the crests were re-exported at 1080×1600 with a clearer
-// layout, and the card composition follows the owner's NEW rules:
-//   1. The photo area IS the Content-safezone rect (the round-3 dedicated
-//      photo-crop path is gone) — the member's screenshot fills it.
-//   2. Name-only and six-key-stats are SOLID tier-fill bands laid OVER the
-//      photo — text contrast is guaranteed even when the screenshot is
-//      visually hostile (no more text-on-photo scrimming for the bands).
-//   3. The OVR box has NO "OVR" tag — just the big number with the JOB NAME
-//      below it (top-left, over the photo, backed by a soft top scrim).
-//   4. Type is sized for READABILITY — the entire point of this round
-//      (value type ≈ 40% larger than round 3 relative to card width).
+// ROUND 5 (owner verdict on round 4: "i couldnt get my idea through — check
+// the new card.svg"): ONE design file for every tier. The parser
+// (cardAssets.ts) extracts the plate silhouette, the crop-path photo area,
+// the border-stroke geometry, and ALL placeholder TEXT slots (OVR / job /
+// PLAYERNAME / 6 positional stat slots). Everything the round-4 per-tier
+// SVGs carried that was COLOR now lives in code (TIER_PALETTE): plate fill,
+// border gradient stops, text fill. Composition rules:
+//   1. The member's screenshot is CLIPPED TO THE CROP PATH (round 5 brought
+//      the crop path back — there are no guideline rects/safe areas).
+//   2. Text slots are POSITIONAL: the parser's slot positions/sizes ARE the
+//      layout. Code fills OVR + job (top-left, over the photo), PLAYERNAME
+//      (on the plate), and the six stat columns (label / points / raw
+//      own_value each).
+//   3. Fonts: Bebas Neue was a placeholder — the site's Orbitron renders
+//      everywhere (OVR number in 900, points/name/labels 700, values 600).
+//      Orbitron is WIDER than Bebas, so every slot carries a fitText
+//      maxWidth (shrink-to-fit) — the design positions are honored, the
+//      type never overflows its column.
+//   4. The PLAYERNAME slot is re-centered horizontally (the file's x=285
+//      anchors a left-aligned Bebas string; a centered Orbitron name reads
+//      as designed for any name length). Recorded as a round-5 decision.
 //
 // ONE PLAN, TWO SURFACES: buildCardPlan is the pure layout core; BOTH the
-// on-page <svg> (CrestCard.tsx) and this canvas shell consume the SAME plan
-// object — same path strings, same rects, same colors — so the downloaded
-// JPEG is the on-page card by construction.
+// on-page <svg> (CardSvg.tsx) and this canvas shell consume the SAME plan
+// object — same path strings, same slot positions, same colors — so the
+// downloaded JPEG is the on-page card by construction.
 //
-// Round-2 lessons KEPT: fail-fast aspect gate (now 27:40 — the crest design
+// Round-2 lessons KEPT: fail-fast aspect gate (27:40 — the card.svg design
 // space), document.fonts await before first draw, scalePath mapping of
-// design-space paths onto the backing store (Canvas 2D has no viewBox), and
-// the real stat-grid gutter discipline.
+// design-space paths onto the backing store (Canvas 2D has no viewBox).
 //
 // Export content contract (D-09/T-072-12 — the JPEG circulates OUTSIDE the
 // guild): identity (name, OVR + job name) + the 6 key stats (3-letter label
-// + value + points chip) + Hellz mark. NO guild-average data of any kind —
-// the stat-cell field list is closed and cannot express an aggregate.
+// + points + formatted own_value) + Hellz mark. NO guild-average data of
+// any kind — the stat-slot field list is closed and cannot express an
+// aggregate. NO "OVR" tag (round 4 decision, held).
 //
 // Photo fill: the member's character screenshot (self-uploaded on the
-// Painel, Supabase Storage + RLS) fills the Content-safezone rect. Fallback
-// chain (never an empty hole): screenshot → class portrait (self-hosted ROO
+// Painel, Supabase Storage + RLS) fills the crop path. Fallback chain
+// (never an empty hole): screenshot → class portrait (self-hosted ROO
 // asset, D-15) → ASST-01 neutral monogram.
 //
 // Canvas-taint safety (T-072-13): every image drawn is same-origin — class
@@ -43,24 +53,26 @@
 import type { Tier } from '../dashboard/presentation'
 import markUrl from '../../assets/hellz-mark.svg'
 import {
-  CREST_DESIGN_HEIGHT,
-  CREST_DESIGN_WIDTH,
-  CREST_GEOMETRY,
+  CARD_DESIGN_HEIGHT,
+  CARD_DESIGN_WIDTH,
+  CARD_GEOMETRY,
+  TIER_PALETTE,
   scalePath,
   scaleRect,
-  type CrestGeometry,
-  type CrestGradient,
-  type CrestRect,
-} from './crestAssets'
+  type CardGeometry,
+  type CardRect,
+  type TierPalette,
+} from './cardAssets'
 
 // ---------------------------------------------------------------------------
 // Closed data contract (what callers assemble — PromotionCard from get_promotion
 // rows, the Painel card from my_card; values arrive PRE-FORMATTED strings).
+// Round 5: no per-stat tier field — the design renders points as palette
+// text, there are no tier-colored chips in card.svg.
 export interface CardExportStat {
   label_short: string
   value: string
   points: number | null
-  tier: Tier | null
 }
 
 export interface CardExportData {
@@ -69,114 +81,84 @@ export interface CardExportData {
   charFunction: 'dps' | 'mdps' | 'suporte'
   ovr: number // rounded for display
   stats: CardExportStat[]
-  /** Image filling the Content-safezone photo area (member screenshot or
-   *  class portrait — same-origin blob/asset URL), null → ASST-01 monogram. */
+  /** Image filling the crop-path photo area (member screenshot or class
+   *  portrait — same-origin blob/asset URL), null → ASST-01 monogram. */
   photoSrc: string | null
   /** Class initial for the monogram fallback (ASST-01). */
   monogramLetter: string
 }
 
-// ---------------------------------------------------------------------------
-// Palette. The crest SVGs carry the tier color (plate + solid bands); text
-// contrast is a PER-TIER decision (round 4):
-//   bronze #d1a972 / silver #e6e6e6 / gold #f9b745 are light-to-mid metals
-//   → dark text; the pristine #cf1a87 deep magenta → white text.
-export const BAND_TEXT_HEX: Record<Tier, string> = {
-  bronze: '#241A10',
-  silver: '#241A10',
-  gold: '#241A10',
-  platinum: '#FFFFFF',
-}
-
-/** Site tier tokens (mirror of the @theme --color-tier-* values) — chip
- *  fills keep the rest-of-UI tier vocabulary; the solid bands carry the
- *  owner's own palette from the SVGs. */
-export const TIER_CHIP_HEX: Record<Tier, string> = {
-  bronze: '#C97F3F',
-  silver: '#B8C0CC',
-  gold: '#E9B44C',
-  platinum: '#D7E3F0',
-}
-
-const CHIP_TEXT_COLOR = '#241A10' // dark text on tier-hex chip fills
-const CHIP_MUTED = '#9A8F8F'
-const OVR_TEXT_COLOR = '#FFFFFF' // over the photo — white + shadow
+const OVR_TEXT_COLOR = '#FFFFFF' // over the photo — white + shadow, every tier
 const MONOGRAM_TILE = '#1E1E1E'
 const MONOGRAM_TEXT = '#9A8F8F'
 
-/** Top legibility scrim for the OVER-PHOTO OVR box: black fading out
- *  downward from the photo's top edge (the lower bands are SOLID now — no
- *  scrim needed there). Fractions of the photo rect; same spec painted by
- *  BOTH surfaces from the plan. */
-const SCRIM = { heightFraction: 0.4, alpha: 0.55 } as const
+/** Top legibility scrim for the OVER-PHOTO OVR block: black fading out
+ *  downward from the photo's top edge. Covers the OVR number + job name
+ *  (65% of the crop area's height). Fractions of the crop bbox; the same
+ *  spec is painted by BOTH surfaces from the plan. */
+const SCRIM = { heightFraction: 0.65, alpha: 0.55 } as const
+
+/** The Hellz brand mark, centered in the plate tip below the stat slots
+ *  (kept from rounds 3-4; card.svg has no mark slot — this is an additive
+ *  brand anchor, not part of the design-space contract). */
+const MARK = { y: 1408, size: 54 } as const
 
 // ---------------------------------------------------------------------------
-// Layout plan. The design space is the crest SVGs' own 1080×1600 viewBox;
-// every number scales linearly with the requested width, so
+// Layout plan. The design space is card.svg's own 1080×1600 viewBox; every
+// number scales linearly with the requested width, so
 // buildCardPlan(…, w) is exact at any resolution (downloadCard paints at 2×
-// for retina crispness). Content positions are DERIVED from the tier's
-// guideline rects — the owner's placement authority.
-
-export interface CardPlanStatCell {
-  /** Cell rect (scaled) inside the tier's six-key-stats guideline band. */
-  x: number
-  y: number
-  w: number
-  h: number
-  label: string
-  value: string
-  points: number | null
-  tier: Tier | null
-  /** Alphabetic-baseline text anchors (scaled design space). */
-  labelX: number
-  labelY: number
-  labelSize: number
-  valueX: number
-  valueY: number
-  valueSize: number
-  valueMaxW: number
-  /** Chip box right-aligned INSIDE this cell (round-2 gutter discipline:
-   *  a chip never touches or underlaps the next column). */
-  chipX: number
-  chipY: number
-  chipW: number
-  chipH: number
-  /** Rounded points, or the muted '—' slot marker when points is null. */
-  chipText: string
-  /** Chip fill: the stat's tier hex (site tokens — consistent with the rest
-   *  of the UI), or muted for the '—' slot. */
-  chipColor: string
-  chipTextColor: string
-}
+// for retina crispness). Content positions are the PARSED SLOT POSITIONS —
+// the owner's placement authority.
 
 export type CardPlanPhoto =
   | { kind: 'image'; src: string }
   | { kind: 'monogram'; letter: string }
 
+export interface CardPlanStatSlot {
+  label: string
+  /** Alphabetic-baseline text anchors (scaled design space) + fitText
+   *  bounds. Points = the big rounded rank number (or '—'); value = the
+   *  formatted raw own_value. */
+  labelX: number
+  labelY: number
+  labelSize: number
+  labelMaxW: number
+  points: string
+  pointsX: number
+  pointsY: number
+  pointsSize: number
+  pointsMaxW: number
+  value: string
+  valueX: number
+  valueY: number
+  valueSize: number
+  valueMaxW: number
+}
+
 export interface CardPlan {
   width: number
-  /** height === width × 1600/1080 — the 27:40 crest design space. */
+  /** height === width × 1600/1080 — the 27:40 card.svg design space. */
   height: number
   tier: Tier
-  /** The tier's crest geometry — design-space path strings + parsed
-   *  guideline rects (1080×1600; scale onto the backing store via
-   *  plan.scale). */
-  crest: CrestGeometry
-  /** scale = width / CREST_DESIGN_WIDTH — the one number every consumer
+  /** THE parsed card.svg geometry — design-space path strings + slot
+   *  positions (1080×1600; scale onto the backing store via plan.scale). */
+  card: CardGeometry
+  /** The tier's CODE-DRIVEN palette (plate fill / border stops / text
+   *  fill) applied over the one shared geometry. */
+  palette: TierPalette
+  /** scale = width / CARD_DESIGN_WIDTH — the one number every consumer
    *  multiplies design-space values by. */
   scale: number
   photo: CardPlanPhoto
-  /** The photo rect = the crest's Content-safezone (scaled). */
-  photoRect: CrestRect
-  /** Top legibility scrim spec (scaled; painted INSIDE the photo rect by
-   *  both surfaces — backs the over-photo OVR box). */
+  /** The photo area: the crop path (design space, for the SVG clip) +
+   *  its bbox (scaled, for the canvas cover-fit). */
+  photoClipPath: string
+  photoBBox: CardRect
+  /** Top legibility scrim spec (scaled; painted INSIDE the crop clip by
+   *  both surfaces — backs the over-photo OVR block). */
   scrim: { y1: number; y2: number; alpha: number }
-  /** The SOLID name band (scaled): tier fill + contrast-aware text color. */
-  nameBand: { rect: CrestRect; fill: string; text: string }
-  /** The SOLID stat band (scaled): tier fill. */
-  statsBand: { rect: CrestRect; fill: string }
-  /** OVR block over the photo: big number + job name below, NO "OVR" tag
-   *  (round 4). White + shadow (over-photo legibility). */
+  /** OVR block over the photo: big number + job name below, NO "OVR"
+   *  tag. White + shadow (over-photo legibility on any screenshot). */
   ovr: {
     text: string
     x: number
@@ -189,14 +171,14 @@ export interface CardPlan {
     jobMaxW: number
     color: string
   }
-  /** Player name — the ONLY content of the Name-only band (round 4). */
+  /** Player name — on the plate between photo and stats, palette text
+   *  fill, centered (round-5 decision). */
   name: { text: string; x: number; y: number; size: number; color: string; maxWidth: number }
-  /** The 6 key stats in SERVER/highlight order, 2-col × 3-row inside the
-   *  tier's six-key-stats guideline band, with a real column gutter. */
-  stats: CardPlanStatCell[]
+  /** The 6 key stats in SERVER/highlight order, one per parsed slot
+   *  column, each a self-contained label/points/value group. */
+  stats: CardPlanStatSlot[]
   mark: { src: string; x: number; y: number; size: number }
   colors: {
-    chipText: string
     monogramTile: string
     monogramText: string
   }
@@ -209,103 +191,77 @@ function tierOf(ovr: number): Tier {
   return 'platinum'
 }
 
-function tierOfOrCard(tier: Tier | null, cardTier: Tier): Tier {
-  // Defensive: a stat cell with points but a somehow-null tier still gets a
-  // color (the card's own tier). points === null never reaches here.
-  return tier ?? cardTier
-}
-
 /**
  * Build the full card layout plan. PURE — no canvas, no DOM, no I/O. The
  * 27:40 portrait aspect is structural: height === width × 1600/1080 at ANY
  * width.
  */
-export function buildCardPlan(data: CardExportData, width = CREST_DESIGN_WIDTH): CardPlan {
+export function buildCardPlan(data: CardExportData, width = CARD_DESIGN_WIDTH): CardPlan {
   const tier = tierOf(data.ovr)
-  const crest = CREST_GEOMETRY[tier]
-  const scale = width / CREST_DESIGN_WIDTH
-  const height = (width * CREST_DESIGN_HEIGHT) / CREST_DESIGN_WIDTH
+  const card = CARD_GEOMETRY
+  const palette = TIER_PALETTE[tier]
+  const scale = width / CARD_DESIGN_WIDTH
+  const height = (width * CARD_DESIGN_HEIGHT) / CARD_DESIGN_WIDTH
 
-  // --- Content placement from the tier's guideline rects (owner authority)
-  // — scaled onto the requested width (the plan's numbers live on the
-  // requested width; plan.crest keeps the unscaled design-space originals
-  // for the SVG surface, which maps them via its viewBox for free).
-  const photoRect = scaleRect(crest.guides.contentSafezone, scale)
-  const ovrRect = scaleRect(crest.guides.ovrBox, scale)
-  const nameRect = scaleRect(crest.guides.nameOnly, scale)
-  const statsRect = scaleRect(crest.guides.sixKeyStats, scale)
+  const photoBBox = scaleRect(card.cropBBox, scale)
+  const slots = card.slots
 
-  const bandFill = crest.tierFillHex
-  const bandText = BAND_TEXT_HEX[tier]
-
-  // OVR block: the big number with the JOB NAME below it — NO "OVR" tag
-  // (round 4). Left-aligned number, centered job name, both white with a
-  // shadow (they sit over the photo, backed by the top scrim).
+  // OVR block: the parsed slot (top-left, over the photo) — big number +
+  // JOB NAME below, NO "OVR" tag (round 4). White with a shadow, backed by
+  // the top scrim. The job name shrinks to fit from its x to the card's
+  // right margin.
   const ovr = {
     text: String(Math.round(data.ovr)),
-    x: ovrRect.x + ovrRect.w * 0.08,
-    y: ovrRect.y + ovrRect.h * 0.47,
-    size: ovrRect.h * 0.36,
+    x: slots.ovr.x * scale,
+    y: slots.ovr.y * scale,
+    size: slots.ovr.size * scale,
     jobText: data.charClass,
-    jobX: ovrRect.x + ovrRect.w / 2,
-    jobY: ovrRect.y + ovrRect.h * 0.8,
-    jobSize: ovrRect.h * 0.1,
-    jobMaxW: ovrRect.w * 0.92,
+    jobX: slots.job.x * scale,
+    jobY: slots.job.y * scale,
+    jobSize: slots.job.size * scale,
+    jobMaxW: (CARD_DESIGN_WIDTH - slots.job.x - 40) * scale,
     color: OVR_TEXT_COLOR,
   }
 
-  // Name band: SOLID tier fill — the name is its ONLY content (round 4),
-  // contrast guaranteed by the per-tier band text color.
+  // Player name: the parsed slot's baseline/size, RE-CENTERED horizontally
+  // (round-5 decision — the file's x anchors a left-aligned Bebas string).
   const name = {
     text: data.name,
-    x: nameRect.x + nameRect.w / 2,
-    y: nameRect.y + nameRect.h / 2 + nameRect.h * 0.55 * 0.35,
-    size: nameRect.h * 0.55,
-    color: bandText,
-    maxWidth: nameRect.w * 0.94,
+    x: width / 2,
+    y: slots.name.y * scale,
+    size: slots.name.size * scale,
+    color: palette.textFill,
+    maxWidth: CARD_DESIGN_WIDTH * 0.82 * scale,
   }
 
-  // Stat grid — 2 cols × 3 rows inside the solid six-key-stats band, with a
-  // REAL column gutter (round-2 lesson) and READABILITY-SIZED type
-  // (round-4 point: value type ≈ 40% larger than round 3 relative to the
-  // card width).
-  const padX = statsRect.w * 0.028
-  const gutter = statsRect.w * 0.056
-  const padY = statsRect.h * 0.05
-  const rowGap = statsRect.h * 0.045
-  const cellW = (statsRect.w - padX * 2 - gutter) / 2
-  const cellH = (statsRect.h - padY * 2 - rowGap * 2) / 3
-  const chipH = cellH * 0.6
-  const chipW = chipH * 1.5
-
-  const stats: CardPlanStatCell[] = data.stats.map((stat, i) => {
-    const row = Math.floor(i / 2)
-    const col = i % 2
-    const x = statsRect.x + padX + col * (cellW + gutter)
-    const y = statsRect.y + padY + row * (cellH + rowGap)
+  // Stat slots: parsed positions verbatim; each column's fitText bound is
+  // the distance to the NEXT column's label (the last runs to the plate's
+  // inner right edge, mirrored from the crop bbox's left margin) minus a
+  // real gutter — Orbitron is wider than the placeholder Bebas, so the
+  // shrink-to-fit contract is what keeps the six columns collision-free.
+  const statSlots: CardPlanStatSlot[] = data.stats.map((stat, i) => {
+    const slot = slots.stats[i]
+    const nextX =
+      i < slots.stats.length - 1
+        ? slots.stats[i + 1].label.x
+        : CARD_DESIGN_WIDTH - card.cropBBox.x // mirrored left margin
+    const colW = (nextX - slot.label.x - 8) * scale
     return {
-      x,
-      y,
-      w: cellW,
-      h: cellH,
       label: stat.label_short,
+      labelX: slot.label.x * scale,
+      labelY: slot.label.y * scale,
+      labelSize: slot.label.size * scale,
+      labelMaxW: colW,
+      points: stat.points === null ? '—' : String(Math.round(stat.points)),
+      pointsX: slot.points.x * scale,
+      pointsY: slot.points.y * scale,
+      pointsSize: slot.points.size * scale,
+      pointsMaxW: colW,
       value: stat.value,
-      points: stat.points,
-      tier: stat.tier,
-      labelX: x,
-      labelY: y + cellH * 0.34,
-      labelSize: cellH * 0.3,
-      valueX: x,
-      valueY: y + cellH * 0.95,
-      valueSize: cellH * 0.58,
-      valueMaxW: cellW - chipW - cellH * 0.22,
-      chipX: x + cellW - chipW,
-      chipY: y + (cellH - chipH) / 2,
-      chipW,
-      chipH,
-      chipText: stat.points === null ? '—' : String(Math.round(stat.points)),
-      chipColor: stat.points === null ? CHIP_MUTED : TIER_CHIP_HEX[tierOfOrCard(stat.tier, tier)],
-      chipTextColor: CHIP_TEXT_COLOR,
+      valueX: slot.value.x * scale,
+      valueY: slot.value.y * scale,
+      valueSize: slot.value.size * scale,
+      valueMaxW: colW,
     }
   })
 
@@ -314,29 +270,26 @@ export function buildCardPlan(data: CardExportData, width = CREST_DESIGN_WIDTH):
       ? { kind: 'image', src: data.photoSrc }
       : { kind: 'monogram', letter: data.monogramLetter }
 
-  // Hellz mark: centered in the plate tip below the solid stat band.
-  const markY = statsRect.y + statsRect.h + 55 * scale
   return {
     width,
     height,
     tier,
-    crest,
+    card,
+    palette,
     scale,
     photo,
-    photoRect,
+    photoClipPath: card.cropPath,
+    photoBBox,
     scrim: {
-      y1: photoRect.y,
-      y2: photoRect.y + photoRect.h * SCRIM.heightFraction,
+      y1: photoBBox.y,
+      y2: photoBBox.y + photoBBox.h * SCRIM.heightFraction,
       alpha: SCRIM.alpha,
     },
-    nameBand: { rect: nameRect, fill: bandFill, text: bandText },
-    statsBand: { rect: statsRect, fill: bandFill },
     ovr,
     name,
-    stats,
-    mark: { src: markUrl, x: width / 2, y: markY, size: 54 * scale },
+    stats: statSlots,
+    mark: { src: markUrl, x: width / 2, y: MARK.y * scale, size: MARK.size * scale },
     colors: {
-      chipText: CHIP_TEXT_COLOR,
       monogramTile: MONOGRAM_TILE,
       monogramText: MONOGRAM_TEXT,
     },
@@ -399,53 +352,39 @@ function fitText(
 ): number {
   let px = size
   ctx.font = `${weight} ${px}px Orbitron`
-  while (px > size * 0.45 && ctx.measureText(text).width > maxWidth) {
-    px -= size * 0.05
+  while (px > size * 0.4 && ctx.measureText(text).width > maxWidth) {
+    px -= size * 0.04
     ctx.font = `${weight} ${px}px Orbitron`
   }
   return px
 }
 
-/** Canvas gradient for the parsed border-stroke spec (userSpaceOnUse line
- *  + stops, scaled onto the backing store). */
+/** Canvas gradient for the tier palette stops along the parsed border
+ *  gradient line (userSpaceOnUse geometry, scaled onto the backing store). */
 function applyBorderGradient(
   ctx: CanvasRenderingContext2D,
-  gradient: CrestGradient,
+  palette: TierPalette,
+  line: { x1: number; y1: number; x2: number; y2: number },
   s: number,
 ): CanvasGradient {
-  const grad = ctx.createLinearGradient(gradient.x1 * s, gradient.y1 * s, gradient.x2 * s, gradient.y2 * s)
-  for (const stop of gradient.stops) grad.addColorStop(Math.min(1, Math.max(0, stop.offset)), stop.color)
+  const grad = ctx.createLinearGradient(line.x1 * s, line.y1 * s, line.x2 * s, line.y2 * s)
+  for (const stop of palette.borderStops) grad.addColorStop(Math.min(1, Math.max(0, stop.offset)), stop.color)
   return grad
 }
 
-function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.lineTo(x + w - r, y)
-  ctx.arcTo(x + w, y, x + w, y + r, r)
-  ctx.lineTo(x + w, y + h - r)
-  ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
-  ctx.lineTo(x + r, y + h)
-  ctx.arcTo(x, y + h, x, y + h - r, r)
-  ctx.lineTo(x, y + r)
-  ctx.arcTo(x, y, x + r, y, r)
-  ctx.closePath()
-}
-
 /**
- * Paint the card plan onto a canvas (canvas dims MUST match the 27:40 crest
+ * Paint the card plan onto a canvas (canvas dims MUST match the 27:40 card
  * design aspect — width : height = 1080 : 1600). Awaits fonts and the
  * photo/mark images; any image failure degrades gracefully (monogram /
  * omitted mark), never throws.
  */
 export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData): Promise<void> {
-  // Aspect-ratio invariant (round-2 lesson, adapted to the round-4 portrait
-  // design space 1080×1600 = 27:40): a wrong-aspect backing store would
-  // stretch every draw.
-  const expectedHeight = Math.round((canvas.width * CREST_DESIGN_HEIGHT) / CREST_DESIGN_WIDTH)
+  // Aspect-ratio invariant (round-2 lesson — the design space is card.svg's
+  // 1080×1600 = 27:40): a wrong-aspect backing store would stretch every draw.
+  const expectedHeight = Math.round((canvas.width * CARD_DESIGN_HEIGHT) / CARD_DESIGN_WIDTH)
   if (canvas.height !== expectedHeight) {
     throw new Error(
-      `card canvas must match the crest design aspect 27:40 (${canvas.width}x${expectedHeight}); got ${canvas.width}x${canvas.height}`,
+      `card canvas must match the design aspect 27:40 (${canvas.width}x${expectedHeight}); got ${canvas.width}x${canvas.height}`,
     )
   }
   await loadCardFonts()
@@ -458,63 +397,54 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
 
-  // Base: the tier fill edge-to-edge (no fringe at the plate path's
+  // Base: the tier plate fill edge-to-edge (no fringe at the plate path's
   // anti-aliased border), then the plate path itself.
-  ctx.fillStyle = plan.crest.tierFillHex
+  ctx.fillStyle = plan.palette.plateFill
   ctx.fillRect(0, 0, width, height)
-  const plate = new Path2D(scalePath(plan.crest.platePath, s))
+  const plate = new Path2D(scalePath(plan.card.platePath, s))
   ctx.fill(plate)
 
   // Decorative border: the tier gradient stroked along the silhouette,
-  // CLIPPED to it (only the inner half shows) — the same visual the SVG's
+  // CLIPPED to it (only the inner half shows) — the same visual card.svg's
   // clipPath#clip-path-1 produces.
   ctx.save()
   ctx.clip(plate)
-  ctx.strokeStyle = applyBorderGradient(ctx, plan.crest.borderStroke.gradient, s)
-  ctx.lineWidth = plan.crest.borderStroke.width * s
+  ctx.strokeStyle = applyBorderGradient(ctx, plan.palette, plan.card.borderStroke.line, s)
+  ctx.lineWidth = plan.card.borderStroke.width * s
   ctx.stroke(plate)
   ctx.restore()
 
-  // --- Photo: the member screenshot (or fallback) fills the
-  // Content-safezone rect — the SAME rect the on-page SVG fills.
-  const r = plan.photoRect
+  // --- Photo: the member screenshot (or fallback) CLIPPED TO THE CROP PATH
+  // (round 5) — the SAME path the on-page SVG clips with.
+  const crop = new Path2D(scalePath(plan.card.cropPath, s))
+  const b = plan.photoBBox
   ctx.save()
-  ctx.beginPath()
-  ctx.rect(r.x, r.y, r.w, r.h)
-  ctx.clip()
+  ctx.clip(crop)
   if (plan.photo.kind === 'image') {
     const img = await loadImage(plan.photo.src)
     if (img !== null && img.width > 0 && img.height > 0) {
-      // Cover-fit: scale to cover the full safezone rect, center, let the
-      // clip crop the overflow (mirrors the SVG's preserveAspectRatio slice).
-      const cover = Math.max(r.w / img.width, r.h / img.height)
+      // Cover-fit within the crop bbox: scale to cover, center, let the
+      // crop path clip the overflow (mirrors the SVG's slice behavior).
+      const cover = Math.max(b.w / img.width, b.h / img.height)
       const dw = img.width * cover
       const dh = img.height * cover
-      ctx.drawImage(img, r.x + (r.w - dw) / 2, r.y + (r.h - dh) / 2, dw, dh)
+      ctx.drawImage(img, b.x + (b.w - dw) / 2, b.y + (b.h - dh) / 2, dw, dh)
     } else {
-      drawMonogramFill(ctx, plan, data.monogramLetter)
+      drawMonogramFill(ctx, plan)
     }
   } else {
-    drawMonogramFill(ctx, plan, plan.photo.letter)
+    drawMonogramFill(ctx, plan)
   }
-  // Top legibility scrim (backs the over-photo OVR box; the lower bands are
-  // solid — no scrim needed there).
+  // Top legibility scrim (backs the over-photo OVR block).
   const scrimGrad = ctx.createLinearGradient(0, plan.scrim.y1, 0, plan.scrim.y2)
   scrimGrad.addColorStop(0, `rgba(0,0,0,${plan.scrim.alpha})`)
   scrimGrad.addColorStop(1, 'rgba(0,0,0,0)')
   ctx.fillStyle = scrimGrad
-  ctx.fillRect(r.x, r.y, r.w, plan.scrim.y2 - plan.scrim.y1)
+  ctx.fillRect(b.x, b.y, b.w, plan.scrim.y2 - plan.scrim.y1)
   ctx.restore()
 
-  // --- SOLID bands over the photo (round-4 contrast design): the tier fill
-  // guarantees text legibility on any screenshot.
-  ctx.fillStyle = plan.nameBand.fill
-  ctx.fillRect(plan.nameBand.rect.x, plan.nameBand.rect.y, plan.nameBand.rect.w, plan.nameBand.rect.h)
-  ctx.fillStyle = plan.statsBand.fill
-  ctx.fillRect(plan.statsBand.rect.x, plan.statsBand.rect.y, plan.statsBand.rect.w, plan.statsBand.rect.h)
-
   // --- OVR block (over the photo): big number + job name below, NO "OVR"
-  // tag (round 4). White with a shadow — same legibility contract the SVG's
+  // tag. White with a shadow — same legibility contract the SVG's
   // paint-order stroke delivers.
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
@@ -523,42 +453,32 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.font = `900 ${plan.ovr.size}px Orbitron`
   ctx.fillStyle = plan.ovr.color
   ctx.fillText(plan.ovr.text, plan.ovr.x, plan.ovr.y)
-  ctx.textAlign = 'center'
   fitText(ctx, plan.ovr.jobText, plan.ovr.jobMaxW, 700, plan.ovr.jobSize)
   ctx.fillText(plan.ovr.jobText, plan.ovr.jobX, plan.ovr.jobY)
   ctx.shadowBlur = 0
   ctx.shadowColor = 'transparent'
 
-  // --- Name band: the name only (round 4), solid-fill contrast — no shadow.
+  // --- Player name: on the plate, palette text fill, centered — the solid
+  // card color guarantees contrast (no shadow needed).
   ctx.textAlign = 'center'
   ctx.fillStyle = plan.name.color
   fitText(ctx, plan.name.text, plan.name.maxWidth, 700, plan.name.size)
   ctx.fillText(plan.name.text, plan.name.x, plan.name.y)
 
-  // --- The 6 key stats — 2-col × 3-row inside the solid stat band (server
-  // order), each cell a self-contained label/value/chip group.
+  // --- The 6 key stats — one per parsed slot column (server order), each
+  // column a label / big points number / small raw value stack.
   ctx.textAlign = 'left'
+  ctx.fillStyle = plan.palette.textFill
   for (const cell of plan.stats) {
-    ctx.font = `700 ${cell.labelSize}px Orbitron`
-    ctx.fillStyle = plan.nameBand.text
+    fitText(ctx, cell.label, cell.labelMaxW, 700, cell.labelSize)
     ctx.fillText(cell.label, cell.labelX, cell.labelY)
-    fitText(ctx, cell.value, cell.valueMaxW, 700, cell.valueSize)
+    fitText(ctx, cell.points, cell.pointsMaxW, 700, cell.pointsSize)
+    ctx.fillText(cell.points, cell.pointsX, cell.pointsY)
+    fitText(ctx, cell.value, cell.valueMaxW, 600, cell.valueSize)
     ctx.fillText(cell.value, cell.valueX, cell.valueY)
-
-    // Points chip in the stat's tier color; null points → muted '—' slot.
-    roundRectPath(ctx, cell.chipX, cell.chipY, cell.chipW, cell.chipH, cell.chipH / 2)
-    ctx.fillStyle = cell.chipColor
-    ctx.fill()
-    ctx.fillStyle = cell.chipTextColor
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.font = `700 ${cell.chipH * 0.52}px Orbitron`
-    ctx.fillText(cell.chipText, cell.chipX + cell.chipW / 2, cell.chipY + cell.chipH / 2)
-    ctx.textBaseline = 'alphabetic'
-    ctx.textAlign = 'left'
   }
 
-  // Hellz mark (brand anchor in the plate tip below the stat band).
+  // Hellz mark (brand anchor in the plate tip below the stat slots).
   const mark = await loadImage(plan.mark.src)
   if (mark !== null) {
     ctx.drawImage(
@@ -571,17 +491,17 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   }
 }
 
-function drawMonogramFill(ctx: CanvasRenderingContext2D, plan: CardPlan, letter: string): void {
-  // ASST-01 neutral fallback: surface tile + class initial, centered in the
-  // photo rect (the rect bounds it — never an empty hole).
-  const r = plan.photoRect
+function drawMonogramFill(ctx: CanvasRenderingContext2D, plan: CardPlan): void {
+  // ASST-01 neutral fallback: the crop path filled with the surface tile +
+  // class initial, centered in the crop bbox (never an empty hole).
+  const b = plan.photoBBox
   ctx.fillStyle = plan.colors.monogramTile
-  ctx.fillRect(r.x, r.y, r.w, r.h)
+  ctx.fill(new Path2D(scalePath(plan.card.cropPath, plan.scale)))
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.font = `700 ${r.h * 0.22}px Orbitron`
+  ctx.font = `700 ${b.h * 0.2}px Orbitron`
   ctx.fillStyle = plan.colors.monogramText
-  ctx.fillText(letter, r.x + r.w / 2, r.y + r.h * 0.45)
+  ctx.fillText(plan.photo.kind === 'monogram' ? plan.photo.letter : ' ', b.x + b.w / 2, b.y + b.h * 0.45)
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
 }
@@ -613,6 +533,6 @@ export async function downloadCard(data: CardExportData, filename: string): Prom
   }
 }
 
-// Re-exports for consumers that layout-annotate around the plan (guideline
-// rects in design space; CrestCard renders everything from the plan).
-export { CREST_DESIGN_WIDTH, CREST_DESIGN_HEIGHT, CREST_GEOMETRY, scaleRect, type CrestRect }
+// Re-exports for consumers that layout-annotate around the plan (design
+// space constants; CardSvg renders everything from the plan).
+export { CARD_DESIGN_WIDTH, CARD_DESIGN_HEIGHT, CARD_GEOMETRY, TIER_PALETTE, type CardRect }

@@ -1,5 +1,6 @@
-// cardExport.test.ts — unit locks for the crest card layout plan (plan
-// 07.2-05, CARD-03/D-09/D-10/D-12; checkpoint round 4 readability redesign).
+// cardExport.test.ts — unit locks for the card layout plan (plan
+// 07.2-05, CARD-03/D-09/D-10/D-12; checkpoint round 5, owner supersession:
+// ONE card.svg is the source of truth, tier colors applied by code).
 // The DOM shell (drawCard/downloadCard) needs a canvas — these tests lock
 // the PURE core (buildCardPlan) and the filename slugification, which is
 // where the correctness contracts live:
@@ -7,28 +8,28 @@
 //  - T-072-12: the exported JPEG is a celebration artifact that circulates
 //    OUTSIDE the guild (D-09) — the plan must carry ZERO guild-average data
 //    (no class_average, no best), only identity + the 6 key stats + points.
-//  - D-10 (round-4 crest edition): PORTRAIT 27:40 card, OVR number + job
-//    name (NO "OVR" tag) in the top box, name-only band, and the 6 stats in
-//    the 2-col × 3-row arrangement in SERVER/highlight order (never
-//    re-sorted) inside the tier's solid six-key-stats band.
-//  - Round-2 lessons carried forward: a REAL column gutter (chips never
-//    under the next column's label), every chip inside its OWN cell, and
-//    exact design-space→backing-store scaling (scalePath contract).
-//  - Round 4 (owner's readability redesign): the photo area IS the
-//    Content-safezone; Name-only + six-key-stats are SOLID tier-fill bands
-//    with per-tier contrast-aware text (dark on the light metals, white on
-//    the pristine magenta); type sized for READABILITY (value type ~40%
-//    larger than round 3 relative to card width — LOCKED here so a future
-//    edit cannot silently shrink it again).
+//  - D-10 (round-5 edition): PORTRAIT 27:40 card; OVR number + job name
+//    (NO "OVR" tag) at the parsed over-photo slot; PLAYERNAME on the plate;
+//    the 6 stats in the parsed slot columns in SERVER/highlight order
+//    (never re-sorted).
+//  - Round-5 palette contract: tier colors come from TIER_PALETTE (code) —
+//    dark text on the light metals, white on the pristine magenta; the
+//    border keeps card.svg's stroke geometry with per-tier gradient stops.
+//  - Round-5 typography contract: Orbitron replaced the Bebas placeholder,
+//    and Orbitron is WIDER — every slot carries a fitText maxWidth bounded
+//    by its column (labels/points/values never collide across columns).
+//  - Round-2 lessons carried forward: exact design-space→backing-store
+//    scaling (scalePath contract).
+//  - Round-5 photo contract: the photo area IS the parsed crop path (both
+//    surfaces clip to it); fallback chain monogram (never an empty hole).
 import { describe, expect, it } from 'vitest'
 import {
   buildCardPlan,
   cardFilename,
-  CREST_DESIGN_HEIGHT,
-  CREST_DESIGN_WIDTH,
-  CREST_GEOMETRY,
-  TIER_CHIP_HEX,
-  BAND_TEXT_HEX,
+  CARD_DESIGN_HEIGHT,
+  CARD_DESIGN_WIDTH,
+  CARD_GEOMETRY,
+  TIER_PALETTE,
   type CardExportData,
 } from './cardExport'
 
@@ -38,237 +39,202 @@ const data: CardExportData = {
   charFunction: 'dps',
   ovr: 87.4,
   stats: [
-    { label_short: 'PCB', value: '1.234', points: 96, tier: 'platinum' },
-    { label_short: 'CRT', value: '42,5%', points: 71, tier: 'gold' },
-    { label_short: 'HP', value: '98.765', points: 55, tier: 'silver' },
-    { label_short: 'ASP', value: '183%', points: 30, tier: 'bronze' },
-    { label_short: 'PAT', value: '2.345', points: 12, tier: 'bronze' },
-    { label_short: 'SPM', value: '67,8%', points: 88, tier: 'platinum' },
+    { label_short: 'PCB', value: '1.234', points: 96 },
+    { label_short: 'CRT', value: '42,5%', points: 71 },
+    { label_short: 'HP', value: '98.765', points: 55 },
+    { label_short: 'ASP', value: '183%', points: 30 },
+    { label_short: 'PAT', value: '2.345', points: 12 },
+    { label_short: 'SPM', value: '67,8%', points: 88 },
   ],
   photoSrc: '/assets/classes/class-icon-assassin-cross.png',
   monogramLetter: 'A',
 }
 
-describe('buildCardPlan — card geometry (D-10, round-4 crest edition)', () => {
-  it('is PORTRAIT 27:40 at any width (the 1080×1600 crest design space), with the OVR block above the stat band and the 6 stats in server order', () => {
+describe('buildCardPlan — card geometry (D-10, round-5 single-design edition)', () => {
+  it('is PORTRAIT 27:40 at any width (card.svg\'s 1080×1600 design space), OVR above name above stats', () => {
     for (const width of [360, 1080, 2160]) {
       const plan = buildCardPlan(data, width)
-      expect(plan.height).toBe((width * CREST_DESIGN_HEIGHT) / CREST_DESIGN_WIDTH)
-      expect(plan.scale).toBe(width / CREST_DESIGN_WIDTH)
-      // OVR number sits above the stats grid.
-      expect(plan.ovr.y).toBeLessThan(plan.stats[0].y)
-      // 2 columns × 3 rows: index 0/1 share row 0, 2/3 row 1, 4/5 row 2 —
-      // left column first (server order preserved, never re-sorted).
-      const [s0, s1, s2, s3, s4, s5] = plan.stats
-      expect(s0.label).toBe('PCB')
-      expect(s1.label).toBe('CRT')
-      expect(s2.label).toBe('HP')
-      expect(s3.label).toBe('ASP')
-      expect(s4.label).toBe('PAT')
-      expect(s5.label).toBe('SPM')
-      expect(s0.y).toBe(s1.y)
-      expect(s2.y).toBe(s3.y)
-      expect(s4.y).toBe(s5.y)
-      expect(s0.x).toBeLessThan(s1.x)
-      expect(s2.x).toBe(s0.x)
-      expect(s1.x).toBe(s3.x)
-      expect(plan.stats).toHaveLength(6)
-    }
-  })
-
-  it('places every content block INSIDE its owner guideline rect (round-4 rects are the placement authority)', () => {
-    for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
-      const ovrByTier = { bronze: 60, silver: 70, gold: 80, platinum: 87 } as const
-      const plan = buildCardPlan({ ...data, ovr: ovrByTier[tier] }, CREST_DESIGN_WIDTH)
-      const g = plan.crest.guides
-      // OVR number + job name inside the OVR-number-and-job box.
-      expect(plan.ovr.x).toBeGreaterThanOrEqual(g.ovrBox.x)
-      expect(plan.ovr.x + plan.ovr.size * 1.9).toBeLessThanOrEqual(g.ovrBox.x + g.ovrBox.w + 1)
-      expect(plan.ovr.y).toBeGreaterThan(g.ovrBox.y)
-      expect(plan.ovr.y).toBeLessThanOrEqual(g.ovrBox.y + g.ovrBox.h)
-      expect(plan.ovr.jobY).toBeGreaterThan(plan.ovr.y)
-      expect(plan.ovr.jobY).toBeLessThanOrEqual(g.ovrBox.y + g.ovrBox.h)
-      // The photo area IS the Content-safezone (round 4: no crop path).
-      expect(plan.photoRect).toEqual({
-        x: g.contentSafezone.x,
-        y: g.contentSafezone.y,
-        w: g.contentSafezone.w,
-        h: g.contentSafezone.h,
-      })
-      // Name inside the Name-only band.
-      expect(plan.name.y).toBeGreaterThan(g.nameOnly.y)
-      expect(plan.name.y).toBeLessThan(g.nameOnly.y + g.nameOnly.h)
-      // Every stat cell inside the six-key-stats band.
+      expect(plan.height).toBe((width * CARD_DESIGN_HEIGHT) / CARD_DESIGN_WIDTH)
+      expect(plan.scale).toBe(width / CARD_DESIGN_WIDTH)
+      // Vertical composition order: OVR number (over the photo) → job name
+      // → PLAYERNAME (on the plate) → stat labels → points → values.
+      expect(plan.ovr.y).toBeLessThan(plan.ovr.jobY)
+      expect(plan.ovr.jobY).toBeLessThan(plan.name.y)
       for (const cell of plan.stats) {
-        expect(cell.x).toBeGreaterThanOrEqual(g.sixKeyStats.x)
-        expect(cell.x + cell.w).toBeLessThanOrEqual(g.sixKeyStats.x + g.sixKeyStats.w + 0.01)
-        expect(cell.y).toBeGreaterThanOrEqual(g.sixKeyStats.y)
-        expect(cell.y + cell.h).toBeLessThanOrEqual(g.sixKeyStats.y + g.sixKeyStats.h + 0.01)
+        expect(plan.name.y).toBeLessThan(cell.labelY)
+        expect(cell.labelY).toBeLessThan(cell.pointsY)
+        expect(cell.pointsY).toBeLessThan(cell.valueY)
       }
-      // The Hellz mark sits below the stat band (inside the plate tip).
-      expect(plan.mark.y).toBeGreaterThan(g.sixKeyStats.y + g.sixKeyStats.h)
-      expect(plan.mark.y).toBeLessThan(CREST_DESIGN_HEIGHT)
     }
   })
 
-  it('has NO "OVR" tag and NO subtitle line (round 4: OVR = number + job name; Name-only band = name only)', () => {
-    const plan = buildCardPlan(data, CREST_DESIGN_WIDTH)
+  it('places every text at the PARSED slot positions (the owner\'s placement authority)', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    const slots = CARD_GEOMETRY.slots
+    expect(plan.ovr.x).toBe(slots.ovr.x)
+    expect(plan.ovr.y).toBe(slots.ovr.y)
+    expect(plan.ovr.size).toBeCloseTo(slots.ovr.size, 6)
+    expect(plan.ovr.jobX).toBe(slots.job.x)
+    expect(plan.ovr.jobY).toBe(slots.job.y)
+    // The name is re-centered (round-5 decision) but keeps the slot's
+    // baseline + size.
+    expect(plan.name.x).toBe(CARD_DESIGN_WIDTH / 2)
+    expect(plan.name.y).toBe(slots.name.y)
+    expect(plan.name.size).toBe(slots.name.size)
+    // Each stat column rides its parsed slot, server order preserved.
+    plan.stats.forEach((cell, i) => {
+      expect(cell.labelX).toBe(slots.stats[i].label.x)
+      expect(cell.labelY).toBe(slots.stats[i].label.y)
+      expect(cell.pointsX).toBe(slots.stats[i].points.x)
+      expect(cell.pointsY).toBe(slots.stats[i].points.y)
+      expect(cell.valueX).toBe(slots.stats[i].value.x)
+      expect(cell.valueY).toBe(slots.stats[i].value.y)
+    })
+  })
+
+  it('renders the 6 stats in server order (never re-sorted), left → right', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    expect(plan.stats.map((c) => c.label)).toEqual(['PCB', 'CRT', 'HP', 'ASP', 'PAT', 'SPM'])
+    for (let i = 1; i < 6; i++) {
+      expect(plan.stats[i].labelX).toBeGreaterThan(plan.stats[i - 1].labelX)
+    }
+  })
+
+  it('has NO "OVR" tag and NO aggregate-shaped fields (round 4/5 contracts held)', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     expect(plan.ovr.jobText).toBe('Assassin Cross')
     const serialized = JSON.stringify(plan)
     expect(serialized).not.toContain('caption')
     expect(serialized).not.toContain('subtitle')
-    expect(serialized).not.toContain('OVR')
+    expect(serialized).not.toContain('chip')
   })
 
   it('carries ZERO guild-average data anywhere in the plan (D-09/T-072-12 export contract)', () => {
-    const plan = buildCardPlan(data, CREST_DESIGN_WIDTH)
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     const serialized = JSON.stringify(plan).toLowerCase()
     expect(serialized).not.toContain('class_average')
     expect(serialized).not.toContain('average')
     expect(serialized).not.toContain('"best"')
-    // And no stat cell carries an aggregate-shaped field beyond the closed set.
+    // The stat-slot field list is CLOSED: label + points + value with their
+    // anchors/bounds — nothing else (in particular: no aggregate, no chip).
     for (const cell of plan.stats) {
       expect(Object.keys(cell).sort()).toEqual([
-        'chipColor',
-        'chipH',
-        'chipText',
-        'chipTextColor',
-        'chipW',
-        'chipX',
-        'chipY',
-        'h',
         'label',
+        'labelMaxW',
         'labelSize',
         'labelX',
         'labelY',
         'points',
-        'tier',
+        'pointsMaxW',
+        'pointsSize',
+        'pointsX',
+        'pointsY',
         'value',
         'valueMaxW',
         'valueSize',
         'valueX',
         'valueY',
-        'w',
-        'x',
-        'y',
       ])
     }
   })
 })
 
-describe('buildCardPlan — round-4 readability contract (the WHOLE point of this round)', () => {
-  it('sizes stat type for READABILITY — value type ≥ 3.5% of the card width (≈40% larger than round 3)', () => {
-    // Round 3's verdict: "all the info was small and unreadable". This lock
-    // keeps a future edit from silently shrinking the type again.
-    const plan = buildCardPlan(data, CREST_DESIGN_WIDTH)
+describe('buildCardPlan — round-5 typography contract (Orbitron fit inside the columns)', () => {
+  it('keeps the BIG type the readability rounds locked: points ≥ 8% of the card width', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     for (const cell of plan.stats) {
-      expect(cell.valueSize / CREST_DESIGN_WIDTH).toBeGreaterThan(0.035)
-      expect(cell.labelSize / CREST_DESIGN_WIDTH).toBeGreaterThan(0.018)
-      expect(cell.chipH / CREST_DESIGN_WIDTH).toBeGreaterThan(0.03)
+      expect(cell.pointsSize / CARD_DESIGN_WIDTH).toBeGreaterThan(0.08)
+      expect(cell.labelSize / CARD_DESIGN_WIDTH).toBeGreaterThan(0.05)
+      expect(plan.ovr.size / CARD_DESIGN_WIDTH).toBeGreaterThan(0.2)
     }
-    // Same contract holds at any render width (linear scaling).
+    // Same contract at any render width (linear scaling).
     const small = buildCardPlan(data, 360)
-    expect(small.stats[0].valueSize).toBeCloseTo(plan.stats[0].valueSize * (360 / 1080), 5)
+    expect(small.stats[0].pointsSize).toBeCloseTo(plan.stats[0].pointsSize * (360 / 1080), 5)
   })
 
-  it('lays the name at readable scale inside the Name-only band (no subtitle competing for space)', () => {
-    const plan = buildCardPlan(data, CREST_DESIGN_WIDTH)
-    expect(plan.name.size / CREST_DESIGN_WIDTH).toBeGreaterThan(0.06)
-    // Name band holds ONLY the name — so the type got bigger than round 3's
-    // shared name+job band.
-    expect(plan.name.size).toBeGreaterThan(plan.ovr.jobSize)
+  it('bounds every slot text inside its own column — no collision with the next column', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    for (let i = 0; i < 6; i++) {
+      const cell = plan.stats[i]
+      // The column bound: distance to the next column's label (last column
+      // runs to the plate's inner right, mirrored from the crop bbox).
+      const nextX =
+        i < 5 ? CARD_GEOMETRY.slots.stats[i + 1].label.x : CARD_DESIGN_WIDTH - CARD_GEOMETRY.cropBBox.x
+      const colW = nextX - CARD_GEOMETRY.slots.stats[i].label.x - 8
+      expect(cell.labelMaxW).toBeCloseTo(colW, 6)
+      expect(cell.pointsMaxW).toBeCloseTo(colW, 6)
+      expect(cell.valueMaxW).toBeCloseTo(colW, 6)
+      expect(cell.labelMaxW).toBeGreaterThan(100)
+      // A 2-digit points value at the design size fits (possibly shrunk by
+      // fitText — the maxW is the hard bound either way).
+      expect(cell.pointsMaxW).toBeGreaterThan(cell.pointsSize * 0.8)
+    }
   })
 
-  it('paints the SOLID bands with the tier fill and picks contrast-aware text per tier', () => {
+  it('names shrink-to-fit inside a generous plate bound, still readable', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    expect(plan.name.maxWidth).toBeGreaterThan(CARD_DESIGN_WIDTH * 0.7)
+    expect(plan.name.size / CARD_DESIGN_WIDTH).toBeGreaterThan(0.1)
+  })
+})
+
+describe('buildCardPlan — round-5 palette contract (tier colors applied by code)', () => {
+  it('keys the palette by the OVR tier and carries THAT tier\'s plate fill + border stops + text fill', () => {
     const ovrByTier = { bronze: 60, silver: 70, gold: 80, platinum: 87 } as const
     for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
-      const plan = buildCardPlan({ ...data, ovr: ovrByTier[tier] }, CREST_DESIGN_WIDTH)
-      // Bands: the OWNER's tier hex (from the SVGs), both bands identical.
-      expect(plan.nameBand.fill).toBe(CREST_GEOMETRY[tier].tierFillHex)
-      expect(plan.statsBand.fill).toBe(CREST_GEOMETRY[tier].tierFillHex)
+      const plan = buildCardPlan({ ...data, ovr: ovrByTier[tier] }, CARD_DESIGN_WIDTH)
+      expect(plan.tier).toBe(tier)
+      expect(plan.palette).toBe(TIER_PALETTE[tier])
       // Text contrast: dark on the light metals, white on the deep magenta.
-      expect(plan.nameBand.text).toBe(BAND_TEXT_HEX[tier])
-      expect(plan.name.color).toBe(plan.nameBand.text)
+      expect(plan.name.color).toBe(TIER_PALETTE[tier].textFill)
       if (tier === 'platinum') {
-        expect(plan.nameBand.text).toBe('#FFFFFF')
+        expect(plan.name.color).toBe('#ffffff')
       } else {
-        expect(plan.nameBand.text).toBe('#241A10')
+        expect(plan.name.color).toBe('#241a10')
       }
+      // The border keeps card.svg's GEOMETRY with the palette's stops.
+      expect(plan.card.borderStroke.width).toBe(40)
+      expect(plan.palette.borderStops).toEqual(TIER_PALETTE[tier].borderStops)
     }
   })
 
-  it('backs the over-photo OVR block with a top legibility scrim inside the photo rect', () => {
-    const plan = buildCardPlan(data, CREST_DESIGN_WIDTH)
-    expect(plan.scrim.y1).toBe(plan.photoRect.y)
+  it('paints the over-photo OVR block white on EVERY tier (photo legibility is tier-independent)', () => {
+    const ovrByTier = { bronze: 60, silver: 70, gold: 80, platinum: 87 } as const
+    for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
+      const plan = buildCardPlan({ ...data, ovr: ovrByTier[tier] }, CARD_DESIGN_WIDTH)
+      expect(plan.ovr.color).toBe('#FFFFFF')
+    }
+  })
+})
+
+describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () => {
+  it('carries the parsed crop path as the photo clip on BOTH surfaces, with its scaled bbox', () => {
+    const design = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    expect(design.photoClipPath).toBe(CARD_GEOMETRY.cropPath)
+    expect(design.photoBBox).toEqual({
+      x: CARD_GEOMETRY.cropBBox.x,
+      y: CARD_GEOMETRY.cropBBox.y,
+      w: CARD_GEOMETRY.cropBBox.w,
+      h: CARD_GEOMETRY.cropBBox.h,
+    })
+    const backing = buildCardPlan(data, 2160)
+    expect(backing.photoClipPath).toBe(CARD_GEOMETRY.cropPath)
+    expect(backing.photoBBox.w).toBe(CARD_GEOMETRY.cropBBox.w * 2)
+    expect(backing.photoBBox.h).toBe(CARD_GEOMETRY.cropBBox.h * 2)
+  })
+
+  it('backs the over-photo OVR block with a top legibility scrim inside the crop area', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    expect(plan.scrim.y1).toBe(plan.photoBBox.y)
+    // The scrim must cover the OVR number AND the job name below it.
     expect(plan.scrim.y2).toBeGreaterThan(plan.ovr.jobY)
-    expect(plan.scrim.y2).toBeLessThan(plan.photoRect.y + plan.photoRect.h)
+    expect(plan.scrim.y2).toBeLessThan(plan.photoBBox.y + plan.photoBBox.h)
     expect(plan.scrim.alpha).toBeGreaterThan(0)
     expect(plan.scrim.alpha).toBeLessThan(1)
   })
-})
 
-describe('buildCardPlan — checkpoint round-2 lessons carried forward', () => {
-  it('keeps a REAL column gutter — a chip never touches or underlaps the next column', () => {
-    for (const width of [1080, 2160]) {
-      const plan = buildCardPlan(data, width)
-      const [s0, s1] = plan.stats
-      // Column gutter: cell 0's right edge sits clearly left of cell 1.
-      const gutter = s1.x - (s0.x + s0.w)
-      expect(gutter).toBeGreaterThan(width * 0.01)
-      // Chips are right-aligned INSIDE their own cell, never past it.
-      for (const cell of plan.stats) {
-        expect(cell.chipX + cell.chipW).toBeLessThanOrEqual(cell.x + cell.w)
-        expect(cell.chipX).toBeGreaterThan(cell.x)
-      }
-      // The gap between a left-column chip and the right column's label is
-      // strictly positive (the round-2 bug glued '96' to 'CRT').
-      const chipGap = s1.x - (s0.chipX + s0.chipW)
-      expect(chipGap).toBeGreaterThan(width * 0.01)
-    }
-  })
-
-  it('maps the 1080×1600 design space exactly onto the 2160×3200 download backing store (2×, no drift)', () => {
-    const base = buildCardPlan(data, CREST_DESIGN_WIDTH)
-    const backing = buildCardPlan(data, 2160)
-    expect(backing.height).toBe(3200)
-    expect(backing.ovr.x).toBe(base.ovr.x * 2)
-    expect(backing.ovr.y).toBe(base.ovr.y * 2)
-    expect(backing.ovr.jobY).toBe(base.ovr.jobY * 2)
-    expect(backing.name.x).toBe(base.name.x * 2)
-    expect(backing.photoRect.x).toBe(base.photoRect.x * 2)
-    expect(backing.photoRect.h).toBe(base.photoRect.h * 2)
-    expect(backing.mark.y).toBe(base.mark.y * 2)
-    expect(backing.mark.size).toBe(base.mark.size * 2)
-    for (let i = 0; i < 6; i++) {
-      expect(backing.stats[i].x).toBe(base.stats[i].x * 2)
-      expect(backing.stats[i].y).toBe(base.stats[i].y * 2)
-      expect(backing.stats[i].chipX).toBe(base.stats[i].chipX * 2)
-      expect(backing.stats[i].valueSize).toBe(base.stats[i].valueSize * 2)
-    }
-  })
-})
-
-describe('buildCardPlan — crest selection (owner superseding design)', () => {
-  it('keys the crest by the OVR tier: the plan carries THAT tier\'s crest geometry and palette', () => {
-    const ovrByTier = { bronze: 60, silver: 70, gold: 80, platinum: 87 } as const
-    for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
-      const plan = buildCardPlan({ ...data, ovr: ovrByTier[tier] }, CREST_DESIGN_WIDTH)
-      expect(plan.tier).toBe(tier)
-      expect(plan.crest).toBe(CREST_GEOMETRY[tier])
-      expect(plan.nameBand.fill).toBe(CREST_GEOMETRY[tier].tierFillHex)
-    }
-  })
-
-  it('colors points chips with the site tier tokens; the photo rect rides on the plan for BOTH surfaces', () => {
-    const plan = buildCardPlan(data, CREST_DESIGN_WIDTH)
-    expect(plan.stats[0].chipColor).toBe(TIER_CHIP_HEX.platinum)
-    expect(plan.stats[3].chipColor).toBe(TIER_CHIP_HEX.bronze)
-  })
-})
-
-describe('buildCardPlan — photo fallback chain (never an empty hole)', () => {
   it('carries the image draw when a photo src is set (screenshot or class portrait)', () => {
-    const plan = buildCardPlan(data, CREST_DESIGN_WIDTH)
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     expect(plan.photo.kind).toBe('image')
     if (plan.photo.kind === 'image') {
       expect(plan.photo.src).toBe('/assets/classes/class-icon-assassin-cross.png')
@@ -276,7 +242,7 @@ describe('buildCardPlan — photo fallback chain (never an empty hole)', () => {
   })
 
   it('carries the ASST-01 monogram fallback when no photo exists (photoSrc null)', () => {
-    const plan = buildCardPlan({ ...data, photoSrc: null }, CREST_DESIGN_WIDTH)
+    const plan = buildCardPlan({ ...data, photoSrc: null }, CARD_DESIGN_WIDTH)
     expect(plan.photo.kind).toBe('monogram')
     if (plan.photo.kind === 'monogram') {
       expect(plan.photo.letter).toBe('A')
@@ -286,21 +252,37 @@ describe('buildCardPlan — photo fallback chain (never an empty hole)', () => {
   })
 })
 
-describe('buildCardPlan — chip slots', () => {
-  it('renders the muted — chip slot for null points (never crashes, never invents numbers)', () => {
+describe('buildCardPlan — stat slot text (round 5: points as big palette text)', () => {
+  it('rounds points for display and renders the muted — slot for null (never invents numbers)', () => {
     const plan = buildCardPlan(
-      { ...data, stats: data.stats.map((s, i) => (i === 1 ? { ...s, points: null, tier: null } : s)) },
-      CREST_DESIGN_WIDTH,
+      { ...data, stats: data.stats.map((s, i) => (i === 1 ? { ...s, points: null } : s)) },
+      CARD_DESIGN_WIDTH,
     )
-    const muted = plan.stats[1]
-    expect(muted.chipText).toBe('—')
-    expect(muted.points).toBeNull()
-    expect(muted.tier).toBeNull()
-    // Muted slot is visually distinct from every tiered chip color.
-    for (const cell of plan.stats) {
-      if (cell.points === null) continue
-      expect(cell.chipText).not.toBe('—')
-      expect(cell.chipColor).not.toBe(muted.chipColor)
+    expect(plan.stats[0].points).toBe('96')
+    expect(plan.stats[1].points).toBe('—')
+    // Null points changes ONLY the text — the slot positions stay put.
+    expect(plan.stats[1].pointsX).toBe(plan.stats[1].labelX + (CARD_GEOMETRY.slots.stats[1].points.x - CARD_GEOMETRY.slots.stats[1].label.x))
+  })
+})
+
+describe('buildCardPlan — exact 2× scaling onto the download backing store', () => {
+  it('maps the 1080×1600 design space exactly onto 2160×3200 (2×, no drift)', () => {
+    const base = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    const backing = buildCardPlan(data, 2160)
+    expect(backing.height).toBe(3200)
+    expect(backing.ovr.x).toBe(base.ovr.x * 2)
+    expect(backing.ovr.y).toBe(base.ovr.y * 2)
+    expect(backing.ovr.jobY).toBe(base.ovr.jobY * 2)
+    expect(backing.name.x).toBe(base.name.x * 2)
+    expect(backing.name.y).toBe(base.name.y * 2)
+    expect(backing.mark.y).toBe(base.mark.y * 2)
+    expect(backing.mark.size).toBe(base.mark.size * 2)
+    for (let i = 0; i < 6; i++) {
+      expect(backing.stats[i].labelX).toBe(base.stats[i].labelX * 2)
+      expect(backing.stats[i].pointsY).toBe(base.stats[i].pointsY * 2)
+      expect(backing.stats[i].pointsSize).toBe(base.stats[i].pointsSize * 2)
+      expect(backing.stats[i].valueY).toBe(base.stats[i].valueY * 2)
+      expect(backing.stats[i].valueMaxW).toBe(base.stats[i].valueMaxW * 2)
     }
   })
 })

@@ -1,8 +1,8 @@
 // CardPhotoUpload — the member's character-screenshot area on the Painel
 // (07.2-05 checkpoint round 3, owner decision 1: member SELF-upload on their
-// own card area). The uploaded screenshot fills the photo area (the crest's
-// Content-safezone) of the member's crest card — on the page and in the JPEG
-// export.
+// own card area). The uploaded screenshot fills the card's crop-path photo
+// area (round 5: card.svg's <path id="crop-path">) — on the page and in the
+// JPEG export.
 //
 // Self-contained surface: owns its own data calls (fetchMyCard for the card
 // preview + the photo read) so DashboardPage's "ONE fetch" report discipline
@@ -14,12 +14,12 @@
 //
 // Client-side compression (screenshots can be MBs): the file is decoded and
 // re-encoded as a ≤1200px JPEG (q≈0.85) BEFORE upload — the card's photo
-// area (the Content-safezone, ~860×1076 design px) renders at most at the
+// area (the crop path, ~931×783 design-px bbox) renders at most at the
 // 2160×3200 export backing store, so this is lossless-in-practice at a
 // fraction of the bytes, and it keeps the bucket's 2 MB object cap
 // unreachable through the UI.
 //
-// Preview: a live CrestCard fed by my_card + the current photo (or the
+// Preview: a live CardSvg fed by my_card + the current photo (or the
 // class-portrait fallback / ASST-01 monogram) — the exact component the
 // Destaques showcase uses and plan 07.2-03 will reuse for the member
 // Painel EAFC strip + own-card download.
@@ -32,10 +32,9 @@ import {
   type MyCard,
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
-import { tierForPoints } from '../dashboard/presentation'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { crestSrcFor } from '../assets/ClassCrest'
-import { CrestCard } from '../cards/CrestCard'
+import { CardSvg } from '../cards/CardSvg'
 import type { CardExportData } from '../export/cardExport'
 
 // Enumeration-safe pt-BR copy (shared UI contract): never expose HTTP codes
@@ -155,7 +154,7 @@ export function CardPhotoUpload({ session }: { session: NeoFootSession }) {
     }
   }
 
-  // Live crest-card preview: my_card's key stats + OVR, the stored photo
+  // Live card preview: my_card's key stats + OVR, the stored photo
   // (or the class-portrait fallback / monogram). OVR-null members (insufficient
   // data) get the upload UI without the card — tierForOvr needs a number.
   const preview: CardExportData | null =
@@ -169,7 +168,6 @@ export function CardPhotoUpload({ session }: { session: NeoFootSession }) {
             label_short: k.label_short,
             value: k.own_value === null ? '—' : formatStatValue(k.own_value, k.value_type),
             points: k.points,
-            tier: tierForPoints(k.points),
           })),
           photoSrc: photoUrl ?? crestSrcFor(card.char_class),
           monogramLetter: card.char_class.charAt(0).toUpperCase(),
@@ -240,7 +238,7 @@ export function CardPhotoUpload({ session }: { session: NeoFootSession }) {
             <p className="mb-2 text-center text-xs font-semibold tracking-wide text-muted">
               Pré-visualização do seu card
             </p>
-            <CrestCard data={preview} className="h-auto w-full" />
+            <CardSvg data={preview} className="h-auto w-full" />
           </div>
         )}
       </div>
