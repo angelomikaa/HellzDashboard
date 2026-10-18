@@ -77,6 +77,11 @@ export interface CrestGeometry {
   plateFill: CrestPlateFill
   /** The member's character screenshot is clipped into this path. */
   photoCropPath: string
+  /** Optional decorative stroke ON the photo window (the owner's updated
+   *  pristine crest strokes the crop with #e6e6e6 @ 20 — clipped to the
+   *  crop path, so only the inner half shows). Parsed from the cls-2 style
+   *  block; both surfaces render it for design fidelity. */
+  photoCropStroke: { color: string; width: number } | null
   guides: CrestGuides
 }
 
@@ -107,12 +112,28 @@ function pathMap(svg: string): Map<string, string> {
  */
 const PHOTO_CROP_IDS = ['Photo-crop-path', 'Image-crop', 'Photo-clip-path', 'photo-crop']
 
-function pickPhotoCrop(paths: Map<string, string>): string {
+function pickPhotoCrop(paths: Map<string, string>, svg: string): string {
   for (const id of PHOTO_CROP_IDS) {
     const d = paths.get(id)
     if (d) return d
   }
-  throw new Error(`crest SVG: no photo-crop path found (tried: ${PHOTO_CROP_IDS.join(', ')})`)
+  // The updated pristine crest carries the crop path WITHOUT an id, inside
+  // a `<g id="photo-crop">` group — fall back to the group's first path.
+  const group = svg.match(/<g\b[^>]*id="photo-crop"[^>]*>[\s\S]*?<path\b[^>]*\bd="([^"]+)"/)
+  if (group) return group[1]
+  throw new Error(`crest SVG: no photo-crop path found (tried ids: ${PHOTO_CROP_IDS.join(', ')} + g#photo-crop)`)
+}
+
+/** cls-2 is the crop path's class: `{fill:none}` in the metal crests, but
+ *  the updated pristine crest strokes the photo window
+ *  (`stroke:#e6e6e6;stroke-width:20`) — captured for both surfaces. */
+function photoCropStroke(svg: string): { color: string; width: number } | null {
+  const cls2 = svg.match(/\.cls-2\{([^}]*)\}/)
+  if (!cls2) return null
+  const color = cls2[1].match(/stroke:(#[0-9a-fA-F]{6})/)
+  const width = cls2[1].match(/stroke-width:(\d+(?:\.\d+)?)/)
+  if (color && width) return { color: color[1].toLowerCase(), width: Number(width[1]) }
+  return null
 }
 
 function pickPlate(paths: Map<string, string>): string {
@@ -147,12 +168,13 @@ function guides(paths: Map<string, string>): CrestGuides {
 }
 
 function plateFill(svg: string): CrestPlateFill {
-  // Solid fill: the cls-1 class carries `fill:#rrggbb` (bronze/silver/gold).
-  const solid = svg.match(/\.cls-1\{fill:(#[0-9a-fA-F]{6})\}/)
+  // Solid fill: the cls-1 class carries `fill:#rrggbb` (bronze/silver/gold);
+  // trailing declarations (stroke etc.) are tolerated.
+  const solid = svg.match(/\.cls-1\{fill:(#[0-9a-fA-F]{6})[^}]*\}/)
   if (solid) return { kind: 'solid', hex: solid[1].toLowerCase() }
-  // Gradient fill (pristine): cls-1 references url(#id); parse the
-  // linearGradient's userSpaceOnUse line + ordered stops.
-  const gradRef = svg.match(/\.cls-1\{fill:url\(#([^)]+)\)\}/)
+  // Gradient fill (pristine): cls-1 references url(#id) — trailing
+  // declarations tolerated (the updated crest also strokes the plate).
+  const gradRef = svg.match(/\.cls-1\{fill:url\(#([^)]+)\)[^}]*\}/)
   if (gradRef) {
     const gid = gradRef[1]
     const grad = svg.match(new RegExp(`<linearGradient\\b[^>]*id="${gid}"[^>]*>`))
@@ -183,7 +205,8 @@ function parseCrest(tier: Tier, svg: string): CrestGeometry {
     tier,
     platePath: pickPlate(paths),
     plateFill: plateFill(svg),
-    photoCropPath: pickPhotoCrop(paths),
+    photoCropPath: pickPhotoCrop(paths, svg),
+    photoCropStroke: photoCropStroke(svg),
     guides: guides(paths),
   }
 }

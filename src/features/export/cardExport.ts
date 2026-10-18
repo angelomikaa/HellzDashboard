@@ -465,6 +465,14 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   scrimGrad.addColorStop(1, `rgba(0,0,0,${plan.scrim.alpha})`)
   ctx.fillStyle = scrimGrad
   ctx.fillRect(0, 0, width, height)
+  // The owner's decorative stroke on the photo window (updated pristine
+  // crest: #e6e6e6 @ 20, clipped to the crop → only the inner half shows —
+  // the same visual the SVG paints).
+  if (plan.crest.photoCropStroke !== null) {
+    ctx.strokeStyle = plan.crest.photoCropStroke.color
+    ctx.lineWidth = plan.crest.photoCropStroke.width * s
+    ctx.stroke(crop)
+  }
   ctx.restore()
 
   // --- Text content, positioned by the guideline rects (design space

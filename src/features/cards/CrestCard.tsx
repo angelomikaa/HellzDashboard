@@ -117,6 +117,16 @@ export function CrestCard({ data, className }: { data: CardExportData; className
         )}
         {/* Legibility scrim under the text bands (same spec the canvas paints). */}
         <rect x="0" y="0" width="1000" height="1000" fill={`url(#${scrimId})`} />
+        {/* The owner's decorative stroke on the photo window (updated
+            pristine crest) — clipped, so only the inner half shows. */}
+        {plan.crest.photoCropStroke !== null && (
+          <path
+            d={plan.crest.photoCropPath}
+            fill="none"
+            stroke={plan.crest.photoCropStroke.color}
+            strokeWidth={plan.crest.photoCropStroke.width}
+          />
+        )}
       </g>
 
       {/* OVR hero — inside the OVR-number guideline box. The stroked

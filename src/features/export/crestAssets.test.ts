@@ -33,13 +33,28 @@ describe('crestAssets — every crest parses completely (fail-fast contract)', (
   })
 
   it('normalizes the per-file photo-crop id drift through the selector map', () => {
-    // The four files name their crop layer differently (verified by hand:
+    // The files name their crop layer differently (verified by hand:
     // Photo-crop-path / Image-crop / Photo-clip-path / photo-crop) — the
     // parser must resolve ALL of them, and the extracted paths must differ
     // per tier (each crest has its own crop silhouette).
     const crops = TIERS.map((t) => CREST_GEOMETRY[t].photoCropPath)
     expect(new Set(crops).size).toBe(4)
     for (const d of crops) expect(d).toMatch(/^M/)
+  })
+
+  it('resolves the id-less crop path inside g#photo-crop (updated pristine crest)', () => {
+    // The owner's updated pristine crest dropped the crop path's id — the
+    // path now lives inside a `<g id="photo-crop">` group. The parser must
+    // still find it (group fallback), not just id-matched paths.
+    const pristine = CREST_GEOMETRY.platinum
+    expect(pristine.photoCropPath).toMatch(/^M/)
+    // The final owner re-export also dropped the photo-window stroke
+    // (cls-2 is back to plain `{fill:none}`) — no crest carries a crop
+    // stroke anymore; the parser stays generic (renders it if present).
+    expect(pristine.photoCropStroke).toBeNull()
+    expect(CREST_GEOMETRY.bronze.photoCropStroke).toBeNull()
+    expect(CREST_GEOMETRY.silver.photoCropStroke).toBeNull()
+    expect(CREST_GEOMETRY.gold.photoCropStroke).toBeNull()
   })
 })
 
@@ -70,14 +85,14 @@ describe('crestAssets — parsed geometry is sane (owner guideline contract)', (
     }
   })
 
-  it('parses the owner plate palette: solid hexes for the metals, the Soft_Spectrum gradient for Impecável', () => {
+  it('parses the owner plate palette: solid hexes for the metals, the gradient for Impecável', () => {
     expect(CREST_GEOMETRY.bronze.plateFill).toEqual({ kind: 'solid', hex: '#b58c58' })
     expect(CREST_GEOMETRY.silver.plateFill).toEqual({ kind: 'solid', hex: '#cccccc' })
     expect(CREST_GEOMETRY.gold.plateFill).toEqual({ kind: 'solid', hex: '#f9b745' })
     const pristine = CREST_GEOMETRY.platinum.plateFill
     expect(pristine.kind).toBe('gradient')
     if (pristine.kind === 'gradient') {
-      expect(pristine.stops.length).toBeGreaterThanOrEqual(3)
+      expect(pristine.stops.length).toBeGreaterThanOrEqual(2)
       expect(pristine.stops[0].color).toMatch(/^#[0-9a-f]{6}$/)
       // userSpaceOnUse gradient line inside the design space.
       expect(pristine.x1).toBeGreaterThanOrEqual(0)
