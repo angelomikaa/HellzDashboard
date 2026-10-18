@@ -23,6 +23,7 @@ import { OvrHero } from './OvrHero'
 import { TierLegend } from './TierLegend'
 import { FocusStrip } from './FocusStrip'
 import { CollapsibleGroup } from './CollapsibleGroup'
+import { CardPhotoUpload } from './CardPhotoUpload'
 
 // Enumeration-safe pt-BR copy (KeyStatsPage pattern): raw server text is
 // never rendered — errors map to one of two fixed strings.
@@ -119,6 +120,10 @@ export function DashboardPage({
             charClass={report.char_class}
             charFunction={report.char_function}
           />
+          {/* 07.2-05 round 3 (owner decision 1): the member's character-
+              screenshot upload — self-contained surface with its own data
+              calls, so the page's ONE-report-call discipline stays intact. */}
+          <CardPhotoUpload session={session} />
           <TierLegend />
           <FocusStrip stats={report.stats} onJump={handleFocusJump} />
           {GROUP_ORDER.map((group) => (

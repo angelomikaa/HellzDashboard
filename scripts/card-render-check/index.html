@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>card-render-check</title>
+    <!-- The REAL self-hosted Orbitron files (publicDir = public/) — the same
+         @font-face contract src/index.css declares, so the headless draw
+         exercises the actual font-loading path drawCard awaits. -->
+    <style>
+      @font-face { font-family: "Orbitron"; font-style: normal; font-weight: 600; src: url("/fonts/orbitron-latin-600.woff2") format("woff2"); }
+      @font-face { font-family: "Orbitron"; font-style: normal; font-weight: 700; src: url("/fonts/orbitron-latin-700.woff2") format("woff2"); }
+      @font-face { font-family: "Orbitron"; font-style: normal; font-weight: 900; src: url("/fonts/orbitron-latin-900.woff2") format("woff2"); }
+      body { background: #141414; color: #f0eded; }
+    </style>
+  </head>
+  <body>
+    <pre id="results">running</pre>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

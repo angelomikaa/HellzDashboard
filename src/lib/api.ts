@@ -490,3 +490,87 @@ export async function fetchKeyRelevantStats(session: NeoFootSession, className: 
   const rows = await parseBody<{ stat_key: string }[]>(res)
   return (rows ?? []).map((r) => r.stat_key)
 }
+
+// ---------------------------------------------------------------------------
+// 07.2-05 (checkpoint round 3, owner decision 2): the member's character
+// screenshot — clipped into the photo-crop layer of their crest card.
+// Supabase Storage (private bucket, RLS on storage.objects): a member can
+// write ONLY their own path (top-level folder = the JWT member_id claim);
+// every ACTIVE member can read (screenshots appear on showcase cards in
+// Destaques — that visibility IS the feature). Closed wrappers only — the
+// UI never builds storage URLs itself.
+//
+// IMPORTANT (T-072-13 canvas-taint): fetchCardPhoto returns a BLOB the UI
+// turns into an object URL — the member screenshot NEVER crosses into the
+// app as a cross-origin URL, so the JPEG export's toBlob can never be
+// tainted. No key-stat/config data touches this surface (identity comes
+// from the JWT server-side; the path is derived from session.member_id).
+// ---------------------------------------------------------------------------
+
+const CARD_PHOTO_BUCKET = 'card-photos'
+const CARD_PHOTO_OBJECT = 'card.jpg' // inside the member's own folder
+
+function cardPhotoPath(session: NeoFootSession): string {
+  return `${CARD_PHOTO_BUCKET}/${encodeURIComponent(session.member_id)}/${CARD_PHOTO_OBJECT}`
+}
+
+/** Storage fetch: same two gateway headers as restFetch, but the Storage
+ *  API path and pass-through body/content-type (uploads are raw image
+ *  bytes, not JSON). */
+async function storageFetch(session: NeoFootSession, path: string, init?: RequestInit): Promise<Response> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !anonKey) {
+    throw new ApiError(0, 'network', 'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+  let res: Response
+  try {
+    res = await fetch(`${supabaseUrl}/storage/v1/object/${path}`, {
+      ...init,
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${session.access_token}`,
+        ...init?.headers,
+      },
+    })
+  } catch (err) {
+    throw new ApiError(0, 'network', err instanceof Error ? err.message : 'network error')
+  }
+  return res
+}
+
+/** The member's own character screenshot, or null when none uploaded yet
+ *  (the 404 is the designed no-photo state — never an error). The blob is
+ *  same-origin-safe material for an object URL (canvas export). */
+export async function fetchCardPhoto(session: NeoFootSession): Promise<Blob | null> {
+  const res = await storageFetch(session, cardPhotoPath(session))
+  if (res.status === 404) return null
+  if (!res.ok) {
+    const kind = res.status === 401 ? 'unauthorized' : 'server'
+    throw new ApiError(res.status, kind, `HTTP ${res.status} fetching card photo`)
+  }
+  return await res.blob()
+}
+
+/** Upload/replace the member's screenshot (client-compressed JPEG — see
+ *  CardPhotoUpload). x-upsert makes re-uploads replace the object; RLS
+ *  refuses any path outside the member's own folder server-side. */
+export async function uploadCardPhoto(session: NeoFootSession, image: Blob): Promise<void> {
+  const res = await storageFetch(session, cardPhotoPath(session), {
+    method: 'POST',
+    headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+    body: image,
+  })
+  if (!res.ok) {
+    const kind = res.status === 401 ? 'unauthorized' : 'server'
+    throw new ApiError(res.status, kind, `HTTP ${res.status} uploading card photo`)
+  }
+}
+
+/** Remove the member's screenshot (a 404 — nothing stored — is success). */
+export async function deleteCardPhoto(session: NeoFootSession): Promise<void> {
+  const res = await storageFetch(session, cardPhotoPath(session), { method: 'DELETE' })
+  if (res.ok || res.status === 404) return
+  const kind = res.status === 401 ? 'unauthorized' : 'server'
+  throw new ApiError(res.status, kind, `HTTP ${res.status} removing card photo`)
+}
