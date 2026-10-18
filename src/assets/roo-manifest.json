@@ -9,7 +9,7 @@
     "slug": "lowercase class name, spaces -> hyphens"
   },
   "notes": [
-    "Portrait art exists for every transcendent job on the site EXCEPT Rebellion (the Gunslinger line p8 is completely omitted from the bundle � owner-confirmed). Rebellion portraits come from the repo research samples (assets/rebellion-f.png / assets/rebellion-m.png, byte-identical provenance to the site art) via the fetcher local-source copy.",
+    "Portrait art exists for every transcendent job on the site EXCEPT Rebellion (the Gunslinger line p8 is completely omitted from the bundle � owner-confirmed). The Rebellion research samples that once lived in assets/ were removed by the owner (2026-10-17): Rebellion portraits are now the DESIGNED-missing state — the committed copies under public/assets/classes/ stay intact, and a fetcher re-run reports them MISSING without failing (D-16).",
     "The site only provides SEVEN base-role icons (p1..p7) � there is no per-transcendent-class icon, so classes sharing a base line share the same icon (e.g. High Wizard and Professor both use the Mage icon). That is the site reality, not a mapping error.",
     "Bard is the male-only job of the Archer second line (site art p5_*_big_22): class-m-bard uses the male art; class-f-bard never occurs in-game (expected_missing). Gypsy is its female-only counterpart: class-f-gypsy uses the female art; class-m-gypsy never occurs in-game (expected_missing)."
   ],
@@ -231,14 +231,12 @@
       "slug": "rebellion",
       "files": {
         "class-f-rebellion.png": {
-          "local": "assets/rebellion-f.png",
           "expected_missing": true,
-          "reason": "the Gunslinger line (p8) is completely omitted from the roocamer surface (owner-confirmed) � the repo local research sample is the source"
+          "reason": "the Gunslinger line (p8) is completely omitted from the roocamer surface (owner-confirmed) � the repo samples were removed by the owner (2026-10-17); the committed public/assets/classes copies stay, and fetcher re-runs report MISSING (D-16)"
         },
         "class-m-rebellion.png": {
-          "local": "assets/rebellion-m.png",
           "expected_missing": true,
-          "reason": "the Gunslinger line (p8) is completely omitted from the roocamer surface (owner-confirmed) � the repo local research sample is the source"
+          "reason": "the Gunslinger line (p8) is completely omitted from the roocamer surface (owner-confirmed) � the repo samples were removed by the owner (2026-10-17); the committed public/assets/classes copies stay, and fetcher re-runs report MISSING (D-16)"
         },
         "class-icon-rebellion.png": {
           "expected_missing": true,
