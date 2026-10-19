@@ -164,6 +164,10 @@ export interface CardPlan {
     x: number
     y: number
     size: number
+    /** Fit bound for the big number (mirrors the job bound: from the slot's
+     *  x to the card's right margin minus 40). Never binds at 2-3 digits —
+     *  insurance for pathological inputs, shared by both surfaces. */
+    maxW: number
     jobText: string
     jobX: number
     jobY: number
@@ -215,6 +219,7 @@ export function buildCardPlan(data: CardExportData, width = CARD_DESIGN_WIDTH): 
     x: slots.ovr.x * scale,
     y: slots.ovr.y * scale,
     size: slots.ovr.size * scale,
+    maxW: (CARD_DESIGN_WIDTH - slots.ovr.x - 40) * scale,
     jobText: data.charClass,
     jobX: slots.job.x * scale,
     jobY: slots.job.y * scale,
@@ -311,6 +316,81 @@ export function cardFilename(name: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// THE SHARED FIT CONTRACT (round 6, the owner's overflow defect: "the card
+// is overflowing — the shape was reduced but the letters were not").
+//
+// Round 5's SVG side decided the textLength squeeze with a 0.62em advance
+// ESTIMATE — real Orbitron 700 advances are ~0.83em, so slots the estimate
+// passed ("88" at 128px: est 158px vs a 161px column) render ~213px wide on
+// the page and stick OUT of the plate silhouette, while the canvas side
+// (which always measured real metrics) fit fine. One contract for BOTH
+// surfaces now:
+//
+//   fitCardText: measure the string at its design size (REAL metrics —
+//   canvas measureText with loaded Orbitron); if it fits, render untouched;
+//   otherwise SHRINK THE FONT SIZE proportionally (glyph shape preserved —
+//   the owner's proportion/readability rule) down to a readability floor
+//   (CARD_FIT_FLOOR of the design size); only past the floor squeeze the
+//   glyphs horizontally (SVG textLength+spacingAndGlyphs / canvas x-scale)
+//   as the emergency clamp. Every slot thus fits its column at design
+//   scale, and the viewBox scales the whole composition at any width.
+
+/** Conservative advance estimate for when REAL metrics are unavailable
+ *  (non-browser test environments; the on-page font-load flash). Deliberately
+ *  WIDE (~0.8em ≈ real Orbitron's worst) — squeeze early rather than overflow. */
+export const estimateOrbitron = (text: string, _weight: number, size: number): number =>
+  text.length * size * 0.8
+
+export type TextMeasurer = (text: string, weight: number, size: number) => number
+
+/** Cached offscreen 2D context for real advance measurement. */
+let measureCtx: CanvasRenderingContext2D | null = null
+
+/** REAL Orbitron advance width (canvas measureText with the loaded font —
+ *  the exact numbers the canvas draw uses). Callers must ensure the card
+ *  fonts are loaded first (loadCardFonts / CardSvg's fonts.ready gate);
+ *  pre-load this measures the narrower fallback, so both call sites gate on
+ *  font readiness. Non-browser → the conservative estimate (pure tests). */
+export function measureOrbitron(text: string, weight: number, size: number): number {
+  if (typeof document === 'undefined') return estimateOrbitron(text, weight, size)
+  if (measureCtx === null) {
+    measureCtx = document.createElement('canvas').getContext('2d')
+    if (measureCtx === null) return estimateOrbitron(text, weight, size)
+  }
+  measureCtx.font = `${weight} ${size}px Orbitron`
+  return measureCtx.measureText(text).width
+}
+
+/** Readability floor: a fitted slot never shrinks below this fraction of its
+ *  design size; beyond it the emergency glyph-squeeze takes over. */
+export const CARD_FIT_FLOOR = 0.55
+
+export interface CardTextFit {
+  /** The size to render at (design/scaled units — same space as `size`). */
+  size: number
+  /** Emergency clamp: render the glyphs squeezed to exactly this width
+   *  (SVG textLength / canvas horizontal scale). Set only when the
+   *  readability floor could not fit the string. */
+  squeezeTo?: number
+}
+
+/** The ONE fit decision both surfaces share (see the section header). */
+export function fitCardText(
+  text: string,
+  weight: number,
+  size: number,
+  maxW: number,
+  measure: TextMeasurer = measureOrbitron,
+  floor: number = CARD_FIT_FLOOR,
+): CardTextFit {
+  const natural = measure(text, weight, size)
+  if (natural <= maxW) return { size }
+  const fitted = (size * maxW) / natural
+  if (fitted >= size * floor) return { size: fitted }
+  return { size: size * floor, squeezeTo: maxW }
+}
+
+// ---------------------------------------------------------------------------
 // DOM shell — everything below touches canvas/DOM only.
 
 /** Await the exact Orbitron weights the card paints with (round-2 lesson:
@@ -342,21 +422,34 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   })
 }
 
-/** Draw text shrunk-to-fit within maxWidth (names/values can be long). */
-function fitText(
+/** Paint one text slot under the SHARED fitCardText contract: fitted font
+ *  size (shrink-to-fit, readability floor); past the floor, the emergency
+ *  horizontal glyph-squeeze — the canvas twin of the SVG's textLength +
+ *  lengthAdjust="spacingAndGlyphs". `center` squeezes around the anchor
+ *  (the centered player name); otherwise the squeeze is anchored at x. */
+function paintFitted(
   ctx: CanvasRenderingContext2D,
   text: string,
-  maxWidth: number,
+  x: number,
+  y: number,
   weight: number,
   size: number,
-): number {
-  let px = size
-  ctx.font = `${weight} ${px}px Orbitron`
-  while (px > size * 0.4 && ctx.measureText(text).width > maxWidth) {
-    px -= size * 0.04
-    ctx.font = `${weight} ${px}px Orbitron`
+  maxW: number,
+  center = false,
+): void {
+  const fit = fitCardText(text, weight, size, maxW)
+  ctx.font = `${weight} ${fit.size}px Orbitron`
+  ctx.textAlign = center ? 'center' : 'left'
+  if (fit.squeezeTo === undefined) {
+    ctx.fillText(text, x, y)
+    return
   }
-  return px
+  const natural = ctx.measureText(text).width
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.scale(natural > 0 ? fit.squeezeTo / natural : 1, 1)
+  ctx.fillText(text, 0, 0)
+  ctx.restore()
 }
 
 /** Canvas gradient for the tier palette stops along the parsed border
@@ -445,37 +538,30 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
 
   // --- OVR block (over the photo): big number + job name below, NO "OVR"
   // tag. White with a shadow — same legibility contract the SVG's
-  // paint-order stroke delivers.
+  // paint-order stroke delivers. Both slots under the SHARED fit contract.
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
   ctx.shadowColor = 'rgba(0,0,0,0.65)'
   ctx.shadowBlur = 14 * s
-  ctx.font = `900 ${plan.ovr.size}px Orbitron`
   ctx.fillStyle = plan.ovr.color
-  ctx.fillText(plan.ovr.text, plan.ovr.x, plan.ovr.y)
-  fitText(ctx, plan.ovr.jobText, plan.ovr.jobMaxW, 700, plan.ovr.jobSize)
-  ctx.fillText(plan.ovr.jobText, plan.ovr.jobX, plan.ovr.jobY)
+  paintFitted(ctx, plan.ovr.text, plan.ovr.x, plan.ovr.y, 900, plan.ovr.size, plan.ovr.maxW)
+  paintFitted(ctx, plan.ovr.jobText, plan.ovr.jobX, plan.ovr.jobY, 700, plan.ovr.jobSize, plan.ovr.jobMaxW)
   ctx.shadowBlur = 0
   ctx.shadowColor = 'transparent'
 
   // --- Player name: on the plate, palette text fill, centered — the solid
   // card color guarantees contrast (no shadow needed).
-  ctx.textAlign = 'center'
   ctx.fillStyle = plan.name.color
-  fitText(ctx, plan.name.text, plan.name.maxWidth, 700, plan.name.size)
-  ctx.fillText(plan.name.text, plan.name.x, plan.name.y)
+  paintFitted(ctx, plan.name.text, plan.name.x, plan.name.y, 700, plan.name.size, plan.name.maxWidth, true)
 
   // --- The 6 key stats — one per parsed slot column (server order), each
-  // column a label / big points number / small raw value stack.
-  ctx.textAlign = 'left'
+  // column a label / big points number / small raw value stack, all under
+  // the SHARED fit contract (real metrics — the round-6 overflow fix).
   ctx.fillStyle = plan.palette.textFill
   for (const cell of plan.stats) {
-    fitText(ctx, cell.label, cell.labelMaxW, 700, cell.labelSize)
-    ctx.fillText(cell.label, cell.labelX, cell.labelY)
-    fitText(ctx, cell.points, cell.pointsMaxW, 700, cell.pointsSize)
-    ctx.fillText(cell.points, cell.pointsX, cell.pointsY)
-    fitText(ctx, cell.value, cell.valueMaxW, 600, cell.valueSize)
-    ctx.fillText(cell.value, cell.valueX, cell.valueY)
+    paintFitted(ctx, cell.label, cell.labelX, cell.labelY, 700, cell.labelSize, cell.labelMaxW)
+    paintFitted(ctx, cell.points, cell.pointsX, cell.pointsY, 700, cell.pointsSize, cell.pointsMaxW)
+    paintFitted(ctx, cell.value, cell.valueX, cell.valueY, 600, cell.valueSize, cell.valueMaxW)
   }
 
   // Hellz mark (brand anchor in the plate tip below the stat slots).

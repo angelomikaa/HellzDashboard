@@ -23,8 +23,11 @@
 //
 // The summary JSON lands in #results; the runner reads the DOM dumped by
 // Edge headless and asserts every probe passed.
+import { createElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import { buildCardPlan, drawCard, type CardExportData } from '../../src/features/export/cardExport'
 import { CARD_DESIGN_HEIGHT, CARD_DESIGN_WIDTH, CARD_GEOMETRY, TIER_PALETTE } from '../../src/features/export/cardAssets'
+import { CardSvg } from '../../src/features/cards/CardSvg'
 
 const base: CardExportData = {
   name: 'Maria Silva',
@@ -162,6 +165,143 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
   }
 }
 
+// ---------------------------------------------------------------------------
+// ON-PAGE SVG AUDIT (round 6, the owner's overflow defect: "the card is
+// overflowing — the shape was reduced but the letters were not").
+//
+// The canvas probes above only exercise the EXPORT surface; the owner saw
+// the overflow on the PAGE. This audit mounts the REAL CardSvg component
+// (the same <svg viewBox> composition the Destaques/Painel render) and
+// measures every text slot's RENDERED advance with the real loaded Orbitron
+// (getComputedTextLength — font-metric truth, in design-space user units,
+// independent of display size) against its column bound:
+//
+//  - slot fit: every text's rendered length ≤ its bound (label/points/value
+//    ≤ column width; name ≤ plate bound; OVR/job ≤ their bounds) — this is
+//    the assertion that would have caught the round-5 defect (the SVG-side
+//    0.62em advance estimate passed slots that REAL Orbitron metrics
+//    overflow: a 3-letter 72px label is ~162px wide, its column ~136px).
+//  - plate containment: name/stat glyphs stay inside the plate silhouette's
+//    inner span (60..1020 in design space).
+//  - scale tracking: the same SVG mounted at 360px and 720px container
+//    widths renders the name glyph box at exactly half/double the client
+//    width — text and card shape MUST scale together (this would have
+//    caught an HTML-overlay regression where text lives outside the SVG's
+//    coordinate space).
+const OVR_MAXW_DESIGN = CARD_DESIGN_WIDTH - CARD_GEOMETRY.slots.ovr.x - 40 // mirrors the job bound
+
+interface SlotExpectation {
+  text: string
+  maxW: number
+  x: number | null // null = centered (name) — plate-containment instead
+}
+
+async function auditMount(
+  width: number,
+  data: CardExportData,
+  expectNameClientW: boolean,
+): Promise<Record<string, unknown>> {
+  const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+  const expected: SlotExpectation[] = [
+    { text: plan.ovr.text, maxW: OVR_MAXW_DESIGN, x: plan.ovr.x },
+    { text: plan.ovr.jobText, maxW: plan.ovr.jobMaxW, x: plan.ovr.jobX },
+    { text: plan.name.text, maxW: plan.name.maxWidth, x: null },
+    ...plan.stats.flatMap((c) => [
+      { text: c.label, maxW: c.labelMaxW, x: c.labelX },
+      { text: c.points, maxW: c.pointsMaxW, x: c.pointsX },
+      { text: c.value, maxW: c.valueMaxW, x: c.valueX },
+    ]),
+  ]
+
+  const host = document.createElement('div')
+  host.style.width = `${width}px`
+  document.body.appendChild(host)
+  const root = createRoot(host)
+  root.render(createElement(CardSvg, { data }))
+  // Concurrent React commits via MessageChannel — timer ticks (NOT rAF:
+  // headless virtual time never pumps frames) are enough to flush the
+  // commit before measuring.
+  await new Promise<void>((resolve) => setTimeout(resolve, 150))
+  void fetch(`/__progress?audit=w${width}`, { method: 'POST', body: 'mounted' }).catch(() => {})
+
+  const svg = host.querySelector('svg')
+  const violations: string[] = []
+  let nameClientW = -1
+  if (!svg) {
+    violations.push('no <svg> mounted')
+  } else {
+    const texts = Array.from(svg.querySelectorAll('text'))
+    if (texts.length !== expected.length) {
+      violations.push(`expected ${expected.length} text nodes, found ${texts.length}`)
+    }
+    texts.forEach((t, i) => {
+      const exp = expected[i]
+      if (!exp) return
+      if (t.textContent !== exp.text) {
+        violations.push(`slot ${i}: content "${t.textContent}" ≠ expected "${exp.text}"`)
+        return
+      }
+      const len = t.getComputedTextLength()
+      // 4px: glyph INK boxes overshoot/undershoot the advance-width anchors
+      // by ~2-3px (side bearings) — the bounds are advance-based with an 8px
+      // gutter, so bearing-level excursions are typographically safe.
+      if (len > exp.maxW + 4) {
+        violations.push(`slot ${i} "${exp.text}": rendered ${len.toFixed(1)} > bound ${exp.maxW.toFixed(1)}`)
+      }
+      const bb = t.getBBox()
+      if (exp.x === null) {
+        // Centered name on the plate: glyphs must stay in the silhouette's
+        // inner span (plate interior 60..1020 in design space).
+        if (bb.x < 60 || bb.x + bb.width > 1020) {
+          violations.push(`name bbox ${bb.x.toFixed(1)}..${(bb.x + bb.width).toFixed(1)} leaves the plate span 60..1020`)
+        }
+      } else {
+        if (bb.x < exp.x - 4) {
+          violations.push(`slot ${i} starts at ${bb.x.toFixed(1)} < anchor ${exp.x.toFixed(1)}`)
+        }
+        if (bb.x + bb.width > exp.x + exp.maxW + 4) {
+          violations.push(`slot ${i} "${exp.text}" glyphs end at ${(bb.x + bb.width).toFixed(1)} > ${exp.x + exp.maxW}`)
+        }
+      }
+    })
+    if (expectNameClientW && texts[2]) {
+      nameClientW = texts[2].getBoundingClientRect().width
+    }
+  }
+  root.unmount()
+  host.remove()
+  return { containerWidth: width, texts: violations.length === 0 ? expected.length : 'violations', violations, nameClientW }
+}
+
+async function auditOnPage(): Promise<Record<string, unknown>> {
+  await Promise.all([
+    document.fonts.load('900 100px Orbitron'),
+    document.fonts.load('700 100px Orbitron'),
+    document.fonts.load('600 100px Orbitron'),
+  ])
+  await document.fonts.ready
+  const out: Record<string, unknown> = {}
+  // The showcase-data case (short name) and a stress case (long name — the
+  // clamp path) at TWO display widths each.
+  const showcase: CardExportData = { ...base, ovr: 87, photoSrc: '/assets/classes/class-icon-lord-knight.png' }
+  const stress: CardExportData = {
+    ...showcase,
+    name: 'Alexander von Hohenzollern-Sigmaringen',
+    stats: showcase.stats.map((s, i) => (i === 0 ? { ...s, value: '123.456' } : s)),
+  }
+  for (const width of [360, 720]) {
+    out[`w${width}`] = await auditMount(width, showcase, true)
+    out[`stressW${width}`] = await auditMount(width, stress, false)
+  }
+  // Scale tracking: the name glyph box must double exactly when the card
+  // container doubles (text lives IN the SVG's coordinate space).
+  const w360 = out.w360 as { nameClientW: number }
+  const w720 = out.w720 as { nameClientW: number }
+  const ratio = w720.nameClientW / w360.nameClientW
+  out.scaleTracking = { nameRatio360to720: Number(ratio.toFixed(4)), ok: Math.abs(ratio - 2) < 0.05 }
+  return out
+}
+
 async function main(): Promise<void> {
   try {
     const results: Record<string, unknown> = {}
@@ -194,6 +334,12 @@ async function main(): Promise<void> {
       document.fonts.check('900 100px Orbitron') &&
       document.fonts.check('700 100px Orbitron') &&
       document.fonts.check('600 100px Orbitron')
+    // The on-page SVG surface: real-metric slot-fit + scale-tracking audit.
+    try {
+      results.onPage = await auditOnPage()
+    } catch (err) {
+      results.onPage = { fatal: err instanceof Error ? err.message : String(err) }
+    }
     // Static design facts ride along (they pin the design-source wiring).
     results.meta = {
       designSize: `${CARD_DESIGN_WIDTH}x${CARD_DESIGN_HEIGHT}`,

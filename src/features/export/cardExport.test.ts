@@ -28,9 +28,14 @@ import {
   cardFilename,
   CARD_DESIGN_HEIGHT,
   CARD_DESIGN_WIDTH,
+  CARD_FIT_FLOOR,
   CARD_GEOMETRY,
+  estimateOrbitron,
+  fitCardText,
+  measureOrbitron,
   TIER_PALETTE,
   type CardExportData,
+  type TextMeasurer,
 } from './cardExport'
 
 const data: CardExportData = {
@@ -249,6 +254,68 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     } else {
       expect.fail('expected monogram photo fallback')
     }
+  })
+})
+
+describe('fitCardText — the round-6 shared fit contract (measured, not estimated)', () => {
+  // The REAL advance that caused the round-5 page overflow, measured in the
+  // headless harness: Orbitron 700 '88' at 128px rendered 213.5px — 0.834em
+  // per glyph, far wider than the 0.62em estimate the SVG squeeze used.
+  const realOrbitron: TextMeasurer = (text, _weight, size) => text.length * size * 0.834
+
+  it('shrinks a slot the old 0.62em estimate would have passed (the regression that hit Destaques)', () => {
+    // '88' points at 128px in the last column (bound 161): the estimate said
+    // 158.7 ≤ 161 → no squeeze → real render 213.5px, out of the plate.
+    const fit = fitCardText('88', 700, 128, 161, realOrbitron)
+    expect(fit.size).toBeLessThan(128)
+    expect(fit.squeezeTo).toBeUndefined()
+    // The fitted result MEASURES inside the bound (the contract's invariant).
+    expect(realOrbitron('88', 700, fit.size)).toBeLessThanOrEqual(161 + 1e-9)
+    // Same for the 3-letter labels that bled into the next column.
+    const label = fitCardText('PCB', 700, 72, 136.5, realOrbitron)
+    expect(label.size).toBeLessThan(72)
+    expect(realOrbitron('PCB', 700, label.size)).toBeLessThanOrEqual(136.5 + 1e-9)
+  })
+
+  it('keeps fitting text untouched (no distortion when the design size fits)', () => {
+    const narrow: TextMeasurer = (t, _w, s) => t.length * s * 0.5
+    const fit = fitCardText('87', 900, 256, 920, narrow)
+    expect(fit).toEqual({ size: 256 })
+  })
+
+  it('clamps at the readability floor and squeezes glyphs only past it (the emergency path)', () => {
+    const extreme: TextMeasurer = (t, _w, s) => t.length * s * 3
+    const fit = fitCardText('888', 700, 128, 161, extreme)
+    expect(fit.size).toBeCloseTo(128 * CARD_FIT_FLOOR, 6)
+    expect(fit.squeezeTo).toBe(161)
+    // A moderately long name shrinks WITHOUT reaching the floor.
+    const name = fitCardText('Maria Silva', 700, 128, 885, realOrbitron)
+    expect(name.size).toBeGreaterThan(128 * CARD_FIT_FLOOR)
+    expect(name.squeezeTo).toBeUndefined()
+  })
+
+  it('keeps the big points type readable under real Orbitron widths (≥ 8% of the card width)', () => {
+    // The 2-digit points hero number after fitting stays above the round-4
+    // readability lock (8% of 1080 = 86.4px at design scale).
+    const fit = fitCardText('88', 700, 128, 161, realOrbitron)
+    expect(fit.size / CARD_DESIGN_WIDTH).toBeGreaterThan(0.08)
+  })
+
+  it('bounds the OVR number (plan insurance shared by both surfaces)', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    expect(plan.ovr.maxW).toBeCloseTo(CARD_DESIGN_WIDTH - CARD_GEOMETRY.slots.ovr.x - 40, 6)
+    // The 2-3 digit OVR hero never binds at design size.
+    const fit = fitCardText(plan.ovr.text, 900, plan.ovr.size, plan.ovr.maxW)
+    expect(fit.size).toBe(plan.ovr.size)
+  })
+
+  it('measures real metrics in the browser and falls back to the conservative estimate outside it', () => {
+    // In vitest there is no 2D canvas → the measurer degrades to the
+    // deliberately-wide estimate (never zero, never NaN).
+    const w = measureOrbitron('PCB', 700, 72)
+    expect(w).toBeGreaterThan(0)
+    expect(Number.isFinite(w)).toBe(true)
+    expect(w).toBe(estimateOrbitron('PCB', 700, 72))
   })
 })
 

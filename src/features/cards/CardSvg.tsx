@@ -31,27 +31,75 @@
 // svg is decorative (aria-hidden) because every consumer labels the
 // surrounding article.
 //
-// Overflow guards: the canvas shell shrinks long text via fitText (measure
-// + shrink); SVG has no measuring, so text that would overflow its slot
-// gets textLength + lengthAdjust="spacingAndGlyphs" (a condensed squeeze —
-// the same visual contract: the text stays inside its column).
-import { useId, useMemo } from 'react'
-import { buildCardPlan, type CardExportData } from '../export/cardExport'
-
-/** Orbitron's average advance ≈ 0.62em — the estimate that decides whether
- *  a string needs the squeeze (slightly conservative: squeeze a touch early
- *  rather than overflow past the next column). */
-const overflows = (text: string, size: number, maxWidth: number): boolean =>
-  text.length * size * 0.62 > maxWidth
-
-const squeeze = (text: string, size: number, maxWidth: number): number | undefined =>
-  overflows(text, size, maxWidth) ? maxWidth : undefined
+// Overflow guards (round 6 — the owner's overflow defect fix): the canvas
+// shell and this component share ONE fit contract (cardExport.fitCardText):
+// REAL Orbitron advance metrics (canvas measureText with the loaded font —
+// the round-5 0.62em estimate passed slots real Orbitron overflows: a
+// 2-digit points number rendered ~213px into a ~161px column and out of the
+// plate). Every slot shrinks its font size proportionally to fit its column
+// (readability floor), with a textLength glyph-squeeze only as the emergency
+// clamp past the floor. Text lives INSIDE the <svg viewBox> coordinate
+// space, so the fitted composition scales with the card at any width.
+import { useEffect, useId, useMemo, useState } from 'react'
+import {
+  buildCardPlan,
+  estimateOrbitron,
+  fitCardText,
+  measureOrbitron,
+  type CardExportData,
+  type CardTextFit,
+  type TextMeasurer,
+} from '../export/cardExport'
 
 export function CardSvg({ data, className }: { data: CardExportData; className?: string }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
   // The plan at the design space's own width — the <svg viewBox> does the
   // responsive mapping for free (canvas's scalePath job, done by the browser).
   const plan = useMemo(() => buildCardPlan(data, 1080), [data])
+
+  // Real-metric fitting needs the loaded Orbitron (before that, measureText
+  // measures the narrower fallback and under-fits). Gate the measurer on the
+  // exact card weights + document.fonts.ready; until ready, the conservative
+  // 0.8em estimate squeezes early rather than overflowing during the flash.
+  const [fontsReady, setFontsReady] = useState(false)
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      document.fonts.load('900 100px Orbitron'),
+      document.fonts.load('700 48px Orbitron'),
+      document.fonts.load('600 26px Orbitron'),
+    ])
+      .then(() => document.fonts.ready)
+      .then(() => {
+        if (alive) setFontsReady(true)
+      })
+      .catch(() => {
+        // Progressive enhancement: fit with whatever measurer is available.
+        if (alive) setFontsReady(true)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+  const measure: TextMeasurer = fontsReady ? measureOrbitron : estimateOrbitron
+
+  // THE shared fit contract (cardExport.fitCardText) applied per slot — the
+  // SAME decision the canvas export paints with (identical measurer, floor,
+  // clamp): on-page card and downloaded JPEG cannot drift apart.
+  const fits = useMemo(
+    () => ({
+      ovr: fitCardText(plan.ovr.text, 900, plan.ovr.size, plan.ovr.maxW, measure),
+      job: fitCardText(plan.ovr.jobText, 700, plan.ovr.jobSize, plan.ovr.jobMaxW, measure),
+      name: fitCardText(plan.name.text, 700, plan.name.size, plan.name.maxWidth, measure),
+      stats: plan.stats.map((c) => ({
+        label: fitCardText(c.label, 700, c.labelSize, c.labelMaxW, measure),
+        points: fitCardText(c.points, 700, c.pointsSize, c.pointsMaxW, measure),
+        value: fitCardText(c.value, 600, c.valueSize, c.valueMaxW, measure),
+      })),
+    }),
+    [plan, measure],
+  )
+  const textLengthOf = (fit: CardTextFit): number | undefined => fit.squeezeTo
   const plateClipId = `card-plate-clip-${uid}`
   const cropClipId = `card-crop-clip-${uid}`
   const borderGradId = `card-border-grad-${uid}`
@@ -153,11 +201,13 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         <text
           x={plan.ovr.x}
           y={plan.ovr.y}
-          fontSize={plan.ovr.size}
+          fontSize={fits.ovr.size}
           fontWeight="900"
+          textLength={textLengthOf(fits.ovr)}
+          lengthAdjust="spacingAndGlyphs"
           stroke="#000000"
           strokeOpacity="0.55"
-          strokeWidth={plan.ovr.size * 0.06}
+          strokeWidth={fits.ovr.size * 0.06}
           paintOrder="stroke"
         >
           {plan.ovr.text}
@@ -165,13 +215,13 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         <text
           x={plan.ovr.jobX}
           y={plan.ovr.jobY}
-          fontSize={plan.ovr.jobSize}
+          fontSize={fits.job.size}
           fontWeight="700"
-          textLength={squeeze(plan.ovr.jobText, plan.ovr.jobSize, plan.ovr.jobMaxW)}
+          textLength={textLengthOf(fits.job)}
           lengthAdjust="spacingAndGlyphs"
           stroke="#000000"
           strokeOpacity="0.55"
-          strokeWidth={plan.ovr.jobSize * 0.12}
+          strokeWidth={fits.job.size * 0.12}
           paintOrder="stroke"
         >
           {plan.ovr.jobText}
@@ -186,10 +236,10 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         y={plan.name.y}
         textAnchor="middle"
         fontFamily="Orbitron, sans-serif"
-        fontSize={plan.name.size}
+        fontSize={fits.name.size}
         fontWeight="700"
         fill={plan.name.color}
-        textLength={squeeze(plan.name.text, plan.name.size, plan.name.maxWidth)}
+        textLength={textLengthOf(fits.name)}
         lengthAdjust="spacingAndGlyphs"
       >
         {plan.name.text}
@@ -203,9 +253,9 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           <text
             x={cell.labelX}
             y={cell.labelY}
-            fontSize={cell.labelSize}
+            fontSize={fits.stats[i].label.size}
             fontWeight="700"
-            textLength={squeeze(cell.label, cell.labelSize, cell.labelMaxW)}
+            textLength={textLengthOf(fits.stats[i].label)}
             lengthAdjust="spacingAndGlyphs"
           >
             {cell.label}
@@ -213,9 +263,9 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           <text
             x={cell.pointsX}
             y={cell.pointsY}
-            fontSize={cell.pointsSize}
+            fontSize={fits.stats[i].points.size}
             fontWeight="700"
-            textLength={squeeze(cell.points, cell.pointsSize, cell.pointsMaxW)}
+            textLength={textLengthOf(fits.stats[i].points)}
             lengthAdjust="spacingAndGlyphs"
           >
             {cell.points}
@@ -223,9 +273,9 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           <text
             x={cell.valueX}
             y={cell.valueY}
-            fontSize={cell.valueSize}
+            fontSize={fits.stats[i].value.size}
             fontWeight="600"
-            textLength={squeeze(cell.value, cell.valueSize, cell.valueMaxW)}
+            textLength={textLengthOf(fits.stats[i].value)}
             lengthAdjust="spacingAndGlyphs"
           >
             {cell.value}
