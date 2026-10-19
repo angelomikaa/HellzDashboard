@@ -1,43 +1,47 @@
-// cardExport.ts — the card JPEG export (plan 07.2-05, CARD-03 / D-09 /
-// D-10 / D-12; checkpoint round 5, owner supersession: "this one file
-// [card.svg] becomes the source of truth for card design"). Zero new npm
-// dependencies (v1.1 invariant): native Canvas 2D + Path2D + the already
-// self-hosted Orbitron woff2 + brand mark.
+// cardExport.ts — the card PNG export (plan 07.2-05, CARD-03 / D-09 /
+// D-10 / D-12; checkpoint round 7, owner supersession: ONE card.svg
+// [src/assets/card.svg] becomes the source of truth for card design —
+// placeholder TEXT slots filled by code, crop-path photo area, Bebas Neue
+// everywhere except the player name (Orbitron), detached border over the
+// crop, central column alignment, PNG export with NO background (the
+// shield plate paints; everything outside it is transparent). Zero new npm
+// dependencies (v1.1 invariant): native Canvas 2D + Path2D + the self-hosted
+// Orbitron woff2 + Bebas Neue (Google Fonts @import in src/index.css —
+// graceful fallback to Orbitron if it cannot load) + brand mark.
 //
-// ROUND 5 (owner verdict on round 4: "i couldnt get my idea through — check
-// the new card.svg"): ONE design file for every tier. The parser
-// (cardAssets.ts) extracts the plate silhouette, the crop-path photo area,
-// the border-stroke geometry, and ALL placeholder TEXT slots (OVR / job /
-// PLAYERNAME / 6 positional stat slots). Everything the round-4 per-tier
-// SVGs carried that was COLOR now lives in code (TIER_PALETTE): plate fill,
-// border gradient stops, text fill. Composition rules:
+// ROUND 7 (owner verdict on round 6: "the card is overflowing ... keep a
+// matching proportion and readability", then the new seeded card.svg):
 //   1. The member's screenshot is CLIPPED TO THE CROP PATH (round 5 brought
 //      the crop path back — there are no guideline rects/safe areas).
 //   2. Text slots are POSITIONAL: the parser's slot positions/sizes ARE the
 //      layout. Code fills OVR + job (top-left, over the photo), PLAYERNAME
 //      (on the plate), and the six stat columns (label / points / raw
 //      own_value each).
-//   3. Fonts: Bebas Neue was a placeholder — the site's Orbitron renders
-//      everywhere (OVR number in 900, points/name/labels 700, values 600).
-//      Orbitron is WIDER than Bebas, so every slot carries a fitText
-//      maxWidth (shrink-to-fit) — the design positions are honored, the
-//      type never overflows its column.
-//   4. The PLAYERNAME slot is re-centered horizontally (the file's x=285
-//      anchors a left-aligned Bebas string; a centered Orbitron name reads
-//      as designed for any name length). Recorded as a round-5 decision.
+//   3. Fonts: Bebas Neue for every slot EXCEPT the player name (Orbitron).
+//      Bebas Neue is WIDER than the old estimates, so every slot carries a
+//      fitText maxWidth — the design positions are honored, the type never
+//      overflows its column, and every slot shrinks proportionally
+//      (matching proportion, readability floor, emergency squeeze last).
+//   4. The PLAYERNAME slot is Orbitron, centered on the plate's horizontal
+//      midline (the file's parsed x anchors the placeholder's left edge —
+//      the owner drew 'PLAYERNAME' centered on the shield).
+//   5. The stat columns are CENTRALLY aligned: number / label / value share
+//      one center x per column (the owner's proportion rule).
+//   6. Export is a PNG with NO background: canvas starts transparent, only
+//      the shield plate path paints — nothing fills outside it.
 //
 // ONE PLAN, TWO SURFACES: buildCardPlan is the pure layout core; BOTH the
 // on-page <svg> (CardSvg.tsx) and this canvas shell consume the SAME plan
 // object — same path strings, same slot positions, same colors — so the
-// downloaded JPEG is the on-page card by construction.
+// downloaded PNG is the on-page card by construction.
 //
 // Round-2 lessons KEPT: fail-fast aspect gate (27:40 — the card.svg design
 // space), document.fonts await before first draw, scalePath mapping of
 // design-space paths onto the backing store (Canvas 2D has no viewBox).
 //
-// Export content contract (D-09/T-072-12 — the JPEG circulates OUTSIDE the
-// guild): identity (name, OVR + job name) + the 6 key stats (3-letter label
-// + points + formatted own_value) + Hellz mark. NO guild-average data of
+// Export content contract (D-09/T-072-12 — the PNG circulates OUTSIDE the
+// guild): identity (name, OVR + job name) + the 6 key stats (label +
+// points + formatted own_value) + Hellz mark. NO guild-average data of
 // any kind — the stat-slot field list is closed and cannot express an
 // aggregate. NO "OVR" tag (round 4 decision, held).
 //
@@ -67,7 +71,7 @@ import {
 // ---------------------------------------------------------------------------
 // Closed data contract (what callers assemble — PromotionCard from get_promotion
 // rows, the Painel card from my_card; values arrive PRE-FORMATTED strings).
-// Round 5: no per-stat tier field — the design renders points as palette
+// Round 7: no per-stat tier field — the design renders points as palette
 // text, there are no tier-colored chips in card.svg.
 export interface CardExportStat {
   label_short: string
@@ -92,6 +96,13 @@ const OVR_TEXT_COLOR = '#FFFFFF' // over the photo — white + shadow, every tie
 const MONOGRAM_TILE = '#1E1E1E'
 const MONOGRAM_TEXT = '#9A8F8F'
 
+/** The font split (round 7 owner decision): Bebas Neue everywhere except
+ *  the player name, which stays Orbitron. Bebas loads from Google Fonts
+ *  (src/index.css @import); if it cannot load, the SVG font stacks fall
+ *  through to Orbitron and the canvas falls back to the system sans — the
+ *  fit contract keeps every slot inside its column either way. */
+export const CARD_FONTS = { slots: 'Bebas Neue', name: 'Orbitron' } as const
+
 /** Top legibility scrim for the OVER-PHOTO OVR block: black fading out
  *  downward from the photo's top edge. Covers the OVR number + job name
  *  (65% of the crop area's height). Fractions of the crop bbox; the same
@@ -99,40 +110,45 @@ const MONOGRAM_TEXT = '#9A8F8F'
 const SCRIM = { heightFraction: 0.65, alpha: 0.55 } as const
 
 /** The Hellz brand mark, centered in the plate tip below the stat slots
- *  (kept from rounds 3-4; card.svg has no mark slot — this is an additive
+ *  (kept from rounds 3-6; card.svg has no mark slot — this is an additive
  *  brand anchor, not part of the design-space contract). */
 const MARK = { y: 1408, size: 54 } as const
 
 // ---------------------------------------------------------------------------
 // Layout plan. The design space is card.svg's own 1080×1600 viewBox; every
 // number scales linearly with the requested width, so
-// buildCardPlan(…, w) is exact at any resolution (downloadCard paints at 2×
-// for retina crispness). Content positions are the PARSED SLOT POSITIONS —
-// the owner's placement authority.
-
+// buildCardPlan(…, w) is exact at any resolution (downloadCard paints at
+// 2× for retina crispness). Content positions are the PARSED SLOT POSITIONS
+// — the owner's placement authority. Stat columns are CENTRALLY aligned:
+// label / points / value share one center x per column (parsed label x),
+// column width = gap to the next column's center minus a gutter.
 export type CardPlanPhoto =
   | { kind: 'image'; src: string }
   | { kind: 'monogram'; letter: string }
 
 export interface CardPlanStatSlot {
-  label: string
   /** Alphabetic-baseline text anchors (scaled design space) + fitText
    *  bounds. Points = the big rounded rank number (or '—'); value = the
-   *  formatted raw own_value. */
-  labelX: number
+   *  formatted raw own_value. All three lines share centerX / colW and are
+   *  rendered centrally aligned on the column center (round 7). */
+  label: string
   labelY: number
   labelSize: number
   labelMaxW: number
   points: string
-  pointsX: number
   pointsY: number
   pointsSize: number
   pointsMaxW: number
   value: string
-  valueX: number
   valueY: number
   valueSize: number
   valueMaxW: number
+  /** Column center x (scaled design space) — every line in the column
+   *  renders centered here (round 7 central alignment). */
+  centerX: number
+  /** Column width bound (scaled design space) — gap to the next column's
+   *  center minus a gutter. fitCardText shrinks proportionally to fit. */
+  colW: number
 }
 
 export interface CardPlan {
@@ -146,6 +162,10 @@ export interface CardPlan {
   /** The tier's CODE-DRIVEN palette (plate fill / border stops / text
    *  fill) applied over the one shared geometry. */
   palette: TierPalette
+  /** The card's FONT SPLIT (round 7): Bebas Neue for every slot EXCEPT the
+   *  player name (Orbitron). Both surfaces read the families from here so
+   *  the split cannot drift between the SVG and the canvas. */
+  fonts: { slots: string; name: string }
   /** scale = width / CARD_DESIGN_WIDTH — the one number every consumer
    *  multiplies design-space values by. */
   scale: number
@@ -164,9 +184,6 @@ export interface CardPlan {
     x: number
     y: number
     size: number
-    /** Fit bound for the big number (mirrors the job bound: from the slot's
-     *  x to the card's right margin minus 40). Never binds at 2-3 digits —
-     *  insurance for pathological inputs, shared by both surfaces. */
     maxW: number
     jobText: string
     jobX: number
@@ -175,11 +192,13 @@ export interface CardPlan {
     jobMaxW: number
     color: string
   }
-  /** Player name — on the plate between photo and stats, palette text
-   *  fill, centered (round-5 decision). */
+  /** Player name — ORBITRON on the plate between photo and stats, palette
+   *  text fill, centered on the plate's horizontal midline (round 7 — the
+   *  parsed x anchors the placeholder's left edge, not the center). */
   name: { text: string; x: number; y: number; size: number; color: string; maxWidth: number }
   /** The 6 key stats in SERVER/highlight order, one per parsed slot
-   *  column, each a self-contained label/points/value group. */
+   *  column, each a self-contained label/points/value group — all three
+   *  lines centrally aligned on the column center (round 7). */
   stats: CardPlanStatSlot[]
   mark: { src: string; x: number; y: number; size: number }
   colors: {
@@ -199,8 +218,19 @@ function tierOf(ovr: number): Tier {
  * Build the full card layout plan. PURE — no canvas, no DOM, no I/O. The
  * 27:40 portrait aspect is structural: height === width × 1600/1080 at ANY
  * width.
+ *
+ * `measure` (default measureBebas) resolves the stat COLUMN CENTERS: the
+ * file's points placeholders are the same '99' string in every column, so
+ * each column's center = points anchor + width('99')/2 (design space).
+ * Callers that gate on font readiness pass their gated measurer so the
+ * centers use real metrics once the fonts land (before that, the
+ * conservative estimate shifts all columns uniformly by <1% and corrects).
  */
-export function buildCardPlan(data: CardExportData, width = CARD_DESIGN_WIDTH): CardPlan {
+export function buildCardPlan(
+  data: CardExportData,
+  width = CARD_DESIGN_WIDTH,
+  measure: (text: string, weight: number, size: number) => number = measureBebas,
+): CardPlan {
   const tier = tierOf(data.ovr)
   const card = CARD_GEOMETRY
   const palette = TIER_PALETTE[tier]
@@ -210,10 +240,25 @@ export function buildCardPlan(data: CardExportData, width = CARD_DESIGN_WIDTH): 
   const photoBBox = scaleRect(card.cropBBox, scale)
   const slots = card.slots
 
+  // Column centers (round 7 central alignment): the points placeholder
+  // '99' is the SAME string in every column, so the column center =
+  // points anchor + width('99')/2 in design space — the owner's evenly
+  // pitched center grid (parse-locked in cardAssets). Column width bound =
+  // the span to the neighboring centers minus a gutter. Every line in a
+  // column renders centered at its centerX.
+  const centers = slots.stats.map(
+    (slot) => slot.points.x + measure('99', 400, slot.points.size) / 2,
+  )
+  const colWs = centers.map((x, i) => {
+    const leftGap = i === 0 ? 0 : x - centers[i - 1]
+    const rightGap = i === centers.length - 1 ? 0 : centers[i + 1] - x
+    const span = i === 0 ? rightGap : i === centers.length - 1 ? leftGap : (leftGap + rightGap) / 2
+    return span - 8
+  })
+
   // OVR block: the parsed slot (top-left, over the photo) — big number +
   // JOB NAME below, NO "OVR" tag (round 4). White with a shadow, backed by
-  // the top scrim. The job name shrinks to fit from its x to the card's
-  // right margin.
+  // the top scrim.
   const ovr = {
     text: String(Math.round(data.ovr)),
     x: slots.ovr.x * scale,
@@ -228,45 +273,45 @@ export function buildCardPlan(data: CardExportData, width = CARD_DESIGN_WIDTH): 
     color: OVR_TEXT_COLOR,
   }
 
-  // Player name: the parsed slot's baseline/size, RE-CENTERED horizontally
-  // (round-5 decision — the file's x anchors a left-aligned Bebas string).
+  // Player name: ORBITRON (round 7), the parsed slot's baseline/size,
+  // CENTERED on the plate bbox's horizontal midline — the file's parsed x
+  // anchors the LEFT edge of the 'PLAYERNAME' placeholder, which the owner
+  // drew centered on the shield (spans ~246..~830 → center ≈ the plate
+  // midline ≈539.5). Centering at the raw anchor would hang the name off
+  // the plate's left edge (headless-audit-proven). The fit bound is
+  // symmetric inside the plate's inner span (gutter 14px per side) — a
+  // long name squeezes INTO the shield, never past it.
+  const plateMidX = (card.plateBBox.x + card.plateBBox.w / 2) * scale
+  const plateInnerL = (card.plateBBox.x + 14) * scale
+  const plateInnerR = (card.plateBBox.x + card.plateBBox.w - 14) * scale
   const name = {
     text: data.name,
-    x: width / 2,
+    x: plateMidX,
     y: slots.name.y * scale,
     size: slots.name.size * scale,
     color: palette.textFill,
-    maxWidth: CARD_DESIGN_WIDTH * 0.82 * scale,
+    maxWidth: 2 * Math.min(plateMidX - plateInnerL, plateInnerR - plateMidX),
   }
 
-  // Stat slots: parsed positions verbatim; each column's fitText bound is
-  // the distance to the NEXT column's label (the last runs to the plate's
-  // inner right edge, mirrored from the crop bbox's left margin) minus a
-  // real gutter — Orbitron is wider than the placeholder Bebas, so the
-  // shrink-to-fit contract is what keeps the six columns collision-free.
+  // Stat slots: parsed positions verbatim; every line centered on the
+  // column centerX; fitText bound = column width minus gutter.
   const statSlots: CardPlanStatSlot[] = data.stats.map((stat, i) => {
     const slot = slots.stats[i]
-    const nextX =
-      i < slots.stats.length - 1
-        ? slots.stats[i + 1].label.x
-        : CARD_DESIGN_WIDTH - card.cropBBox.x // mirrored left margin
-    const colW = (nextX - slot.label.x - 8) * scale
     return {
       label: stat.label_short,
-      labelX: slot.label.x * scale,
       labelY: slot.label.y * scale,
       labelSize: slot.label.size * scale,
-      labelMaxW: colW,
+      labelMaxW: colWs[i] * scale,
       points: stat.points === null ? '—' : String(Math.round(stat.points)),
-      pointsX: slot.points.x * scale,
       pointsY: slot.points.y * scale,
       pointsSize: slot.points.size * scale,
-      pointsMaxW: colW,
+      pointsMaxW: colWs[i] * scale,
       value: stat.value,
-      valueX: slot.value.x * scale,
       valueY: slot.value.y * scale,
       valueSize: slot.value.size * scale,
-      valueMaxW: colW,
+      valueMaxW: colWs[i] * scale,
+      centerX: centers[i] * scale,
+      colW: colWs[i] * scale,
     }
   })
 
@@ -281,6 +326,7 @@ export function buildCardPlan(data: CardExportData, width = CARD_DESIGN_WIDTH): 
     tier,
     card,
     palette,
+    fonts: CARD_FONTS,
     scale,
     photo,
     photoClipPath: card.cropPath,
@@ -302,42 +348,26 @@ export function buildCardPlan(data: CardExportData, width = CARD_DESIGN_WIDTH): 
 }
 
 // ---------------------------------------------------------------------------
-// Export filename: 'hellz-<slugified name>.jpg' — diacritics stripped
-// (NFD → combining marks removed), non-alphanumerics collapsed to single
-// hyphens, no leading/trailing hyphen.
-export function cardFilename(name: string): string {
-  const slug = name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  return `hellz-${slug}.jpg`
-}
-
-// ---------------------------------------------------------------------------
-// THE SHARED FIT CONTRACT (round 6, the owner's overflow defect: "the card
-// is overflowing — the shape was reduced but the letters were not").
-//
-// Round 5's SVG side decided the textLength squeeze with a 0.62em advance
-// ESTIMATE — real Orbitron 700 advances are ~0.83em, so slots the estimate
-// passed ("88" at 128px: est 158px vs a 161px column) render ~213px wide on
-// the page and stick OUT of the plate silhouette, while the canvas side
-// (which always measured real metrics) fit fine. One contract for BOTH
-// surfaces now:
+// THE SHARED FIT CONTRACT (rounds 6-7: "the card is overflowing — the shape
+// was reduced but the letters were not" → keep a matching proportion and
+// readability).
 //
 //   fitCardText: measure the string at its design size (REAL metrics —
-//   canvas measureText with loaded Orbitron); if it fits, render untouched;
+//   canvas measureText with the LOADED font); if it fits, render untouched;
 //   otherwise SHRINK THE FONT SIZE proportionally (glyph shape preserved —
 //   the owner's proportion/readability rule) down to a readability floor
 //   (CARD_FIT_FLOOR of the design size); only past the floor squeeze the
 //   glyphs horizontally (SVG textLength+spacingAndGlyphs / canvas x-scale)
 //   as the emergency clamp. Every slot thus fits its column at design
-//   scale, and the viewBox scales the whole composition at any width.
-
+//   scale, and the viewBox/canvas scales the whole composition at any width.
 /** Conservative advance estimate for when REAL metrics are unavailable
- *  (non-browser test environments; the on-page font-load flash). Deliberately
- *  WIDE (~0.8em ≈ real Orbitron's worst) — squeeze early rather than overflow. */
+ *  (non-browser test environments; the on-page font-load flash). Bebas is
+ *  NARROW-ish but tall: ~0.5em per char over-estimates the real advances of
+ *  caps/digits (verified against a real render in scripts/card-render-check,
+ *  which asserts estimate ≥ real for the live label widths) — squeeze early
+ *  rather than overflow, but never crush 4–6-char labels to the floor. */
+export const estimateBebas = (text: string, _weight: number, size: number): number =>
+  text.length * size * 0.5
 export const estimateOrbitron = (text: string, _weight: number, size: number): number =>
   text.length * size * 0.8
 
@@ -361,9 +391,36 @@ export function measureOrbitron(text: string, weight: number, size: number): num
   return measureCtx.measureText(text).width
 }
 
+/** REAL Bebas Neue advance width (canvas measureText with the loaded font —
+ *  Bebas is WIDER than the old placeholder estimates; real metrics keep the
+ *  stat columns collision-free). Same readiness contract as measureOrbitron. */
+export function measureBebas(text: string, _weight: number, size: number): number {
+  if (typeof document === 'undefined') return estimateBebas(text, _weight, size)
+  if (measureCtx === null) {
+    measureCtx = document.createElement('canvas').getContext('2d')
+    if (measureCtx === null) return estimateBebas(text, _weight, size)
+  }
+  measureCtx.font = `400 ${size}px "Bebas Neue"`
+  return measureCtx.measureText(text).width
+}
+
 /** Readability floor: a fitted slot never shrinks below this fraction of its
  *  design size; beyond it the emergency glyph-squeeze takes over. */
 export const CARD_FIT_FLOOR = 0.55
+
+// ---------------------------------------------------------------------------
+// Export filename: 'hellz-<slugified name>.png' — diacritics stripped
+// (NFD → combining marks removed), non-alphanumerics collapsed to single
+// hyphens, no leading/trailing hyphen.
+export function cardFilename(name: string): string {
+  const slug = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return `hellz-${slug}.png`
+}
 
 export interface CardTextFit {
   /** The size to render at (design/scaled units — same space as `size`). */
@@ -393,16 +450,16 @@ export function fitCardText(
 // ---------------------------------------------------------------------------
 // DOM shell — everything below touches canvas/DOM only.
 
-/** Await the exact Orbitron weights the card paints with (round-2 lesson:
- *  without this the first export renders the fallback font). Also awaits
+/** Await the exact fonts the card paints with (round-2 lesson: without this
+ *  the first export renders the fallback font). Also awaits
  *  document.fonts.ready — belt-and-braces so a pending @font-face load can
  *  never race the first draw. Best-effort: a rejected load never blocks. */
 async function loadCardFonts(): Promise<void> {
   try {
     await Promise.all([
-      document.fonts.load('900 160px Orbitron'),
+      document.fonts.load('400 48px Bebas Neue'),
+      document.fonts.load('400 128px Bebas Neue'),
       document.fonts.load('700 48px Orbitron'),
-      document.fonts.load('600 26px Orbitron'),
     ])
     await document.fonts.ready
   } catch {
@@ -425,20 +482,25 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
 /** Paint one text slot under the SHARED fitCardText contract: fitted font
  *  size (shrink-to-fit, readability floor); past the floor, the emergency
  *  horizontal glyph-squeeze — the canvas twin of the SVG's textLength +
- *  lengthAdjust="spacingAndGlyphs". `center` squeezes around the anchor
- *  (the centered player name); otherwise the squeeze is anchored at x. */
+ *  lengthAdjust="spacingAndGlyphs". `center` squeezes AROUND the anchor
+ *  (translate → scale → fillText(0,0) with textAlign 'center'): the glyphs
+ *  compress symmetrically about the column center, never sliding left —
+ *  the round-7 central-alignment rule survives the emergency clamp. */
 function paintFitted(
   ctx: CanvasRenderingContext2D,
   text: string,
   x: number,
   y: number,
+  family: string,
   weight: number,
   size: number,
   maxW: number,
   center = false,
 ): void {
-  const fit = fitCardText(text, weight, size, maxW)
-  ctx.font = `${weight} ${fit.size}px Orbitron`
+  const fit = fitCardText(text, weight, size, maxW, (t, w, s) =>
+    family === CARD_FONTS.slots ? measureBebas(t, w, s) : measureOrbitron(t, w, s),
+  )
+  ctx.font = `${weight} ${fit.size}px ${family}`
   ctx.textAlign = center ? 'center' : 'left'
   if (fit.squeezeTo === undefined) {
     ctx.fillText(text, x, y)
@@ -485,30 +547,20 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   const ctx = canvas.getContext('2d')
   if (ctx === null) throw new Error('canvas 2d context unavailable')
 
-  const { width, height } = plan
   const s = plan.scale
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
 
-  // Base: the tier plate fill edge-to-edge (no fringe at the plate path's
-  // anti-aliased border), then the plate path itself.
-  ctx.fillStyle = plan.palette.plateFill
-  ctx.fillRect(0, 0, width, height)
+  // NO full-canvas fill: the PNG is TRANSPARENT around the shield. Paint
+  // only the plate path — tier color inside, nothing outside.
   const plate = new Path2D(scalePath(plan.card.platePath, s))
+  ctx.fillStyle = plan.palette.plateFill
   ctx.fill(plate)
 
-  // Decorative border: the tier gradient stroked along the silhouette,
-  // CLIPPED to it (only the inner half shows) — the same visual card.svg's
-  // clipPath#clip-path-1 produces.
-  ctx.save()
-  ctx.clip(plate)
-  ctx.strokeStyle = applyBorderGradient(ctx, plan.palette, plan.card.borderStroke.line, s)
-  ctx.lineWidth = plan.card.borderStroke.width * s
-  ctx.stroke(plate)
-  ctx.restore()
-
   // --- Photo: the member screenshot (or fallback) CLIPPED TO THE CROP PATH
-  // (round 5) — the SAME path the on-page SVG clips with.
+  // (round 5) — the SAME path the on-page SVG clips with. Painted BEFORE
+  // the border so the border sits on top of the photo edges (round 7
+  // deliberate order: plate → photo → scrim → border-over → texts).
   const crop = new Path2D(scalePath(plan.card.cropPath, s))
   const b = plan.photoBBox
   ctx.save()
@@ -536,32 +588,47 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.fillRect(b.x, b.y, b.w, plan.scrim.y2 - plan.scrim.y1)
   ctx.restore()
 
+  // --- Detached border (round 7, the owner's deliberate design): the tier
+  // gradient stroke ON the crop-path geometry, painted OVER the photo —
+  // covering its edges. CLIPPED to the plate silhouette (the owner's
+  // clip-path-1): the stroke's outer half is cut, the inner half covers the
+  // photo. After the photo, before ALL text.
+  ctx.save()
+  ctx.clip(new Path2D(scalePath(plan.card.borderStroke.clipPath, s)))
+  ctx.strokeStyle = applyBorderGradient(ctx, plan.palette, plan.card.borderStroke.line, s)
+  ctx.lineWidth = plan.card.borderStroke.width * s
+  ctx.stroke(crop)
+  ctx.restore()
+
   // --- OVR block (over the photo): big number + job name below, NO "OVR"
   // tag. White with a shadow — same legibility contract the SVG's
-  // paint-order stroke delivers. Both slots under the SHARED fit contract.
+  // paint-order stroke delivers. Both slots under the SHARED fit contract
+  // (Bebas Neue — real measured metrics, round 6-7).
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
   ctx.shadowColor = 'rgba(0,0,0,0.65)'
   ctx.shadowBlur = 14 * s
   ctx.fillStyle = plan.ovr.color
-  paintFitted(ctx, plan.ovr.text, plan.ovr.x, plan.ovr.y, 900, plan.ovr.size, plan.ovr.maxW)
-  paintFitted(ctx, plan.ovr.jobText, plan.ovr.jobX, plan.ovr.jobY, 700, plan.ovr.jobSize, plan.ovr.jobMaxW)
+  paintFitted(ctx, plan.ovr.text, plan.ovr.x, plan.ovr.y, plan.fonts.slots, 400, plan.ovr.size, plan.ovr.maxW)
+  paintFitted(ctx, plan.ovr.jobText, plan.ovr.jobX, plan.ovr.jobY, plan.fonts.slots, 400, plan.ovr.jobSize, plan.ovr.jobMaxW)
   ctx.shadowBlur = 0
   ctx.shadowColor = 'transparent'
 
-  // --- Player name: on the plate, palette text fill, centered — the solid
-  // card color guarantees contrast (no shadow needed).
+  // --- Player name: Orbitron on the plate, palette text fill, centered at
+  // its parsed slot x (round 7). The solid card color guarantees contrast
+  // (no shadow needed).
   ctx.fillStyle = plan.name.color
-  paintFitted(ctx, plan.name.text, plan.name.x, plan.name.y, 700, plan.name.size, plan.name.maxWidth, true)
+  paintFitted(ctx, plan.name.text, plan.name.x, plan.name.y, plan.fonts.name, 700, plan.name.size, plan.name.maxWidth, true)
 
   // --- The 6 key stats — one per parsed slot column (server order), each
-  // column a label / big points number / small raw value stack, all under
-  // the SHARED fit contract (real metrics — the round-6 overflow fix).
+  // column a label / big points number / small raw value stack, ALL THREE
+  // LINES CENTRALLY ALIGNED on the column centerX (round 7), all under the
+  // SHARED fit contract (real metrics — the round 6-7 overflow fix).
   ctx.fillStyle = plan.palette.textFill
   for (const cell of plan.stats) {
-    paintFitted(ctx, cell.label, cell.labelX, cell.labelY, 700, cell.labelSize, cell.labelMaxW)
-    paintFitted(ctx, cell.points, cell.pointsX, cell.pointsY, 700, cell.pointsSize, cell.pointsMaxW)
-    paintFitted(ctx, cell.value, cell.valueX, cell.valueY, 600, cell.valueSize, cell.valueMaxW)
+    paintFitted(ctx, cell.label, cell.centerX, cell.labelY, plan.fonts.slots, 400, cell.labelSize, cell.labelMaxW, true)
+    paintFitted(ctx, cell.points, cell.centerX, cell.pointsY, plan.fonts.slots, 400, cell.pointsSize, cell.pointsMaxW, true)
+    paintFitted(ctx, cell.value, cell.centerX, cell.valueY, plan.fonts.slots, 400, cell.valueSize, cell.valueMaxW, true)
   }
 
   // Hellz mark (brand anchor in the plate tip below the stat slots).
@@ -594,18 +661,19 @@ function drawMonogramFill(ctx: CanvasRenderingContext2D, plan: CardPlan): void {
 
 /**
  * Render the card offscreen at 2160×3200 (2× the 1080×1600 design space for
- * retina crispness) and trigger a JPEG download via a temporary anchor +
+ * retina crispness) and trigger a PNG download via a temporary anchor +
  * object URL. Same-origin images only (D-15/T-072-13) — a tainted canvas
  * would make the blob step throw loudly here, which the self-hosted rule
- * makes unreachable.
+ * makes unreachable. The PNG has NO background: transparent outside the
+ * shield plate.
  */
 export async function downloadCard(data: CardExportData, filename: string): Promise<void> {
   const canvas = document.createElement('canvas')
   canvas.width = 2160
   canvas.height = 3200
   await drawCard(canvas, data)
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
-  if (blob === null) throw new Error('falha ao gerar o JPEG do card')
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+  if (blob === null) throw new Error('falha ao gerar o PNG do card')
   const url = URL.createObjectURL(blob)
   try {
     const a = document.createElement('a')

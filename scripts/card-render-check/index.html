@@ -5,8 +5,11 @@
     <title>card-render-check</title>
     <!-- The REAL self-hosted Orbitron files (publicDir = public/) — the same
          @font-face contract src/index.css declares, so the headless draw
-         exercises the actual font-loading path drawCard awaits. -->
+         exercises the actual font-loading path drawCard awaits. Bebas Neue
+         rides the SAME Google Fonts @import the app CSS uses (round 7) —
+         graceful fallback to Orbitron if the fetch fails. -->
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
       @font-face { font-family: "Orbitron"; font-style: normal; font-weight: 600; src: url("/fonts/orbitron-latin-600.woff2") format("woff2"); }
       @font-face { font-family: "Orbitron"; font-style: normal; font-weight: 700; src: url("/fonts/orbitron-latin-700.woff2") format("woff2"); }
       @font-face { font-family: "Orbitron"; font-style: normal; font-weight: 900; src: url("/fonts/orbitron-latin-900.woff2") format("woff2"); }

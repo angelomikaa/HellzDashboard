@@ -1,39 +1,51 @@
 // cardExport.test.ts — unit locks for the card layout plan (plan
-// 07.2-05, CARD-03/D-09/D-10/D-12; checkpoint round 5, owner supersession:
-// ONE card.svg is the source of truth, tier colors applied by code).
-// The DOM shell (drawCard/downloadCard) needs a canvas — these tests lock
-// the PURE core (buildCardPlan) and the filename slugification, which is
-// where the correctness contracts live:
+// 07.2-05, CARD-03/D-09/D-10/D-12; checkpoint round 7, owner supersession:
+// ONE card.svg is the source of truth, Bebas Neue everywhere except the
+// player name, border-over-photo, central column alignment, PNG export).
+// The DOM shell (drawCard/downloadCard) needs a canvas — the pure-core
+// tests below lock buildCardPlan + the filename + the fit contract, and a
+// stubbed-DOM paint-sequence test locks the PNG export contract:
 //
-//  - T-072-12: the exported JPEG is a celebration artifact that circulates
+//  - T-072-12: the exported PNG is a celebration artifact that circulates
 //    OUTSIDE the guild (D-09) — the plan must carry ZERO guild-average data
 //    (no class_average, no best), only identity + the 6 key stats + points.
-//  - D-10 (round-5 edition): PORTRAIT 27:40 card; OVR number + job name
-//    (NO "OVR" tag) at the parsed over-photo slot; PLAYERNAME on the plate;
-//    the 6 stats in the parsed slot columns in SERVER/highlight order
-//    (never re-sorted).
-//  - Round-5 palette contract: tier colors come from TIER_PALETTE (code) —
-//    dark text on the light metals, white on the pristine magenta; the
-//    border keeps card.svg's stroke geometry with per-tier gradient stops.
-//  - Round-5 typography contract: Orbitron replaced the Bebas placeholder,
-//    and Orbitron is WIDER — every slot carries a fitText maxWidth bounded
-//    by its column (labels/points/values never collide across columns).
+//  - D-10 (round-7 edition): PORTRAIT 27:40 card; OVR number + job name
+//    (NO "OVR" tag) at the parsed over-photo slot; PLAYERNAME on the plate
+//    (Orbitron — the ONLY Orbitron slot); the 6 stats in the parsed slot
+//    columns in SERVER/highlight order (never re-sorted), each column's
+//    three lines centrally aligned on the column center.
+//  - Round-7 font split: the plan CARRIES the font strings — Bebas Neue for
+//    every slot except the player name (Orbitron); both surfaces read them
+//    from the plan so the split cannot drift.
+//  - Round-5 palette contract (held): tier colors come from TIER_PALETTE
+//    (code) — dark text on the light metals, white on the pristine magenta.
+//  - Round-6/7 fit contract: fitCardText with REAL measured metrics (canvas
+//    measureText) — shrink-to-fit with a readability floor, emergency
+//    glyph-squeeze only past it; labels may be 3–6 chars ('PDMG.R') and
+//    must still fit their column.
+//  - PNG export (round 7): toBlob('image/png'), filename hellz-*.png, NO
+//    full-canvas background fill — the paint sequence fills only the plate
+//    path + the in-crop scrim (verified against a recorded canvas op log).
 //  - Round-2 lessons carried forward: exact design-space→backing-store
 //    scaling (scalePath contract).
 //  - Round-5 photo contract: the photo area IS the parsed crop path (both
 //    surfaces clip to it); fallback chain monogram (never an empty hole).
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildCardPlan,
   cardFilename,
   CARD_DESIGN_HEIGHT,
   CARD_DESIGN_WIDTH,
   CARD_FIT_FLOOR,
+  CARD_FONTS,
   CARD_GEOMETRY,
+  estimateBebas,
   estimateOrbitron,
   fitCardText,
+  measureBebas,
   measureOrbitron,
   TIER_PALETTE,
+  downloadCard,
   type CardExportData,
   type TextMeasurer,
 } from './cardExport'
@@ -62,13 +74,14 @@ describe('buildCardPlan — card geometry (D-10, round-5 single-design edition)'
       expect(plan.height).toBe((width * CARD_DESIGN_HEIGHT) / CARD_DESIGN_WIDTH)
       expect(plan.scale).toBe(width / CARD_DESIGN_WIDTH)
       // Vertical composition order: OVR number (over the photo) → job name
-      // → PLAYERNAME (on the plate) → stat labels → points → values.
+      // → PLAYERNAME (on the plate) → POINTS → labels → values (points row
+      // sits above the label row — round 7 geometry).
       expect(plan.ovr.y).toBeLessThan(plan.ovr.jobY)
       expect(plan.ovr.jobY).toBeLessThan(plan.name.y)
       for (const cell of plan.stats) {
-        expect(plan.name.y).toBeLessThan(cell.labelY)
-        expect(cell.labelY).toBeLessThan(cell.pointsY)
-        expect(cell.pointsY).toBeLessThan(cell.valueY)
+        expect(plan.name.y).toBeLessThan(cell.pointsY)
+        expect(cell.pointsY).toBeLessThan(cell.labelY)
+        expect(cell.labelY).toBeLessThan(cell.valueY)
       }
     }
   })
@@ -81,18 +94,22 @@ describe('buildCardPlan — card geometry (D-10, round-5 single-design edition)'
     expect(plan.ovr.size).toBeCloseTo(slots.ovr.size, 6)
     expect(plan.ovr.jobX).toBe(slots.job.x)
     expect(plan.ovr.jobY).toBe(slots.job.y)
-    // The name is re-centered (round-5 decision) but keeps the slot's
-    // baseline + size.
-    expect(plan.name.x).toBe(CARD_DESIGN_WIDTH / 2)
+    // The name renders CENTERED on the plate bbox's horizontal midline (the
+    // parsed x anchors the placeholder's left edge — the owner drew
+    // 'PLAYERNAME' centered on the shield), baseline + size from the slot.
+    const plateMid = CARD_GEOMETRY.plateBBox.x + CARD_GEOMETRY.plateBBox.w / 2
+    expect(plan.name.x).toBeCloseTo(plateMid, 6)
     expect(plan.name.y).toBe(slots.name.y)
     expect(plan.name.size).toBe(slots.name.size)
-    // Each stat column rides its parsed slot, server order preserved.
+    // Each stat column rides its parsed slot: all three lines center on the
+    // DERIVED column center (= points anchor + width('99')/2 — the owner
+    // centered the placeholder on the grid, round 7), server order preserved.
     plan.stats.forEach((cell, i) => {
-      expect(cell.labelX).toBe(slots.stats[i].label.x)
+      const center =
+        slots.stats[i].points.x + measureBebas('99', 400, slots.stats[i].points.size) / 2
+      expect(cell.centerX).toBeCloseTo(center, 6)
       expect(cell.labelY).toBe(slots.stats[i].label.y)
-      expect(cell.pointsX).toBe(slots.stats[i].points.x)
       expect(cell.pointsY).toBe(slots.stats[i].points.y)
-      expect(cell.valueX).toBe(slots.stats[i].value.x)
       expect(cell.valueY).toBe(slots.stats[i].value.y)
     })
   })
@@ -101,7 +118,7 @@ describe('buildCardPlan — card geometry (D-10, round-5 single-design edition)'
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     expect(plan.stats.map((c) => c.label)).toEqual(['PCB', 'CRT', 'HP', 'ASP', 'PAT', 'SPM'])
     for (let i = 1; i < 6; i++) {
-      expect(plan.stats[i].labelX).toBeGreaterThan(plan.stats[i - 1].labelX)
+      expect(plan.stats[i].centerX).toBeGreaterThan(plan.stats[i - 1].centerX)
     }
   })
 
@@ -122,22 +139,22 @@ describe('buildCardPlan — card geometry (D-10, round-5 single-design edition)'
     expect(serialized).not.toContain('"best"')
     // The stat-slot field list is CLOSED: label + points + value with their
     // anchors/bounds — nothing else (in particular: no aggregate, no chip).
+    // centerX / colW are the column geometry (round 7 central alignment).
     for (const cell of plan.stats) {
       expect(Object.keys(cell).sort()).toEqual([
+        'centerX',
+        'colW',
         'label',
         'labelMaxW',
         'labelSize',
-        'labelX',
         'labelY',
         'points',
         'pointsMaxW',
         'pointsSize',
-        'pointsX',
         'pointsY',
         'value',
         'valueMaxW',
         'valueSize',
-        'valueX',
         'valueY',
       ])
     }
@@ -149,8 +166,8 @@ describe('buildCardPlan — round-5 typography contract (Orbitron fit inside the
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     for (const cell of plan.stats) {
       expect(cell.pointsSize / CARD_DESIGN_WIDTH).toBeGreaterThan(0.08)
-      expect(cell.labelSize / CARD_DESIGN_WIDTH).toBeGreaterThan(0.05)
-      expect(plan.ovr.size / CARD_DESIGN_WIDTH).toBeGreaterThan(0.2)
+      expect(cell.labelSize / CARD_DESIGN_WIDTH).toBeGreaterThan(0.04)
+      expect(plan.ovr.size / CARD_DESIGN_WIDTH).toBeGreaterThan(0.15)
     }
     // Same contract at any render width (linear scaling).
     const small = buildCardPlan(data, 360)
@@ -159,13 +176,19 @@ describe('buildCardPlan — round-5 typography contract (Orbitron fit inside the
 
   it('bounds every slot text inside its own column — no collision with the next column', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    // The column grid: the DERIVED centers (points anchor + width('99')/2,
+    // the same contract buildCardPlan applies — evenly pitched ≈141px).
+    const centers = CARD_GEOMETRY.slots.stats.map(
+      (s) => s.points.x + measureBebas('99', 400, s.points.size) / 2,
+    )
     for (let i = 0; i < 6; i++) {
       const cell = plan.stats[i]
-      // The column bound: distance to the next column's label (last column
-      // runs to the plate's inner right, mirrored from the crop bbox).
-      const nextX =
-        i < 5 ? CARD_GEOMETRY.slots.stats[i + 1].label.x : CARD_DESIGN_WIDTH - CARD_GEOMETRY.cropBBox.x
-      const colW = nextX - CARD_GEOMETRY.slots.stats[i].label.x - 8
+      // Column bound: midpoint to the previous center + midpoint to the next
+      // center, minus a gutter (boundaries lie midway between centers).
+      const leftGap = i === 0 ? 0 : centers[i] - centers[i - 1]
+      const rightGap = i === 5 ? 0 : centers[i + 1] - centers[i]
+      const span = i === 0 ? rightGap : i === 5 ? leftGap : (leftGap + rightGap) / 2
+      const colW = span - 8
       expect(cell.labelMaxW).toBeCloseTo(colW, 6)
       expect(cell.pointsMaxW).toBeCloseTo(colW, 6)
       expect(cell.valueMaxW).toBeCloseTo(colW, 6)
@@ -176,10 +199,18 @@ describe('buildCardPlan — round-5 typography contract (Orbitron fit inside the
     }
   })
 
-  it('names shrink-to-fit inside a generous plate bound, still readable', () => {
+  it('names shrink-to-fit inside a symmetric plate bound, still readable', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    // The bound is symmetric inside the plate's inner span (gutter 14px per
+    // side) — the name can use the shield's full width, never leave it.
+    const plateMid = CARD_GEOMETRY.plateBBox.x + CARD_GEOMETRY.plateBBox.w / 2
+    const expectedMaxW = 2 * Math.min(
+      plateMid - CARD_GEOMETRY.plateBBox.x - 14,
+      CARD_GEOMETRY.plateBBox.x + CARD_GEOMETRY.plateBBox.w - 14 - plateMid,
+    )
+    expect(plan.name.maxWidth).toBeCloseTo(expectedMaxW, 6)
     expect(plan.name.maxWidth).toBeGreaterThan(CARD_DESIGN_WIDTH * 0.7)
-    expect(plan.name.size / CARD_DESIGN_WIDTH).toBeGreaterThan(0.1)
+    expect(plan.name.size / CARD_DESIGN_WIDTH).toBeGreaterThan(0.05)
   })
 })
 
@@ -305,7 +336,7 @@ describe('fitCardText — the round-6 shared fit contract (measured, not estimat
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     expect(plan.ovr.maxW).toBeCloseTo(CARD_DESIGN_WIDTH - CARD_GEOMETRY.slots.ovr.x - 40, 6)
     // The 2-3 digit OVR hero never binds at design size.
-    const fit = fitCardText(plan.ovr.text, 900, plan.ovr.size, plan.ovr.maxW)
+    const fit = fitCardText(plan.ovr.text, 400, plan.ovr.size, plan.ovr.maxW)
     expect(fit.size).toBe(plan.ovr.size)
   })
 
@@ -319,6 +350,145 @@ describe('fitCardText — the round-6 shared fit contract (measured, not estimat
   })
 })
 
+describe('buildCardPlan — round-7 font split (Bebas everywhere, Orbitron only in the name)', () => {
+  it('carries the font strings IN the plan — both surfaces read them, no drift possible', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    expect(plan.fonts.slots).toBe('Bebas Neue')
+    expect(plan.fonts.name).toBe('Orbitron')
+    expect(plan.fonts).toBe(CARD_FONTS)
+  })
+
+  it('measures Bebas with real metrics in the browser; falls back to the estimate outside it', () => {
+    // Node/vitest has no 2D canvas → the conservative estimate (never 0/NaN).
+    const w = measureBebas('PDMG.R', 400, 48)
+    expect(w).toBeGreaterThan(0)
+    expect(Number.isFinite(w)).toBe(true)
+    expect(w).toBe(estimateBebas('PDMG.R', 400, 48))
+  })
+
+  it('keeps the estimate conservative: 0.5em/char (Bebas is narrow — never crush labels)', () => {
+    // 0.5em/char over-estimates real Bebas advances (harness-verified) while
+    // keeping 4–6-char labels comfortably above the readability floor.
+    expect(estimateBebas('PDMG.R', 400, 48)).toBe(6 * 48 * 0.5)
+    expect(estimateBebas('PVP.R', 400, 48)).toBe(5 * 48 * 0.5)
+  })
+
+  it('fits a 6-char label (PDMG.R) inside its column under Bebas metrics, above the floor', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    for (const cell of plan.stats) {
+      const fit = fitCardText('PDMG.R', 400, cell.labelSize, cell.labelMaxW, estimateBebas)
+      expect(fit.squeezeTo).toBeUndefined() // shrink-to-fit, no emergency squeeze
+      expect(fit.size).toBeGreaterThanOrEqual(cell.labelSize * CARD_FIT_FLOOR)
+      expect(estimateBebas('PDMG.R', 400, fit.size)).toBeLessThanOrEqual(cell.labelMaxW + 1e-9)
+      // The fitted label stays legible (well above the 0.55 floor at design size).
+      expect(fit.size / CARD_DESIGN_WIDTH).toBeGreaterThan(0.03)
+    }
+  })
+})
+
+describe('downloadCard — round-7 PNG export contract (recorded paint sequence)', () => {
+  interface Op { op: string; args: unknown[] }
+  function makeFakeEnv(): { ops: Op[]; toBlobTypes: string[]; downloads: string[]; canvas: { width: number; height: number } } {
+    const ops: Op[] = []
+    const toBlobTypes: string[] = []
+    const downloads: string[] = []
+    const gradient = { addColorStop: () => {} }
+    const ctx: Record<string, unknown> = {
+      imageSmoothingEnabled: false,
+      imageSmoothingQuality: '',
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 0,
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+      shadowColor: '',
+      shadowBlur: 0,
+      save: () => ops.push({ op: 'save', args: [] }),
+      restore: () => ops.push({ op: 'restore', args: [] }),
+      translate: (...a: unknown[]) => ops.push({ op: 'translate', args: a }),
+      scale: (...a: unknown[]) => ops.push({ op: 'scale', args: a }),
+      fill: () => ops.push({ op: 'fill', args: [] }),
+      stroke: () => ops.push({ op: 'stroke', args: [] }),
+      clip: () => ops.push({ op: 'clip', args: [] }),
+      fillRect: (...a: unknown[]) => ops.push({ op: 'fillRect', args: a }),
+      fillText: (...a: unknown[]) => ops.push({ op: 'fillText', args: a }),
+      drawImage: (...a: unknown[]) => ops.push({ op: 'drawImage', args: a }),
+      measureText: () => ({ width: 42 }),
+      createLinearGradient: () => gradient,
+    }
+    const canvas = { width: 2160, height: 3200 }
+    const fakeCanvas = {
+      ...canvas,
+      getContext: () => ctx,
+      toBlob: (cb: (b: Blob | null) => void, type?: string) => {
+        toBlobTypes.push(type ?? '')
+        cb(new Blob([new Uint8Array([1, 2, 3])], { type: type ?? 'application/octet-stream' }))
+      },
+    }
+    const fakeDocument = {
+      fonts: { load: async () => [], ready: Promise.resolve() },
+      body: { appendChild: () => {} },
+      createElement: (tag: string) => {
+        if (tag === 'canvas') return { ...fakeCanvas }
+        return {
+          href: '',
+          download: '',
+          click: () => downloads.push('clicked'),
+          remove: () => {},
+        }
+      },
+    }
+    class FakeImage {
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      width = 0
+      height = 0
+      set src(_v: string) {
+        // No image ever loads in this stub — the graceful fallback runs.
+        queueMicrotask(() => this.onerror?.())
+      }
+    }
+    vi.stubGlobal('Path2D', class P2D {
+      d: string | undefined
+      constructor(d?: string) {
+        this.d = d
+      }
+    })
+    vi.stubGlobal('Image', FakeImage)
+    vi.stubGlobal('document', fakeDocument)
+    vi.stubGlobal('URL', { createObjectURL: () => 'blob:fake', revokeObjectURL: () => {} })
+    return { ops, toBlobTypes, downloads, canvas }
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('encodes image/png, keeps the requested hellz-*.png filename, and paints NO full-canvas background', async () => {
+    const { ops, toBlobTypes, downloads, canvas } = makeFakeEnv()
+    await downloadCard(data, cardFilename('Maria Silva'))
+    // PNG (round 7): toBlob called with 'image/png' — the transparent card.
+    expect(toBlobTypes).toEqual(['image/png'])
+    expect(downloads).toEqual(['clicked'])
+    // NO background: every fillRect is the in-crop legibility scrim —
+    // strictly narrower than the canvas (nothing paints edge to edge).
+    const fillRects = ops.filter((o) => o.op === 'fillRect')
+    expect(fillRects.length).toBeGreaterThan(0)
+    for (const r of fillRects) {
+      const [x, y, w] = r.args as number[]
+      expect(w).toBeLessThan(canvas.width)
+      expect(x).toBeGreaterThanOrEqual(0)
+      expect(y).toBeGreaterThanOrEqual(0)
+      expect(y + (r.args[3] as number)).toBeLessThanOrEqual(canvas.height)
+    }
+    // The plate path paints (tier fill), the border strokes, and text draws.
+    expect(ops.some((o) => o.op === 'fill')).toBe(true)
+    expect(ops.some((o) => o.op === 'stroke')).toBe(true)
+    expect(ops.filter((o) => o.op === 'fillText').length).toBeGreaterThanOrEqual(2 + 6 * 3 + 1)
+  })
+})
+
 describe('buildCardPlan — stat slot text (round 5: points as big palette text)', () => {
   it('rounds points for display and renders the muted — slot for null (never invents numbers)', () => {
     const plan = buildCardPlan(
@@ -327,8 +497,12 @@ describe('buildCardPlan — stat slot text (round 5: points as big palette text)
     )
     expect(plan.stats[0].points).toBe('96')
     expect(plan.stats[1].points).toBe('—')
-    // Null points changes ONLY the text — the slot positions stay put.
-    expect(plan.stats[1].pointsX).toBe(plan.stats[1].labelX + (CARD_GEOMETRY.slots.stats[1].points.x - CARD_GEOMETRY.slots.stats[1].label.x))
+    // Null points changes ONLY the text — the slot positions stay put
+    // (centerX stays the derived column center).
+    expect(plan.stats[1].centerX).toBeCloseTo(
+      CARD_GEOMETRY.slots.stats[1].points.x + measureBebas('99', 400, 128) / 2,
+      6,
+    )
   })
 })
 
@@ -345,7 +519,8 @@ describe('buildCardPlan — exact 2× scaling onto the download backing store', 
     expect(backing.mark.y).toBe(base.mark.y * 2)
     expect(backing.mark.size).toBe(base.mark.size * 2)
     for (let i = 0; i < 6; i++) {
-      expect(backing.stats[i].labelX).toBe(base.stats[i].labelX * 2)
+      expect(backing.stats[i].centerX).toBe(base.stats[i].centerX * 2)
+      expect(backing.stats[i].labelMaxW).toBe(base.stats[i].labelMaxW * 2)
       expect(backing.stats[i].pointsY).toBe(base.stats[i].pointsY * 2)
       expect(backing.stats[i].pointsSize).toBe(base.stats[i].pointsSize * 2)
       expect(backing.stats[i].valueY).toBe(base.stats[i].valueY * 2)
@@ -355,12 +530,12 @@ describe('buildCardPlan — exact 2× scaling onto the download backing store', 
 })
 
 describe('cardFilename — export slugification', () => {
-  it("slugifies the player name: 'Maria Silva' → 'hellz-maria-silva.jpg'", () => {
-    expect(cardFilename('Maria Silva')).toBe('hellz-maria-silva.jpg')
+  it("slugifies the player name: 'Maria Silva' → 'hellz-maria-silva.png'", () => {
+    expect(cardFilename('Maria Silva')).toBe('hellz-maria-silva.png')
   })
 
   it('strips diacritics and collapses punctuation', () => {
-    expect(cardFilename('João Álvares')).toBe('hellz-joao-alvares.jpg')
-    expect(cardFilename('  Ana   B  ')).toBe('hellz-ana-b.jpg')
+    expect(cardFilename('João Álvares')).toBe('hellz-joao-alvares.png')
+    expect(cardFilename('  Ana   B  ')).toBe('hellz-ana-b.png')
   })
 })

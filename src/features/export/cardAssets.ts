@@ -1,53 +1,46 @@
 // cardAssets.ts — SINGLE SOURCE OF TRUTH for the card design (07.2-05
-// checkpoint round 5, owner supersession: "check the new card.svg at the
-// assets folder, it now contains placeholder texts too, eliminating the
-// necessity for safe area ... We can change the color of the card via code
-// too, so this one file becomes the source of truth for card design").
+// checkpoint round 7, owner supersession: "i seeded a new card ... border
+// is now detached from the plate and over the crop ... Bebas Neue takes over
+// the rest ... all our abreviation labels must go from 3 letter to 4-6
+// chars ... this one file becomes the source of truth for card design").
 //
 // THE FILE: src/assets/card.svg (viewBox 1080×1600 — portrait 27:40), the
 // owner's ONE design for every tier. Structure (verified against the file):
-//   - Plate: TWO paths sharing the SAME silhouette d:
-//       · cls-1 — solid fill (currently #cf1a87 pristine magenta = the
-//         RECOLORABLE card color; the placeholder value is never trusted —
-//         tier palettes below own the fill)
-//       · cls-2 — the same path stroked with the decorative border
-//         stroke:url(#Blue_to_Magenta) stroke-width:40, clipped by
-//         clipPath#clip-path-1 (only the inner half of the stroke shows)
-//   - <path id="crop-path"> (cls-3): the PHOTO AREA — the upper region of
-//     the silhouette down to ~y=864, full width. The member's screenshot is
-//     CLIPPED to this path (round 5 brought the crop path back — there are
-//     no guideline rects anymore, just the text to be edited).
-//   - Placeholder TEXT slots (all 'Bebas Neue', fill #e6e6e6 — BOTH are
-//     placeholders; code substitutes font and color):
-//       · <text id="OVR"> — cls-4, font-size 12.093 with
-//         transform="matrix(21.169 0 0 21.169 119.82 466.72)" → effective
-//         size ≈ 12.093 × 21.169 ≈ 256px at (119.82, 466.72). The parser
-//         resolves the matrix ONCE — the matrix hack never reaches render.
-//       · Job Class — cls-5 (48px) at (147.772, 533.928), under the number.
-//       · PLAYERNAME — cls-7 (128px) at (285.408, 1030.58), on the plate
-//         between the photo and the stats band.
-//       · <g id="Stats"> → KEY1..KEY6, each: key label (cls-6, 72px,
-//         y≈1141), points value (cls-7, 128px, y≈1265), raw own_value
-//         (cls-8, 36px, y≈1314). SLOTS ARE POSITIONAL — code fills them
-//         with the member's six key stats in server order.
+//   - <path id="base-plate"> cls-1 — solid recolorable plate fill, the full
+//     shield silhouette. The plate is painted FIRST on both surfaces; the
+//     area outside the shield stays transparent (PNG-transparent design).
+//   - <path id="crop-path"> cls-2 — the PHOTO AREA: the top portion of the
+//     silhouette closed at ~y=937 (full width). Its geometry also IS the
+//     detached border: a gradient stroke (stroke:url(#Blue_to_Magenta),
+//     width 40) drawn by the render layer AFTER the photo, covering the
+//     photo's edges — deliberate design choice, round 7.
+//   - Placeholder TEXT slots (Bebas Neue unless noted — family + fill are
+//     placeholders; code substitutes):
+//       · #OVR — cls-4 Bebas Neue, 8.503px × matrix 21.169 → ≈180px
+//         effective at (137.029, 412.59), top-left over the photo
+//       · Job class — cls-5 Bebas Neue, 72px at (137.029, 487.48), under
+//         the number (no "OVR" tag, round 4 held)
+//       · PLAYERNAME — cls-6 ORBITRON, 109.72px × matrix 0.656 → ≈72px
+//         effective at (246.528, 1057.007). ORBITRON ONLY HERE: every other
+//         slot is Bebas Neue (round 7).
+//       · six stat columns, left → right (points anchors evenly pitched at
+//         ≈141px: 136.177 / 277.158 / 418.138 / 559.118 / 700.099 / 841.079 —
+//         the owner CENTERED the '99' placeholders on the column grid, so the
+//         parse locks that even pitch), each: label cls-7 Bebas Neue 48px
+//         (y≈1273.507), points cls-8 Bebas Neue 128px (y≈1199.703), value
+//         cls-7 Bebas Neue 48px (y≈1319.255). All THREE lines are CENTRALLY
+//         ALIGNED per column (round 7): the column CENTER is derived at
+//         plan-build as the points anchor + width('99')/2 (the owner's own
+//         centering of the placeholder proves the grid) — label 4–6 chars
+//         (MATK / PDMG.R / PVP.R), points big hero number, value raw
+//         own_value.
 //
 // TIER VARIANTS LIVE IN CODE: one TIER_PALETTE per tier (plate fill, border
-// gradient stops, text fill) applied over the SAME parsed geometry — the
-// four round-4 per-tier SVGs are retired; their palettes survive here. The
-// file's own #e6e6e6 text fill / 'Bebas Neue' are placeholders the parser
-// deliberately ignores.
+// gradient stops, text fill) applied over the SAME parsed geometry.
 //
-// This module parses card.svg ONCE at module load (pure string parsing — no
-// DOM, so it runs in node/vitest) and exposes the normalized geometry + the
-// slot map. Both rendering surfaces consume it:
-//   - CardSvg.tsx (on-page <svg>) renders the paths/slots directly
-//   - cardExport.ts paints the SAME path strings on canvas via scalePath
-//     and the SAME slot positions — on-page card and downloaded JPEG are
-//     identical by construction.
-//
-// Fail-fast: a missing layer, an unparseable matrix, or a wrong slot count
-// throws at module load — a malformed design asset must never ship as a
-// silently broken card.
+// Parsed once at module load (pure string parsing — runs in node/vitest).
+// Fail-fast on missing/malformed layers.
+
 import type { Tier } from '../dashboard/presentation'
 import cardRaw from '../../assets/card.svg?raw'
 
@@ -67,14 +60,18 @@ export interface CardRect {
 }
 
 /** A resolved text slot: design-space position + EFFECTIVE font size
- *  (matrix scale × class font-size — the OVR slot's matrix hack resolved). */
+ *  (matrix scale × class font-size — the OVR / name slot matrix hacks
+ *  resolved once here, never reaching the render surfaces). */
 export interface CardTextSlot {
   x: number
   y: number
   size: number
 }
 
-/** One of the six positional stat slots inside <g id="Stats">. */
+/** One of the six positional stat slots inside <g id="Stats">. All three
+ *  lines (label / points / value) render centered on the column centerX —
+ *  DERIVED at plan-build as points.x + width('99')/2 (the parse locks the
+ *  points anchors' even pitch, proving the owner's center grid). */
 export interface CardStatSlot {
   label: CardTextSlot
   points: CardTextSlot
@@ -82,9 +79,9 @@ export interface CardStatSlot {
 }
 
 /** A linearGradient in the SAME design space (userSpaceOnUse line + stops)
- *  — the border stroke's GEOMETRY (line + width). The COLORS come from the
- *  tier palette; the file's Blue_to_Magenta stops are the pristine tier's
- *  palette source. */
+ *  — the detached border stroke's GEOMETRY (line + width). The COLORS come
+ *  from the tier palette; the file's Blue_to_Magenta stops are the pristine
+ *  tier's palette source. */
 export interface CardGradientLine {
   x1: number
   y1: number
@@ -92,42 +89,64 @@ export interface CardGradientLine {
   y2: number
 }
 
+export interface CardBorderStroke {
+  /** The gradient line (userSpaceOnUse geometry, scaled with everything). */
+  line: CardGradientLine
+  /** Stroke width — 40 in the owner's file (round 7). */
+  width: number
+  /** The border's CLIP path (clipPath#clip-path-1 — the plate silhouette).
+   *  The owner clips the border-over stroke to the plate: its outer half is
+   *  cut, the inner half paints OVER the photo edges (deliberate round-7
+   *  design). Both surfaces must apply this clip. */
+  clipPath: string
+}
+
 export interface CardGeometry {
-  /** The solid plate silhouette (cls-1 path) — also the border clip. */
+  /** The solid plate silhouette (cls-1 path) — full shield. Painted first
+   *  on both surfaces; nothing fills outside it (transparent design). */
   platePath: string
-  /** The PHOTO AREA path (id="crop-path") — the screenshot is clipped to
-   *  this path on BOTH surfaces. */
+  /** Bounding box of the plate path (the name's center derives from its
+   *  horizontal midline — see CardGeometry.slots.name). */
+  plateBBox: CardRect
+  /** The PHOTO AREA path (id="crop-path"): top portion of the shield closed
+   *  at ~y=937. The screenshot is clipped to this path on BOTH surfaces,
+   *  and its geometry IS the detached border stroke painted over it. */
   cropPath: string
   /** Bounding box of the crop path (cover-fit drawing bounds). */
   cropBBox: CardRect
-  /** Decorative border: stroke width + gradient line, clipped to the
-   *  silhouette. Required — a card without its border is malformed. */
-  borderStroke: { line: CardGradientLine; width: number }
+  /** Detached border: stroke width + gradient line + plate-silhouette clip,
+   *  painted over the photo (covering its edges — deliberate). The clip
+   *  cuts the stroke's outer half; the inner half covers the photo. */
+  borderStroke: CardBorderStroke
   slots: {
     /** Big OVR number — top-left, OVER the photo. */
     ovr: CardTextSlot
     /** Job class name, under the OVR number (still over the photo). */
     job: CardTextSlot
-    /** Player name — on the plate, between photo and stats. */
+    /** Player name — ORBITRON only, on the plate between photo and stats.
+     *  The parsed (x,y,size) give the BASELINE + type size; the RENDER
+     *  CENTER is the plate bbox's horizontal midline (the file's x anchors
+     *  the left edge of the 'PLAYERNAME' placeholder, which the owner drew
+     *  centered on the shield — same placeholder-centering pattern as the
+     *  stat columns; recorded r5 decision, held r7). */
     name: CardTextSlot
-    /** The six positional stat slots, left → right. */
+    /** The six positional stat slots, left → right. The COLUMN CENTER is
+     *  derived by the renderer from the points anchor (+ width('99')/2 —
+     *  the owner centered the placeholder on the grid); label/value raw x's
+     *  are left-anchors of the owner's placeholder strings and only
+     *  sanity-bound to their column. */
     stats: CardStatSlot[]
   }
 }
 
 // ---------------------------------------------------------------------------
-// Tier palettes — the CODE-DRIVEN colors (round 5: the per-tier SVGs are
-// retired; these palettes ARE their successors). Text fill follows the
-// round-4 contrast rule: dark on the light metals, white on the deep
-// magenta. The pristine border keeps card.svg's own Blue_to_Magenta stops
-// verbatim (it IS the pristine design; the bright #ff12f7 end reads clearly
-// against the darker #cf1a87 plate).
+// Tier palettes — the CODE-DRIVEN colors (the per-tier SVGs are retired;
+// these palettes ARE their successors). Text fill follows the contrast
+// rule: dark on the light metals, white on the deep magenta. The pristine
+// border keeps card.svg's own Blue_to_Magenta stops verbatim.
 export interface TierPalette {
-  /** The recolorable card color (plate cls-1 fill). */
   plateFill: string
-  /** Border gradient stops (the gradient LINE/width come from card.svg). */
   borderStops: { offset: number; color: string }[]
-  /** Text color on the plate (name + stats block). */
   textFill: string
 }
 
@@ -175,8 +194,8 @@ function attributes(tag: string): Map<string, string> {
   return attrs
 }
 
-/** class → font-size from the file's <style> block (placeholder sizes —
- *  the SIZES are honored, the font family/fill are not). */
+/** class → font-size from the file's <style> block (placeholder sizes — the
+ *  SIZES are honored, the font family/fill are not). */
 function classFontSizes(svg: string): Map<string, number> {
   const map = new Map<string, number>()
   const style = svg.match(/<style>([\s\S]*?)<\/style>/)
@@ -189,8 +208,9 @@ function classFontSizes(svg: string): Map<string, number> {
 }
 
 /** Resolve transform="matrix(a b c d e f)" → position (e,f) + uniform
- *  scale (a===d, b=c=0). Non-uniform matrices throw — the design must stay
- *  resolvable to a plain position+size. */
+ *  scale (a===d, b=c=0). Non-uniform matrices throw. Only the OVR slot
+ *  (cls-4) and the PLAYERNAME slot (cls-6) carry design matrix scales;
+ *  both are resolved ONCE here. */
 function matrixTransform(transform: string | undefined): { x: number; y: number; scale: number } {
   if (!transform) return { x: 0, y: 0, scale: 1 }
   const m = transform.match(/matrix\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s*\)/)
@@ -223,17 +243,13 @@ function textSlots(svg: string): RawText[] {
   return texts
 }
 
-function slotOf(t: RawText, fontSize: number, what: string): CardTextSlot {
-  if (t.scale !== 1) {
-    // Only the OVR slot is allowed a scaled matrix (its 12.093×21.169 hack).
-    throw new Error(`card.svg: unexpected scaled matrix on ${what}`)
-  }
-  return { x: t.x, y: t.y, size: fontSize }
+function slotOf(t: RawText, fontSize: number): CardTextSlot {
+  return { x: t.x, y: t.y, size: fontSize * t.scale }
 }
 
 /** The plate path: the FIRST cls-1 path in the document (the file has
- *  exactly two identical silhouette paths — cls-1 solid + cls-2 stroked;
- *  cls-1 is the recolorable fill). */
+ *  exactly two identical silhouette paths — cls-1 solid fill + cls-2
+ *  stroked crop path; cls-1 is the recolorable fill). */
 function pickPlatePath(svg: string): string {
   for (const m of svg.matchAll(/<path\b([^>]*)>/g)) {
     const attrs = attributes(m[1])
@@ -251,8 +267,7 @@ function pickCropPath(svg: string): string {
 }
 
 /** BBox of the crop path. The path uses ONLY absolute M/L/C/Z commands, so
- *  every numeric token is a coordinate (control points may slightly
- *  overestimate — acceptable: the photo covers a hair more than the curve). */
+ *  every numeric token is a coordinate. */
 function pathBBox(d: string, what: string): CardRect {
   if (!d.trim().startsWith('M')) throw new Error(`card.svg: ${what} must start with an absolute M`)
   if (/[mlaz]/.test(d)) throw new Error(`card.svg: ${what} must use only absolute M/L/C/Z commands`)
@@ -265,16 +280,20 @@ function pathBBox(d: string, what: string): CardRect {
   return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }
 }
 
-/** The border stroke: cls-2 = `stroke:url(#<gradient>) stroke-width:40`.
- *  Only the geometry (line + width) is taken — the file's placeholder
- *  gradient stops stay in the file (pristine's live on in TIER_PALETTE). */
-function borderStroke(svg: string): { line: CardGradientLine; width: number } {
-  const cls2 = svg.match(/\.cls-2\{([^}]*)\}/)
-  if (!cls2) throw new Error('card.svg: no cls-2 border style found')
-  const strokeRef = cls2[1].match(/stroke:url\(#([^)]+)\)/)
-  const width = cls2[1].match(/stroke-width:(\d+(?:\.\d+)?)/)
+/** The border stroke, round 7: cls-3 = `fill:none;
+ *  stroke:url(#<gradient>);stroke-width:40` on the path inside
+ *  <g id="border-over">, which carries clip-path="url(#<clip>)" — the
+ *  owner clips the stroke to the plate silhouette so the border covers the
+ *  photo's edges without spilling outside the shield. Only the GEOMETRY is
+ *  taken (line + width + clip path d) — the file's placeholder gradient
+ *  stops stay in the file (pristine's live on in TIER_PALETTE). */
+function borderStroke(svg: string): CardBorderStroke {
+  const cls3 = svg.match(/\.cls-3\{([^}]*)\}/)
+  if (!cls3) throw new Error('card.svg: no cls-3 border-over style found')
+  const strokeRef = cls3[1].match(/stroke:url\(#([^)]+)\)/)
+  const width = cls3[1].match(/stroke-width:(\d+(?:\.\d+)?)/)
   if (!strokeRef || !width) {
-    throw new Error('card.svg: cls-2 must stroke:url(#gradient) with a stroke-width')
+    throw new Error('card.svg: cls-3 must stroke:url(#gradient) with a stroke-width')
   }
   const grad = svg.match(new RegExp('<linearGradient\\b[^>]*id="' + strokeRef[1] + '"[^>]*>'))
   if (!grad) throw new Error(`card.svg: border gradient "${strokeRef[1]}" not found`)
@@ -282,6 +301,16 @@ function borderStroke(svg: string): { line: CardGradientLine; width: number } {
   if (!attrs.get('x1') || !attrs.get('x2')) {
     throw new Error(`card.svg: border gradient "${strokeRef[1]}" needs a userSpaceOnUse line`)
   }
+  // The clip: the border path must reference a clipPath whose single <path>
+  // is the plate silhouette (the owner's clip-path-1).
+  const borderPath = [...svg.matchAll(/<path\b([^>]*)>/g)]
+    .map((m) => attributes(m[1]))
+    .find((a) => a.get('class') === 'cls-3')
+  const clipRef = borderPath?.get('clip-path')?.match(/url\(#([^)]+)\)/)?.[1]
+  if (!clipRef) throw new Error('card.svg: the border-over path must clip to the plate silhouette')
+  const clip = svg.match(new RegExp('<clipPath\\b[^>]*id="' + clipRef + '"[^>]*>[\\s\\S]*?</clipPath>'))
+  const clipD = clip?.[0].match(/<path\b[^>]*\bd="([^"]+)"/)?.[1]
+  if (!clipD) throw new Error(`card.svg: clipPath "${clipRef}" must contain the silhouette <path d>`)
   return {
     line: {
       x1: Number(attrs.get('x1')),
@@ -290,6 +319,7 @@ function borderStroke(svg: string): { line: CardGradientLine; width: number } {
       y2: Number(attrs.get('y2')),
     },
     width: Number(width[1]),
+    clipPath: clipD,
   }
 }
 
@@ -314,53 +344,72 @@ function parseCard(svg: string): CardGeometry {
   }
   const ovrSize = need('cls-4', 'OVR')
   const jobSize = need('cls-5', 'job')
-  const labelSize = need('cls-6', 'stat label')
-  const pointsSize = need('cls-7', 'points')
-  const valueSize = need('cls-8', 'stat value')
+  const labelSize = need('cls-7', 'stat label / value')
+  const pointsSize = need('cls-8', 'points')
+  const nameSize = need('cls-6', 'player name')
 
   const texts = textSlots(svg)
   expectCount(texts, 'cls-4', 1)
   expectCount(texts, 'cls-5', 1)
-  expectCount(texts, 'cls-6', 6)
-  expectCount(texts, 'cls-7', 7) // 6 points + 1 PLAYERNAME
+  expectCount(texts, 'cls-6', 1)
+  expectCount(texts, 'cls-7', 12) // 6 labels + 6 raw values
   expectCount(texts, 'cls-8', 6)
 
-  // OVR: the ONE slot allowed a scaled matrix — resolve it ONCE here
-  // (12.093px × 21.169 matrix ≈ 256px effective; the hack never reaches
-  // the render surfaces).
+  // OVR: ONE OF THE TWO slots allowed a scaled matrix — resolve ONCE here
+  // (8.503px × 21.169 ≈ 180px effective; the hack never reaches render).
   const ovrRaw = texts.find((t) => t.cls === 'cls-4')!
   if (ovrRaw.scale === 1) throw new Error('card.svg: the OVR slot must carry its design matrix scale')
   const ovr: CardTextSlot = { x: ovrRaw.x, y: ovrRaw.y, size: ovrSize * ovrRaw.scale }
 
-  const job = slotOf(texts.find((t) => t.cls === 'cls-5')!, jobSize, 'the job slot')
+  const job = slotOf(texts.find((t) => t.cls === 'cls-5')!, jobSize)
 
-  // cls-7 is shared by the 6 points slots and PLAYERNAME: the name is the
-  // single one ABOVE the stats band (y < 1100; points sit at y≈1265).
+  // PLAYERNAME: the SECOND slot allowed a scaled matrix (0.656 → ≈72px).
+  const nameRaw = texts.find((t) => t.cls === 'cls-6')!
+  const name = slotOf(nameRaw, nameSize)
+
+  // cls-7 is shared by the 6 stat labels and the 6 raw values (both 48px
+  // Bebas Neue). Labels sit at y≈1283.5, values at y≈1329.25.
   const cls7 = texts.filter((t) => t.cls === 'cls-7').sort(byX)
-  const nameRaw = cls7.filter((t) => t.y < 1100)
-  const pointsRaw = cls7.filter((t) => t.y >= 1100).sort(byX)
-  if (nameRaw.length !== 1 || pointsRaw.length !== 6) {
-    throw new Error('card.svg: cls-7 must be exactly 6 points slots (y≥1100) + 1 PLAYERNAME (y<1100)')
+  const labelRaw = cls7.filter((t) => t.y < 1300).sort(byX)
+  const valueRaw = cls7.filter((t) => t.y >= 1300).sort(byX)
+  if (labelRaw.length !== 6 || valueRaw.length !== 6) {
+    throw new Error('card.svg: cls-7 must be exactly 6 stat labels (y<1300) + 6 raw values (y>=1300)')
   }
-  const name = slotOf(nameRaw[0], pointsSize, 'the name slot')
 
-  const labelRaw = texts.filter((t) => t.cls === 'cls-6').sort(byX)
-  const valueRaw = texts.filter((t) => t.cls === 'cls-8').sort(byX)
+  const pointsRaw = texts.filter((t) => t.cls === 'cls-8').sort(byX)
+  if (pointsRaw.length !== 6) {
+    throw new Error('card.svg: cls-8 must be exactly 6 stat point values')
+  }
+  // THE COLUMN-CENTER GRID (round 7): the points placeholders are the SAME
+  // string ('99') in every column, so their left anchors sit at
+  // center − width('99')/2 — CONSTANT offset → the points x's are the
+  // column centers' grid, evenly pitched. The label/value anchors are left-
+  // anchors of DIFFERENT-width placeholder strings ('MATK' vs 'MDMG.R') and
+  // are NOT centers. Lock the even pitch: a future file edit that breaks
+  // the grid breaks the central-alignment design.
+  for (let i = 1; i < pointsRaw.length; i++) {
+    const pitch = pointsRaw[i].x - pointsRaw[i - 1].x
+    const first = pointsRaw[1].x - pointsRaw[0].x
+    if (Math.abs(pitch - first) > 1) {
+      throw new Error(
+        `card.svg: stat points anchors are not evenly pitched (column ${i + 1} pitch ${pitch.toFixed(3)} ≠ ${first.toFixed(3)}) — the center grid is broken`,
+      )
+    }
+  }
 
   const stats: CardStatSlot[] = labelRaw.map((label, i) => {
-    const points = slotOf(pointsRaw[i], pointsSize, `points slot ${i + 1}`)
+    // Sanity bound (NOT centering): the points/value anchors are left-anchors
+    // of the owner's PLACEHOLDER strings — they may differ from the label x
+    // (different string widths) but must stay near their column. The COLUMN
+    // CENTER is derived downstream (points anchor + width('99')/2, the
+    // owner's own centering of the placeholder — see buildCardPlan).
+    const span = Math.max(label.x, pointsRaw[i].x, valueRaw[i].x) - Math.min(label.x, pointsRaw[i].x, valueRaw[i].x)
+    if (span > 20) throw new Error(`card.svg: stat slot ${i + 1} is not column-aligned (span ${span}px)`)
     return {
-      label: slotOf(label, labelSize, `label slot ${i + 1}`),
-      points,
-      value: slotOf(valueRaw[i], valueSize, `value slot ${i + 1}`),
+      label: slotOf(label, labelSize),
+      points: slotOf(pointsRaw[i], pointsSize),
+      value: slotOf(valueRaw[i], labelSize),
     }
-  })
-
-  // Slot sanity: within each stat slot the three texts must be column-aligned
-  // (label → points → value within ~40px) — a shuffled design must fail loud.
-  stats.forEach((s, i) => {
-    const span = Math.max(s.label.x, s.points.x, s.value.x) - Math.min(s.label.x, s.points.x, s.value.x)
-    if (span > 40) throw new Error(`card.svg: stat slot ${i + 1} is not column-aligned (span ${span}px)`)
   })
 
   const platePath = pickPlatePath(svg)
@@ -368,6 +417,7 @@ function parseCard(svg: string): CardGeometry {
 
   return {
     platePath,
+    plateBBox: pathBBox(platePath, 'base-plate'),
     cropPath,
     cropBBox: pathBBox(cropPath, 'crop-path'),
     borderStroke: borderStroke(svg),
@@ -385,10 +435,10 @@ export const CARD_GEOMETRY: CardGeometry = parseCard(cardRaw)
 // scalePath — THE CANVAS-MAPPING CONTRACT (kept from checkpoint round 2):
 // the card paths are authored in the 1080×1600 design space; the on-page
 // <svg viewBox> maps them to the element for free, but Canvas 2D has no
-// viewBox — the JPEG shell MUST transform every path onto the backing store
-// itself. Exact for our paths: every card path uses ONLY absolute M/L/C/Z
-// commands (no relative commands, no arcs), so every numeric token is a
-// coordinate.
+// viewBox — the JPEG/PNG shell MUST transform every path onto the backing
+// store itself. Exact for our paths: every card path uses ONLY absolute
+// M/L/C/Z commands (no relative commands, no arcs), so every numeric token
+// is a coordinate.
 export function scalePath(d: string, s: number): string {
   return d.replace(/-?\d+(?:\.\d+)?/g, (n) => String(Math.round(parseFloat(n) * s * 1000) / 1000))
 }

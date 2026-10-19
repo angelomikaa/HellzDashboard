@@ -1,3 +1,8 @@
+/* Bebas Neue — the card's type face for every slot except the player name
+   (round 7 owner decision: fetch from Google Fonts; if it cannot load, the
+   card font stacks fall through to Orbitron and the fit contract keeps
+   every slot inside its column — degrade, never crash). */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
 @import "tailwindcss";
 
 @font-face {

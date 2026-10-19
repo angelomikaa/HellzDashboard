@@ -1,31 +1,43 @@
-// Headless REAL-RENDER check for the card export (07.2-05 gates; round 5,
-// the owner's single card.svg source of truth). Draws all four tier cards
-// via the ACTUAL drawCard pipeline (fonts, images, canvas) at the 2160×3200
-// download backing store (2× the 1080×1600 design space), then probes the
-// pixels:
+// Headless REAL-RENDER check for the card export (07.2-05 gates; round 7,
+// the owner's typography/layout/export overhaul: Bebas Neue everywhere
+// except the player name — Google Fonts @import, border-over-photo with the
+// plate-silhouette clip, central stat columns, transparent PNG export).
+// Draws all four tier cards via the ACTUAL drawCard pipeline (fonts, images,
+// canvas) at the 2160×3200 download backing store (2× the 1080×1600 design
+// space), then probes the pixels:
 //
-//  - frame: the tier plate fill covers the canvas corners (outside the
-//    plate silhouette) and the plate area is painted
+//  - transparency: the canvas corners sit OUTSIDE the plate silhouette and
+//    the PNG has NO background — alpha must be 0 there (round 7 export)
+//  - plate: the tier fill paints the shield interior
 //  - photo: the class portrait is CLIPPED INTO the crop path (grid probe
 //    inside the crop bbox differs from the plate fill) — monogram tier:
 //    the ASST-01 tile shows
-//  - border: the tier gradient stroke shows along the silhouette edges at
-//    the gradient line's ends (probe near stop0 / stop1 colors, distinct
-//    from the plate fill)
+//  - border-over-photo: the tier gradient stroke's band covers the crop
+//    path's bottom edge — probed BELOW the edge (over plate fill) AND just
+//    INSIDE it (over the photo/monogram: the border paints LAST, covering
+//    the photo's edges — the round-7 deliberate order)
 //  - text: white OVR + job glyphs over the photo (top-left); palette
 //    text-fill glyphs for the name (on the plate) and the six stat columns
-//  - fonts: document.fonts.check confirms Orbitron loaded (no serif
-//    fallback rendered)
+//  - fonts: document.fonts.check confirms Orbitron AND Bebas Neue loaded
+//    (no serif fallback rendered)
+//  - Bebas estimate: the conservative 0.5em/char estimate never
+//    UNDER-estimates the real Bebas advances (measureText truth)
 //  - readability: the points type stays ≥ 8% of the card width (the
 //    round-5 lock on the big rank numbers)
 //  - aspect gate: drawCard REJECTS a wrong-aspect (square) backing store
-//  - taint: canvas.toBlob('image/jpeg') succeeds for every tier
+//  - export: canvas.toBlob('image/png') succeeds for every tier (taint +
+//    round-7 PNG format)
 //
 // The summary JSON lands in #results; the runner reads the DOM dumped by
 // Edge headless and asserts every probe passed.
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
-import { buildCardPlan, drawCard, type CardExportData } from '../../src/features/export/cardExport'
+import {
+  buildCardPlan,
+  drawCard,
+  estimateBebas,
+  type CardExportData,
+} from '../../src/features/export/cardExport'
 import { CARD_DESIGN_HEIGHT, CARD_DESIGN_WIDTH, CARD_GEOMETRY, TIER_PALETTE } from '../../src/features/export/cardAssets'
 import { CardSvg } from '../../src/features/cards/CardSvg'
 
@@ -35,12 +47,12 @@ const base: CardExportData = {
   charFunction: 'dps',
   ovr: 87,
   stats: [
-    { label_short: 'PCB', value: '1.234', points: 96 },
-    { label_short: 'CRT', value: '42,5%', points: 71 },
+    { label_short: 'MATK', value: '1.234', points: 96 },
+    { label_short: 'MDEF', value: '42,5%', points: 71 },
     { label_short: 'HP', value: '98.765', points: 55 },
-    { label_short: 'ASP', value: '183%', points: 30 },
-    { label_short: 'PAT', value: '2.345', points: 12 },
-    { label_short: 'SPM', value: '67,8%', points: 88 },
+    { label_short: 'ASPD', value: '183%', points: 30 },
+    { label_short: 'MDMG.R', value: '2.345', points: 12 },
+    { label_short: 'PVP.R', value: '67,8%', points: 88 },
   ],
   photoSrc: null,
   monogramLetter: 'A',
@@ -78,9 +90,20 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
 
   const plateFill = palette.plateFill
 
-  // Frame: the canvas corners are OUTSIDE the plate silhouette → they show
-  // the edge-to-edge plate fill base.
-  const frame = near(px(4, 4), plateFill, 8) && near(px(CARD_DESIGN_WIDTH - 4, 4), plateFill, 8)
+  // Transparency (round 7): the canvas corners sit OUTSIDE the plate
+  // silhouette and the PNG has NO background — alpha MUST be 0 there.
+  const cornerAlpha = (x: number, y: number): number => ctx.getImageData(x, y, 1, 1).data[3]
+  const transparentOutside =
+    cornerAlpha(4, 4) === 0 &&
+    cornerAlpha(canvas.width - 5, 4) === 0 &&
+    cornerAlpha(4, canvas.height - 5) === 0 &&
+    cornerAlpha(canvas.width - 5, canvas.height - 5) === 0
+
+  // Plate: the tier fill paints the shield interior (probe points well
+  // inside the silhouette, clear of text/lines: between name and stats,
+  // and in the plate tip below the stats).
+  const platePainted =
+    near(px(540, 1140), plateFill, 8) && near(px(300, 1400), plateFill, 8)
 
   // Photo area: the crop path. Sample a grid inside its bbox (skipping the
   // scrimmed top and the OVR block) — the photo is present if ANY sampled
@@ -101,26 +124,41 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
     photo = near(px(b.x + b.w * 0.3, b.y + b.h * 0.75), plan.colors.monogramTile, 10)
   }
 
-  // Gradient border: probe the silhouette's left/right edges BELOW the
-  // crop area (y=1100 — the photo covers the border above y≈864 by design:
-  // the crop path reaches the silhouette edges). The clip shows the
-  // stroke's inner half (~20px wide); the gradient line's horizontal
-  // offsets depend only on x.
+  // Border-over-photo (round 7): the gradient stroke runs ON the crop-path
+  // geometry. Probe its band at THREE points along the crop path:
+  //   · left edge  (x≈84,  y=600): inner half of the left vertical — ≈stop0
+  //   · right edge (x≈995, y=600): inner half of the right vertical — ≈stop1
+  //   · bottom edge (x=540, y=945): BELOW the crop's bottom edge (y≈937,
+  //     interior of the plate) — mid-gradient, never plate fill
+  // …and ONE point INSIDE the photo area at the bottom edge (x=540, y=928):
+  // the stroke band (917..957) covers the photo there — the border paints
+  // OVER the photo (the round-7 deliberate order), so this pixel must be
+  // gradient, NOT photo/monogram.
   const line = plan.card.borderStroke.line
   const stop0 = palette.borderStops[0].color
   const stop1 = palette.borderStops[palette.borderStops.length - 1].color
-  const leftX = line.x1 + 21
-  const rightX = line.x2 - 11
-  const midY = 1100
+  const midHex = (a: string, b: string): string => {
+    const [r1, g1, b1] = hexToRgb(a)
+    const [r2, g2, b2] = hexToRgb(b)
+    const mid = (u: number, v: number) => Math.round((u + v) / 2)
+    return `#${[mid(r1, r2), mid(g1, g2), mid(b1, b2)].map((v) => v.toString(16).padStart(2, '0')).join('')}`
+  }
+  const expectedMid = midHex(stop0, stop1)
   const toHex = (d: Uint8ClampedArray): string =>
     '#' + [d[0], d[1], d[2]].map((v) => v.toString(16).padStart(2, '0')).join('')
-  const leftPx = px(leftX, midY)
-  const rightPx = px(rightX, midY)
+  const leftPx = px(line.x1 + 21, 600)
+  const rightPx = px(line.x2 - 11, 600)
+  const bottomPx = px(540, 945)
+  const overPhotoPx = px(540, 928)
   const borderGradient =
     (near(leftPx, stop0, 70) || near(leftPx, stop1, 70)) &&
     (near(rightPx, stop1, 70) || near(rightPx, stop0, 70)) &&
-    !near(leftPx, plateFill, 8) &&
-    !near(rightPx, plateFill, 8)
+    near(bottomPx, expectedMid, 70) &&
+    !near(bottomPx, plateFill, 12)
+  // The over-photo pixel: gradient-colored, and NOT the monogram tile / a
+  // photo pixel (any sampled photo pixel would differ from the gradient —
+  // both facts together prove the border covers the photo's edge).
+  const borderOverPhoto = near(overPhotoPx, expectedMid, 70) && !near(overPhotoPx, plateFill, 12)
 
   // OVR text: count white glyphs over the photo (number + job name block,
   // top-left — the parsed OVR/job slots' region).
@@ -141,27 +179,58 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
   }
 
   // Stat columns: glyph pixels in the text fill across the three slot rows
-  // (labels ≈1141 / points ≈1265 / values ≈1315).
+  // (points ≈1209.7 / labels ≈1283.5 / values ≈1329.3 — round-7 geometry,
+  // all centered on the column centers).
   let statText = 0
-  for (let y = 1090; y < 1340; y += 4) {
-    for (let x = 110; x < 1000; x += 5) {
+  for (let y = 1140; y < 1345; y += 4) {
+    for (let x = 100; x < 990; x += 5) {
       if (near(px(x, y), palette.textFill, 60)) statText++
     }
   }
 
-  // Taint check: toBlob must succeed (same-origin discipline).
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+  // Bebas estimate guard (round 7): the conservative 0.5em/char estimate
+  // must NEVER under-estimate the real Bebas advances (measureText truth —
+  // if a real advance exceeds the estimate, widen the estimate constant).
+  const bebasSamples: Array<[string, number]> = [
+    ['PDMG.R', 48],
+    ['PVP.R', 48],
+    ['MATK', 48],
+    ['99', 128],
+    ['10800', 48],
+  ]
+  const bebasReal = bebasSamples.map(([text, size]) => {
+    ctx.font = `400 ${size}px "Bebas Neue"`
+    const real = ctx.measureText(text).width
+    const est = estimateBebas(text, 400, size)
+    return { text, size, real: Number(real.toFixed(2)), estimate: est, ok: est >= real }
+  })
+
+  // Export check: toBlob must succeed as PNG (same-origin discipline +
+  // the round-7 format contract).
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
 
   return {
-    frame,
+    transparentOutside,
+    platePainted,
     photo,
     borderGradient,
-    borderProbe: { left: toHex(leftPx), right: toHex(rightPx), expectL: stop0, expectR: stop1, plate: plateFill },
+    borderOverPhoto,
+    borderProbe: {
+      left: toHex(leftPx),
+      right: toHex(rightPx),
+      bottom: toHex(bottomPx),
+      overPhoto: toHex(overPhotoPx),
+      expectL: stop0,
+      expectR: stop1,
+      expectMid: expectedMid,
+      plate: plateFill,
+    },
     ovrTextPixels: ovrText,
     nameTextPixels: nameText,
     statTextPixels: statText,
     pointsSizeRatio: plan.stats[0].pointsSize / CARD_DESIGN_WIDTH,
-    blobOk: blob !== null && blob.type === 'image/jpeg' && blob.size > 20000,
+    bebasEstimateGuard: bebasReal,
+    blobOk: blob !== null && blob.type === 'image/png' && blob.size > 20000,
   }
 }
 
@@ -181,6 +250,8 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
 //    the assertion that would have caught the round-5 defect (the SVG-side
 //    0.62em advance estimate passed slots that REAL Orbitron metrics
 //    overflow: a 3-letter 72px label is ~162px wide, its column ~136px).
+//  - central alignment (round 7): every stat column's three lines render
+//    CENTERED on the column center (bbox center ≈ centerX, ±6px).
 //  - plate containment: name/stat glyphs stay inside the plate silhouette's
 //    inner span (60..1020 in design space).
 //  - scale tracking: the same SVG mounted at 360px and 720px container
@@ -193,7 +264,14 @@ const OVR_MAXW_DESIGN = CARD_DESIGN_WIDTH - CARD_GEOMETRY.slots.ovr.x - 40 // mi
 interface SlotExpectation {
   text: string
   maxW: number
-  x: number | null // null = centered (name) — plate-containment instead
+  /** Non-null = LEFT-anchored slot (OVR number / job): glyphs start at x
+   *  and end ≤ x + maxW. null = CENTERED slot (name, round-7 stat columns):
+   *  the glyph box is centered on the column center with plate containment
+   *  instead of a left anchor. */
+  x: number | null
+  /** For centered stat slots: the column center the glyph box must be
+   *  centered on (round 7 central alignment — the owner's rule). */
+  centerX?: number
 }
 
 async function auditMount(
@@ -207,9 +285,9 @@ async function auditMount(
     { text: plan.ovr.jobText, maxW: plan.ovr.jobMaxW, x: plan.ovr.jobX },
     { text: plan.name.text, maxW: plan.name.maxWidth, x: null },
     ...plan.stats.flatMap((c) => [
-      { text: c.label, maxW: c.labelMaxW, x: c.labelX },
-      { text: c.points, maxW: c.pointsMaxW, x: c.pointsX },
-      { text: c.value, maxW: c.valueMaxW, x: c.valueX },
+      { text: c.label, maxW: c.labelMaxW, x: null, centerX: c.centerX },
+      { text: c.points, maxW: c.pointsMaxW, x: null, centerX: c.centerX },
+      { text: c.value, maxW: c.valueMaxW, x: null, centerX: c.centerX },
     ]),
   ]
 
@@ -250,10 +328,19 @@ async function auditMount(
       }
       const bb = t.getBBox()
       if (exp.x === null) {
-        // Centered name on the plate: glyphs must stay in the silhouette's
-        // inner span (plate interior 60..1020 in design space).
+        // Centered slot (name / round-7 stat columns): glyphs must stay in
+        // the silhouette's inner span (plate interior 60..1020), and — for
+        // the stat columns — the box must be CENTERED on the column center.
         if (bb.x < 60 || bb.x + bb.width > 1020) {
-          violations.push(`name bbox ${bb.x.toFixed(1)}..${(bb.x + bb.width).toFixed(1)} leaves the plate span 60..1020`)
+          violations.push(`slot ${i} "${exp.text}" bbox ${bb.x.toFixed(1)}..${(bb.x + bb.width).toFixed(1)} leaves the plate span 60..1020`)
+        }
+        if (exp.centerX !== undefined) {
+          const center = bb.x + bb.width / 2
+          if (Math.abs(center - exp.centerX) > 6) {
+            violations.push(
+              `slot ${i} "${exp.text}" centered at ${center.toFixed(1)} ≠ column center ${exp.centerX.toFixed(1)}`,
+            )
+          }
         }
       } else {
         if (bb.x < exp.x - 4) {
@@ -278,6 +365,8 @@ async function auditOnPage(): Promise<Record<string, unknown>> {
     document.fonts.load('900 100px Orbitron'),
     document.fonts.load('700 100px Orbitron'),
     document.fonts.load('600 100px Orbitron'),
+    document.fonts.load('400 48px Bebas Neue'),
+    document.fonts.load('400 128px Bebas Neue'),
   ])
   await document.fonts.ready
   const out: Record<string, unknown> = {}
@@ -328,12 +417,13 @@ async function main(): Promise<void> {
     } catch {
       aspectGate = true
     }
-    // Fonts: Orbitron must ACTUALLY be loaded (no serif fallback in the
-    // glyph probes above).
+    // Fonts: Orbitron AND Bebas Neue must ACTUALLY be loaded (no serif
+    // fallback in the glyph probes above).
     const fontsLoaded =
       document.fonts.check('900 100px Orbitron') &&
       document.fonts.check('700 100px Orbitron') &&
-      document.fonts.check('600 100px Orbitron')
+      document.fonts.check('600 100px Orbitron') &&
+      document.fonts.check('400 128px Bebas Neue')
     // The on-page SVG surface: real-metric slot-fit + scale-tracking audit.
     try {
       results.onPage = await auditOnPage()
@@ -343,11 +433,12 @@ async function main(): Promise<void> {
     // Static design facts ride along (they pin the design-source wiring).
     results.meta = {
       designSize: `${CARD_DESIGN_WIDTH}x${CARD_DESIGN_HEIGHT}`,
-      sourceFile: 'src/assets/card.svg (single source of truth, round 5)',
+      sourceFile: 'src/assets/card.svg (single source of truth, round 7 — Bebas/Orbitron split, border-over-photo, transparent PNG)',
       slotCount: CARD_GEOMETRY.slots.stats.length,
       ovrEffectiveSize: CARD_GEOMETRY.slots.ovr.size,
       plateFillsDistinct: new Set(Object.values(TIER_PALETTE).map((p) => p.plateFill)).size === 4,
       borderWidthAllTiers: CARD_GEOMETRY.borderStroke.width === 40,
+      borderClippedToPlate: CARD_GEOMETRY.borderStroke.clipPath === CARD_GEOMETRY.platePath,
       fontsLoaded,
       aspectGateRejectsSquare: aspectGate,
     }

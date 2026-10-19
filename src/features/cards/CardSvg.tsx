@@ -1,29 +1,38 @@
-// CardSvg — the on-page card (07.2-05 checkpoint round 5, owner
-// supersession: ONE card.svg is the source of truth for the card design).
+// CardSvg — the on-page card (07.2-05 checkpoint round 7, owner
+// supersession: ONE card.svg is the source of truth — placeholder text
+// slots filled by code, photo clipped to the crop path, tier colors via
+// code-driven TIER_PALETTE, Bebas Neue everywhere except the player name
+// (Orbitron), detached border stroke over the crop, central column
+// alignment, transparent background outside the shield plate).
 //
 // REUSABLE BY DESIGN: this is the ONE card both surfaces consume —
 //   - PromotionCard (Destaques showcase) wraps it with the download button,
-//   - the Painel card area (the upload preview; plan 07.2-03's EAFC strip +
+//   - CardPhotoUpload (Painel own-card preview, plan 07.2-03's EAFC strip +
 //     own-card download) feeds it member data directly.
 //
 // SAME ARTIFACT AS THE EXPORT, BY CONSTRUCTION: the component renders
 // buildCardPlan(data, 1080) — the EXACT pure plan the canvas export paints
 // (cardExport.drawCard). Same path strings, same parsed slot positions,
-// same tier palette: on-page card and downloaded JPEG cannot drift apart.
+// same tier palette: on-page card and downloaded PNG cannot drift apart.
 //
-// Round-5 composition (the owner's rules):
-//   1. The photo (member screenshot or class portrait) is CLIPPED TO THE
-//      parsed crop path — round 5 brought the crop path back; there are no
-//      guideline rects anymore.
-//   2. All text is drawn into the PARSED placeholder-slot positions with
-//      the tier's code-driven palette (plate fill / border stops / text
-//      fill — TIER_PALETTE, the successors of the retired per-tier SVGs).
-//   3. The OVR block (big number + job name, NO "OVR" tag) sits over the
-//      photo, backed by the plan's top scrim, with the paint-order stroke
-//      as the SVG twin of the canvas shadow.
-//   4. Fonts: the file's Bebas Neue was a placeholder — the site's Orbitron
-//      renders everywhere; textLength squeeze keeps wide Orbitron strings
-//      inside their slots.
+// Round 7 composition (the owner's rules):
+//   1. The plate (shield-shaped tier color) is painted FIRST — nothing
+//      fills outside it, so the card has NO background: the downloaded PNG
+//      is transparent around the shield, and the on-page card shows the
+//      page backdrop through it.
+//   2. The photo (member screenshot or class portrait) is CLIPPED TO THE
+//      parsed crop path (round 5 brought it back — no guideline rects,
+//      just the text to be edited).
+//   3. The detached border (gradient stroke, width 40, painted ON the
+//      crop-path geometry) goes over the photo — covering its edges,
+//      deliberate design choice. CLIPPED to the plate silhouette (the
+//      owner's clip-path-1): the outer half of the stroke is cut, the
+//      inner half covers the photo.
+//   4. The top scrim backs the over-photo OVR block. All text is Bebas Neue
+//      EXCEPT the player name (Orbitron). Every text slot shrinks-to-fit
+//      its column (real measured metrics) so labels 4–6 chars wide never
+//      collide; the stat columns are CENTRALLY aligned (number / label /
+//      value share one center x per column).
 //
 // Photo-crop contract: data.photoSrc (member screenshot or class portrait —
 // always a same-origin asset/blob URL, T-072-13); null falls back to the
@@ -31,20 +40,20 @@
 // svg is decorative (aria-hidden) because every consumer labels the
 // surrounding article.
 //
-// Overflow guards (round 6 — the owner's overflow defect fix): the canvas
-// shell and this component share ONE fit contract (cardExport.fitCardText):
-// REAL Orbitron advance metrics (canvas measureText with the loaded font —
-// the round-5 0.62em estimate passed slots real Orbitron overflows: a
-// 2-digit points number rendered ~213px into a ~161px column and out of the
-// plate). Every slot shrinks its font size proportionally to fit its column
-// (readability floor), with a textLength glyph-squeeze only as the emergency
-// clamp past the floor. Text lives INSIDE the <svg viewBox> coordinate
-// space, so the fitted composition scales with the card at any width.
+// Overflow guards (rounds 6-7): the canvas shell and this component share
+// ONE fit contract (cardExport.fitCardText): REAL measured advance
+// metrics (canvas measureText with the loaded font). Every slot shrinks its
+// font size proportionally to fit its column (readability floor), with a
+// textLength glyph-squeeze only as the emergency clamp past the floor.
+// Text lives INSIDE the <svg viewBox> coordinate space, so the fitted
+// composition scales with the card at any width.
 import { useEffect, useId, useMemo, useState } from 'react'
 import {
   buildCardPlan,
+  estimateBebas,
   estimateOrbitron,
   fitCardText,
+  measureBebas,
   measureOrbitron,
   type CardExportData,
   type CardTextFit,
@@ -53,21 +62,18 @@ import {
 
 export function CardSvg({ data, className }: { data: CardExportData; className?: string }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
-  // The plan at the design space's own width — the <svg viewBox> does the
-  // responsive mapping for free (canvas's scalePath job, done by the browser).
-  const plan = useMemo(() => buildCardPlan(data, 1080), [data])
-
-  // Real-metric fitting needs the loaded Orbitron (before that, measureText
-  // measures the narrower fallback and under-fits). Gate the measurer on the
-  // exact card weights + document.fonts.ready; until ready, the conservative
-  // 0.8em estimate squeezes early rather than overflowing during the flash.
+  // Real-metric fitting needs the loaded fonts (before that, measureText
+  // measures the narrower fallback and under-fits). Gate the measurers on
+  // the exact card weights + document.fonts.ready; until ready, the
+  // conservative estimates squeeze early rather than overflowing during
+  // the flash. Bebas Neue everywhere except the player name (Orbitron).
   const [fontsReady, setFontsReady] = useState(false)
   useEffect(() => {
     let alive = true
     Promise.all([
-      document.fonts.load('900 100px Orbitron'),
+      document.fonts.load('400 48px Bebas Neue'),
+      document.fonts.load('400 128px Bebas Neue'),
       document.fonts.load('700 48px Orbitron'),
-      document.fonts.load('600 26px Orbitron'),
     ])
       .then(() => document.fonts.ready)
       .then(() => {
@@ -81,27 +87,37 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
       alive = false
     }
   }, [])
-  const measure: TextMeasurer = fontsReady ? measureOrbitron : estimateOrbitron
+  const beb: TextMeasurer = fontsReady ? measureBebas : estimateBebas
+  const orb: TextMeasurer = fontsReady ? measureOrbitron : estimateOrbitron
+
+  // The plan at the design space's own width — the <svg viewBox> does the
+  // responsive mapping for free (canvas's scalePath job, done by the browser).
+  // RE-DERIVED when the fonts land: the stat COLUMN CENTERS are derived from
+  // the parsed points anchors + width('99')/2 (round 7 central alignment) —
+  // with the gated measurer once Bebas Neue is really loaded, with the
+  // conservative estimate only during the load flash (same contract as the
+  // fit decisions below — the whole composition self-corrects on load).
+  const plan = useMemo(() => buildCardPlan(data, 1080, beb), [data, beb])
 
   // THE shared fit contract (cardExport.fitCardText) applied per slot — the
   // SAME decision the canvas export paints with (identical measurer, floor,
-  // clamp): on-page card and downloaded JPEG cannot drift apart.
+  // clamp): on-page card and downloaded PNG cannot drift apart.
   const fits = useMemo(
     () => ({
-      ovr: fitCardText(plan.ovr.text, 900, plan.ovr.size, plan.ovr.maxW, measure),
-      job: fitCardText(plan.ovr.jobText, 700, plan.ovr.jobSize, plan.ovr.jobMaxW, measure),
-      name: fitCardText(plan.name.text, 700, plan.name.size, plan.name.maxWidth, measure),
+      ovr: fitCardText(plan.ovr.text, 400, plan.ovr.size, plan.ovr.maxW, beb),
+      job: fitCardText(plan.ovr.jobText, 400, plan.ovr.jobSize, plan.ovr.jobMaxW, beb),
+      name: fitCardText(plan.name.text, 700, plan.name.size, plan.name.maxWidth, orb),
       stats: plan.stats.map((c) => ({
-        label: fitCardText(c.label, 700, c.labelSize, c.labelMaxW, measure),
-        points: fitCardText(c.points, 700, c.pointsSize, c.pointsMaxW, measure),
-        value: fitCardText(c.value, 600, c.valueSize, c.valueMaxW, measure),
+        label: fitCardText(c.label, 400, c.labelSize, c.labelMaxW, beb),
+        points: fitCardText(c.points, 400, c.pointsSize, c.pointsMaxW, beb),
+        value: fitCardText(c.value, 400, c.valueSize, c.valueMaxW, beb),
       })),
     }),
-    [plan, measure],
+    [plan, beb, orb],
   )
   const textLengthOf = (fit: CardTextFit): number | undefined => fit.squeezeTo
-  const plateClipId = `card-plate-clip-${uid}`
   const cropClipId = `card-crop-clip-${uid}`
+  const borderClipId = `card-border-clip-${uid}`
   const borderGradId = `card-border-grad-${uid}`
   const scrimId = `card-scrim-${uid}`
   const b = plan.photoBBox
@@ -114,7 +130,7 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
       focusable="false"
     >
       <defs>
-        {/* The tier border gradient (parsed geometry + palette stops) */}
+        {/* The tier border gradient (parsed geometry + palette stops). */}
         <linearGradient
           id={borderGradId}
           gradientUnits="userSpaceOnUse"
@@ -127,41 +143,30 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
             <stop key={i} offset={s.offset} stopColor={s.color} />
           ))}
         </linearGradient>
-        {/* Border clip: the plate silhouette itself (the SVG twin of the
-            canvas's ctx.clip(plate) — only the inner stroke half shows). */}
-        <clipPath id={plateClipId}>
-          <path d={plan.card.platePath} />
-        </clipPath>
         {/* Photo clip: THE crop path from card.svg (round 5). */}
         <clipPath id={cropClipId}>
-          <path d={plan.photoClipPath} />
+          <path d={plan.card.cropPath} />
         </clipPath>
-        {/* Top legibility scrim (backs the over-photo OVR block) */}
+        {/* Border clip: the owner's clip-path-1 = the plate silhouette —
+            the border-over stroke's outer half is cut (round 7). */}
+        <clipPath id={borderClipId}>
+          <path d={plan.card.borderStroke.clipPath} />
+        </clipPath>
+        {/* Top legibility scrim (backs the over-photo OVR block). */}
         <linearGradient id={scrimId} gradientUnits="userSpaceOnUse" x1="0" y1={plan.scrim.y1} x2="0" y2={plan.scrim.y2}>
           <stop offset="0" stopColor="#000000" stopOpacity={plan.scrim.alpha} />
-          <stop offset="1" stopColor="#000000" stopOpacity="0" />
+          <stop offset="1" stopColor="#000000" stopOpacity={0} />
         </linearGradient>
       </defs>
 
-      {/* Base + plate: the tier palette fill edge-to-edge (no anti-aliasing
-          fringe), then card.svg's silhouette in the same fill. */}
-      <rect x="0" y="0" width={plan.width} height={plan.height} fill={plan.palette.plateFill} />
+      {/* Plate: shield-shaped tier color fill — NOTHING fills outside it,
+          so the card has no background: transparent PNG download, and the
+          page backdrop shows through the on-page card. */}
       <path d={plan.card.platePath} fill={plan.palette.plateFill} />
 
-      {/* Decorative border: the tier gradient stroked along the silhouette,
-          clipped to it (only the inner half shows). */}
-      <g clipPath={`url(#${plateClipId})`}>
-        <path
-          d={plan.card.platePath}
-          fill="none"
-          stroke={`url(#${borderGradId})`}
-          strokeWidth={plan.card.borderStroke.width}
-        />
-      </g>
-
       {/* Photo: member screenshot / class portrait CLIPPED TO THE CROP PATH
-          (preserveAspectRatio slice over the crop bbox = cover-fit) — or the
-          ASST-01 monogram (never an empty hole). */}
+          (preserveAspectRatio slice over the crop bbox = cover-fit) — or
+          the ASST-01 monogram (never an empty hole). */}
       <g clipPath={`url(#${cropClipId})`}>
         {plan.photo.kind === 'image' ? (
           <image
@@ -193,16 +198,31 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         <rect x={b.x} y={b.y} width={b.w} height={plan.scrim.y2 - plan.scrim.y1} fill={`url(#${scrimId})`} />
       </g>
 
+      {/* Detached border: the gradient stroke painted ON the crop-path
+          geometry, over the photo (covering its edges — deliberate round-7
+          order: plate → photo → scrim → border-over → text). CLIPPED to the
+          plate silhouette (the owner's clip-path-1): the stroke's outer
+          half is cut, the inner half covers the photo edges. */}
+      <path
+        d={plan.card.cropPath}
+        fill="none"
+        stroke={`url(#${borderGradId})`}
+        strokeWidth={plan.card.borderStroke.width}
+        clipPath={`url(#${borderClipId})`}
+      />
+
       {/* OVR block — big number + JOB NAME below, NO "OVR" tag, at the
-          parsed slot positions. The stroked under-layer (paint-order) is
-          the SVG twin of the canvas's text shadow: white type stays legible
-          over any screenshot. */}
-      <g fontFamily="Orbitron, sans-serif" fill={plan.ovr.color}>
+          parsed slot positions over the photo. White + stroke (paint-order)
+          is the SVG twin of the canvas's text shadow: legible over any
+          screenshot. Bebas Neue (the player name is the only Orbitron slot);
+          the Orbitron fallback covers a failed Google Fonts load (fit
+          contract keeps the slot inside its column either way). */}
+      <g fontFamily={`${plan.fonts.slots}, ${plan.fonts.name}, sans-serif`} fill={plan.ovr.color}>
         <text
           x={plan.ovr.x}
           y={plan.ovr.y}
           fontSize={fits.ovr.size}
-          fontWeight="900"
+          fontWeight="400"
           textLength={textLengthOf(fits.ovr)}
           lengthAdjust="spacingAndGlyphs"
           stroke="#000000"
@@ -216,28 +236,28 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           x={plan.ovr.jobX}
           y={plan.ovr.jobY}
           fontSize={fits.job.size}
-          fontWeight="700"
+          fontWeight="400"
           textLength={textLengthOf(fits.job)}
           lengthAdjust="spacingAndGlyphs"
           stroke="#000000"
           strokeOpacity="0.55"
-          strokeWidth={fits.job.size * 0.12}
+          strokeWidth={fits.job.size * 0.06}
           paintOrder="stroke"
         >
           {plan.ovr.jobText}
         </text>
       </g>
 
-      {/* Player name — on the plate between photo and stats, palette text
-          fill, centered (round-5 decision); the solid card color guarantees
-          contrast. */}
+      {/* Player name — Orbitron only (round 7), palette text fill, centered
+          on the plate's horizontal midline (the parsed x anchors the
+          placeholder's left edge) on the plate between photo and stats. */}
       <text
         x={plan.name.x}
         y={plan.name.y}
         textAnchor="middle"
-        fontFamily="Orbitron, sans-serif"
-        fontSize={fits.name.size}
+        fontFamily={`${plan.fonts.name}, sans-serif`}
         fontWeight="700"
+        fontSize={fits.name.size}
         fill={plan.name.color}
         textLength={textLengthOf(fits.name)}
         lengthAdjust="spacingAndGlyphs"
@@ -246,35 +266,39 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
       </text>
 
       {/* The 6 key stats — one per parsed slot column (server order), each
-          a label / big points number / small raw value stack in the palette
-          text fill. */}
+          a label / big points number / small raw value stack, ALL THREE
+          LINES CENTRALLY ALIGNED on the column center (round 7). Bebas
+          Neue, shrink-to-fit per column. */}
       {plan.stats.map((cell, i) => (
-        <g key={i} fontFamily="Orbitron, sans-serif" fill={plan.palette.textFill}>
+        <g key={i} fontFamily={`${plan.fonts.slots}, ${plan.fonts.name}, sans-serif`} fill={plan.palette.textFill}>
           <text
-            x={cell.labelX}
+            x={cell.centerX}
             y={cell.labelY}
+            textAnchor="middle"
+            fontWeight="400"
             fontSize={fits.stats[i].label.size}
-            fontWeight="700"
             textLength={textLengthOf(fits.stats[i].label)}
             lengthAdjust="spacingAndGlyphs"
           >
             {cell.label}
           </text>
           <text
-            x={cell.pointsX}
+            x={cell.centerX}
             y={cell.pointsY}
+            textAnchor="middle"
+            fontWeight="400"
             fontSize={fits.stats[i].points.size}
-            fontWeight="700"
             textLength={textLengthOf(fits.stats[i].points)}
             lengthAdjust="spacingAndGlyphs"
           >
             {cell.points}
           </text>
           <text
-            x={cell.valueX}
+            x={cell.centerX}
             y={cell.valueY}
+            textAnchor="middle"
+            fontWeight="400"
             fontSize={fits.stats[i].value.size}
-            fontWeight="600"
             textLength={textLengthOf(fits.stats[i].value)}
             lengthAdjust="spacingAndGlyphs"
           >

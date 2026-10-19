@@ -1,11 +1,13 @@
 // cardAssets.test.ts — unit locks for the card.svg parser (07.2-05
-// checkpoint round 5, owner supersession: ONE card.svg is the single source
+// checkpoint round 7, owner supersession: ONE card.svg is the single source
 // of truth for the card design — placeholder TEXT slots the code fills,
-// crop-path photo area, tier colors applied by code). These tests lock that
-// the parser extracts every layer the card needs — plate silhouette, crop
-// path, border stroke geometry, and ALL text slots with their positions and
-// EFFECTIVE font sizes (the OVR slot's matrix hack resolved) — and that the
-// code-driven tier palettes carry the retired round-4 per-tier SVG palettes.
+// crop-path photo area, tier colors applied by code, Bebas Neue everywhere
+// except the player name (Orbitron), detached border over the crop,
+// central column alignment). These tests lock that the parser extracts every
+// layer the card needs — plate silhouette, crop path, border stroke
+// geometry, and ALL text slots with their positions and EFFECTIVE font sizes
+// (the OVR and name slot matrix hacks resolved) — and that the code-driven
+// tier palettes carry the retired round-4 per-tier SVG palettes.
 //
 // A malformed or hand-edited-broken card.svg must fail loudly here
 // (module-load fail-fast), never ship as a silently broken card.
@@ -20,7 +22,7 @@ import {
 } from './cardAssets'
 
 describe('cardAssets — card.svg parses completely (fail-fast contract)', () => {
-  it('parses the round-5 design space: portrait 1080×1600 (27:40, NOT 2:3)', () => {
+  it('parses the round-7 design space: portrait 1080×1600 (27:40, NOT 2:3)', () => {
     expect(CARD_DESIGN_WIDTH).toBe(1080)
     expect(CARD_DESIGN_HEIGHT).toBe(1600)
     expect(CARD_DESIGN_WIDTH / CARD_DESIGN_HEIGHT).toBeCloseTo(0.675, 3)
@@ -30,7 +32,8 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(CARD_GEOMETRY.platePath.startsWith('M')).toBe(true)
     expect(CARD_GEOMETRY.platePath.length).toBeGreaterThan(100)
     expect(CARD_GEOMETRY.cropPath.startsWith('M')).toBe(true)
-    // The crop path is a DISTINCT path (the photo area, not the silhouette).
+    // The crop path is a DISTINCT path (the photo area top portion, not the
+    // full silhouette — it closes at ~y=937).
     expect(CARD_GEOMETRY.cropPath).not.toBe(CARD_GEOMETRY.platePath)
   })
 
@@ -40,8 +43,8 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(b.y).toBeGreaterThanOrEqual(0)
     expect(b.x + b.w).toBeLessThanOrEqual(CARD_DESIGN_WIDTH + 1)
     expect(b.y + b.h).toBeLessThanOrEqual(CARD_DESIGN_HEIGHT)
-    // The owner's crop path spans essentially the full card width and the
-    // upper ~54% of the height (down to ~y=864 of 1600).
+    // The crop path spans essentially the full card width and the upper
+    // ~54% of the height (down to ~y=937 of 1600).
     expect(b.w).toBeGreaterThan(CARD_DESIGN_WIDTH * 0.85)
     expect(b.h).toBeGreaterThan(CARD_DESIGN_HEIGHT * 0.45)
     expect(b.h).toBeLessThan(CARD_DESIGN_HEIGHT * 0.6)
@@ -55,58 +58,81 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(line.y1).toBeGreaterThanOrEqual(0)
     expect(line.y2).toBeLessThanOrEqual(CARD_DESIGN_HEIGHT)
   })
+
+  it('extracts the border CLIP: the plate silhouette (the owner clips border-over to the plate, round 7)', () => {
+    // The border-over group clips its stroke with clipPath#clip-path-1,
+    // whose single path IS the plate silhouette: the stroke's outer half is
+    // cut, the inner half paints OVER the photo edges. If a future file
+    // edit decouples the clip from the plate, this lock forces a look.
+    expect(CARD_GEOMETRY.borderStroke.clipPath.startsWith('M')).toBe(true)
+    expect(CARD_GEOMETRY.borderStroke.clipPath).toBe(CARD_GEOMETRY.platePath)
+  })
 })
 
 describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes', () => {
-  it('resolves the OVR slot THROUGH its matrix hack: 12.093px × 21.169 ≈ 256px at (119.82, 466.72)', () => {
+  it('resolves the OVR slot THROUGH its matrix hack: 8.503px × 21.169 ≈ 180px at (136.177, 412.59)', () => {
     const ovr = CARD_GEOMETRY.slots.ovr
-    expect(ovr.x).toBeCloseTo(119.82, 1)
-    expect(ovr.y).toBeCloseTo(466.72, 1)
-    expect(ovr.size).toBeCloseTo(12.093 * 21.169, 1)
-    expect(ovr.size).toBeGreaterThan(240) // the number must be BIG (readability rounds 3-5)
-    expect(ovr.size).toBeLessThan(280)
+    expect(ovr.x).toBeCloseTo(136.177, 1)
+    expect(ovr.y).toBeCloseTo(412.59, 1)
+    expect(ovr.size).toBeCloseTo(8.503 * 21.169, 1)
+    expect(ovr.size).toBeGreaterThan(170) // the number must be BIG (readability rounds 3-7)
+    expect(ovr.size).toBeLessThan(190)
   })
 
-  it('resolves the job slot (48px) directly under the OVR number', () => {
+  it('resolves the job slot (72px Bebas) directly under the OVR number', () => {
     const job = CARD_GEOMETRY.slots.job
-    expect(job.x).toBeCloseTo(147.772, 1)
-    expect(job.y).toBeCloseTo(533.928, 1)
-    expect(job.size).toBe(48)
+    expect(job.x).toBeCloseTo(136.177, 1)
+    expect(job.y).toBeCloseTo(487.48, 1)
+    expect(job.size).toBe(72)
     expect(job.y).toBeGreaterThan(CARD_GEOMETRY.slots.ovr.y)
   })
 
-  it('resolves the PLAYERNAME slot (128px) on the plate between photo and stats', () => {
+  it('resolves the PLAYERNAME slot (ORBITRON, ≈72px effective via its 0.656 matrix) on the plate between photo and stats', () => {
     const name = CARD_GEOMETRY.slots.name
-    expect(name.x).toBeCloseTo(285.408, 1)
-    expect(name.y).toBeCloseTo(1030.58, 1)
-    expect(name.size).toBe(128)
-    // Between the crop area's bottom (~864) and the stats labels (~1141).
+    expect(name.x).toBeCloseTo(246.528, 1)
+    expect(name.y).toBeCloseTo(1047.007, 1)
+    expect(name.size).toBeCloseTo(109.72 * 0.656, 1)
+    expect(name.size).toBeGreaterThan(60)
+    expect(name.size).toBeLessThan(80)
+    // Between the crop area's bottom (~937) and the stats labels (~1273).
     expect(name.y).toBeGreaterThan(CARD_GEOMETRY.cropBBox.y + CARD_GEOMETRY.cropBBox.h)
     expect(name.y).toBeLessThan(CARD_GEOMETRY.slots.stats[0].label.y)
   })
 
-  it('resolves all SIX positional stat slots, left → right, at the owner\'s columns (~141px pitch)', () => {
+  it('resolves all SIX positional stat slots, left → right, on the owner\'s ~141px center grid', () => {
     const stats = CARD_GEOMETRY.slots.stats
     expect(stats).toHaveLength(6)
-    const labelXs = stats.map((s) => s.label.x)
-    expect(labelXs[0]).toBeCloseTo(129.473, 1)
-    expect(labelXs[5]).toBeCloseTo(837.415, 1)
+    // The COLUMN GRID is the points anchors' even pitch (≈141px): the owner
+    // centered the SAME '99' placeholder string on every column center, so
+    // the points x's MUST come evenly pitched (the parse also fail-fasts on
+    // this in cardAssets.ts — here it is locked from the outside too).
+    const pointsXs = stats.map((s) => s.points.x)
+    expect(pointsXs[0]).toBeCloseTo(136.177, 1)
+    expect(pointsXs[5]).toBeCloseTo(841.079, 1)
     for (let i = 1; i < 6; i++) {
-      const pitch = labelXs[i] - labelXs[i - 1]
-      expect(pitch).toBeGreaterThan(135)
-      expect(pitch).toBeLessThan(150)
+      const pitch = pointsXs[i] - pointsXs[i - 1]
+      expect(pitch).toBeGreaterThan(138)
+      expect(pitch).toBeLessThan(144)
     }
-    // Per slot: label (72px, y≈1141) above points (128px, y≈1265) above
-    // value (36px, y≈1315), column-aligned.
+    // Per slot: label (48px, y≈1273.5), points (128px, y≈1199.7), value
+    // (48px, y≈1319.3) — points row ABOVE the label row. All three lines
+    // render CENTERED on the derived column center (round 7 central
+    // alignment — see buildCardPlan); the parsed x's are the owner's
+    // left-anchors for the PLACEHOLDER strings (different widths →
+    // different left anchors), so they only sanity-bound together (well
+    // within a column pitch), never serve as centers.
     for (const s of stats) {
-      expect(s.label.size).toBe(72)
+      expect(s.label.size).toBe(48)
       expect(s.points.size).toBe(128)
-      expect(s.value.size).toBe(36)
-      expect(s.label.y).toBeCloseTo(1141.259, 1)
-      expect(s.points.y).toBeCloseTo(1265.763, 1)
-      expect(s.value.y).toBeCloseTo(1314.963, 1)
-      expect(s.points.y).toBeGreaterThan(s.label.y)
-      expect(s.value.y).toBeGreaterThan(s.points.y)
+      expect(s.value.size).toBe(48)
+      expect(s.points.y).toBeCloseTo(1199.703, 1)
+      expect(s.label.y).toBeCloseTo(1273.507, 1)
+      expect(s.value.y).toBeCloseTo(1319.255, 1)
+      expect(s.points.y).toBeLessThan(s.label.y)
+      expect(s.label.y).toBeLessThan(s.value.y)
+      // Placeholder anchors stay near their column (sanity, not centering).
+      const span = Math.max(s.label.x, s.points.x, s.value.x) - Math.min(s.label.x, s.points.x, s.value.x)
+      expect(span).toBeLessThanOrEqual(20)
     }
   })
 })
