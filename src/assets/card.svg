@@ -3,13 +3,13 @@
   <defs>
     <style>
       .cls-1{fill:#cf1a87}
-      .cls-2{fill:none;stroke:url(#Blue_to_Magenta);stroke-width:40;stroke-miterlimit:10}
-      .cls-3{fill:none}
-      .cls-4{font-family:&apos;Bebas Neue&apos;;font-size:12.093;fill:#e6e6e6}
-      .cls-5{font-family:&apos;Bebas Neue&apos;;font-size:48;fill:#e6e6e6}
-      .cls-6{font-family:&apos;Bebas Neue&apos;;font-size:72;fill:#e6e6e6}
-      .cls-7{font-family:&apos;Bebas Neue&apos;;font-size:128;fill:#e6e6e6}
-      .cls-8{font-family:&apos;Bebas Neue&apos;;font-size:36;fill:#e6e6e6}
+      .cls-2{fill:none}
+      .cls-3{fill:none;stroke:url(#Blue_to_Magenta);stroke-width:40;stroke-miterlimit:10}
+      .cls-4{font-family:&apos;Bebas Neue&apos;;font-size:8.503;fill:#e6e6e6}
+      .cls-5{font-family:&apos;Bebas Neue&apos;;font-size:72;fill:#e6e6e6}
+      .cls-6{font-family:Orbitron;font-size:109.72;fill:#e6e6e6}
+      .cls-7{font-family:&apos;Bebas Neue&apos;;font-size:48;fill:#e6e6e6}
+      .cls-8{font-family:&apos;Bebas Neue&apos;;font-size:128;fill:#e6e6e6}
     </style>
     <clipPath id="clip-path-1">
       <path d="M432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.096 964.415 1005.352 1354.515 1005.352 1354.515 C931.514 1492.629 821.774 1398.682 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C268.204 1399.808 164.274 1506.502 73.61 1354.515 C73.61 1354.515 74.813 931.519 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 Z"/>
@@ -21,55 +21,45 @@
   </defs>
   <title>pristine.ai</title>
   <g id="Card">
-    <g>
-      <path d="M432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.096 964.415 1005.352 1354.515 1005.352 1354.515 C931.514 1492.629 821.774 1398.682 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C268.204 1399.808 164.274 1506.502 73.61 1354.515 C73.61 1354.515 74.813 931.519 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 Z" class="cls-1"/>
-      <path d="M432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.096 964.415 1005.352 1354.515 1005.352 1354.515 C931.514 1492.629 821.774 1398.682 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C268.204 1399.808 164.274 1506.502 73.61 1354.515 C73.61 1354.515 74.813 931.519 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 Z" class="cls-2" clip-path="url(#clip-path-1)"/>
+    <path id="base-plate" d="M432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.096 964.415 1005.352 1354.515 1005.352 1354.515 C931.514 1492.629 821.774 1398.682 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C268.204 1399.808 164.274 1506.502 73.61 1354.515 C73.61 1354.515 74.813 931.519 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 Z" class="cls-1"/>
+    <path id="crop-path" d="M74.127 937.03 C74.127 937.03 74.094 515.49 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.86 520.928 1004.807 937.006 1004.807 937.006 Z" class="cls-2"/>
+    <g id="border-over">
+      <path d="M432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.096 964.415 1005.352 1354.515 1005.352 1354.515 C931.514 1492.629 821.774 1398.682 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C268.204 1399.808 164.274 1506.502 73.61 1354.515 C73.61 1354.515 74.813 931.519 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 Z" class="cls-3" clip-path="url(#clip-path-1)"/>
     </g>
-    <path id="crop-path" d="M73.61 864.338 C73.61 864.338 74.043 486.498 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.911 491.382 1004.794 864.338 1004.794 864.338 Z" class="cls-3"/>
-    <text id="OVR" transform="matrix(21.169 0 0 21.169 119.82 466.72)" x="0" y="0" xml:space="preserve" class="cls-4"><tspan x="0" y="0">99</tspan></text>
-    <text transform="matrix(1 0 0 1 147.772 533.928)" x="0" y="0" xml:space="preserve" class="cls-5"><tspan x="0" y="0">Job Class</tspan></text>
-    <g id="Stats">
-      <g id="KEY1">
-        <text transform="matrix(1 0 0 1 129.473 1141.259)" x="0" y="0" xml:space="preserve" class="cls-6"><tspan x="0" y="0">matk</tspan></text>
-        <text transform="matrix(1 0 0 1 138.429 1265.763)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">99</tspan></text>
-        <text transform="matrix(1 0 0 1 153.629 1314.963)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">10802</tspan></text>
-      </g>
-      <g id="KEY2">
-        <g>
-          <text transform="matrix(1 0 0 1 273.941 1141.259)" x="0" y="0" xml:space="preserve" class="cls-6"><tspan x="0" y="0">KEY2</tspan></text>
-          <text transform="matrix(1 0 0 1 279.297 1265.763)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">99</tspan></text>
-        </g>
-        <text transform="matrix(1 0 0 1 280.511 1314.963)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">288,74%</tspan></text>
-      </g>
-      <g id="KEY3">
-        <g>
-          <text transform="matrix(1 0 0 1 414.81 1141.259)" x="0" y="0" xml:space="preserve" class="cls-6"><tspan x="0" y="0">KEY2</tspan></text>
-          <text transform="matrix(1 0 0 1 420.166 1265.763)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">99</tspan></text>
-        </g>
-        <text transform="matrix(1 0 0 1 421.38 1314.963)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">288,74%</tspan></text>
-      </g>
-      <g id="KEY4">
-        <g>
-          <text transform="matrix(1 0 0 1 555.678 1141.259)" x="0" y="0" xml:space="preserve" class="cls-6"><tspan x="0" y="0">KEY2</tspan></text>
-          <text transform="matrix(1 0 0 1 561.034 1265.763)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">99</tspan></text>
-        </g>
-        <text transform="matrix(1 0 0 1 562.248 1314.963)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">288,74%</tspan></text>
-      </g>
-      <g id="KEY5">
-        <g>
-          <text transform="matrix(1 0 0 1 696.547 1141.259)" x="0" y="0" xml:space="preserve" class="cls-6"><tspan x="0" y="0">KEY2</tspan></text>
-          <text transform="matrix(1 0 0 1 701.903 1265.763)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">99</tspan></text>
-        </g>
-        <text transform="matrix(1 0 0 1 703.117 1314.963)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">288,74%</tspan></text>
-      </g>
-      <g id="KEY6">
-        <g>
-          <text transform="matrix(1 0 0 1 837.415 1141.259)" x="0" y="0" xml:space="preserve" class="cls-6"><tspan x="0" y="0">KEY2</tspan></text>
-          <text transform="matrix(1 0 0 1 842.771 1265.763)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">99</tspan></text>
-        </g>
-        <text transform="matrix(1 0 0 1 843.985 1314.963)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">288,74%</tspan></text>
-      </g>
+    <g id="OVR">
+      <text id="OVR-2" data-name="OVR" transform="matrix(21.169 0 0 21.169 136.177 412.59)" x="0" y="0" xml:space="preserve" class="cls-4"><tspan x="0" y="0">99</tspan></text>
+      <text transform="matrix(1 0 0 1 136.177 487.48)" x="0" y="0" xml:space="preserve" class="cls-5"><tspan x="0" y="0">JOB CLASS</tspan></text>
     </g>
-    <text transform="matrix(1 0 0 1 285.408 1030.58)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">PLAYERNAME</tspan></text>
+    <text transform="matrix(0.656 0 0 0.656 246.528 1047.007)" x="0" y="0" xml:space="preserve" class="cls-6"><tspan x="0" y="0">PLAYERNAME</tspan></text>
+    <g id="KEY1">
+      <text transform="matrix(1 0 0 1 269.222 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG.R</tspan></text>
+      <text transform="matrix(1 0 0 1 277.158 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text transform="matrix(1 0 0 1 275.846 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.02</tspan></text>
+    </g>
+    <g id="KEY2">
+      <text transform="matrix(1 0 0 1 147.273 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
+      <text transform="matrix(1 0 0 1 136.177 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text transform="matrix(1 0 0 1 137.029 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10800</tspan></text>
+    </g>
+    <g id="KEY3">
+      <text transform="matrix(1 0 0 1 565.366 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG</tspan></text>
+      <text transform="matrix(1 0 0 1 559.118 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text transform="matrix(1 0 0 1 557.806 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.02</tspan></text>
+    </g>
+    <g id="KEY4">
+      <text transform="matrix(1 0 0 1 429.234 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
+      <text transform="matrix(1 0 0 1 418.138 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text transform="matrix(1 0 0 1 418.99 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10800</tspan></text>
+    </g>
+    <g id="KEY5">
+      <text transform="matrix(1 0 0 1 847.327 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG</tspan></text>
+      <text transform="matrix(1 0 0 1 841.079 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text transform="matrix(1 0 0 1 839.767 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.02</tspan></text>
+    </g>
+    <g id="KEY6">
+      <text transform="matrix(1 0 0 1 711.195 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
+      <text transform="matrix(1 0 0 1 700.099 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text transform="matrix(1 0 0 1 700.951 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10800</tspan></text>
+    </g>
   </g>
 </svg>
