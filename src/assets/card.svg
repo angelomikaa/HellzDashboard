@@ -4,17 +4,17 @@
     <style>
       .cls-1{fill:#cf1a87}
       .cls-2{fill:none}
-      .cls-3{fill:none;stroke:url(#Blue_to_Magenta);stroke-width:40;stroke-miterlimit:10}
-      .cls-4{font-family:&apos;Bebas Neue&apos;;font-size:8.503;fill:#e6e6e6}
+      .cls-3{fill:none;stroke:url(#Blue_to_Magenta);stroke-width:48;stroke-miterlimit:10}
+      .cls-4{font-family:&apos;Bebas Neue&apos;;font-size:6.992;fill:#e6e6e6}
       .cls-5{font-family:&apos;Bebas Neue&apos;;font-size:72;fill:#e6e6e6}
       .cls-6{font-family:Orbitron;font-size:109.72;fill:#e6e6e6}
-      .cls-7{font-family:&apos;Bebas Neue&apos;;font-size:48;fill:#e6e6e6}
-      .cls-8{font-family:&apos;Bebas Neue&apos;;font-size:128;fill:#e6e6e6}
+      .cls-7{font-family:&apos;Bebas Neue&apos;;font-size:56;fill:#e6e6e6}
+      .cls-8{font-family:&apos;Bebas Neue&apos;;font-size:148;fill:#e6e6e6}
     </style>
     <clipPath id="clip-path-1">
       <path d="M432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.096 964.415 1005.352 1354.515 1005.352 1354.515 C931.514 1492.629 821.774 1398.682 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C268.204 1399.808 164.274 1506.502 73.61 1354.515 C73.61 1354.515 74.813 931.519 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 Z"/>
     </clipPath>
-    <linearGradient id="Blue_to_Magenta" x1="63.61" y1="799.387" x2="1015.352" y2="799.387" gradientUnits="userSpaceOnUse">
+    <linearGradient id="Blue_to_Magenta" x1="61.61" y1="799.387" x2="1017.352" y2="799.387" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#6e9aff"/>
       <stop offset="1" stop-color="#ff12f7"/>
     </linearGradient>
@@ -32,34 +32,34 @@
     </g>
     <text transform="matrix(0.656 0 0 0.656 246.528 1047.007)" x="0" y="0" xml:space="preserve" class="cls-6"><tspan x="0" y="0">PLAYERNAME</tspan></text>
     <g id="KEY1">
-      <text transform="matrix(1 0 0 1 269.222 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG.R</tspan></text>
-      <text transform="matrix(1 0 0 1 277.158 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text transform="matrix(1 0 0 1 275.846 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.02</tspan></text>
+      <text id="LABEL" transform="matrix(1 0 0 1 132.431 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
+      <text id="RATING" transform="matrix(1 0 0 1 120.019 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT" transform="matrix(1 0 0 1 123.219 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10000</tspan></text>
     </g>
     <g id="KEY2">
-      <text transform="matrix(1 0 0 1 147.273 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
-      <text transform="matrix(1 0 0 1 136.177 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text transform="matrix(1 0 0 1 137.029 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10800</tspan></text>
+      <text id="KEYLABEL" transform="matrix(1 0 0 1 252.373 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG.R</tspan></text>
+      <text id="RATING-2" data-name="RATING" transform="matrix(1 0 0 1 262.165 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT-2" data-name="STAT" transform="matrix(1 0 0 1 260.101 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.77</tspan></text>
     </g>
     <g id="KEY3">
-      <text transform="matrix(1 0 0 1 565.366 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG</tspan></text>
-      <text transform="matrix(1 0 0 1 559.118 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text transform="matrix(1 0 0 1 557.806 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.02</tspan></text>
+      <text id="LABEL-2" data-name="LABEL" transform="matrix(1 0 0 1 536.666 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG.R</tspan></text>
+      <text id="RATING-3" data-name="RATING" transform="matrix(1 0 0 1 546.458 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT-3" data-name="STAT" transform="matrix(1 0 0 1 544.394 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.77</tspan></text>
     </g>
     <g id="KEY4">
-      <text transform="matrix(1 0 0 1 429.234 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
-      <text transform="matrix(1 0 0 1 418.138 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text transform="matrix(1 0 0 1 418.99 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10800</tspan></text>
+      <text id="LABEL-3" data-name="LABEL" transform="matrix(1 0 0 1 416.724 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
+      <text id="RATING-4" data-name="RATING" transform="matrix(1 0 0 1 404.312 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT-4" data-name="STAT" transform="matrix(1 0 0 1 407.512 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10000</tspan></text>
     </g>
     <g id="KEY5">
-      <text transform="matrix(1 0 0 1 847.327 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG</tspan></text>
-      <text transform="matrix(1 0 0 1 841.079 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text transform="matrix(1 0 0 1 839.767 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.02</tspan></text>
+      <text id="LABEL-4" data-name="LABEL" transform="matrix(1 0 0 1 820.959 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG.R</tspan></text>
+      <text id="RATING-5" data-name="RATING" transform="matrix(1 0 0 1 830.751 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT-5" data-name="STAT" transform="matrix(1 0 0 1 828.687 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.77</tspan></text>
     </g>
     <g id="KEY6">
-      <text transform="matrix(1 0 0 1 711.195 1273.507)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
-      <text transform="matrix(1 0 0 1 700.099 1199.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text transform="matrix(1 0 0 1 700.951 1319.255)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10800</tspan></text>
+      <text id="LABEL-5" data-name="LABEL" transform="matrix(1 0 0 1 701.016 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
+      <text id="RATING-6" data-name="RATING" transform="matrix(1 0 0 1 688.604 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT-6" data-name="STAT" transform="matrix(1 0 0 1 691.804 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10000</tspan></text>
     </g>
   </g>
 </svg>
