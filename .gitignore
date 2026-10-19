@@ -36,3 +36,4 @@ public/ocr/
 .preview-log.txt
 
 scripts/card-render-check/dist/
+scripts/card-render-check/results.json
