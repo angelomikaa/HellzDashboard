@@ -349,6 +349,15 @@ export interface PromotionCardRow {
   // points} (RNK-02 re-baselined: key identity is the sanctioned 07.2 D-03
   // reveal; config data is never serialised).
   highlights: PromotionHighlight[]
+  // 07.2-05 round 7 photo consistency (owner decision 3): the member's
+  // card-photos STORAGE OBJECT PATH (bucket + key, server-composed from the
+  // member id — never a public URL; the bucket is private and its RLS grants
+  // ACTIVE members read, showcase visibility IS the feature). The client
+  // fetches it as a BLOB (T-072-13 canvas-taint discipline — the same rule
+  // as the Painel own-card) and falls back to the class portrait when the
+  // object doesn't exist (no upload yet → 404). No key-stat/config data
+  // rides this field.
+  photo_path: string
 }
 
 export interface PromotionSection {
@@ -573,4 +582,36 @@ export async function deleteCardPhoto(session: NeoFootSession): Promise<void> {
   if (res.ok || res.status === 404) return
   const kind = res.status === 401 ? 'unauthorized' : 'server'
   throw new ApiError(res.status, kind, `HTTP ${res.status} removing card photo`)
+}
+
+/** ANOTHER member's card photo, by the STORAGE PATH the get_promotion RPC
+ *  composes (07.2-05 round 7 photo consistency). Same blob discipline as
+ *  fetchCardPhoto (T-072-13): the blob becomes an object URL in the UI, so
+ *  the canvas export can never be tainted. The bucket RLS grants ACTIVE
+ *  members read (showcase visibility IS the feature — card-photos-storage
+ *  seed); a 404 is the designed no-photo state. ANY failure resolves null —
+ *  showcase cards degrade to the class portrait, never break the page.
+ *  Defense in depth: the path arrives server-composed from the SECURITY
+ *  DEFINER RPC, but only bucket-internal single-segment keys pass through —
+ *  anything else (foreign bucket, traversal, query junk) resolves null. */
+export async function fetchCardPhotoByPath(
+  session: NeoFootSession,
+  path: string,
+): Promise<Blob | null> {
+  if (
+    !path.startsWith('card-photos/') ||
+    path.includes('..') ||
+    path.includes('?') ||
+    path.includes('#') ||
+    path.includes('//')
+  ) {
+    return null
+  }
+  try {
+    const res = await storageFetch(session, path)
+    if (!res.ok) return null
+    return await res.blob()
+  } catch {
+    return null
+  }
 }

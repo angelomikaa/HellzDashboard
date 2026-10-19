@@ -147,6 +147,7 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
               {section.cards.map((card) => (
                 <PromotionCard
                   key={card.display_name}
+                  session={session}
                   card={card}
                   charClass={section.class_name}
                 />

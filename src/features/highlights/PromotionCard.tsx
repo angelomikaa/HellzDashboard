@@ -13,12 +13,16 @@
 // only the Destaques-specific affordance: the 'Baixar card' download button
 // (D-08/D-03/D-09) wired to the SAME export module the card renders from.
 //
-// Photo-crop on showcase cards: the promotion payload carries no member_id,
-// so the crop falls back to the member's CLASS PORTRAIT (self-hosted ROO
-// asset, D-15 — same-origin, canvas-taint-safe); the member's own uploaded
-// screenshot rides on THEIR card via the Painel (CardPhotoUpload; plan
-// 07.2-03 completes the member-side own-card). The ASST-01 monogram covers
-// art-less classes (Rebellion) — never an empty hole, never a broken image.
+// Photo-crop on showcase cards (round 7 CONSISTENCY DECISION, owner): both
+// card surfaces show the member's SUBMITTED photo where available — the same
+// fallback chain as the Painel own-card (CardPhotoUpload). The promotion
+// payload (get_promotion) carries the member's card-photos STORAGE PATH
+// (photo_path, server-composed); this wrapper fetches it as a BLOB (never a
+// cross-origin URL — T-072-13, so the PNG export can never be canvas-tainted)
+// and turns it into an object URL. Fallbacks: no path / fetch miss / 404 (no
+// upload yet) → the member's CLASS PORTRAIT (self-hosted ROO asset, D-15 —
+// same-origin) → the ASST-01 monogram inside CardSvg. Never an empty hole,
+// never a broken image.
 //
 // The 6 highlights are the class's KEY STATS (07.2-01 D-13 supersession),
 // rendered by CardSvg in the owner's slot columns in SERVER order (catalog
@@ -26,13 +30,14 @@
 // number per column IS the entire celebration (round 5: the palette text
 // fill replaced the tier-colored chips).
 //
-// Export contents (D-09/T-072-12 — the JPEG circulates OUTSIDE the guild):
+// Export contents (D-09/T-072-12 — the PNG circulates OUTSIDE the guild):
 // identity + the 6 key stats + points + Hellz mark. ZERO
 // guild-average data. The button sits BELOW the card; while generating:
 // disabled + 'Gerando…'; failure → inline enumeration-safe role=alert copy,
 // never raw errors.
-import { useMemo, useState } from 'react'
-import type { PromotionCardRow } from '../../lib/api'
+import { useEffect, useMemo, useState } from 'react'
+import { fetchCardPhotoByPath, type PromotionCardRow } from '../../lib/api'
+import type { NeoFootSession } from '../auth/session'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { crestSrcFor } from '../assets/ClassCrest'
 import { CardSvg } from '../cards/CardSvg'
@@ -41,18 +46,54 @@ import { cardFilename, downloadCard, type CardExportData } from '../export/cardE
 // Enumeration-safe pt-BR copy: never expose HTTP codes or internals.
 const DOWNLOAD_ERROR = 'Não foi possível gerar o card. Tente novamente.'
 
-export function PromotionCard({ card, charClass }: { card: PromotionCardRow; charClass: string }) {
+export function PromotionCard({
+  session,
+  card,
+  charClass,
+}: {
+  session: NeoFootSession
+  card: PromotionCardRow
+  charClass: string
+}) {
   // CardSvg derives the tier palette from the unit-locked tierForOvr
   // banding; ovr is ALWAYS non-null on a card (the RPC omits OVR-incapable
   // members), so the card always exists — no insufficient-data variant here.
 
-  // D-08/D-03: the download assembles the export from the SAME verbatim
-  // payload the card renders — values pre-formatted (formatStatValue),
-  // photo = the class portrait (self-hosted, D-15 — the canvas can never be
-  // tainted). CardSvg consumes the identical object.
+  // Round 7 photo consistency: fetch the member's submitted photo (the
+  // payload's storage path) as a BLOB → object URL; null until it lands,
+  // then the class portrait shows through (the fallback chain's middle rung)
+  // and the card re-renders with the real photo. The object URL is revoked
+  // on unmount/re-fetch.
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    let objectUrl: string | null = null
+    const path = typeof card.photo_path === 'string' ? card.photo_path : ''
+    if (path !== '') {
+      fetchCardPhotoByPath(session, path)
+        .then((blob) => {
+          if (!alive || blob === null) return
+          objectUrl = URL.createObjectURL(blob)
+          setPhotoUrl(objectUrl)
+        })
+        .catch(() => {
+          /* unreachable (fetchCardPhotoByPath resolves null) — degrade to portrait */
+        })
+    }
+    return () => {
+      alive = false
+      if (objectUrl !== null) URL.revokeObjectURL(objectUrl)
+    }
+  }, [session, card.photo_path])
+
   const [generating, setGenerating] = useState(false)
   const [failed, setFailed] = useState(false)
 
+  // D-08/D-03: the download assembles the export from the SAME verbatim
+  // payload the card renders — values pre-formatted (formatStatValue),
+  // photo = the member's submitted screenshot (blob object URL) or the
+  // class portrait (self-hosted, D-15) — both same-origin, the canvas can
+  // never be tainted. CardSvg consumes the identical object.
   const exportData: CardExportData = useMemo(
     () => ({
       name: card.display_name,
@@ -64,10 +105,10 @@ export function PromotionCard({ card, charClass }: { card: PromotionCardRow; cha
         value: formatStatValue(h.value, h.value_type),
         points: h.points,
       })),
-      photoSrc: crestSrcFor(charClass),
+      photoSrc: photoUrl ?? crestSrcFor(charClass),
       monogramLetter: charClass.charAt(0).toUpperCase(),
     }),
-    [card, charClass],
+    [card, charClass, photoUrl],
   )
 
   async function handleDownload(): Promise<void> {
@@ -103,7 +144,7 @@ export function PromotionCard({ card, charClass }: { card: PromotionCardRow; cha
           void handleDownload()
         }}
         disabled={generating}
-        aria-label={`Baixar card de ${card.display_name} (JPEG)`}
+        aria-label={`Baixar card de ${card.display_name} (PNG)`}
         className="rounded-md border border-line bg-surface px-3 py-2 text-sm font-semibold text-content hover-control disabled:cursor-not-allowed disabled:opacity-60"
       >
         {generating ? 'Gerando…' : 'Baixar card'}

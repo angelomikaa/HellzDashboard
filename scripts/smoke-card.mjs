@@ -638,6 +638,17 @@ async function main() {
         promoCards.every((c) => (c.highlights || []).every((h) => typeof h.label_short === 'string' && h.label_short.length > 0)),
       'label_short present',
     )
+    // 7f. 07.2-05 round 7 (owner decision 3, photo consistency): every card
+    // row carries the member's card-photos STORAGE PATH (server-composed
+    // `<uuid>/card.jpg` inside the private bucket) — Destaques shows the
+    // submitted photo, the client fetches it as a blob under the bucket's
+    // active-members read RLS.
+    const PHOTO_PATH_RE = /^card-photos\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/card\.jpg$/
+    check(
+      '7f. every card carries photo_path (card-photos/<member-uuid>/card.jpg)',
+      promoCards.length > 0 && promoCards.every((c) => typeof c.photo_path === 'string' && PHOTO_PATH_RE.test(c.photo_path)),
+      promoCards[0] ? String(promoCards[0].photo_path) : 'n/a',
+    )
 
     // ---- Probe 8: my_card reflects the D-05 rule-4 promotion live ---------
     // After 5i the fixture class has zero relevant rows; add one back and
