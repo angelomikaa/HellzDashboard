@@ -15,6 +15,7 @@ import {
 } from '../../lib/api'
 import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER, type GroupKey } from '../../lib/groups'
 import { formatStatValue } from '../../lib/parseStatValue'
+import { ClassCrest } from '../assets/ClassCrest'
 import { ConfirmDialog } from './ConfirmDialog'
 import type { NeoFootSession } from '../auth/session'
 
@@ -185,6 +186,9 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                       disabled={busy}
                       className="flex min-h-11 w-full items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-left hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                     >
+                      {/* 07.2-06 D-17: leading class icon (decorative; the row
+                          text already names the class). */}
+                      <ClassCrest charClass={row.char_class} size="sm" />
                       <span aria-hidden="true" className="text-sm text-muted">
                         {isExpanded ? '▾' : '▸'}
                       </span>
@@ -220,13 +224,16 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                                 </span>
                               </button>
                               {open && (
-                                <div id={groupRegionId} className="mt-1 flex flex-col">
+                                <div
+                                  id={groupRegionId}
+                                  className="mt-1 grid grid-cols-1 gap-x-6 sm:grid-cols-2 lg:grid-cols-3"
+                                >
                                   {row.stats
                                     .filter((stat) => stat.group_name === group)
                                     .map((stat) => (
                                       <div
                                         key={stat.stat_key}
-                                        className="flex items-center justify-between gap-2 py-1"
+                                        className="flex items-center justify-between gap-2 border-b border-line py-1"
                                       >
                                         <span className="flex min-w-0 items-baseline gap-2">
                                           <span className="text-sm font-semibold text-content">

@@ -69,13 +69,22 @@ const IMG_SIZES = {
   md: 'h-12 w-12 rounded-lg',
 } as const
 
-export function ClassCrest({ charClass, size = 'md' }: { charClass: string; size?: 'sm' | 'md' }) {
+// 07.2-06 (D-17 staff surfaces): staff rows carry `char_class: string | null`
+// (a member can be whitelisted before a character exists) — null renders the
+// neutral monogram tile with an em-dash, never a broken image.
+export function ClassCrest({
+  charClass,
+  size = 'md',
+}: {
+  charClass: string | null
+  size?: 'sm' | 'md'
+}) {
   const [failed, setFailed] = useState(false)
   // A card/row can be reused for a different class (list recycling) — reset
   // the belt-and-braces error flag whenever the class changes.
   useEffect(() => setFailed(false), [charClass])
 
-  const iconSrc = ICON_SRC.get(charClass)
+  const iconSrc = charClass === null ? undefined : ICON_SRC.get(charClass)
   if (iconSrc !== undefined && !failed) {
     return (
       <img
@@ -95,7 +104,7 @@ export function ClassCrest({ charClass, size = 'md' }: { charClass: string; size
       aria-hidden="true"
       className={`flex shrink-0 items-center justify-center border border-line bg-surface font-display font-semibold text-muted ${TILE_SIZES[size]}`}
     >
-      {charClass.charAt(0).toUpperCase()}
+      {charClass === null ? '—' : charClass.charAt(0).toUpperCase()}
     </div>
   )
 }

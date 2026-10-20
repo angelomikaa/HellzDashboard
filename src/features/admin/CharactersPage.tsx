@@ -30,6 +30,7 @@ import {
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { FUNCTION_LABELS } from '../../lib/groups'
+import { ClassCrest } from '../assets/ClassCrest'
 import { ConfirmDialog } from './ConfirmDialog'
 
 // Enumeration-safe pt-BR copy (UI contract): never expose HTTP codes, gateway
@@ -358,7 +359,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
               Nenhum membro na lista branca ainda.
             </p>
           ) : (
-            <div className="mt-6 flex flex-col gap-4">
+            <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
               {/* Owner gate round 4 (07.1-02): per-character card list. The
                   old 7-column table needed horizontal expansion (scroll or
                   negative-margin) to keep the edge controls' focus rings from
@@ -372,7 +373,12 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                   contributes to scrollable overflow) always have clearance
                   inside the card's own padding. DOM order = character info
                   first, then its controls: the focus order follows the visual
-                  reading order. */}
+                  reading order.
+                  07.2-06 LAYT-01: the list uses the wide shell as a 2-up card
+                  register at xl (NOT the rejected 7-column table); the card
+                  being edited spans both columns so the inline form keeps its
+                  comfortable field widths. Mobile/tablet stay 1-up exactly as
+                  before. */}
               {data.members.map((member) => {
                 const editing = draft?.memberId === member.id
                 const saving = savingRowId === member.id
@@ -389,7 +395,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                     aria-busy={saving}
                     className={`rounded-lg border border-line bg-surface p-4 sm:p-5 hover-card${
                       member.active ? '' : ' opacity-60'
-                    }`}
+                    }${editing ? ' xl:col-span-2' : ''}`}
                   >
                     {editing && draft ? (
                       <>
@@ -480,6 +486,9 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                       </>
                     ) : (
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        {/* 07.2-06 D-17: leading class icon (decorative; the
+                            class name still renders as text below). */}
+                        <ClassCrest charClass={member.char_class} size="sm" />
                         <span className="text-base font-semibold text-content">
                           {member.display_name}
                         </span>
