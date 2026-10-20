@@ -387,19 +387,17 @@ export function SubmitPage({ session }: SubmitPageProps) {
               {/* Capture strip (owner feedback, 07.2-06 checkpoint round 2):
                   the example shot + the OCR upload box occupy ONE full-width
                   strip; the fields are ONLY below it. */}
-              <div className="flex w-full flex-col gap-3 rounded-md border border-line bg-surface p-3 sm:flex-row sm:items-center sm:gap-4">
+              <div className="flex w-full flex-col gap-4 rounded-lg border border-line bg-surface p-4 lg:flex-row lg:items-stretch">
                 <a
-                  href="/examples/basic.svg"
+                  href="/examples/basic.png"
                   target="_blank"
                   rel="noreferrer"
-                  className="block w-full shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:w-40"
+                  className="mx-auto block w-full max-w-xs shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:mx-0 lg:w-80"
                 >
                   <img
-                    src="/examples/basic.svg"
+                    src="/examples/basic.png"
                     alt="Exemplo da tela básica do personagem"
-                    width={691}
-                    height={416}
-                    className="h-24 w-full rounded-md border border-line object-cover"
+                    className="h-auto w-full rounded-md border border-line object-contain"
                   />
                 </a>
                 <div className="min-w-0 flex-1">

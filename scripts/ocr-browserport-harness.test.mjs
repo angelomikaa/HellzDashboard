@@ -76,6 +76,18 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const SAMPLES_DIR = path.join(ROOT, '.secrets', 'ocr-samples')
 const EXPECTED_PATH = path.join(SAMPLES_DIR, 'expected.json')
+// 07.2-06 checkpoint round 3: the owner re-cut the sample bundle with the
+// "ideal" fixtures - sampbasic.png now ships as sampbasicideal.png. Resolve
+// the canonical name so the harness reads either bundle unchanged.
+const SAMPLE_ALIASES = { 'sampbasic.png': 'sampbasicideal.png' }
+function samplePath(file) {
+  const alias = SAMPLE_ALIASES[file]
+  if (alias !== undefined && existsSync(path.join(SAMPLES_DIR, alias))) return path.join(SAMPLES_DIR, alias)
+  return path.join(SAMPLES_DIR, file)
+}
+function expectedFor(expected, file) {
+  return expected[SAMPLE_ALIASES[file] ?? file] ?? expected[file]
+}
 const CALIBRATION_PATH = path.join(ROOT, 'scripts', 'ocr-regions.json')
 const hasSamples =
   existsSync(SAMPLES_DIR) && readdirSync(SAMPLES_DIR).some((f) => /\.png$/i.test(f))
@@ -230,7 +242,7 @@ const CANONICAL = [
 ]
 
 async function loadSampleCanvas(file) {
-  const { data, info } = await sharp(path.join(SAMPLES_DIR, file))
+  const { data, info } = await sharp(samplePath(file))
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true })
@@ -242,7 +254,7 @@ async function loadSampleCanvas(file) {
 
 /** Rescale a sample by `factor` (sharp cubic — the spike's rescale fixture). */
 async function rescaledSample(file, factor) {
-  const src = await sharp(path.join(SAMPLES_DIR, file)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const src = await sharp(samplePath(file)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const w = Math.max(1, Math.round(src.info.width * factor))
   const h = Math.max(1, Math.round(src.info.height * factor))
   const { data, info } = await sharp(src.data, { raw: { width: src.info.width, height: src.info.height, channels: 4 } })
@@ -257,7 +269,7 @@ async function rescaledSample(file, factor) {
 
 /** Pad a sample with synthetic plain margins (the spike's loose-crop fixture). */
 async function paddedSample(file, margins, bg) {
-  const src = await sharp(path.join(SAMPLES_DIR, file)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const src = await sharp(samplePath(file)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const { data, info } = await sharp(src.data, { raw: { width: src.info.width, height: src.info.height, channels: 4 } })
     .extend({
       top: Math.round(src.info.height * (margins.top ?? 0)),
@@ -355,7 +367,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       const groups = Object.values(JSON.parse(readFileSync(CALIBRATION_PATH, 'utf8')).groups)
       expect(groups.length).toBe(11)
       for (const g of groups) {
-        const meta = await sharp(path.join(SAMPLES_DIR, g.screenshot)).metadata()
+        const meta = await sharp(samplePath(g.screenshot)).metadata()
         expect(
           [meta.width, meta.height],
           `${g.screenshot} decoded dims vs recorded calibration resolution`,
@@ -369,7 +381,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
         )
       }
       for (const { capture, file } of CANONICAL) {
-        const meta = await sharp(path.join(SAMPLES_DIR, file)).metadata()
+        const meta = await sharp(samplePath(file)).metadata()
         const imgAspect = meta.width / meta.height
         expect(
           needsCrop(imgAspect, CAPTURES[capture].aspect),
@@ -391,7 +403,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       for (const { capture, file } of CANONICAL) {
         const canvas = await loadSampleCanvas(file)
         const outcomes = await readScreenshot(capture, canvas)
-        const exp = expected[file]
+        const exp = expectedFor(expected, file)
         for (const o of outcomes) {
           total += 1
           if (o.status === 'filled') {
@@ -422,7 +434,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
         for (const { capture, file } of CANONICAL) {
           const canvas = await rescaledSample(file, factor)
           const outcomes = await readScreenshot(capture, canvas)
-          const exp = expected[file]
+          const exp = expectedFor(expected, file)
           const lines = []
           let correct = 0
           let total = 0
@@ -467,7 +479,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
         for (const { capture, file } of CANONICAL) {
           const canvas = await paddedSample(file, pad.margins, pad.bg)
           const outcomes = await readScreenshot(capture, canvas)
-          const exp = expected[file]
+          const exp = expectedFor(expected, file)
           const lines = []
           let correct = 0
           let total = 0

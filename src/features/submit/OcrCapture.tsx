@@ -21,7 +21,7 @@
 // (2026-10-12, D-05-UAT-5): the cancel is no longer silent — the step
 // surfaces a cancelled-feedback status line (and the overlay's decline
 // button is relabelled accordingly) that clears on the next upload.
-import { useRef, useState } from 'react'
+import { useRef, useState, type DragEvent } from 'react'
 import { CropOverlay } from './CropOverlay'
 import type { CaptureKey, OcrFieldOutcome } from './ocr'
 import { CAPTURES } from './ocr/regions'
@@ -154,6 +154,9 @@ export function OcrCapture({
 }: OcrCaptureProps) {
   const [status, setStatus] = useState<OcrStatus>('idle')
   const [cropBitmap, setCropBitmap] = useState<ImageBitmap | null>(null)
+  // Drag-and-drop state (owner feedback, 07.2-06 checkpoint round 3): the
+  // capture field is a dropzone, not a plain button.
+  const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const running = status === 'reading'
   const line = statusMessage(status)
@@ -225,30 +228,62 @@ export function OcrCapture({
 
   return (
     <div className="flex flex-col gap-2">
+      {/* Dropzone (owner feedback, 07.2-06 checkpoint round 3): drag a print
+          here OR click to browse. A real <button> keeps it keyboard
+          reachable; the drag handlers only add the pointer affordance. */}
       <button
         type="button"
         disabled={disabled || running}
         aria-busy={running}
         onClick={() => fileInputRef.current?.click()}
-        className="inline-flex min-h-11 max-w-full items-center justify-center gap-1 self-start rounded-md bg-accent px-4 py-2 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+        onDragEnter={(e: DragEvent<HTMLButtonElement>) => {
+          e.preventDefault()
+          if (!disabled && !running) setDragActive(true)
+        }}
+        onDragOver={(e: DragEvent<HTMLButtonElement>) => {
+          e.preventDefault()
+          if (!disabled && !running) setDragActive(true)
+        }}
+        onDragLeave={(e: DragEvent<HTMLButtonElement>) => {
+          e.preventDefault()
+          setDragActive(false)
+        }}
+        onDrop={(e: DragEvent<HTMLButtonElement>) => {
+          e.preventDefault()
+          setDragActive(false)
+          if (disabled || running) return
+          const file = e.dataTransfer.files?.[0]
+          if (file) void handleFile(file)
+        }}
+        className={`flex min-h-40 w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 py-6 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+          dragActive
+            ? 'border-accent bg-accent/10'
+            : 'border-line bg-surface hover:border-accent'
+        }`}
       >
-        {/* Upload icon: arrow-up-from-bracket shape, 16px (05-UI-SPEC). */}
+        {/* Upload icon: arrow-up-from-bracket shape (05-UI-SPEC). */}
         <svg
           aria-hidden="true"
-          width="16"
-          height="16"
+          width="28"
+          height="28"
           viewBox="0 0 16 16"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
+          className="text-muted"
         >
           <path d="M8 11V3" />
           <path d="M4 7l4-4 4 4" />
           <path d="M2 13h12" />
         </svg>
-        {CTA_LABEL}
+        <span className="text-base font-semibold text-content">
+          {running ? 'Lendo captura…' : CTA_LABEL}
+        </span>
+        <span className="text-sm text-muted">
+          Arraste o print aqui ou clique para selecionar
+        </span>
       </button>
       <input
         ref={fileInputRef}

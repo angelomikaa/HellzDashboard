@@ -859,7 +859,13 @@ export async function readBasicScreen(sharp, worker, img) {
 // ---------------------------------------------------------------------------
 
 async function decodeSample(sharp, file) {
-  const { data, info } = await sharp(path.join(SAMPLES_DIR, file)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  // 07.2-06 checkpoint round 3: the sample bundle re-cut sampbasic.png as
+  // sampbasicideal.png. Fall back to the ideal fixture when the original
+  // name is gone.
+  const alias = file === 'sampbasic.png' ? 'sampbasicideal.png' : null
+  const resolved =
+    alias !== null && existsSync(path.join(SAMPLES_DIR, alias)) ? alias : file
+  const { data, info } = await sharp(path.join(SAMPLES_DIR, resolved)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   if (info.channels !== 4) throw new Error(`expected RGBA decode for ${file}`)
   return { data: data, width: info.width, height: info.height }
 }

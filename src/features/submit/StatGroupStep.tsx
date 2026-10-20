@@ -74,19 +74,17 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
           Tapping the example opens the full-size asset in a new tab — it is a
           static panel-provided reference image, never member screenshot
           data. */}
-      <div className="flex w-full flex-col gap-3 rounded-md border border-line bg-surface p-3 sm:flex-row sm:items-center sm:gap-4">
+      <div className="flex w-full flex-col gap-4 rounded-lg border border-line bg-surface p-4 lg:flex-row lg:items-stretch">
         <a
-          href={`/examples/${group}.svg`}
+          href={`/examples/${group}.png`}
           target="_blank"
           rel="noreferrer"
-          className="block w-full shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:w-40"
+          className="mx-auto block w-full max-w-xs shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:mx-0 lg:w-80"
         >
           <img
-            src={`/examples/${group}.svg`}
+            src={`/examples/${group}.png`}
             alt={`Exemplo da captura de ${groupLabel}`}
-            width={691}
-            height={416}
-            className="h-24 w-full rounded-md border border-line object-cover"
+            className="h-auto w-full rounded-md border border-line object-contain"
           />
         </a>
         <div className="min-w-0 flex-1">{capture}</div>
