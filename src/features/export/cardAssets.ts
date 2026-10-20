@@ -19,7 +19,9 @@
 //      clipped by clipPath#clip-path-1 (= the plate silhouette): the stroke's
 //      outer half is cut, the inner ≈24px band rings the WHOLE shield and
 //      covers the photo's top/side edges. The gradient line runs
-//      x1=61.61 → x2=1017.352 — extended past the plate edges. Paint order:
+//      x1=61.61 → x2=1017.352 — extended past the plate edges. The file's
+//      stops are the UI's five-stop Impecável rainbow; the palette owns the
+//      live colors per tier. Paint order:
 //      plate → photo → border → texts.
 //   - Placeholder TEXT slots (Bebas Neue unless noted — family + fill are
 //     placeholders; code substitutes):
@@ -90,9 +92,9 @@ export interface CardStatSlot {
 }
 
 /** A linearGradient in the SAME design space (userSpaceOnUse line + stops)
- *  — the detached border stroke's GEOMETRY (line + width). The COLORS come
- *  from the tier palette; the file's Blue_to_Magenta stops are the pristine
- *  tier's palette source. */
+ *  — the detached border stroke's GEOMETRY (line + width). Only the geometry
+ *  is parsed; the COLORS come from the tier palette (the file's stops show
+ *  the UI's Impecável rainbow as the top-tier reference). */
 export interface CardGradientLine {
   x1: number
   y1: number
@@ -160,8 +162,10 @@ export interface CardGeometry {
 // ---------------------------------------------------------------------------
 // Tier palettes — the CODE-DRIVEN colors (the per-tier SVGs are retired;
 // these palettes ARE their successors). Text fill follows the contrast
-// rule: dark on the light metals, white on the deep magenta. The pristine
-// border keeps card.svg's own Blue_to_Magenta stops verbatim.
+// rule: dark on the light metals, white on the deep magenta. The platinum
+// border mirrors the UI's Impecável rainbow (tier-impecavel-border in
+// src/index.css) stop-for-stop, so the card and the tier-styled UI frame
+// never read as two different gradients.
 export interface TierPalette {
   plateFill: string
   borderStops: { offset: number; color: string }[]
@@ -195,9 +199,15 @@ export const TIER_PALETTE: Record<Tier, TierPalette> = {
   },
   platinum: {
     plateFill: '#cf1a87',
+    // Same five stops as the UI's tier-impecavel-border gradient
+    // (linear-gradient(120deg, #f26d6f, #e9b44c, #3fb950, #58a6ff, #b8c0cc)),
+    // spread along the card's horizontal border line.
     borderStops: [
-      { offset: 0, color: '#6e9aff' },
-      { offset: 1, color: '#ff12f7' },
+      { offset: 0, color: '#f26d6f' },
+      { offset: 0.25, color: '#e9b44c' },
+      { offset: 0.5, color: '#3fb950' },
+      { offset: 0.75, color: '#58a6ff' },
+      { offset: 1, color: '#b8c0cc' },
     ],
     textFill: '#ffffff',
   },

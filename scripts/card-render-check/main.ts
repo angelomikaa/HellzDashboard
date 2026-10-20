@@ -323,12 +323,16 @@ function referenceCardSvg(
   // plateFill IS #e6e6e6 and would otherwise be recolored by the text pass.
   svg = svg.replaceAll('fill:#e6e6e6', `fill:${palette.textFill}`)
   svg = svg.replace('.cls-1{fill:#cf1a87}', `.cls-1{fill:${palette.plateFill}}`)
-  for (const [from, to] of [
-    ['stop-color="#6e9aff"', `stop-color="${palette.borderStops[0].color}"`],
-    ['stop-color="#ff12f7"', `stop-color="${palette.borderStops[palette.borderStops.length - 1].color}"`],
-  ]) {
-    svg = svg.replace(from, to)
-  }
+  // Border stops: REBUILD the whole stop list from the palette — tiers no
+  // longer share the file's stop count (platinum now mirrors the UI's
+  // five-stop Impecável rainbow).
+  const gradStops = palette.borderStops
+    .map((s) => `<stop offset="${s.offset}" stop-color="${s.color}"/>`)
+    .join('')
+  svg = svg.replace(
+    /(<linearGradient\b[^>]*id="Blue_to_Magenta"[^>]*>)[\s\S]*?(<\/linearGradient>)/,
+    `$1${gradStops}$2`,
+  )
   // Extra defs: the photo clip (the crop path — the file has no image clip
   // of its own) + the shared scrim gradient.
   const defs =

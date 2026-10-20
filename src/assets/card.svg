@@ -15,8 +15,11 @@
       <path d="M432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.096 964.415 1005.352 1354.515 1005.352 1354.515 C931.514 1492.629 821.774 1398.682 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C268.204 1399.808 164.274 1506.502 73.61 1354.515 C73.61 1354.515 74.813 931.519 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 Z"/>
     </clipPath>
     <linearGradient id="Blue_to_Magenta" x1="61.61" y1="799.387" x2="1017.352" y2="799.387" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#6e9aff"/>
-      <stop offset="1" stop-color="#ff12f7"/>
+      <stop offset="0" stop-color="#f26d6f"/>
+      <stop offset="0.25" stop-color="#e9b44c"/>
+      <stop offset="0.5" stop-color="#3fb950"/>
+      <stop offset="0.75" stop-color="#58a6ff"/>
+      <stop offset="1" stop-color="#b8c0cc"/>
     </linearGradient>
   </defs>
   <title>pristine.ai</title>

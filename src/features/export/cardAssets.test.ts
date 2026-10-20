@@ -163,12 +163,18 @@ describe('cardAssets — tier palettes (the round-4 per-tier SVG colors, now cod
     expect(TIER_PALETTE.platinum.plateFill).toBe('#cf1a87')
   })
 
-  it('carries the retired round-4 border gradients per tier (Orange_to_Yellow / Overcast / Red_to_Amber / Blue_to_Magenta)', () => {
+  it('carries the retired round-4 border gradients per tier, with the platinum ring matching the UI Impecável rainbow', () => {
     expect(TIER_PALETTE.bronze.borderStops.map((s) => s.color)).toEqual(['#ed7b00', '#b49f00'])
     expect(TIER_PALETTE.silver.borderStops.map((s) => s.color)).toEqual(['#7e888e', '#cbd2d6'])
     expect(TIER_PALETTE.gold.borderStops.map((s) => s.color)).toEqual(['#ff635f', '#d38f00'])
-    // Pristine keeps card.svg's own Blue_to_Magenta verbatim.
-    expect(TIER_PALETTE.platinum.borderStops.map((s) => s.color)).toEqual(['#6e9aff', '#ff12f7'])
+    // The top tier reads the SAME five stops as tier-impecavel-border.
+    expect(TIER_PALETTE.platinum.borderStops.map((s) => s.color)).toEqual([
+      '#f26d6f',
+      '#e9b44c',
+      '#3fb950',
+      '#58a6ff',
+      '#b8c0cc',
+    ])
     for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
       expect(TIER_PALETTE[tier].borderStops.length).toBeGreaterThanOrEqual(2)
     }
