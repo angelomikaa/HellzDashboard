@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MyReportStat } from '../../lib/api'
 import {
-  focusCandidates,
   improvementFocus,
   LOWER_IS_BETTER_STATS,
   percentilePhrase,
@@ -121,41 +120,6 @@ describe('percentilePhrase (D-09/D-10/D-11: 10% steps, direct melhores/piores to
 
   it('0 -> entre os 10% piores (B=0 clamps up to 10 — never "0%")', () => {
     expect(percentilePhrase(0, 'CRIT')).toBe('Você está entre os 10% piores em CRIT.')
-  })
-})
-
-describe('focusCandidates (D-16: 3 weakest eligible stats, stable ascending)', () => {
-  it('filters nulls and takes the 3 lowest points, ascending', () => {
-    const stats = [null, 80, 60, 10, 5, 3, 45].map((points, i) =>
-      stat(points, { stat_key: `s${i}`, label: `S${i}` }),
-    )
-    expect(focusCandidates(stats).map((s) => s.points)).toEqual([3, 5, 10])
-  })
-
-  it('breaks ties by original array order (stable)', () => {
-    const a = stat(10, { stat_key: 'a', label: 'A' })
-    const b = stat(10, { stat_key: 'b', label: 'B' })
-    const c = stat(5, { stat_key: 'c', label: 'C' })
-    expect(focusCandidates([a, b, c]).map((s) => s.stat_key)).toEqual(['c', 'a', 'b'])
-  })
-
-  it('returns [] when no stats are eligible (all points null)', () => {
-    const stats = [stat(null), stat(null, { stat_key: 's2' })]
-    expect(focusCandidates(stats)).toEqual([])
-  })
-
-  it('returns 1-2 items when only that many are eligible', () => {
-    const two = [stat(90, { stat_key: 'a' }), stat(20, { stat_key: 'b' })]
-    expect(focusCandidates(two).map((s) => s.stat_key)).toEqual(['b', 'a'])
-    const one = [stat(90, { stat_key: 'a' }), stat(null, { stat_key: 'b' })]
-    expect(focusCandidates(one).map((s) => s.stat_key)).toEqual(['a'])
-  })
-
-  it('does NOT mutate the input array', () => {
-    const stats = [stat(50, { stat_key: 'a' }), stat(10, { stat_key: 'b' }), stat(null, { stat_key: 'c' })]
-    const snapshot = JSON.parse(JSON.stringify(stats))
-    focusCandidates(stats)
-    expect(stats).toEqual(snapshot)
   })
 })
 

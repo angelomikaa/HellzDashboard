@@ -1,26 +1,34 @@
-// FocusStrip — the improvement-focus strip (04-UI-SPEC § FocusStrip, D-16),
-// the explicit improvement loop: the 3 lowest-points stats as full jump
-// buttons.
-// Selection happens INSIDE via the 04-01 tested focusCandidates rule
-// (eligible = points non-null, stable ascending sort, first 3). The strip
-// hides itself entirely when nothing is eligible (UI-SPEC edge rule).
+// FocusStrip — the improvement-focus strip (07.2 D-07 rewire), the explicit
+// improvement loop: the 3 stats MOST BEHIND the class average among the
+// member's key ∪ relevant stats, as full jump buttons.
+//
+// 07.2-03: selection happens INSIDE via the unit-locked improvementFocus
+// rule (07.2-02) — eligible = points non-null AND stat_key ∈ priorityKeys
+// (key ∪ relevant, assembled by keyStatStrip.priorityKeySet from my_card).
+// This replaces the retired 3-lowest-points selection rule: "there's
+// no need for an assassin to improve his cura realizada stat" — the
+// priorityKeys filter IS the essence. The strip hides itself entirely when
+// nothing is eligible (an empty priorityKeys set yields [] — UI-SPEC edge
+// rule).
 // Points arrive opaque from the RPC — the item only rounds the given number
 // for display; the color comes from tierForPoints via the literal TIER_TEXT
 // map. The accent-red heading is one of the four reserved accent uses
 // (interaction red #DC3538 — a different token from tier gold #E9B44C).
 import type { MyReportStat } from '../../lib/api'
 import type { GroupKey } from '../../lib/groups'
-import { focusCandidates, tierForPoints } from './presentation'
+import { improvementFocus, tierForPoints } from './presentation'
 import { TIER_TEXT_DISPLAY } from './tierDisplay'
 
 export function FocusStrip({
   stats,
+  priorityKeys,
   onJump,
 }: {
   stats: MyReportStat[]
+  priorityKeys: ReadonlySet<string>
   onJump: (statKey: string, group: GroupKey) => void
 }) {
-  const focus = focusCandidates(stats)
+  const focus = improvementFocus(stats, priorityKeys)
   if (focus.length === 0) return null
 
   return (

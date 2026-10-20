@@ -1,29 +1,52 @@
 // DashboardPage — the Painel composition (04-UI-SPEC § Layout & Grid,
-// CMP-01). Owns the page's ONE data call: fetchMyReport on mount,
-// compute-on-read — no polling, no caching, no refresh button. Switching
-// tabs unmounts this page (App renders conditionally), so returning to
-// Painel refetches; that IS the refresh mechanism.
+// CMP-01). Owns the page's data calls on mount, compute-on-read — no
+// polling, no caching, no refresh button. Switching tabs unmounts this page
+// (App renders conditionally), so returning to Painel refetches; that IS
+// the refresh mechanism.
 //
-// Security posture (AGENTS.md / 04-UI-SPEC hard rules): the my_report
-// response is rendered VERBATIM — this page never derives, hints at, or
-// requests key-stat identity (the client types cannot even represent it),
-// never queries other individuals (aggregates only — the RPC is the
-// sanctioned boundary), and never computes points/OVR client-side: they
-// arrive opaque and are presentation inputs exclusively.
+// 07.2-03 (D-01/D-02/D-07/D-08): the mount effect now fetches my_report and
+// my_card IN PARALLEL (plus the member's own screenshot for the D-08
+// download photo chain) — a my_card or photo failure must NOT kill the page
+// (it degrades into a nullable myCard and the grouped view renders
+// regardless); only an 'unauthorized' session error surfaces SESSION_ERROR
+// per the page's existing contract. Above the unchanged 57-stat grouped
+// view, the my_card payload renders as the EAFC key-stat hero strip
+// (KeyStatCard) with the member's OWN card download (D-08 — same
+// buildCardPlan/downloadCard export contract as the Destaques showcase).
+//
+// Security posture (AGENTS.md / 04-UI-SPEC hard rules): the my_report and
+// my_card responses are rendered VERBATIM — this page never derives, hints
+// at, or requests additional key-stat data (my_card carries ONLY the
+// sanctioned 07.2 D-03 reveal, closed-typed in api.ts), never queries other
+// individuals (aggregates only — the RPCs are the sanctioned boundary), and
+// never computes points/OVR client-side: they arrive opaque and are
+// presentation inputs exclusively.
 //
 // The Tab type is imported TYPE-ONLY from App (erased at build time — no
 // runtime cycle with App's value import of this module).
-import { useEffect, useState } from 'react'
-import { ApiError, fetchMyReport, type MyReport } from '../../lib/api'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  ApiError,
+  fetchCardPhoto,
+  fetchMyCard,
+  fetchMyReport,
+  type MyCard,
+  type MyReport,
+} from '../../lib/api'
 import { GROUP_LABELS, GROUP_ORDER, type GroupKey } from '../../lib/groups'
 import type { NeoFootSession } from '../auth/session'
 import type { Tab } from '../../App'
 import { StatCard } from './StatCard'
+import { KeyStatCard } from './KeyStatCard'
 import { OvrHero } from './OvrHero'
 import { TierLegend } from './TierLegend'
 import { FocusStrip } from './FocusStrip'
 import { CollapsibleGroup } from './CollapsibleGroup'
 import { CardPhotoUpload } from './CardPhotoUpload'
+import { keyStatStripModel, priorityKeySet } from './keyStatStrip'
+import { formatStatValue } from '../../lib/parseStatValue'
+import { crestSrcFor } from '../assets/ClassCrest'
+import { cardFilename, downloadCard, type CardExportData } from '../export/cardExport'
 
 // Enumeration-safe pt-BR copy (KeyStatsPage pattern): raw server text is
 // never rendered — errors map to one of two fixed strings.
@@ -33,6 +56,9 @@ const SESSION_ERROR = 'Sua sessão expirou ou você não tem permissão. Entre n
 const EMPTY_TITLE = 'Nenhum status enviado ainda'
 const EMPTY_BODY =
   'Envie seus status para ver seus cards, sua posição na classe e o que melhorar.'
+const STRIP_EXPLAINER =
+  'Seus stats-chave aparecem aqui assim que a configuração da sua classe estiver completa.'
+const DOWNLOAD_ERROR = 'Não foi possível gerar o card. Tente novamente.'
 
 export function DashboardPage({
   session,
@@ -42,20 +68,49 @@ export function DashboardPage({
   onNavigate: (tab: Tab) => void
 }) {
   // null report = still loading; error holds the mapped pt-BR copy.
+  // null myCard = still loading OR the my_card fetch failed (degrade — the
+  // grouped view renders regardless; only the strip hides itself).
   // openGroups per D-05: Geral open by default, Quasi/Especial collapsed —
   // the page owns this state so focus jumps can expand a target group.
   const [report, setReport] = useState<MyReport | null>(null)
+  const [myCard, setMyCard] = useState<MyCard | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [openGroups, setOpenGroups] = useState<Record<GroupKey, boolean>>({ general: true, quasi: false, special: false })
 
-  // Mount-only fetch with a cancelled flag (KeyStatsPage pattern): exactly
-  // ONE data call per visit; the cleanup flag makes a fast tab switch away
-  // a no-op instead of a stale-state write.
+  // The member's own screenshot (07.2-05 round 7 photo consistency): an
+  // object URL over the stored blob feeds the D-08 download's photo area —
+  // same fallback chain as the on-page CardPhotoUpload preview (member
+  // screenshot → class portrait → ASST-01 monogram).
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+
+  // Mount-only fetches with a cancelled flag (KeyStatsPage pattern): the
+  // three reads are independent surfaces, so a my_card or photo failure is
+  // caught into null (the page still renders) while ONLY an unauthorized
+  // my_report/my_card session error kills the page with SESSION_ERROR.
   useEffect(() => {
     let cancelled = false
-    fetchMyReport(session)
-      .then((r) => {
-        if (!cancelled) setReport(r)
+    let photoObjectUrl: string | null = null
+    Promise.all([
+      fetchMyReport(session),
+      // 07.2 D-08: the member's own card data (sanctioned D-03 reveal).
+      fetchMyCard(session).catch((err: unknown) => {
+        if (err instanceof ApiError && err.kind === 'unauthorized') throw err
+        return null
+      }),
+      // The member's stored screenshot for the download's photo area —
+      // BLOB → object URL (T-072-13: never a cross-origin URL, the export
+      // canvas can never be tainted). Any failure degrades to the class
+      // portrait via crestSrcFor.
+      fetchCardPhoto(session).catch(() => null),
+    ])
+      .then(([r, card, photoBlob]) => {
+        if (cancelled) return
+        setReport(r)
+        setMyCard(card)
+        if (photoBlob !== null) {
+          photoObjectUrl = URL.createObjectURL(photoBlob)
+          setPhotoUrl(photoObjectUrl)
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -65,6 +120,7 @@ export function DashboardPage({
       })
     return () => {
       cancelled = true
+      if (photoObjectUrl !== null) URL.revokeObjectURL(photoObjectUrl)
     }
   }, [session])
 
@@ -85,11 +141,58 @@ export function DashboardPage({
     })
   }
 
+  // D-08 export assembly (07.2-05 export contract): the SAME closed
+  // CardExportData the Destaques showcase and the CardPhotoUpload preview
+  // build — identity + the 6 key stats (label_short + formatted own_value +
+  // opaque points), ZERO averages. null while the card/OVR is insufficient
+  // ('— dados insuficientes' has no card to celebrate) — the download
+  // button is disabled in exactly that state.
+  const exportData: CardExportData | null = useMemo(() => {
+    if (myCard === null || myCard.char_class === null || myCard.ovr.value === null) return null
+    return {
+      name: session.display_name,
+      charClass: myCard.char_class,
+      charFunction: myCard.char_function,
+      ovr: Math.round(myCard.ovr.value),
+      stats: myCard.key_stats.map((k) => ({
+        label_short: k.label_short,
+        value: k.own_value === null ? '—' : formatStatValue(k.own_value, k.value_type),
+        points: k.points,
+      })),
+      photoSrc: photoUrl ?? crestSrcFor(myCard.char_class),
+      monogramLetter: myCard.char_class.charAt(0).toUpperCase(),
+    }
+  }, [myCard, photoUrl, session.display_name])
+
+  // Same generating/failure affordances as the showcase download
+  // (PromotionCard): disabled + 'Gerando…', inline enumeration-safe
+  // role=alert copy, never raw errors.
+  const [generating, setGenerating] = useState(false)
+  const [downloadFailed, setDownloadFailed] = useState(false)
+
+  async function handleDownloadCard(): Promise<void> {
+    if (exportData === null) return
+    setGenerating(true)
+    setDownloadFailed(false)
+    try {
+      // Current export contract (07.2-05 round 7+): transparent PNG,
+      // hellz-<nome>.png — via the shared cardFilename slugifier.
+      await downloadCard(exportData, cardFilename(session.display_name))
+    } catch {
+      setDownloadFailed(true)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   const loading = report === null && error === null
+  // The strip state machine (keyStatStrip.ts, unit-locked): hidden /
+  // explainer / cards-in-server-order.
+  const strip = keyStatStripModel(myCard)
 
   // Render priority (UI-SPEC state matrix): error > loading > empty >
   // success. The empty state (D-13) replaces EVERYTHING below the fold —
-  // no hero, no legend, no grayed grid — message + CTA only.
+  // no hero, no strip, no legend, no grayed grid — message + CTA only.
   return (
     <section aria-busy={loading}>
       {error !== null ? (
@@ -112,20 +215,75 @@ export function DashboardPage({
         </section>
       ) : (
         <>
-          {/* Hero + legend + focus strip, then the 57 cards grouped
-              Geral/Quasi/Especial (D-04/D-05/D-06). */}
+          {/* Hero + EAFC key-stat strip + legend + focus strip, then the 57
+              cards grouped Geral/Quasi/Especial (D-04/D-05/D-06; strip =
+              07.2 D-01/D-02). OVR stays the hero's role — the strip has no
+              OVR card. */}
           <OvrHero
             ovr={report.ovr}
             displayName={session.display_name}
             charClass={report.char_class}
             charFunction={report.char_function}
           />
+          {/* 07.2 D-01: the 6 EAFC key-stat mini cards, my_card's key_stats
+              IN SERVER ORDER. Explainer state = muted line; my_card failure
+              = the strip self-hides (grouped view survives). Lives ONLY in
+              this success branch — the D-13 empty state replaces it. */}
+          {strip.kind !== 'hidden' && (
+            <section aria-label="Stats-chave" className="mt-4">
+              {strip.kind === 'cards' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                    {strip.stats.map((k) => (
+                      <KeyStatCard key={k.stat_key} stat={k} />
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    {/* 07.2 D-08: member own-card download — same export
+                        module/contract as the showcase (PNG, transparent,
+                        hellz-<nome>.png). Disabled while OVR is
+                        insufficient (no card to celebrate). */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleDownloadCard()
+                      }}
+                      disabled={generating || exportData === null}
+                      aria-label="Baixar meu card (PNG)"
+                      className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      {generating ? 'Gerando…' : 'Baixar meu card'}
+                    </button>
+                    {downloadFailed && (
+                      <p
+                        role="alert"
+                        aria-live="polite"
+                        className="text-xs font-semibold text-destructive"
+                      >
+                        {DOWNLOAD_ERROR}
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted">{STRIP_EXPLAINER}</p>
+              )}
+            </section>
+          )}
           {/* 07.2-05 round 3 (owner decision 1): the member's character-
               screenshot upload — self-contained surface with its own data
-              calls, so the page's ONE-report-call discipline stays intact. */}
+              calls, so the page's report-call discipline stays intact. */}
           <CardPhotoUpload session={session} />
           <TierLegend />
-          <FocusStrip stats={report.stats} onJump={handleFocusJump} />
+          {/* 07.2 D-07: foco = the stats most behind the class average among
+              key ∪ relevant (priorityKeySet from my_card; empty set when the
+              my_card fetch failed — improvementFocus returns [] and the
+              strip self-hides). */}
+          <FocusStrip
+            stats={report.stats}
+            priorityKeys={priorityKeySet(myCard)}
+            onJump={handleFocusJump}
+          />
           {GROUP_ORDER.map((group) => (
             <CollapsibleGroup
               key={group}

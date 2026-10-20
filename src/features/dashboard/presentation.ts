@@ -34,21 +34,6 @@ export function percentilePhrase(points: number, label: string): string {
   return `Você está entre os ${b}% ${word} em ${label}.`
 }
 
-/** D-16: the 3 weakest stats — eligible (points !== null), stable ascending sort.
- * @deprecated 07.2 D-07 — replaced by improvementFocus (key∪relevant, most-behind
- * vs class average). Kept ONLY because FocusStrip.tsx still imports it; plan
- * 07.2-03 rewires FocusStrip to improvementFocus, after which this and its
- * tests must be deleted (zero remaining references).
- */
-export function focusCandidates(stats: MyReportStat[]): MyReportStat[] {
-  return stats
-    .map((stat, index) => ({ stat, index }))
-    .filter((e) => e.stat.points !== null)
-    .sort((a, b) => (a.stat.points as number) - (b.stat.points as number) || a.index - b.index)
-    .slice(0, 3)
-    .map((e) => e.stat)
-}
-
 // 07.2 D-07: the three negative lower-is-better stats — a LOWER-than-average
 // value (more negative) is BETTER, not behind (owner-locked D-07 semantics).
 export const LOWER_IS_BETTER_STATS: ReadonlySet<string> = new Set([
@@ -60,8 +45,8 @@ export const LOWER_IS_BETTER_STATS: ReadonlySet<string> = new Set([
 /**
  * 07.2 D-07 foco de melhoria: evaluates the key∪relevant stats (priorityKeys
  * from my_card's key_stats ∪ relevant_stat_keys) and picks the ones MOST BEHIND
- * compared to the class average — replacing focusCandidates' 3-lowest-points
- * rule. "There's no need for an assassin to improve his cura realizada stat":
+ * compared to the class average — replacing the retired 3-lowest-points
+ * selection rule. "There's no need for an assassin to improve his cura realizada stat":
  * the priorityKeys filter IS the essence.
  *
  * - Eligible: points !== null && own_value !== null && priorityKeys.has(stat_key).
