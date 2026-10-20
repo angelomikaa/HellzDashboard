@@ -221,11 +221,12 @@ export function DashboardPage({
         </section>
       ) : (
         <>
-          {/* Owner checkpoint round 4: the OVR hero and the 6 EAFC key-stat
-              mini cards (my_card key_stats IN SERVER ORDER) share ONE wide
-              strip — tier border on the strip, OVR anchored left, key cards
-              filling the rest (6-up at lg, 2/3-up below). The tier legend
-              keeps decoding the colors just under the strip. */}
+          {/* Owner checkpoint rounds 4-5: the member's own player card, the
+              OVR hero and the 6 EAFC key-stat mini cards (my_card key_stats
+              IN SERVER ORDER) share ONE wide strip — tier border on the
+              strip, card + OVR anchored left, key cards filling the rest
+              (3-up at lg, 6-up at xl, 2/3-up below). The tier legend keeps
+              decoding the colors just under the strip. */}
           <section
             aria-label="Resumo do personagem"
             className={`mt-4 rounded-lg border-2 bg-dominant p-3 ${
@@ -233,17 +234,51 @@ export function DashboardPage({
             }`}
           >
             <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-4">
-              <OvrHero
-                ovr={report.ovr}
-                displayName={session.display_name}
-                charClass={report.char_class}
-                charFunction={report.char_function}
-                layout="strip"
-              />
+              {/* Owner checkpoint round 5: the member's own card moved INTO
+                  the OVR hero strip; its upload/remove affordances now live
+                  on the card itself (CardPhotoUpload owns the hover overlay
+                  and its own data calls). */}
+              <div className="flex items-center gap-3 lg:shrink-0 lg:gap-4">
+                <CardPhotoUpload
+                  session={session}
+                  className="w-32 shrink-0 sm:w-36 lg:w-40 xl:w-48"
+                  previewActions={
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleDownloadCard()
+                        }}
+                        disabled={generating || exportData === null}
+                        aria-label="Baixar meu card (PNG)"
+                        className="h-9 rounded-md bg-accent px-3 text-xs font-semibold text-accent-foreground hover-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      >
+                        {generating ? 'Gerando…' : 'Baixar card'}
+                      </button>
+                      {downloadFailed && (
+                        <p
+                          role="alert"
+                          aria-live="polite"
+                          className="text-center text-xs font-semibold text-destructive"
+                        >
+                          {DOWNLOAD_ERROR}
+                        </p>
+                      )}
+                    </>
+                  }
+                />
+                <OvrHero
+                  ovr={report.ovr}
+                  displayName={session.display_name}
+                  charClass={report.char_class}
+                  charFunction={report.char_function}
+                  layout="strip"
+                />
+              </div>
               {strip.kind !== 'hidden' && (
                 <div className="min-w-0 flex-1 border-t border-line pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
                   {strip.kind === 'cards' ? (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:h-full lg:grid-cols-6 lg:content-center">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:h-full lg:grid-cols-3 lg:content-center xl:grid-cols-6">
                       {strip.stats.map((k) => (
                         <KeyStatCard key={k.stat_key} stat={k} />
                       ))}
@@ -260,39 +295,6 @@ export function DashboardPage({
           <div className="flex justify-end">
             <TierLegend />
           </div>
-          {/* 07.2-05 round 3 (owner decision 1): the member's character-
-              screenshot upload — self-contained surface with its own data
-              calls, so the page's report-call discipline stays intact.
-              Owner feedback (07.2-06 checkpoint): the own-card download lives
-              WITH the preview card (injected via previewActions), not under
-              the key-stat strip where it read as disconnected. */}
-          <CardPhotoUpload
-            session={session}
-            previewActions={
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleDownloadCard()
-                  }}
-                  disabled={generating || exportData === null}
-                  aria-label="Baixar meu card (PNG)"
-                  className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                  {generating ? 'Gerando…' : 'Baixar meu card'}
-                </button>
-                {downloadFailed && (
-                  <p
-                    role="alert"
-                    aria-live="polite"
-                    className="text-center text-xs font-semibold text-destructive"
-                  >
-                    {DOWNLOAD_ERROR}
-                  </p>
-                )}
-              </>
-            }
-          />
           {/* 07.2 D-07: foco = the stats most behind the class average among
               key ∪ relevant (priorityKeySet from my_card; empty set when the
               my_card fetch failed — improvementFocus returns [] and the

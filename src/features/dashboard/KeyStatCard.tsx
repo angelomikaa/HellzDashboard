@@ -7,7 +7,10 @@
 // strip above it). Points arrive opaque from the RPC — the chip only rounds
 // the given number for display, nothing is recomputed here. Tier is
 // communicated by COLOR only (StatCard D-03 idiom) and all tier classes
-// flow through the render-layer display maps in tierDisplay.ts.
+// flow through the render-layer display maps in tierDisplay.ts. Owner
+// checkpoint round 5: the card root lost its border (the surrounding OVR
+// strip already carries the tier frame); the points chip keeps the tier
+// color.
 //
 // The `key-<stat_key>` anchor with tabIndex={-1} mirrors StatCard's
 // `stat-<stat_key>` anchor so programmatic foco jumps can target the strip
@@ -22,13 +25,12 @@ export function KeyStatCard({ stat }: { stat: CardKeyStat }) {
   // State matrix (StatCard idiom, locked order): missing > insufficient > tiered.
   const missing = stat.own_value === null
   const tier = stat.points !== null ? tierForPoints(stat.points) : null
-  const borderClass = !missing && tier !== null ? TIER_BORDER_DISPLAY[tier] : 'border-line'
 
   return (
     <div
       id={`key-${stat.stat_key}`}
       tabIndex={-1}
-      className={`rounded-lg border bg-surface p-3 hover-card focus:outline-none focus:ring-2 focus:ring-accent ${borderClass}${missing ? ' opacity-60' : ''}`}
+      className={`rounded-lg bg-surface p-3 hover-card focus:outline-none focus:ring-2 focus:ring-accent${missing ? ' opacity-60' : ''}`}
     >
       <span className="block font-display text-xs font-semibold uppercase tracking-wide text-content">
         {stat.label_short}

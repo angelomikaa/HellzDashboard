@@ -79,12 +79,17 @@ async function compressToJpeg(file: File, maxDim = 1200, quality = 0.85): Promis
 export function CardPhotoUpload({
   session,
   previewActions,
+  className = '',
 }: {
   session: NeoFootSession
   // Owner feedback (07.2-06 checkpoint, 2026-10-20): the own-card download
   // belongs WITH the card preview — DashboardPage injects the button here so
   // the action sits under the card it exports.
   previewActions?: ReactNode
+  // Owner checkpoint round 5: the preview now lives INSIDE the Painel's OVR
+  // strip, so the strip controls the width; this component renders only the
+  // card (the old "Foto do personagem" section/thumbnail/copy are gone).
+  className?: string
 }) {
   // Photo: object URL of the stored screenshot (null = none uploaded — the
   // designed empty state). Card: the my_card payload for the live preview.
@@ -183,77 +188,74 @@ export function CardPhotoUpload({
         }
       : null
 
+  // Owner checkpoint round 5: upload affordances live ON the card — hovering
+  // (or focusing) the card reveals "Alterar foto"/"Remover" overlaid on the
+  // photo area; touch/narrow screens get the same buttons in normal flow
+  // under the card (hover does not exist there).
+  const actionButtons = (
+    <>
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={busy}
+        className="h-9 rounded-md bg-accent px-3 text-xs font-semibold text-accent-foreground hover-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        {busy ? 'Enviando…' : photoUrl === null ? 'Enviar foto' : 'Alterar foto'}
+      </button>
+      {photoUrl !== null && (
+        <button
+          type="button"
+          onClick={() => {
+            void handleRemove()
+          }}
+          disabled={busy}
+          className="h-9 rounded-md border border-line bg-dominant/80 px-3 text-xs font-semibold text-content hover-control disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          Remover
+        </button>
+      )}
+    </>
+  )
+
   return (
-    <section
-      aria-label="Foto do personagem"
-      className="rounded-lg border border-line bg-surface p-4 sm:p-6"
-    >
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold text-content">Foto do personagem</h2>
-          <p className="mt-1 text-sm text-muted">
-            Envie um print do seu personagem no jogo — ele aparece na janela do seu card.
-            JPG ou PNG, a imagem é otimizada automaticamente.
-          </p>
-          {photoUrl !== null && (
-            <img
-              src={photoUrl}
-              alt="Seu print de personagem atual"
-              className="mt-3 h-24 w-24 rounded-md border border-line object-cover"
-            />
-          )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="hidden"
-              onChange={(e) => {
-                void handleFile(e.target.files?.[0]).then(() => {
-                  // Allow re-selecting the same file.
-                  if (inputRef.current) inputRef.current.value = ''
-                })
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={busy}
-              className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              {busy ? 'Enviando…' : photoUrl === null ? 'Enviar foto' : 'Alterar foto'}
-            </button>
-            {photoUrl !== null && (
-              <button
-                type="button"
-                onClick={() => {
-                  void handleRemove()
-                }}
-                disabled={busy}
-                className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                Remover
-              </button>
-            )}
+    <div className={`flex flex-col ${className}`}>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          void handleFile(e.target.files?.[0]).then(() => {
+            // Allow re-selecting the same file.
+            if (inputRef.current) inputRef.current.value = ''
+          })
+        }}
+      />
+      {preview !== null ? (
+        <div
+          className="group relative"
+          role="group"
+          aria-label="Foto do personagem no seu card"
+        >
+          <CardSvg data={preview} className="h-auto w-full" />
+          <div className="mt-2 flex flex-wrap gap-2 sm:absolute sm:inset-x-0 sm:bottom-0 sm:mt-0 sm:flex-col sm:gap-1.5 sm:rounded-b-lg sm:bg-linear-to-t sm:from-dominant sm:via-dominant/85 sm:to-transparent sm:p-2 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+            {actionButtons}
           </div>
-          {error !== null && (
-            <p role="alert" aria-live="polite" className="mt-3 text-sm font-semibold text-destructive">
-              {error}
-            </p>
-          )}
         </div>
-        {preview !== null && (
-          <div className="w-full max-w-64 shrink-0 self-center sm:self-auto">
-            <p className="mb-2 text-center text-xs font-semibold tracking-wide text-muted">
-              Pré-visualização do seu card
-            </p>
-            <CardSvg data={preview} className="h-auto w-full" />
-            {previewActions !== undefined && (
-              <div className="mt-3 flex flex-col items-stretch gap-2">{previewActions}</div>
-            )}
-          </div>
-        )}
-      </div>
-    </section>
+      ) : (
+        <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line p-3 text-center">
+          <p className="text-xs text-muted">Envie um print do seu personagem.</p>
+          <div className="flex flex-wrap justify-center gap-2">{actionButtons}</div>
+        </div>
+      )}
+      {preview !== null && previewActions !== undefined && (
+        <div className="mt-2 flex flex-col items-stretch gap-2">{previewActions}</div>
+      )}
+      {error !== null && (
+        <p role="alert" aria-live="polite" className="mt-2 text-center text-xs font-semibold text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
   )
 }
