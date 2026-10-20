@@ -2,6 +2,12 @@
 // improvement loop: the 3 stats MOST BEHIND the class average among the
 // member's key ∪ relevant stats, as full jump buttons.
 //
+// Round 11 (owner checkpoint): the strip now lives INSIDE the hero's right
+// column, under the identity header and the key-stat tiles, so the column
+// carries the whole read — who you are, where you stand, what to improve.
+// It therefore renders as an inline block (a divider + heading + chips)
+// instead of its former standalone bordered card.
+//
 // 07.2-03: selection happens INSIDE via the unit-locked improvementFocus
 // rule (07.2-02) — eligible = points non-null AND stat_key ∈ priorityKeys
 // (key ∪ relevant, assembled by keyStatStrip.priorityKeySet from my_card).
@@ -32,7 +38,7 @@ export function FocusStrip({
   if (focus.length === 0) return null
 
   return (
-    <section className="mt-4 rounded-lg border border-line bg-surface p-4">
+    <div className="border-t border-line pt-3">
       <h2 className="text-sm font-semibold text-accent">Foco de melhoria</h2>
       <div className="mt-2 flex flex-wrap gap-2">
         {focus.map((stat) => {
@@ -42,7 +48,7 @@ export function FocusStrip({
               key={stat.stat_key}
               type="button"
               onClick={() => onJump(stat.stat_key, stat.group_name)}
-              className="flex h-11 items-center gap-2 rounded-md border border-line bg-surface px-3 hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="flex h-11 items-center gap-2 rounded-md bg-surface px-3 hover-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <span className="text-sm text-content">{stat.label}</span>
               <span className={`text-sm font-semibold ${tier ? TIER_TEXT_DISPLAY[tier] : ''}`}>
@@ -52,6 +58,6 @@ export function FocusStrip({
           )
         })}
       </div>
-    </section>
+    </div>
   )
 }

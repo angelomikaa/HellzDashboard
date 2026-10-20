@@ -269,21 +269,24 @@ export function DashboardPage({
                   ) : (
                     <p className="text-sm text-muted">{STRIP_EXPLAINER}</p>
                   ))}
+                {/* Owner checkpoint round 11: foco de melhoria moved INSIDE
+                    the hero column — identity, key stats and the improvement
+                    loop now read as one block beside the card.
+                    07.2 D-07: foco = the stats most behind the class average
+                    among key ∪ relevant (priorityKeySet from my_card; empty
+                    set when the my_card fetch failed — improvementFocus
+                    returns [] and the strip self-hides). */}
+                <FocusStrip
+                  stats={report.stats}
+                  priorityKeys={priorityKeySet(myCard)}
+                  onJump={handleFocusJump}
+                />
               </div>
             </div>
           </section>
           <div className="flex justify-end">
             <TierLegend />
           </div>
-          {/* 07.2 D-07: foco = the stats most behind the class average among
-              key ∪ relevant (priorityKeySet from my_card; empty set when the
-              my_card fetch failed — improvementFocus returns [] and the
-              strip self-hides). */}
-          <FocusStrip
-            stats={report.stats}
-            priorityKeys={priorityKeySet(myCard)}
-            onJump={handleFocusJump}
-          />
           {GROUP_ORDER.map((group) => (
             <CollapsibleGroup
               key={group}
