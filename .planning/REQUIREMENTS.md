@@ -16,12 +16,28 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 - [ ] **WHIT-05**: Officers can see which whitelist members haven't claimed a PIN (server-derived flag, staff-only surface; never the hash)
 - [ ] **WHIT-06**: Owner can reset a member's PIN via an owner-only RPC (reuses the hash-pin flow) — resolves the forgotten-PIN lockout gap left by player-picked PINs
 - [ ] **WHIT-07**: Adding a removed (inactive) handle reactivates the member (history preserved) instead of erroring
+- [ ] **WHIT-08** (owner feedback 2026-10-20): A visitor/player can SUBMIT a membership request (handle + display name + optional message) without staff involvement; the request is stored server-side with a `pending` status and never grants access by itself
+- [ ] **WHIT-09** (owner feedback 2026-10-20): Officers/owners see pending membership requests in Validações and approve or reject them; approval runs the existing `add_member` path (handle-only registration, first-login PIN flow), rejection is recorded with no access granted
+- [ ] **WHIT-10** (owner feedback 2026-10-20): A requester can check their own request status; pending/rejected requesters are told they must be whitelisted by an officer and cannot reach any member data
+
+### Character Identity Capture
+
+- [ ] **IDEN-01** (owner feedback 2026-10-20): Every submission captures the in-game character ID, nickname and job(s) alongside combat power — OCR pre-fill plus mandatory manual correction, same discipline as the stat fields
+- [ ] **IDEN-02** (owner feedback 2026-10-20): The captured values are stored PER SUBMISSION (append-only history), so a job swap leaves a trace; the latest validated submission supplies the nickname used on the member/destaques cards
+- [ ] **IDEN-03** (owner feedback 2026-10-20): Staff can see a member's job/nickname history (who swapped when); members never see other members' identity history
 
 ### Personalized Home
 
 - [ ] **HOME-01**: After login, members land on a new Início tab showing their own OVR card (reused OvrHero) and a top-3 best-stats strip (value + points + tier badge)
 - [ ] **HOME-02**: Members with more than 7 days since their last validated submission see a stale-data CTA navigating to Enviar Status; members who never submitted see an evergreen first-submission variant; fresh data shows no banner
 - [ ] **HOME-03**: `my_report` gains only `last_validated_at` — closed-payload discipline holds (zero new per-stat fields, zero key-stat hints)
+- [ ] **SHWC-01** (owner feedback 2026-10-20): Destaques renders its promo cards as a premium scroll-snap slider (1-up mobile, 3-up desktop, keyboard + swipe reachable) — members-only access stays unchanged for now (public visitor homepage explicitly deferred)
+
+### Unified Key/Relevant Selection
+
+- [ ] **KEYU-01** (owner feedback 2026-10-20): Stats-Chave uses ONE ordered selection set per (class, build-role): the first 6 selected stats are the keys, the 7th and beyond are relevants — the current key-XOR-relevant gating is replaced
+- [ ] **KEYU-02** (owner feedback 2026-10-20): Deselecting a key promotes the oldest still-selected relevant into the key set (deterministic order, server-enforced), so the key set stays at 6 whenever ≥6 stats are selected
+- [ ] **KEYU-03** (owner feedback 2026-10-20): Selection order is persisted server-side (single RPC, advisory-lock safe); the member-facing payload still reveals nothing about keys/relevants
 
 ### Fine Ranks
 

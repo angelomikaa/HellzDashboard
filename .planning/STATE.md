@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: 07.2-06 owner-feedback fixes done — awaiting layout checkpoint + new phase for round-2 features
+stopped_at: Phase 07.2 complete (6/6) — roadmap re-planned from owner feedback; next: Phase 8 planning
 last_updated: "2026-10-20T13:45:00.000Z"
 last_activity: 2026-10-20
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 12
-  completed_plans: 11
-  percent: 92
+  completed_plans: 12
+  percent: 100
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 ## Current Position
 
-Phase: 07.2 (premium-showcase-game-grounding-inserted) — EXECUTING
-Plan: 5 of 6 complete (07.2-01, 07.2-02, 07.2-05, 07.2-03, 07.2-04) — 07.2-06 tasks 1-2 done + owner-feedback fixes, task 3 (owner desktop/mobile walk) PENDING
-Status: Awaiting owner layout sign-off; owner feedback round 2 scoped into a NEW phase (capture / membership / showcase UX)
-Last activity: 2026-10-20 -- 07.2-06 owner feedback (round 1) addressed: own-card download moved beside the preview card (CardPhotoUpload previewActions slot), Ranking detail expands inline under its row (Fragment), Personagens class/function token filters (pure view aid), Enviar Status OCR = two-column right rail (example + upload) with fields in the main column; build green + 352/352 tests green (6240ade)
+Phase: 07.2 (premium-showcase-game-grounding-inserted) — COMPLETE (6/6 plans, owner-approved after 8 design rounds + layout feedback round 1)
+Plan: all 6 complete — next: Phase 8 (whitelist self-request + PIN setup + character identity capture)
+Status: Ready for Phase 8 planning
+Last activity: 2026-10-20 -- 07.2-06 complete (desktop pass + owner feedback fixes: download beside preview, inline rank details, Personagens filters, two-column OCR step). Owner feedback round 2 triaged per owner decisions: capture + membership → Phase 8 (migration 0014), unified key/relevant → Phase 9 (inside set_key_stat v2), Destaques slider → Phase 10 (members-only; public visitor homepage deferred)
 
 ## Accumulated Context
 
@@ -75,6 +75,8 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 07.2]: 07.2-04: the staff view-aid column sort is isolated in a pure rankView.ts module that member surfaces never import; 'server' passes the payload through verbatim (same reference), unit-locked by 4 vitest cases (T-072-11 accepted) — member-facing server-order discipline stays structurally enforceable
 - [Phase 07.2]: 07.2-06: Personagens desktop width = a 2-up CARD register at xl (the editing card spans both columns), NOT the plan's "real table with columns" — the owner explicitly rejected the 7-column table in the 07.1-02 round-4 gate ("ruining the aesthetic"), so LAYT-01's goal (use the wide shell, no squish) is met without re-introducing a rejected layout; the D-08 control-matrix code is untouched
 - [Phase 07.2]: 07.2-06: the grouped-stat grid lives in CollapsibleGroup.tsx (not DashboardPage.tsx as the plan's files_modified implied) — widened there with the same sm/lg/xl system; ClassCrest now accepts char_class null (staff rows can be whitelisted before a character exists) and renders the neutral '—' monogram tile
+- [Phase 07.2]: 07.2-06 owner feedback round 1 (2026-10-20) — IN-SCOPE FIXES SHIPPED (6240ade): own-card download moved INSIDE the card preview (CardPhotoUpload.previewActions — it read as disconnected under the key-stat strip); Ranking details expand inline under their row (Fragment, aria-controls region preserved); Personagens class/function token filters (pure view aid, no server round trip); Enviar Status OCR is a two-column section (example + upload right rail, fields main column; mobile keeps upload-first)
+- [Phase 07.2]: ROADMAP RE-PLANNED from owner feedback round 2 (owner decisions 2026-10-20): (a) ID/nickname/job capture = PER-SUBMISSION history, latest validated supplies the card nickname → Phase 8 (migration 0014, D-06 superseded; fixes the Painel card showing the seeded 'owner nickname' instead of the in-game name); (b) membership self-request + officer manual whitelist → Phase 8 (WHIT-08/09/10, request table RPC-only, approval reuses add_member); (c) unified key/relevant ordered set (first 6 keys, 7th+ relevants, deselect promotes oldest relevant) → Phase 9 INSIDE set_key_stat v2 (KEYU-01/02/03 — never a separate migration); (d) Destaques scroll-snap slider → Phase 10 (SHWC-01, members-only — public visitor homepage explicitly DEFERRED)
 
 ### Blockers/Concerns (open — carry to next milestone)
 

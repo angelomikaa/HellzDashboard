@@ -80,7 +80,7 @@ Plans:
   5. Desktop widths no longer squish/misalign mobile-first elements — a deliberate desktop layout pass across cards and dense screens (LAYT-01)
   6. Officials and above see a full-stat OVR-based rank view in its own tab (all 57 stats; members never see it) (RANK-02)
   7. A secondary "relevant" stat tier exists (unlimited count, never displayed on cards) whose sole purpose is guiding the "foco de melhoria" section (RELV-01)
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 - [x] 07.2-01-PLAN.md — Server foundation: migration 0013 (relevant tier, my_card, role_rank, get_promotion key highlights, label_short) live + smoke matrix + D-11 owner review (Wave 1)
@@ -88,49 +88,53 @@ Plans:
 - [x] 07.2-05-PLAN.md — ROO assets + canvas JPEG export + Destaques full-bleed showcase rework (Wave 3)
 - [x] 07.2-03-PLAN.md — Painel EAFC key-stat strip + member own-card download + foco rewiring + Stats-Chave relevant section (Wave 4)
 - [x] 07.2-04-PLAN.md — Officials rank view: role-primary boards + 57-stat detail + staff tab (Wave 4)
-- [ ] 07.2-06-PLAN.md — Desktop layout pass, one breakpoint system + staff-view class icons + owner walk (Wave 5)
+- [x] 07.2-06-PLAN.md — Desktop layout pass, one breakpoint system + staff-view class icons + owner walk (Wave 5)
 
-### Phase 8: Whitelist Lifecycle & First-Login PIN Setup
-**Goal**: Staff control exactly who can access the panel — officers add players by handle only, players choose their own PIN at first login, and a forgotten PIN is resolvable by the owner — with the whitelist as the trust boundary and no second rate-limit mechanism.
+### Phase 8: Whitelist Lifecycle, Self-Request Whitelisting, First-Login PIN Setup & Character Identity Capture
+**Goal**: Staff control exactly who can access the panel — players may REQUEST access, officers manually whitelist them, players choose their own PIN at first login, and every submission records the in-game identity (ID, nickname, jobs) — with the whitelist as the trust boundary and no second rate-limit mechanism.
 **Depends on**: Nothing within v1.1 (independent of Phases 7, 9, 10; builds on the shipped v1.0 auth stack)
-**Requirements**: WHIT-01, WHIT-02, WHIT-03, WHIT-04, WHIT-05, WHIT-06, WHIT-07
+**Requirements**: WHIT-01, WHIT-02, WHIT-03, WHIT-04, WHIT-05, WHIT-06, WHIT-07, WHIT-08, WHIT-09, WHIT-10, IDEN-01, IDEN-02, IDEN-03
 **Success Criteria** (what must be TRUE):
   1. An officer or owner can add a player with handle-only registration (handle + display name, role forced `member`, no PIN set), and that player — logging in for the first time — is routed to a first-login flow to choose their own 4-digit PIN (double-entry confirmation) and lands directly in the panel with a standard 7-day session
   2. A second PIN-setup attempt on an already-claimed handle fails with an `already_set` response (atomic claim, no silent last-writer-wins), and setup attempts are rate-limited by the existing lockout machinery — no parallel rate-limit mechanism exists
   3. Officers can see which whitelisted members haven't claimed a PIN yet (server-derived flag on a staff-only surface, never the hash), and a removed (inactive) player re-added by staff rejoins with their submission history intact instead of erroring
   4. The owner can reset a member's PIN via an owner-only RPC, and the member can then log in with the new PIN
   5. Trust-boundary hygiene holds: handles with the dummy sentinel prefix are rejected at add time, and legacy placeholder-PIN whitelist rows are converted to the claim flow (their next login routes to first-login PIN setup, and their lockout rows are cleared)
+  6. (Owner feedback 2026-10-20) A player can submit a membership request without staff help; officers approve/reject it in Validações; approval reuses the handle-only `add_member` path and a pending request grants zero data access — a requester can check their own status
+  7. (Owner feedback 2026-10-20) Each submission captures the in-game ID, nickname and job(s) with OCR pre-fill + manual correction, stored PER SUBMISSION (append-only history) so job swaps are traceable; the latest validated submission supplies the card nickname, and staff can view the identity history (members cannot)
 **Plans**: TBD
 
-Cross-cutting constraints: deploy order invariant — migration 0014 (nullable `pin_hash`; renumbered: Phase 7's catalog migration took 0012, Phase 07.2 takes 0013) → patched `verify-pin` + new `setup-pin` Edge Functions live → first `add_member` use (the null-hash branch must precede the bcrypt compare or pinless members 500); `add_member` stays the ONLY write surface on `members` (no new RLS policy, no direct INSERT); inactive members must NEVER receive `pin_setup_required` (uniform 401 — branch ordering is a smoke-probed must-have).
+Cross-cutting constraints: deploy order invariant — migration 0014 (nullable `pin_hash` + the identity-capture columns/table; renumbered: Phase 7's catalog migration took 0012, Phase 07.2 takes 0013) → patched `verify-pin` + new `setup-pin` Edge Functions live → first `add_member` use (the null-hash branch must precede the bcrypt compare or pinless members 500); `add_member` stays the ONLY write surface on `members` (no new RLS policy, no direct INSERT); inactive members must NEVER receive `pin_setup_required` (uniform 401 — branch ordering is a smoke-probed must-have); membership requests are a separate table with RPC-only writes (insert = anon-safe request; approve/reject = staff-gated SECURITY DEFINER) — a pending request is never a member row.
 **UI hint**: yes
 
 ### Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats
 **Goal**: Points differentiate the top end by real stat gaps within class+build-role cohorts — the leader holds 99 and everyone below scales by value distance — while key-stat configuration becomes per (class, build-role) with zero deploy-day OVR change, all landing in ONE migration and re-locked with ONE tripod pass.
 **Depends on**: Phase 7 (build-role vocabulary exists, catalog aligned, realistic seeded cohorts resident for band calibration)
-**Requirements**: SCALE-01, SCALE-02, SCALE-03, ROLE-01, ROLE-02, ROLE-03, ROLE-04, ROLE-06, ROLE-07, ROLE-08, ROLE-10, ROLE-11, HOME-03
+**Requirements**: SCALE-01, SCALE-02, SCALE-03, ROLE-01, ROLE-02, ROLE-03, ROLE-04, ROLE-06, ROLE-07, ROLE-08, ROLE-10, ROLE-11, HOME-03, KEYU-01, KEYU-02, KEYU-03
 **Success Criteria** (what must be TRUE):
   1. Per-stat points are value-proportional within class+build-role cohorts: the leader(s) at the max value hold exactly 99, everyone below scales by `own/max × 99` (top-end cuts at 98/97/96/95 emerge naturally), and OVR inherits the finer scale with zero formula change and the floor of 51 preserved — proven by exact-value smoke on live data
      2. ONE migration (0015; renumbered: Phase 7 took 0012, Phase 07.2 takes 0013, Phase 8 takes 0014) swaps the formula across all three rank RPCs (`my_report`, `class_top5`, `get_promotion`), rebuilds `class_key_stats` to key per (class, build-role) with block-at-7 per combo, backfills every existing class config into all build-role values (pre/post-migration OVR parity smoke: zero OVR change or null on deploy day), ships `set_key_stat` v2 with the old signature dropped, and folds in the single additive `last_validated_at` scalar on `my_report` — zero new per-stat fields
   3. OVR in all three RPCs reads the member's own (class, build-role) config, per-stat cohorts become class+build-role, and a member with no configured combo gets OVR = null via the existing data-insufficient rendering — never a silent class-defaults fallback
   4. Every re-locked baseline is green in the same phase: `rankMath.ts` locked test values, `smoke-rank.mjs` exact-value matrix, and `smoke-promotion.mjs` ordering (fixtures carry build roles and per-combo 6-row key-stat inserts); tier bands (D-01/D-02) are recalibrated by the owner against the resident seeded cohorts before being locked, and the improvement-screen percentile phrase is gone — stat cards no longer claim percentile position
   5. The admin surface works and the governance holds: Stats-Chave gains the role selector (class → role → stat chips, per-combo count display, block-at-7 copy), build-role assignment stays staff-only (Personagens path), the staff audit pass re-assigns existing members' build roles before any per-role differentiation applies, officers see the per-(class, role) config coverage indicator (staff-only) — and RNK-02 closed-payload discipline holds (leak probes stay green, no member-visible sign that role configs differ)
+  6. (Owner feedback 2026-10-20) Key and relevant are ONE ordered selection set per (class, build-role): first 6 = keys, 7th+ = relevants; deselecting a key promotes the oldest remaining relevant so the key set stays at 6 whenever ≥6 are selected — implemented inside `set_key_stat` v2 (single RPC, persisted order, advisory-lock safe), replacing the key-XOR-relevant gating
 **Plans**: TBD
 
-Cross-cutting constraints: ONE migration, ONE tripod re-lock — both features rewrite the same three RPC bodies, so they land together (owner decision 8; ROLES.md §3.6: never rewrite the same three RPC bodies twice in one milestone); the backfill is the live-data continuity trick — without it every member's OVR nulls on migration day (P-ROLE-1, pre/post parity smoke is the detection); advisory-lock hash gains the role component and the old `set_key_stat` signature is dropped in the same migration (P-ROLE-6); promotion top-5 stays class-wide across roles (OVR is the cross-role comparable currency); staff audit pass (ROLE-10) gates BEFORE per-role differentiation lands (P-ROLE-3: silent wrong-cohort scoring); migration + frontend deploy together to avoid stale-band skew (R17); formula edges (all-equal → one locked behavior, max=0, n≥3 gate retention) locked in spec + smoke; no new npm dependencies.
+Cross-cutting constraints: ONE migration, ONE tripod re-lock — both features rewrite the same three RPC bodies, so they land together (owner decision 8; ROLES.md §3.6: never rewrite the same three RPC bodies twice in one milestone); the backfill is the live-data continuity trick — without it every member's OVR nulls on migration day (P-ROLE-1, pre/post parity smoke is the detection); advisory-lock hash gains the role component and the old `set_key_stat` signature is dropped in the same migration (P-ROLE-6); the unified key/relevant selection (owner feedback 2026-10-20) ships INSIDE that same `set_key_stat` v2 rewrite — never as a separate migration; promotion top-5 stays class-wide across roles (OVR is the cross-role comparable currency); staff audit pass (ROLE-10) gates BEFORE per-role differentiation lands (P-ROLE-3: silent wrong-cohort scoring); migration + frontend deploy together to avoid stale-band skew (R17); formula edges (all-equal → one locked behavior, max=0, n≥3 gate retention) locked in spec + smoke; no new npm dependencies.
 **UI hint**: yes
 
 ### Phase 10: Personalized Home Landing Tab
 **Goal**: Login lands players on a personalized home — their own OVR and best stats at a glance, with a clear nudge when their data is stale — while Destaques keeps the guild-wide EAFC celebration.
 **Depends on**: Phase 9 (`my_report` gains `last_validated_at` in migration 0014 — shipped there, consumed here)
-**Requirements**: HOME-01, HOME-02
+**Requirements**: HOME-01, HOME-02, SHWC-01
 **Success Criteria** (what must be TRUE):
   1. After login, members land on a new Início tab showing their own OVR card (reused OvrHero) and a top-3 best-stats strip (value + points + tier badge), sorted client-side from fields the payload already returns
   2. A member more than 7 days since their last validated submission sees a stale-data CTA navigating to Enviar Status; a member who never submitted sees the evergreen first-submission variant; a member with fresh data sees no banner — the strictly-greater-than-7-days boundary is locked in a test
   3. The home tab shows only the player's own data — Destaques keeps the guild-wide EAFC cards and the aggregates-only discipline is unchanged
+  4. (Owner feedback 2026-10-20) Destaques promo cards render in a premium scroll-snap slider (1-up mobile, 3-up desktop, keyboard + swipe reachable, server order preserved); access stays members-only — the public visitor-homepage idea is explicitly deferred (owner decision 2026-10-20)
 **Plans**: TBD
 
-Cross-cutting constraints: no router library — `'inicio'` joins the existing `App.tsx` Tab union pattern; no date library — epoch-diff arithmetic on the ISO string; no client-side points recomputation (AGENTS.md non-negotiable).
+Cross-cutting constraints: no router library — `'inicio'` joins the existing `App.tsx` Tab union pattern; no date library — epoch-diff arithmetic on the ISO string; no client-side points recomputation (AGENTS.md non-negotiable); the slider is CSS scroll-snap only (no new npm dependency, no autoplay — 07.1 D-05 static-only rule).
 **UI hint**: yes
 
 ## Progress
