@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: Completed 07.2-03-PLAN.md
-last_updated: "2026-10-20T06:37:20.990Z"
+stopped_at: Completed 07.2-04-PLAN.md
+last_updated: "2026-10-20T08:02:02.909Z"
 last_activity: 2026-10-20
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 12
-  completed_plans: 10
-  percent: 83
+  completed_plans: 11
+  percent: 92
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 07.2 (premium-showcase-game-grounding-inserted) — EXECUTING
-Plan: 4 of 6 complete (07.2-01, 07.2-02, 07.2-05, 07.2-03) — next: 07.2-04 (Wave 4)
+Plan: 5 of 6 complete (07.2-01, 07.2-02, 07.2-05, 07.2-03, 07.2-04) — next: 07.2-06 (final plan)
 Status: Ready to execute
-Last activity: 2026-10-20 -- 07.2-03 complete (Painel EAFC key-stat strip + own-card PNG download live, D-07 foco rewired over key∪relevant, focusCandidates deleted, Stats-Chave Relevantes governance live)
+Last activity: 2026-10-20 -- 07.2-04 complete (officials Ranking tab live: three role-primary OVR boards (D-18), server-order-verbatim staff table with view-aid sort, 57-stat detail with value/points/class average (D-19/D-20); App 'ranking' staff tab UX-gated, server-enforced)
 
 ## Accumulated Context
 
@@ -68,7 +68,11 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 07.2]: 07.2-05 APPROVED by the owner (2026-10-19, after 8 visual feedback rounds): final design = ONE owner-seeded src/assets/card.svg (single source of truth) + code tier palettes, border ON the plate silhouette (proven by 0-differing-pixel file-vs-app render diff — permanent guard in scripts/card-render-check), Bebas Neue everywhere except Orbitron player name, transparent PNG export, member photo uploads LIVE on the RLS-guarded card-photos bucket, get_promotion unified to the my_card rating basis LIVE. Gates at approval: build ✓, 346/346 tests ✓, headless render check incl. file-vs-app pixel diff ✓, live smokes 58/58 + 21/21 + rank ✓. Next: Wave 4 (07.2-03 + 07.2-04); 07.2-03 consumes CardSvg/buildCardPlan directly. Owner-flagged follow-up: 4–6 char label edge cases (HIT stays 3, IG.PDEF/IG.MDEF run 7) may need spot-correction via one apply-seed.mjs run
 - [Phase ?]: 07.2-03: member own-card download built against the CURRENT 07.2-05 export contract (photoSrc/monogramLetter, transparent PNG, hellz-<nome>.png) � the plan's export snapshot predated the owner's 8 card-design rounds; aria-label 'Baixar meu card (PNG)'
 - [Phase ?]: 07.2-03: download photo chain = member's uploaded screenshot (blob object URL) -> class portrait -> monogram, per the 07.2-05 round-7 owner photo-consistency decision (not the plan's literal crestSrc-only)
-- [Phase ?]: 07.2-03: focusCandidates deleted (function + 5 tests) after the FocusStrip rewire � zero references remaining; D-07 foco now selects via improvementFocus over priorityKeySet (key union relevant from my_card)
+- [Phase ?]: 07.2-03: focusCandidates deleted (function + 5 tests) after the FocusStrip rewire 
+ zero references remaining; D-07 foco now selects via improvementFocus over priorityKeySet (key union relevant from my_card)
+- [Phase 07.2]: 07.2-04: role-rank board labels consumed via the shared FUNCTION_LABELS map (role vocabulary lives in ONE place per the Phase 07 decision) instead of duplicated literals in RankPage — the labels can never drift from the dps/mdps/suporte vocabulary
+- [Phase 07.2]: 07.2-04: detail grouping uses a client-side catalog join (fetchCatalog stat_key→group_name map) because the closed role_rank payload has NO per-stat group_name (0013 census); unmapped keys fall back to Geral — the catalog is already a sanctioned staff read (Stats-Chave)
+- [Phase 07.2]: 07.2-04: the staff view-aid column sort is isolated in a pure rankView.ts module that member surfaces never import; 'server' passes the payload through verbatim (same reference), unit-locked by 4 vitest cases (T-072-11 accepted) — member-facing server-order discipline stays structurally enforceable
 
 ### Blockers/Concerns (open — carry to next milestone)
 
@@ -90,8 +94,8 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-20T06:34:47.395Z
-Stopped at: Completed 07.2-03-PLAN.md
+Last session: 2026-10-20T08:02:02.851Z
+Stopped at: Completed 07.2-04-PLAN.md
 Resume file: None
 
 ## Performance Metrics
@@ -106,6 +110,7 @@ Resume file: None
 | 07.2 | 07.2-02 | ~103 min (RED→GREEN TDD) | 2 | 5 | 2026-10-16 |
 | 07.2 | 07.2-05 | multi-session (3 days, ~8 owner visual rounds) | 4 | 75 | 2026-10-19 |
 | 07.2 | 07.2-03 | ~73 min (RED→GREEN TDD) | 3 | 10 | 2026-10-20 |
+| 07.2 | 07.2-04 | ~45 min | 2 | 4 | 2026-10-20 |
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*
