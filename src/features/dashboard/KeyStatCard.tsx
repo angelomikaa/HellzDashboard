@@ -30,7 +30,7 @@ export function KeyStatCard({ stat }: { stat: CardKeyStat }) {
     <div
       id={`key-${stat.stat_key}`}
       tabIndex={-1}
-      className={`flex flex-col justify-between rounded-lg bg-surface p-3 hover-card focus:outline-none focus:ring-2 focus:ring-accent${missing ? ' opacity-60' : ''}`}
+      className={`rounded-lg bg-surface p-3 hover-card focus:outline-none focus:ring-2 focus:ring-accent${missing ? ' opacity-60' : ''}`}
     >
       <span className="block font-display text-xs font-semibold uppercase tracking-wide text-content">
         {stat.label_short}

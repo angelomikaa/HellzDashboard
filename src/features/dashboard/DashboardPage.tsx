@@ -251,7 +251,7 @@ export function DashboardPage({
                 downloading={generating}
                 downloadError={downloadFailed ? DOWNLOAD_ERROR : null}
               />
-              <div className="flex min-w-0 flex-1 flex-col gap-4">
+              <div className="flex min-w-0 flex-1 flex-col gap-4 lg:justify-center">
                 <OvrHero
                   ovr={report.ovr}
                   displayName={session.display_name}
@@ -261,7 +261,7 @@ export function DashboardPage({
                 />
                 {strip.kind !== 'hidden' &&
                   (strip.kind === 'cards' ? (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:min-h-0 lg:flex-1 lg:auto-rows-fr">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
                       {strip.stats.map((k) => (
                         <KeyStatCard key={k.stat_key} stat={k} />
                       ))}

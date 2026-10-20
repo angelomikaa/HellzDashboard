@@ -321,11 +321,10 @@ export function CardPhotoUpload({
           aria-label="Foto do personagem no seu card"
         >
           <CardSvg data={preview} className="h-auto w-full" />
-          {/* Owner checkpoint round 7: the actions are a STRIP pinned across
-              the photo area's bottom edge (the card's image region ends at
-              ~41% from the bottom of the 1080×1600 card), not a pill —
-              hover/focus reveals it, touch screens get the row in flow. */}
-          <div className="mt-2 flex flex-wrap justify-center gap-1.5 sm:absolute sm:inset-x-0 sm:bottom-[41%] sm:mt-0 sm:border-y sm:border-line sm:bg-dominant/90 sm:p-1.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+          {/* Owner checkpoint round 9: the actions are a STRIP pinned across
+              the card's bottom edge; hover/focus reveals it, touch screens
+              get the row in flow. */}
+          <div className="mt-2 flex flex-wrap justify-center gap-1.5 sm:absolute sm:inset-x-0 sm:bottom-0 sm:mt-0 sm:border-t sm:border-line sm:bg-dominant/90 sm:p-1.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
             {actionButtons}
           </div>
         </div>
