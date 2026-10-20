@@ -242,30 +242,15 @@ export function DashboardPage({
                 <CardPhotoUpload
                   session={session}
                   className="w-32 shrink-0 sm:w-36 lg:w-40 xl:w-48"
-                  previewActions={
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
+                  onDownload={
+                    exportData === null
+                      ? undefined
+                      : () => {
                           void handleDownloadCard()
-                        }}
-                        disabled={generating || exportData === null}
-                        aria-label="Baixar meu card (PNG)"
-                        className="h-9 rounded-md bg-accent px-3 text-xs font-semibold text-accent-foreground hover-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                      >
-                        {generating ? 'Gerando…' : 'Baixar card'}
-                      </button>
-                      {downloadFailed && (
-                        <p
-                          role="alert"
-                          aria-live="polite"
-                          className="text-center text-xs font-semibold text-destructive"
-                        >
-                          {DOWNLOAD_ERROR}
-                        </p>
-                      )}
-                    </>
+                        }
                   }
+                  downloading={generating}
+                  downloadError={downloadFailed ? DOWNLOAD_ERROR : null}
                 />
                 <OvrHero
                   ovr={report.ovr}

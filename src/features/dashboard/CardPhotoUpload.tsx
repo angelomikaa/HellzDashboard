@@ -21,8 +21,13 @@
 //
 // Preview: a live CardSvg fed by my_card + the current photo (or the
 // class-portrait fallback / ASST-01 monogram) — the exact component the
-// Destaques showcase uses and plan 07.2-03 will reuse for the member
-// Painel EAFC strip + own-card download.
+// Destaques showcase uses and the member Painel's EAFC strip (07.2-03).
+//
+// Card actions (owner checkpoint round 6): alter photo / remove photo /
+// download card are THREE icon-only buttons shown inline over the card's
+// bottom edge on hover/focus (touch screens get the same row in normal
+// flow). Each icon carries an accessible label plus a tooltip, so the
+// strip stays free of button text.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   deleteCardPhoto,
@@ -76,19 +81,75 @@ async function compressToJpeg(file: File, maxDim = 1200, quality = 0.85): Promis
   }
 }
 
+/** Icon-only card action with a hover/focus tooltip (owner round 6). The
+ *  tooltip is CSS-only (no JS state) and the accessible name lives on the
+ *  button, so screen readers never depend on the tooltip being visible. */
+function IconAction({
+  label,
+  onClick,
+  disabled = false,
+  tone = 'neutral',
+  children,
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  tone?: 'accent' | 'neutral'
+  children: ReactNode
+}) {
+  return (
+    <span className="group/action relative inline-flex">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        className={`inline-flex h-9 w-9 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+          tone === 'accent'
+            ? 'bg-accent text-accent-foreground hover-primary'
+            : 'border border-line bg-dominant text-content hover-control'
+        }`}
+      >
+        {children}
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-dominant px-2 py-1 text-[11px] font-semibold text-content opacity-0 shadow-lg transition-opacity group-hover/action:opacity-100 group-focus-within/action:opacity-100"
+      >
+        {label}
+      </span>
+    </span>
+  )
+}
+
+const iconProps = {
+  width: 18,
+  height: 18,
+  viewBox: '0 0 16 16',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.6,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  'aria-hidden': true,
+} as const
+
 export function CardPhotoUpload({
   session,
-  previewActions,
+  onDownload,
+  downloading = false,
+  downloadError = null,
   className = '',
 }: {
   session: NeoFootSession
-  // Owner feedback (07.2-06 checkpoint, 2026-10-20): the own-card download
-  // belongs WITH the card preview — DashboardPage injects the button here so
-  // the action sits under the card it exports.
-  previewActions?: ReactNode
-  // Owner checkpoint round 5: the preview now lives INSIDE the Painel's OVR
-  // strip, so the strip controls the width; this component renders only the
-  // card (the old "Foto do personagem" section/thumbnail/copy are gone).
+  // Owner round 6: the own-card download joined the on-card action row
+  // (icon-only). DashboardPage owns the export contract and passes the
+  // handler/state down.
+  onDownload?: () => void
+  downloading?: boolean
+  downloadError?: string | null
+  // Owner checkpoint round 5: the preview lives INSIDE the Painel's OVR
+  // strip, so the strip controls the width.
   className?: string
 }) {
   // Photo: object URL of the stored screenshot (null = none uploaded — the
@@ -188,31 +249,52 @@ export function CardPhotoUpload({
         }
       : null
 
-  // Owner checkpoint round 5: upload affordances live ON the card — hovering
-  // (or focusing) the card reveals "Alterar foto"/"Remover" overlaid on the
-  // photo area; touch/narrow screens get the same buttons in normal flow
-  // under the card (hover does not exist there).
+  // Owner checkpoint round 6: ONE inline, icon-only action row — alter photo,
+  // remove photo, download card — with tooltips (excessive text would clutter
+  // the strip). Shown on hover/focus over the card at sm+, always in flow on
+  // touch/narrow screens.
   const actionButtons = (
     <>
-      <button
-        type="button"
+      <IconAction
+        label={busy ? 'Enviando…' : photoUrl === null ? 'Enviar foto' : 'Alterar foto'}
         onClick={() => inputRef.current?.click()}
         disabled={busy}
-        className="h-9 rounded-md bg-accent px-3 text-xs font-semibold text-accent-foreground hover-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        tone="accent"
       >
-        {busy ? 'Enviando…' : photoUrl === null ? 'Enviar foto' : 'Alterar foto'}
-      </button>
+        <svg {...iconProps}>
+          <path d="M8 11V3" />
+          <path d="M4 7l4-4 4 4" />
+          <path d="M2 13h12" />
+        </svg>
+      </IconAction>
       {photoUrl !== null && (
-        <button
-          type="button"
+        <IconAction
+          label="Remover foto"
           onClick={() => {
             void handleRemove()
           }}
           disabled={busy}
-          className="h-9 rounded-md border border-line bg-dominant/80 px-3 text-xs font-semibold text-content hover-control disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
-          Remover
-        </button>
+          <svg {...iconProps}>
+            <path d="M2.5 4h11" />
+            <path d="M6 4V2.5h4V4" />
+            <path d="M4 4l.6 9.5h6.8L12 4" />
+            <path d="M6.75 6.5v4.5M9.25 6.5v4.5" />
+          </svg>
+        </IconAction>
+      )}
+      {onDownload !== undefined && (
+        <IconAction
+          label={downloading ? 'Gerando…' : 'Baixar card'}
+          onClick={onDownload}
+          disabled={downloading}
+        >
+          <svg {...iconProps}>
+            <path d="M8 2v8" />
+            <path d="M4 6l4 4 4-4" />
+            <path d="M2 13h12" />
+          </svg>
+        </IconAction>
       )}
     </>
   )
@@ -238,22 +320,19 @@ export function CardPhotoUpload({
           aria-label="Foto do personagem no seu card"
         >
           <CardSvg data={preview} className="h-auto w-full" />
-          <div className="mt-2 flex flex-wrap gap-2 sm:absolute sm:inset-x-0 sm:bottom-0 sm:mt-0 sm:flex-col sm:gap-1.5 sm:rounded-b-lg sm:bg-linear-to-t sm:from-dominant sm:via-dominant/85 sm:to-transparent sm:p-2 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+          <div className="mt-2 flex flex-wrap justify-center gap-1.5 sm:absolute sm:bottom-2 sm:left-1/2 sm:mt-0 sm:-translate-x-1/2 sm:rounded-full sm:border sm:border-line sm:bg-dominant/90 sm:p-1 sm:opacity-0 sm:shadow-lg sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
             {actionButtons}
           </div>
         </div>
       ) : (
         <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line p-3 text-center">
           <p className="text-xs text-muted">Envie um print do seu personagem.</p>
-          <div className="flex flex-wrap justify-center gap-2">{actionButtons}</div>
+          <div className="flex flex-wrap justify-center gap-1.5">{actionButtons}</div>
         </div>
       )}
-      {preview !== null && previewActions !== undefined && (
-        <div className="mt-2 flex flex-col items-stretch gap-2">{previewActions}</div>
-      )}
-      {error !== null && (
+      {(error !== null || downloadError !== null) && (
         <p role="alert" aria-live="polite" className="mt-2 text-center text-xs font-semibold text-destructive">
-          {error}
+          {error ?? downloadError}
         </p>
       )}
     </div>
