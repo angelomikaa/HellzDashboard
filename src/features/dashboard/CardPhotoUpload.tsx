@@ -288,6 +288,7 @@ export function CardPhotoUpload({
           label={downloading ? 'Gerando…' : 'Baixar card'}
           onClick={onDownload}
           disabled={downloading}
+          tone="accent"
         >
           <svg {...iconProps}>
             <path d="M8 2v8" />
@@ -320,7 +321,11 @@ export function CardPhotoUpload({
           aria-label="Foto do personagem no seu card"
         >
           <CardSvg data={preview} className="h-auto w-full" />
-          <div className="mt-2 flex flex-wrap justify-center gap-1.5 sm:absolute sm:bottom-2 sm:left-1/2 sm:mt-0 sm:-translate-x-1/2 sm:rounded-full sm:border sm:border-line sm:bg-dominant/90 sm:p-1 sm:opacity-0 sm:shadow-lg sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+          {/* Owner checkpoint round 7: the actions are a STRIP pinned across
+              the photo area's bottom edge (the card's image region ends at
+              ~41% from the bottom of the 1080×1600 card), not a pill —
+              hover/focus reveals it, touch screens get the row in flow. */}
+          <div className="mt-2 flex flex-wrap justify-center gap-1.5 sm:absolute sm:inset-x-0 sm:bottom-[41%] sm:mt-0 sm:border-y sm:border-line sm:bg-dominant/90 sm:p-1.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
             {actionButtons}
           </div>
         </div>

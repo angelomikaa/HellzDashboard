@@ -221,37 +221,37 @@ export function DashboardPage({
         </section>
       ) : (
         <>
-          {/* Owner checkpoint rounds 4-5: the member's own player card, the
-              OVR hero and the 6 EAFC key-stat mini cards (my_card key_stats
-              IN SERVER ORDER) share ONE wide strip — tier border on the
-              strip, card + OVR anchored left, key cards filling the rest
-              (3-up at lg, 6-up at xl, 2/3-up below). The tier legend keeps
-              decoding the colors just under the strip. */}
+          {/* Owner checkpoint rounds 4-7: the member's own player card (sized
+              like a Destaques card), the OVR summary and the 6 EAFC key-stat
+              mini cards (my_card key_stats IN SERVER ORDER) share ONE wide
+              strip — tier border on the strip, card left, OVR + key cards
+              stacked beside it. The tier legend keeps decoding the colors
+              just under the strip. */}
           <section
             aria-label="Resumo do personagem"
             className={`mt-4 rounded-lg border-2 bg-dominant p-3 ${
               ovrTier !== null ? TIER_BORDER_DISPLAY[ovrTier] : 'border-line'
             }`}
           >
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-4">
-              {/* Owner checkpoint round 5: the member's own card moved INTO
-                  the OVR hero strip; its upload/remove affordances now live
-                  on the card itself (CardPhotoUpload owns the hover overlay
-                  and its own data calls). */}
-              <div className="flex items-center gap-3 lg:shrink-0 lg:gap-4">
-                <CardPhotoUpload
-                  session={session}
-                  className="w-32 shrink-0 sm:w-36 lg:w-40 xl:w-48"
-                  onDownload={
-                    exportData === null
-                      ? undefined
-                      : () => {
-                          void handleDownloadCard()
-                        }
-                  }
-                  downloading={generating}
-                  downloadError={downloadFailed ? DOWNLOAD_ERROR : null}
-                />
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-6">
+              {/* Owner checkpoint round 7: the own-card preview is now sized
+                  like a Destaques card (≈a third of the content column) and
+                  the actions joined it as an icon strip over the photo area
+                  (CardPhotoUpload owns the hover overlay and its data calls). */}
+              <CardPhotoUpload
+                session={session}
+                className="mx-auto w-40 shrink-0 sm:w-48 lg:mx-0 lg:w-64 xl:w-72"
+                onDownload={
+                  exportData === null
+                    ? undefined
+                    : () => {
+                        void handleDownloadCard()
+                      }
+                }
+                downloading={generating}
+                downloadError={downloadFailed ? DOWNLOAD_ERROR : null}
+              />
+              <div className="flex min-w-0 flex-1 flex-col gap-4">
                 <OvrHero
                   ovr={report.ovr}
                   displayName={session.display_name}
@@ -259,22 +259,17 @@ export function DashboardPage({
                   charFunction={report.char_function}
                   layout="strip"
                 />
-              </div>
-              {strip.kind !== 'hidden' && (
-                <div className="min-w-0 flex-1 border-t border-line pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-                  {strip.kind === 'cards' ? (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:h-full lg:grid-cols-3 lg:content-center xl:grid-cols-6">
+                {strip.kind !== 'hidden' &&
+                  (strip.kind === 'cards' ? (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:min-h-0 lg:flex-1 lg:auto-rows-fr">
                       {strip.stats.map((k) => (
                         <KeyStatCard key={k.stat_key} stat={k} />
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted lg:flex lg:h-full lg:items-center">
-                      {STRIP_EXPLAINER}
-                    </p>
-                  )}
-                </div>
-              )}
+                    <p className="text-sm text-muted">{STRIP_EXPLAINER}</p>
+                  ))}
+              </div>
             </div>
           </section>
           <div className="flex justify-end">

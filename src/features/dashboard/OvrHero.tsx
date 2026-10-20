@@ -61,8 +61,27 @@ export function OvrHero({
     </>
   )
 
+  // Strip layout (owner checkpoint round 7): a horizontal OVR block so the
+  // Painel can put the (now Destaques-sized) player card beside it without
+  // spending vertical space on a stacked block.
   if (layout === 'strip') {
-    return <div className="flex flex-col justify-center lg:w-56 lg:shrink-0">{content}</div>
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-4">
+          <p
+            className={`text-5xl font-semibold leading-none ${tier !== null ? `font-display ${TIER_TEXT_GLOW[tier]}` : 'text-muted'}`}
+          >
+            {display}
+          </p>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">OVR</p>
+            <h2 className="truncate text-xl font-semibold text-content">{displayName}</h2>
+            <p className="truncate text-sm text-muted">{classLine}</p>
+          </div>
+        </div>
+        {explanation !== null && <p className="text-sm text-muted">{explanation}</p>}
+      </div>
+    )
   }
 
   return (
