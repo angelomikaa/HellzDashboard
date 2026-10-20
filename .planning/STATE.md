@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: 07.2-06 tasks 1-2 complete — awaiting owner layout checkpoint (task 3)
+stopped_at: 07.2-06 owner-feedback fixes done — awaiting layout checkpoint + new phase for round-2 features
 last_updated: "2026-10-20T13:45:00.000Z"
 last_activity: 2026-10-20
 progress:
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 07.2 (premium-showcase-game-grounding-inserted) — EXECUTING
-Plan: 5 of 6 complete (07.2-01, 07.2-02, 07.2-05, 07.2-03, 07.2-04) — 07.2-06 tasks 1-2 done, task 3 (owner desktop/mobile walk) PENDING
-Status: Awaiting owner layout sign-off
-Last activity: 2026-10-20 -- 07.2-06 tasks 1-2 (LAYT-01): wide shell max-w-6xl/xl:max-w-7xl, grouped stats 1→2→3→4 across, OVR hero + legend row at lg, submit wizard capped at max-w-2xl, D-17 class icons in Validações/Personagens, Personagens members 2-up register at xl (NOT the owner-rejected 7-column table), build green + 352/352 tests green
+Plan: 5 of 6 complete (07.2-01, 07.2-02, 07.2-05, 07.2-03, 07.2-04) — 07.2-06 tasks 1-2 done + owner-feedback fixes, task 3 (owner desktop/mobile walk) PENDING
+Status: Awaiting owner layout sign-off; owner feedback round 2 scoped into a NEW phase (capture / membership / showcase UX)
+Last activity: 2026-10-20 -- 07.2-06 owner feedback (round 1) addressed: own-card download moved beside the preview card (CardPhotoUpload previewActions slot), Ranking detail expands inline under its row (Fragment), Personagens class/function token filters (pure view aid), Enviar Status OCR = two-column right rail (example + upload) with fields in the main column; build green + 352/352 tests green (6240ade)
 
 ## Accumulated Context
 
