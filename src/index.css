@@ -61,6 +61,14 @@
   --color-tier-gold: #E9B44C;         /* gold's ONLY surviving role (D-01) */
   --color-tier-platinum: #D7E3F0;
 
+  /* 07.2 D-06: relevant-tier signal — a DELIBERATE exception to the 07.1
+     D-01 single-accent rule (owner direction: relevant stats are marked
+     YELLOW on the Stats-Chave governance surface, against the red key
+     marking). Dedicated token family — it must NOT resurrect the retired
+     UI accent hex (D-06), and tier gold #E9B44C keeps its own tier role. */
+  --color-relevant: #D9A521;          /* relevant-tier border/fill signal */
+  --color-relevant-bright: #E8BC4D;   /* small yellow text on dark (≥4.5:1 on #1E1E1E) */
+
   /* display font — hero elements only (D-07): wordmark/lockup, h1s, OVR/points numbers */
   --font-display: "Orbitron", "Segoe UI", system-ui, sans-serif;
 }

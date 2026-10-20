@@ -45,3 +45,16 @@ export const TIER_DOT_DISPLAY: Record<Tier, string> = {
   ...TIER_BG,
   platinum: 'tier-impecavel-dot',
 }
+
+// 07.2 D-06: relevant-tier chip vocabulary — a SEPARATE concern from the
+// Tier union above (relevant is NEVER a card tier; RELV-01: the relevant
+// marking lives on the Stats-Chave governance surface and guides the foco
+// strip — it never appears on member cards). Literal strings only
+// (Tailwind v4 JIT); the token names match the @theme additions in
+// src/index.css so the classes generate.
+/** Relevant chip: the YELLOW marking (D-06 — deliberate exception to the
+ *  07.1 D-01 single-accent rule; dedicated --color-relevant family, never
+ *  the retired #E3B341 UI accent). */
+export const RELEVANT_CHIP = 'border-relevant text-relevant-bright'
+/** Key chip: the accent-RED marking (D-06 — key = red on Stats-Chave). */
+export const KEY_CHIP = 'border-accent text-accent-bright'
