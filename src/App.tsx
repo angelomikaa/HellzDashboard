@@ -5,6 +5,7 @@ import { RequireAuth } from './features/auth/RequireAuth'
 import { CharactersPage } from './features/admin/CharactersPage'
 import { KeyStatsPage } from './features/admin/KeyStatsPage'
 import { ValidacoesPage } from './features/admin/ValidacoesPage'
+import { RankPage } from './features/rank/RankPage'
 import { HighlightsPage } from './features/highlights/HighlightsPage'
 import { SubmitPage } from './features/submit/SubmitPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
@@ -18,7 +19,14 @@ const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
 // Exported for DashboardPage's type-only import (erased at build — no
 // runtime cycle: App imports the page's value, the page imports only the
 // Tab union as a type).
-export type Tab = 'painel' | 'submit' | 'validacoes' | 'destaques' | 'characters' | 'keystats'
+export type Tab =
+  | 'painel'
+  | 'submit'
+  | 'validacoes'
+  | 'destaques'
+  | 'characters'
+  | 'keystats'
+  | 'ranking'
 
 function App() {
   const [tab, setTab] = useState<Tab>('painel')
@@ -52,6 +60,12 @@ function App() {
         // enforcement is the officer_queue/set_submission_status RPC staff
         // gates (0011); a member session never receives queue data.
         const showValidacoes = tab === 'validacoes' && isStaff
+        // Ranking (07.2-04, RANK-02): same UX-only staff gate + content
+        // re-check — enforcement is role_rank's internal staff gate inside
+        // the 0013 SECURITY DEFINER RPC (member JWT raises 'forbidden',
+        // smoke-proven in 07.2-01); a member session never receives rank
+        // data even if a staff tab lingers across logout/login (D-20).
+        const showRanking = tab === 'ranking' && isStaff
         // Enviar Status is for EVERY role (members submit their own stats).
         const showSubmit = tab === 'submit'
         // Destaques (06-04): every logged-in member — celebration is the point
@@ -145,6 +159,18 @@ function App() {
                     Stats-Chave
                   </button>
                 )}
+                {isStaff && (
+                  <button
+                    type="button"
+                    onClick={() => setTab('ranking')}
+                    aria-current={showRanking ? 'page' : undefined}
+                    className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      showRanking ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
+                    }`}
+                  >
+                    Ranking
+                  </button>
+                )}
               </div>
             </nav>
             <main className="flex-1">
@@ -157,6 +183,11 @@ function App() {
                   <CharactersPage session={session} />
                 ) : showKeyStats ? (
                   <KeyStatsPage session={session} />
+                ) : showRanking ? (
+                  // Content re-check: showRanking re-evaluates isStaff, so a
+                  // lingering staff tab across a logout/login switch renders
+                  // nothing for a member (App-stays-mounted lesson).
+                  <RankPage session={session} />
                 ) : showSubmit ? (
                   <SubmitPage session={session} />
                 ) : (
