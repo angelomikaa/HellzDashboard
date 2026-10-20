@@ -1,39 +1,49 @@
 // cardAssets.ts — SINGLE SOURCE OF TRUTH for the card design (07.2-05
-// checkpoint round 7, owner supersession: "i seeded a new card ... border
-// is now detached from the plate and over the crop ... Bebas Neue takes over
-// the rest ... all our abreviation labels must go from 3 letter to 4-6
-// chars ... this one file becomes the source of truth for card design").
+// checkpoint round 8, owner re-seed: "read card.svg again — actually made
+// new alterations. read all layers carefully." → THE FILE IS THE SPEC).
 //
 // THE FILE: src/assets/card.svg (viewBox 1080×1600 — portrait 27:40), the
-// owner's ONE design for every tier. Structure (verified against the file):
-//   - <path id="base-plate"> cls-1 — solid recolorable plate fill, the full
-//     shield silhouette. The plate is painted FIRST on both surfaces; the
-//     area outside the shield stays transparent (PNG-transparent design).
-//   - <path id="crop-path"> cls-2 — the PHOTO AREA: the top portion of the
-//     silhouette closed at ~y=937 (full width). Its geometry also IS the
-//     detached border: a gradient stroke (stroke:url(#Blue_to_Magenta),
-//     width 40) drawn by the render layer AFTER the photo, covering the
-//     photo's edges — deliberate design choice, round 7.
+// owner's ONE design for every tier. THREE-LAYER BACKGROUND (the owner's
+// explicit round-8 semantics, verified against the file):
+//   1. <path id="base-plate"> cls-1 — solid recolorable plate fill, the full
+//      shield silhouette. Painted FIRST; the area outside the shield stays
+//      transparent (PNG-transparent design).
+//   2. <path id="crop-path"> cls-2 — the PHOTO AREA: the top portion of the
+//      silhouette closed at ~y=937 (full width), fill:none — BORDERLESS by
+//      design. The photo is clipped to it and NOTHING strokes it: the
+//      round-7 "border over the crop" reading is DEAD (that was the app's
+//      divergence the owner flagged: "the border is in the crop, which would
+//      be incorrect").
+//   3. <g id="border-over"> — cls-3 stroke:url(#Blue_to_Magenta) WIDTH 48
+//      ON THE PLATE SILHOUETTE (the cls-3 path's d IS the base-plate d),
+//      clipped by clipPath#clip-path-1 (= the plate silhouette): the stroke's
+//      outer half is cut, the inner ≈24px band rings the WHOLE shield and
+//      covers the photo's top/side edges. The gradient line runs
+//      x1=61.61 → x2=1017.352 — extended past the plate edges. Paint order:
+//      plate → photo → border → texts.
 //   - Placeholder TEXT slots (Bebas Neue unless noted — family + fill are
 //     placeholders; code substitutes):
-//       · #OVR — cls-4 Bebas Neue, 8.503px × matrix 21.169 → ≈180px
-//         effective at (137.029, 412.59), top-left over the photo
-//       · Job class — cls-5 Bebas Neue, 72px at (137.029, 487.48), under
+//       · <g id="OVR"> — cls-4 Bebas Neue, 6.992px × matrix 21.169 → ≈148px
+//         effective at (136.177, 412.59), top-left over the photo
+//       · Job class — cls-5 Bebas Neue, 72px at (136.177, 487.48), under
 //         the number (no "OVR" tag, round 4 held)
 //       · PLAYERNAME — cls-6 ORBITRON, 109.72px × matrix 0.656 → ≈72px
-//         effective at (246.528, 1057.007). ORBITRON ONLY HERE: every other
+//         effective at (246.528, 1047.007). ORBITRON ONLY HERE: every other
 //         slot is Bebas Neue (round 7).
-//       · six stat columns, left → right (points anchors evenly pitched at
-//         ≈141px: 136.177 / 277.158 / 418.138 / 559.118 / 700.099 / 841.079 —
-//         the owner CENTERED the '99' placeholders on the column grid, so the
-//         parse locks that even pitch), each: label cls-7 Bebas Neue 48px
-//         (y≈1273.507), points cls-8 Bebas Neue 128px (y≈1199.703), value
-//         cls-7 Bebas Neue 48px (y≈1319.255). All THREE lines are CENTRALLY
-//         ALIGNED per column (round 7): the column CENTER is derived at
-//         plan-build as the points anchor + width('99')/2 (the owner's own
-//         centering of the placeholder proves the grid) — label 4–6 chars
-//         (MATK / PDMG.R / PVP.R), points big hero number, value raw
-//         own_value.
+//       · SIX SEMANTIC STAT GROUPS <g id="KEY1">…<g id="KEY6"> — each holds
+//         exactly three texts: LABEL (cls-7 Bebas 56, y≈1141.317 — ABOVE the
+//         rating), RATING (cls-8 Bebas 148, y≈1261.703) and STAT (cls-7
+//         Bebas 56, y≈1317.836). Ids drift per group (LABEL / LABEL-2…,
+//         KEYLABEL, RATING-2…, data-name attrs) — the parser resolves roles
+//         from the group's structure (class + vertical order), NEVER from
+//         exact id strings, and orders the columns left → right by the
+//         RATING anchor (the visual grid — the KEY ids are NOT the visual
+//         order: KEY3/KEY4 and KEY5/KEY6 sit swapped in the file). The
+//         rating anchors are evenly pitched at ≈142.15px (the owner CENTERED
+//         the '99' placeholders on the column grid — the parse locks that
+//         pitch); the column CENTER is derived at plan-build as the rating
+//         anchor + width('99')/2. Labels 4–6 chars (MATK / MDMG.R), points
+//         big hero number, value raw own_value.
 //
 // TIER VARIANTS LIVE IN CODE: one TIER_PALETTE per tier (plate fill, border
 // gradient stops, text fill) applied over the SAME parsed geometry.
@@ -68,10 +78,11 @@ export interface CardTextSlot {
   size: number
 }
 
-/** One of the six positional stat slots inside <g id="Stats">. All three
- *  lines (label / points / value) render centered on the column centerX —
- *  DERIVED at plan-build as points.x + width('99')/2 (the parse locks the
- *  points anchors' even pitch, proving the owner's center grid). */
+/** One of the six positional stat slots, resolved from the file's semantic
+ *  <g id="KEY*"> groups. All three lines (label / points / value) render
+ *  centered on the column centerX — DERIVED at plan-build as points.x +
+ *  width('99')/2 (the parse locks the rating anchors' even pitch, proving
+ *  the owner's center grid). Label ABOVE points ABOVE value (round 8). */
 export interface CardStatSlot {
   label: CardTextSlot
   points: CardTextSlot
@@ -92,12 +103,18 @@ export interface CardGradientLine {
 export interface CardBorderStroke {
   /** The gradient line (userSpaceOnUse geometry, scaled with everything). */
   line: CardGradientLine
-  /** Stroke width — 40 in the owner's file (round 7). */
+  /** Stroke width — 48 in the owner's file (round 8). */
   width: number
+  /** The STROKED path (the cls-3 path inside <g id="border-over">) — in the
+   *  owner's file this IS the plate silhouette (three-layer semantics: the
+   *  border rings the whole shield; the crop area stays borderless). Parsed
+   *  separately from the clip so a future re-seed that decouples them stays
+   *  faithful to the file. */
+  strokePath: string
   /** The border's CLIP path (clipPath#clip-path-1 — the plate silhouette).
    *  The owner clips the border-over stroke to the plate: its outer half is
-   *  cut, the inner half paints OVER the photo edges (deliberate round-7
-   *  design). Both surfaces must apply this clip. */
+   *  cut, the inner half paints over the photo/plate edges (deliberate).
+   *  Both surfaces must apply this clip. */
   clipPath: string
 }
 
@@ -114,9 +131,10 @@ export interface CardGeometry {
   cropPath: string
   /** Bounding box of the crop path (cover-fit drawing bounds). */
   cropBBox: CardRect
-  /** Detached border: stroke width + gradient line + plate-silhouette clip,
-   *  painted over the photo (covering its edges — deliberate). The clip
-   *  cuts the stroke's outer half; the inner half covers the photo. */
+  /** Detached border: stroke width + gradient line + stroke path (the plate
+   *  silhouette — three-layer semantics) + the plate-silhouette clip,
+   *  painted over the photo. The clip cuts the stroke's outer half; the
+   *  inner ≈24px band rings the whole shield. */
   borderStroke: CardBorderStroke
   slots: {
     /** Big OVR number — top-left, OVER the photo. */
@@ -280,13 +298,15 @@ function pathBBox(d: string, what: string): CardRect {
   return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }
 }
 
-/** The border stroke, round 7: cls-3 = `fill:none;
- *  stroke:url(#<gradient>);stroke-width:40` on the path inside
+/** The border stroke, round 8: cls-3 = `fill:none;
+ *  stroke:url(#<gradient>);stroke-width:48` on the path inside
  *  <g id="border-over">, which carries clip-path="url(#<clip>)" — the
- *  owner clips the stroke to the plate silhouette so the border covers the
- *  photo's edges without spilling outside the shield. Only the GEOMETRY is
- *  taken (line + width + clip path d) — the file's placeholder gradient
- *  stops stay in the file (pristine's live on in TIER_PALETTE). */
+ *  owner clips the stroke (whose d IS the plate silhouette) to the plate
+ *  silhouette so the border rings the shield without spilling outside.
+ *  The stroked path and the clip are parsed SEPARATELY (a re-seed may
+ *  decouple them). Only the GEOMETRY is taken (stroke path + line + width +
+ *  clip path d) — the file's placeholder gradient stops stay in the file
+ *  (pristine's live on in TIER_PALETTE). */
 function borderStroke(svg: string): CardBorderStroke {
   const cls3 = svg.match(/\.cls-3\{([^}]*)\}/)
   if (!cls3) throw new Error('card.svg: no cls-3 border-over style found')
@@ -301,12 +321,17 @@ function borderStroke(svg: string): CardBorderStroke {
   if (!attrs.get('x1') || !attrs.get('x2')) {
     throw new Error(`card.svg: border gradient "${strokeRef[1]}" needs a userSpaceOnUse line`)
   }
-  // The clip: the border path must reference a clipPath whose single <path>
-  // is the plate silhouette (the owner's clip-path-1).
+  // The border path: the cls-3 path inside <g id="border-over"> — its d IS
+  // the stroked geometry (the plate silhouette in the owner's file). The
+  // clip: the same path must reference a clipPath whose single <path> is
+  // the plate silhouette (the owner's clip-path-1).
   const borderPath = [...svg.matchAll(/<path\b([^>]*)>/g)]
     .map((m) => attributes(m[1]))
     .find((a) => a.get('class') === 'cls-3')
-  const clipRef = borderPath?.get('clip-path')?.match(/url\(#([^)]+)\)/)?.[1]
+  if (!borderPath?.get('d')) {
+    throw new Error('card.svg: no cls-3 border-over path found (the stroked silhouette is required)')
+  }
+  const clipRef = borderPath.get('clip-path')?.match(/url\(#([^)]+)\)/)?.[1]
   if (!clipRef) throw new Error('card.svg: the border-over path must clip to the plate silhouette')
   const clip = svg.match(new RegExp('<clipPath\\b[^>]*id="' + clipRef + '"[^>]*>[\\s\\S]*?</clipPath>'))
   const clipD = clip?.[0].match(/<path\b[^>]*\bd="([^"]+)"/)?.[1]
@@ -319,12 +344,9 @@ function borderStroke(svg: string): CardBorderStroke {
       y2: Number(attrs.get('y2')),
     },
     width: Number(width[1]),
+    strokePath: borderPath.get('d') as string,
     clipPath: clipD,
   }
-}
-
-function byX(a: RawText, b: RawText): number {
-  return a.x - b.x
 }
 
 function expectCount(texts: RawText[], cls: string, n: number): void {
@@ -333,6 +355,37 @@ function expectCount(texts: RawText[], cls: string, n: number): void {
     throw new Error(`card.svg: expected exactly ${n} ${cls} text slot(s), found ${found.length}`)
   }
   return void found
+}
+
+/** The six SEMANTIC stat groups <g id="KEY1">…<g id="KEY6"> with their text
+ *  slots. Roles resolve from the group's STRUCTURE, never exact id strings
+ *  (the file drifts: LABEL / LABEL-2 / KEYLABEL, RATING-2 + data-name,
+ *  STAT-3 + data-name): the single cls-8 text is the RATING; of the two
+ *  cls-7 texts the SMALLER y is the LABEL (above the rating) and the LARGER
+ *  y is the STAT/value line — the file's label-above-rating-above-value
+ *  order, derived from the file on every parse. */
+function keyGroups(svg: string): { id: string; texts: RawText[] }[] {
+  const groups: { id: string; texts: RawText[] }[] = []
+  for (const m of svg.matchAll(/<g id="(KEY\d+)"[^>]*>([\s\S]*?)<\/g>/g)) {
+    const texts: RawText[] = []
+    for (const t of m[2].matchAll(/<text\b([^>]*)>/g)) {
+      const attrs = attributes(t[1])
+      const cls = attrs.get('class')
+      if (!cls) throw new Error(`card.svg: ${m[1]} text slot must carry a class`)
+      const { x, y, scale } = matrixTransform(attrs.get('transform'))
+      texts.push({ cls, id: attrs.get('id'), x, y, scale })
+    }
+    if (texts.length !== 3) {
+      throw new Error(
+        `card.svg: stat group ${m[1]} must hold exactly 3 text slots (label/rating/value), found ${texts.length}`,
+      )
+    }
+    groups.push({ id: m[1], texts })
+  }
+  if (groups.length !== 6) {
+    throw new Error(`card.svg: expected 6 KEY stat groups (KEY1..KEY6), found ${groups.length}`)
+  }
+  return groups
 }
 
 function parseCard(svg: string): CardGeometry {
@@ -352,11 +405,13 @@ function parseCard(svg: string): CardGeometry {
   expectCount(texts, 'cls-4', 1)
   expectCount(texts, 'cls-5', 1)
   expectCount(texts, 'cls-6', 1)
+  // Global census: ALL cls-7/cls-8 texts must live in the KEY groups —
+  // a future edit adding a stray slot fails loudly here.
   expectCount(texts, 'cls-7', 12) // 6 labels + 6 raw values
   expectCount(texts, 'cls-8', 6)
 
   // OVR: ONE OF THE TWO slots allowed a scaled matrix — resolve ONCE here
-  // (8.503px × 21.169 ≈ 180px effective; the hack never reaches render).
+  // (6.992px × 21.169 ≈ 148px effective; the hack never reaches render).
   const ovrRaw = texts.find((t) => t.cls === 'cls-4')!
   if (ovrRaw.scale === 1) throw new Error('card.svg: the OVR slot must carry its design matrix scale')
   const ovr: CardTextSlot = { x: ovrRaw.x, y: ovrRaw.y, size: ovrSize * ovrRaw.scale }
@@ -367,48 +422,54 @@ function parseCard(svg: string): CardGeometry {
   const nameRaw = texts.find((t) => t.cls === 'cls-6')!
   const name = slotOf(nameRaw, nameSize)
 
-  // cls-7 is shared by the 6 stat labels and the 6 raw values (both 48px
-  // Bebas Neue). Labels sit at y≈1283.5, values at y≈1329.25.
-  const cls7 = texts.filter((t) => t.cls === 'cls-7').sort(byX)
-  const labelRaw = cls7.filter((t) => t.y < 1300).sort(byX)
-  const valueRaw = cls7.filter((t) => t.y >= 1300).sort(byX)
-  if (labelRaw.length !== 6 || valueRaw.length !== 6) {
-    throw new Error('card.svg: cls-7 must be exactly 6 stat labels (y<1300) + 6 raw values (y>=1300)')
-  }
+  // THE SIX STAT COLUMNS (round 8 semantic groups): resolve roles inside
+  // each KEY group, then order the columns LEFT → RIGHT by the RATING
+  // anchor — the visual grid (the KEY ids are NOT the visual order: the
+  // owner's file sits KEY3/KEY4 and KEY5/KEY6 visually swapped).
+  const groups = keyGroups(svg).map((g) => {
+    const rating = g.texts.find((t) => t.cls === 'cls-8')
+    if (!rating) throw new Error(`card.svg: stat group ${g.id} has no cls-8 RATING slot`)
+    const pair = g.texts.filter((t) => t.cls === 'cls-7').sort((a, b) => a.y - b.y)
+    if (pair.length !== 2) {
+      throw new Error(`card.svg: stat group ${g.id} must hold exactly 2 cls-7 slots (label + value)`)
+    }
+    if (pair[1].y <= pair[0].y) {
+      throw new Error(`card.svg: stat group ${g.id} label/value rows must sit at DISTINCT y`)
+    }
+    return { id: g.id, label: pair[0], rating, value: pair[1] }
+  })
+  const pointsRaw = groups
+    .sort((a, b) => a.rating.x - b.rating.x)
+    .map((g) => ({ id: g.id, label: g.label, rating: g.rating, value: g.value }))
 
-  const pointsRaw = texts.filter((t) => t.cls === 'cls-8').sort(byX)
-  if (pointsRaw.length !== 6) {
-    throw new Error('card.svg: cls-8 must be exactly 6 stat point values')
-  }
-  // THE COLUMN-CENTER GRID (round 7): the points placeholders are the SAME
-  // string ('99') in every column, so their left anchors sit at
-  // center − width('99')/2 — CONSTANT offset → the points x's are the
-  // column centers' grid, evenly pitched. The label/value anchors are left-
-  // anchors of DIFFERENT-width placeholder strings ('MATK' vs 'MDMG.R') and
-  // are NOT centers. Lock the even pitch: a future file edit that breaks
-  // the grid breaks the central-alignment design.
+  // THE COLUMN-CENTER GRID (rounds 7-8): the RATING placeholders are the
+  // SAME string ('99') in every column, so their left anchors sit at
+  // center − width('99')/2 — CONSTANT offset → the rating x's are the
+  // column centers' grid, evenly pitched. Lock the even pitch: a future
+  // file edit that breaks the grid breaks the central-alignment design.
   for (let i = 1; i < pointsRaw.length; i++) {
-    const pitch = pointsRaw[i].x - pointsRaw[i - 1].x
-    const first = pointsRaw[1].x - pointsRaw[0].x
+    const pitch = pointsRaw[i].rating.x - pointsRaw[i - 1].rating.x
+    const first = pointsRaw[1].rating.x - pointsRaw[0].rating.x
     if (Math.abs(pitch - first) > 1) {
       throw new Error(
-        `card.svg: stat points anchors are not evenly pitched (column ${i + 1} pitch ${pitch.toFixed(3)} ≠ ${first.toFixed(3)}) — the center grid is broken`,
+        `card.svg: stat rating anchors are not evenly pitched (column ${i + 1} pitch ${pitch.toFixed(3)} ≠ ${first.toFixed(3)}) — the center grid is broken`,
       )
     }
   }
 
-  const stats: CardStatSlot[] = labelRaw.map((label, i) => {
-    // Sanity bound (NOT centering): the points/value anchors are left-anchors
-    // of the owner's PLACEHOLDER strings — they may differ from the label x
+  const stats: CardStatSlot[] = pointsRaw.map((col) => {
+    // Sanity bound (NOT centering): the three anchors are left-anchors of
+    // the owner's PLACEHOLDER strings — they may differ from each other
     // (different string widths) but must stay near their column. The COLUMN
-    // CENTER is derived downstream (points anchor + width('99')/2, the
+    // CENTER is derived downstream (rating anchor + width('99')/2, the
     // owner's own centering of the placeholder — see buildCardPlan).
-    const span = Math.max(label.x, pointsRaw[i].x, valueRaw[i].x) - Math.min(label.x, pointsRaw[i].x, valueRaw[i].x)
-    if (span > 20) throw new Error(`card.svg: stat slot ${i + 1} is not column-aligned (span ${span}px)`)
+    const xs = [col.label.x, col.rating.x, col.value.x]
+    const span = Math.max(...xs) - Math.min(...xs)
+    if (span > 20) throw new Error(`card.svg: stat slot ${col.id} is not column-aligned (span ${span}px)`)
     return {
-      label: slotOf(label, labelSize),
-      points: slotOf(pointsRaw[i], pointsSize),
-      value: slotOf(valueRaw[i], labelSize),
+      label: slotOf(col.label, labelSize),
+      points: slotOf(col.rating, pointsSize),
+      value: slotOf(col.value, labelSize),
     }
   })
 

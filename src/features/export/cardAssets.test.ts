@@ -1,13 +1,14 @@
 // cardAssets.test.ts — unit locks for the card.svg parser (07.2-05
-// checkpoint round 7, owner supersession: ONE card.svg is the single source
-// of truth for the card design — placeholder TEXT slots the code fills,
-// crop-path photo area, tier colors applied by code, Bebas Neue everywhere
-// except the player name (Orbitron), detached border over the crop,
-// central column alignment). These tests lock that the parser extracts every
-// layer the card needs — plate silhouette, crop path, border stroke
-// geometry, and ALL text slots with their positions and EFFECTIVE font sizes
-// (the OVR and name slot matrix hacks resolved) — and that the code-driven
-// tier palettes carry the retired round-4 per-tier SVG palettes.
+// checkpoint round 8, owner re-seed: ONE card.svg is the single source of
+// truth for the card design — placeholder TEXT slots the code fills,
+// borderless crop-path photo area, the border stroking the PLATE silhouette
+// (three-layer background), tier colors applied by code, Bebas Neue
+// everywhere except the player name (Orbitron), central column alignment).
+// These tests lock that the parser extracts every layer the card needs —
+// plate silhouette, crop path, border stroke geometry (stroke path + clip),
+// and ALL text slots with their positions and EFFECTIVE font sizes (the OVR
+// and name slot matrix hacks resolved) — and that the code-driven tier
+// palettes carry the retired round-4 per-tier SVG palettes.
 //
 // A malformed or hand-edited-broken card.svg must fail loudly here
 // (module-load fail-fast), never ship as a silently broken card.
@@ -50,33 +51,47 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(b.h).toBeLessThan(CARD_DESIGN_HEIGHT * 0.6)
   })
 
-  it('extracts the border stroke: width 40 + a userSpaceOnUse gradient line inside the design space', () => {
-    expect(CARD_GEOMETRY.borderStroke.width).toBe(40)
+  it('extracts the border stroke: width 48 + a userSpaceOnUse gradient line inside the design space', () => {
+    expect(CARD_GEOMETRY.borderStroke.width).toBe(48)
     const line = CARD_GEOMETRY.borderStroke.line
+    expect(line.x1).toBeCloseTo(61.61, 1)
+    expect(line.x2).toBeCloseTo(1017.352, 1)
     expect(line.x1).toBeGreaterThanOrEqual(0)
-    expect(line.x2).toBeLessThanOrEqual(CARD_DESIGN_WIDTH)
+    expect(line.x2).toBeLessThanOrEqual(CARD_DESIGN_WIDTH + 1)
     expect(line.y1).toBeGreaterThanOrEqual(0)
     expect(line.y2).toBeLessThanOrEqual(CARD_DESIGN_HEIGHT)
   })
 
-  it('extracts the border CLIP: the plate silhouette (the owner clips border-over to the plate, round 7)', () => {
+  it('extracts the border STROKE PATH: the PLATE silhouette (round-8 three-layer semantics)', () => {
+    // The border-over layer strokes the plate silhouette — NOT the crop
+    // path. This is the owner's explicit round-8 ruling ("the current
+    // design on the app looks like the border is in the crop, which would
+    // be incorrect"): the border rings the WHOLE shield, the crop area
+    // stays borderless. If a future file edit decouples the stroked path
+    // from the plate, this lock forces a look.
+    expect(CARD_GEOMETRY.borderStroke.strokePath.startsWith('M')).toBe(true)
+    expect(CARD_GEOMETRY.borderStroke.strokePath).toBe(CARD_GEOMETRY.platePath)
+    expect(CARD_GEOMETRY.borderStroke.strokePath).not.toBe(CARD_GEOMETRY.cropPath)
+  })
+
+  it('extracts the border CLIP: the plate silhouette (the owner clips border-over to the plate)', () => {
     // The border-over group clips its stroke with clipPath#clip-path-1,
     // whose single path IS the plate silhouette: the stroke's outer half is
-    // cut, the inner half paints OVER the photo edges. If a future file
-    // edit decouples the clip from the plate, this lock forces a look.
+    // cut, the inner band paints over the photo/plate edges. If a future
+    // file edit decouples the clip from the plate, this lock forces a look.
     expect(CARD_GEOMETRY.borderStroke.clipPath.startsWith('M')).toBe(true)
     expect(CARD_GEOMETRY.borderStroke.clipPath).toBe(CARD_GEOMETRY.platePath)
   })
 })
 
 describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes', () => {
-  it('resolves the OVR slot THROUGH its matrix hack: 8.503px × 21.169 ≈ 180px at (136.177, 412.59)', () => {
+  it('resolves the OVR slot THROUGH its matrix hack: 6.992px × 21.169 ≈ 148px at (136.177, 412.59)', () => {
     const ovr = CARD_GEOMETRY.slots.ovr
     expect(ovr.x).toBeCloseTo(136.177, 1)
     expect(ovr.y).toBeCloseTo(412.59, 1)
-    expect(ovr.size).toBeCloseTo(8.503 * 21.169, 1)
-    expect(ovr.size).toBeGreaterThan(170) // the number must be BIG (readability rounds 3-7)
-    expect(ovr.size).toBeLessThan(190)
+    expect(ovr.size).toBeCloseTo(6.992 * 21.169, 1)
+    expect(ovr.size).toBeGreaterThan(140) // the number must be BIG (readability rounds 3-8)
+    expect(ovr.size).toBeLessThan(160)
   })
 
   it('resolves the job slot (72px Bebas) directly under the OVR number', () => {
@@ -99,37 +114,38 @@ describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes'
     expect(name.y).toBeLessThan(CARD_GEOMETRY.slots.stats[0].label.y)
   })
 
-  it('resolves all SIX positional stat slots, left → right, on the owner\'s ~141px center grid', () => {
+  it('resolves all SIX positional stat slots from the semantic KEY groups, left → right, on the ~142px center grid', () => {
     const stats = CARD_GEOMETRY.slots.stats
     expect(stats).toHaveLength(6)
-    // The COLUMN GRID is the points anchors' even pitch (≈141px): the owner
-    // centered the SAME '99' placeholder string on every column center, so
-    // the points x's MUST come evenly pitched (the parse also fail-fasts on
-    // this in cardAssets.ts — here it is locked from the outside too).
+    // The COLUMN GRID is the RATING anchors' even pitch (≈142.15px): the
+    // owner centered the SAME '99' placeholder string on every column
+    // center, so the rating x's MUST come evenly pitched (the parse also
+    // fail-fasts on this in cardAssets.ts — here it is locked from the
+    // outside too).
     const pointsXs = stats.map((s) => s.points.x)
-    expect(pointsXs[0]).toBeCloseTo(136.177, 1)
-    expect(pointsXs[5]).toBeCloseTo(841.079, 1)
+    expect(pointsXs[0]).toBeCloseTo(120.019, 1)
+    expect(pointsXs[5]).toBeCloseTo(830.751, 1)
     for (let i = 1; i < 6; i++) {
       const pitch = pointsXs[i] - pointsXs[i - 1]
-      expect(pitch).toBeGreaterThan(138)
+      expect(pitch).toBeGreaterThan(140)
       expect(pitch).toBeLessThan(144)
     }
-    // Per slot: label (48px, y≈1273.5), points (128px, y≈1199.7), value
-    // (48px, y≈1319.3) — points row ABOVE the label row. All three lines
+    // Per slot (round 8): label (56px, y≈1141.3) ABOVE the points rating
+    // (148px, y≈1261.7), value (56px, y≈1317.8) below. All three lines
     // render CENTERED on the derived column center (round 7 central
     // alignment — see buildCardPlan); the parsed x's are the owner's
     // left-anchors for the PLACEHOLDER strings (different widths →
     // different left anchors), so they only sanity-bound together (well
     // within a column pitch), never serve as centers.
     for (const s of stats) {
-      expect(s.label.size).toBe(48)
-      expect(s.points.size).toBe(128)
-      expect(s.value.size).toBe(48)
-      expect(s.points.y).toBeCloseTo(1199.703, 1)
-      expect(s.label.y).toBeCloseTo(1273.507, 1)
-      expect(s.value.y).toBeCloseTo(1319.255, 1)
-      expect(s.points.y).toBeLessThan(s.label.y)
-      expect(s.label.y).toBeLessThan(s.value.y)
+      expect(s.label.size).toBe(56)
+      expect(s.points.size).toBe(148)
+      expect(s.value.size).toBe(56)
+      expect(s.label.y).toBeCloseTo(1141.317, 1)
+      expect(s.points.y).toBeCloseTo(1261.703, 1)
+      expect(s.value.y).toBeCloseTo(1317.836, 1)
+      expect(s.label.y).toBeLessThan(s.points.y)
+      expect(s.points.y).toBeLessThan(s.value.y)
       // Placeholder anchors stay near their column (sanity, not centering).
       const span = Math.max(s.label.x, s.points.x, s.value.x) - Math.min(s.label.x, s.points.x, s.value.x)
       expect(span).toBeLessThanOrEqual(20)

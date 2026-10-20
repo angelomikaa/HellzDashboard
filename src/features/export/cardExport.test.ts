@@ -74,14 +74,14 @@ describe('buildCardPlan — card geometry (D-10, round-5 single-design edition)'
       expect(plan.height).toBe((width * CARD_DESIGN_HEIGHT) / CARD_DESIGN_WIDTH)
       expect(plan.scale).toBe(width / CARD_DESIGN_WIDTH)
       // Vertical composition order: OVR number (over the photo) → job name
-      // → PLAYERNAME (on the plate) → POINTS → labels → values (points row
-      // sits above the label row — round 7 geometry).
+      // → PLAYERNAME (on the plate) → LABEL → POINTS → value (the label row
+      // sits ABOVE the rating row — the round-8 re-seed's structure).
       expect(plan.ovr.y).toBeLessThan(plan.ovr.jobY)
       expect(plan.ovr.jobY).toBeLessThan(plan.name.y)
       for (const cell of plan.stats) {
-        expect(plan.name.y).toBeLessThan(cell.pointsY)
-        expect(cell.pointsY).toBeLessThan(cell.labelY)
-        expect(cell.labelY).toBeLessThan(cell.valueY)
+        expect(plan.name.y).toBeLessThan(cell.labelY)
+        expect(cell.labelY).toBeLessThan(cell.pointsY)
+        expect(cell.pointsY).toBeLessThan(cell.valueY)
       }
     }
   })
@@ -167,7 +167,7 @@ describe('buildCardPlan — round-5 typography contract (Orbitron fit inside the
     for (const cell of plan.stats) {
       expect(cell.pointsSize / CARD_DESIGN_WIDTH).toBeGreaterThan(0.08)
       expect(cell.labelSize / CARD_DESIGN_WIDTH).toBeGreaterThan(0.04)
-      expect(plan.ovr.size / CARD_DESIGN_WIDTH).toBeGreaterThan(0.15)
+      expect(plan.ovr.size / CARD_DESIGN_WIDTH).toBeGreaterThan(0.13)
     }
     // Same contract at any render width (linear scaling).
     const small = buildCardPlan(data, 360)
@@ -229,7 +229,8 @@ describe('buildCardPlan — round-5 palette contract (tier colors applied by cod
         expect(plan.name.color).toBe('#241a10')
       }
       // The border keeps card.svg's GEOMETRY with the palette's stops.
-      expect(plan.card.borderStroke.width).toBe(40)
+      expect(plan.card.borderStroke.width).toBe(48)
+      expect(plan.card.borderStroke.strokePath).toBe(CARD_GEOMETRY.platePath)
       expect(plan.palette.borderStops).toEqual(TIER_PALETTE[tier].borderStops)
     }
   })
@@ -500,7 +501,7 @@ describe('buildCardPlan — stat slot text (round 5: points as big palette text)
     // Null points changes ONLY the text — the slot positions stay put
     // (centerX stays the derived column center).
     expect(plan.stats[1].centerX).toBeCloseTo(
-      CARD_GEOMETRY.slots.stats[1].points.x + measureBebas('99', 400, 128) / 2,
+      CARD_GEOMETRY.slots.stats[1].points.x + measureBebas('99', 400, 148) / 2,
       6,
     )
   })

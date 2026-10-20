@@ -1,10 +1,10 @@
-// Headless REAL-RENDER check for the card export (07.2-05 gates; round 7,
-// the owner's typography/layout/export overhaul: Bebas Neue everywhere
-// except the player name — Google Fonts @import, border-over-photo with the
-// plate-silhouette clip, central stat columns, transparent PNG export).
-// Draws all four tier cards via the ACTUAL drawCard pipeline (fonts, images,
-// canvas) at the 2160×3200 download backing store (2× the 1080×1600 design
-// space), then probes the pixels:
+// Headless REAL-RENDER check for the card export (07.2-05 gates; round 8,
+// the owner's re-seed: the border strokes the PLATE silhouette (three-layer
+// background — the crop area stays borderless), semantic KEY slots with the
+// label ABOVE the rating, 48px border, ≈148px OVR). Draws all four tier
+// cards via the ACTUAL drawCard pipeline (fonts, images, canvas) at the
+// 2160×3200 download backing store (2× the 1080×1600 design space), then
+// probes the pixels:
 //
 //  - transparency: the canvas corners sit OUTSIDE the plate silhouette and
 //    the PNG has NO background — alpha must be 0 there (round 7 export)
@@ -12,10 +12,11 @@
 //  - photo: the class portrait is CLIPPED INTO the crop path (grid probe
 //    inside the crop bbox differs from the plate fill) — monogram tier:
 //    the ASST-01 tile shows
-//  - border-over-photo: the tier gradient stroke's band covers the crop
-//    path's bottom edge — probed BELOW the edge (over plate fill) AND just
-//    INSIDE it (over the photo/monogram: the border paints LAST, covering
-//    the photo's edges — the round-7 deliberate order)
+//  - border (round 8 file semantics): the tier gradient stroke's band rings
+//    the PLATE silhouette (left/right verticals + bottom tip) and covers
+//    the photo's top edge — and the crop path's bottom closure (~y=937)
+//    shows UNBROKEN plate fill (the round-7 "border in the crop" defect is
+//    locked out)
 //  - text: white OVR + job glyphs over the photo (top-left); palette
 //    text-fill glyphs for the name (on the plate) and the six stat columns
 //  - fonts: document.fonts.check confirms Orbitron AND Bebas Neue loaded
@@ -27,6 +28,10 @@
 //  - aspect gate: drawCard REJECTS a wrong-aspect (square) backing store
 //  - export: canvas.toBlob('image/png') succeeds for every tier (taint +
 //    round-7 PNG format)
+//  - FILE-VS-APP RENDER DIFF (round 8): the actual card.svg rasterized
+//    in-browser (palette + photo + scrim injected into the file's own
+//    structure) vs BOTH app surfaces at the same inputs — pixel-identity
+//    outside the masked text/mark regions, for every tier
 //
 // The summary JSON lands in #results; the runner reads the DOM dumped by
 // Edge headless and asserts every probe passed.
@@ -40,6 +45,7 @@ import {
 } from '../../src/features/export/cardExport'
 import { CARD_DESIGN_HEIGHT, CARD_DESIGN_WIDTH, CARD_GEOMETRY, TIER_PALETTE } from '../../src/features/export/cardAssets'
 import { CardSvg } from '../../src/features/cards/CardSvg'
+import cardRaw from '../../src/assets/card.svg?raw'
 
 const base: CardExportData = {
   name: 'Maria Silva',
@@ -72,6 +78,9 @@ function isWhiteish(d: Uint8ClampedArray): boolean {
 function hexToRgb(hex: string): [number, number, number] {
   return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]
 }
+
+const toHex = (d: Uint8ClampedArray): string =>
+  '#' + [d[0], d[1], d[2]].map((v) => v.toString(16).padStart(2, '0')).join('')
 
 function near(d: Uint8ClampedArray, hex: string, tol: number): boolean {
   const [r, g, b] = hexToRgb(hex)
@@ -124,17 +133,21 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
     photo = near(px(b.x + b.w * 0.3, b.y + b.h * 0.75), plan.colors.monogramTile, 10)
   }
 
-  // Border-over-photo (round 7): the gradient stroke runs ON the crop-path
-  // geometry. Probe its band at THREE points along the crop path:
-  //   · left edge  (x≈84,  y=600): inner half of the left vertical — ≈stop0
-  //   · right edge (x≈995, y=600): inner half of the right vertical — ≈stop1
-  //   · bottom edge (x=540, y=945): BELOW the crop's bottom edge (y≈937,
-  //     interior of the plate) — mid-gradient, never plate fill
-  // …and ONE point INSIDE the photo area at the bottom edge (x=540, y=928):
-  // the stroke band (917..957) covers the photo there — the border paints
-  // OVER the photo (the round-7 deliberate order), so this pixel must be
-  // gradient, NOT photo/monogram.
-  const line = plan.card.borderStroke.line
+  // Border (round 8, THE FILE'S THREE-LAYER SEMANTICS): the gradient stroke
+  // runs ON THE PLATE SILHOUETTE — the border rings the WHOLE shield; the
+  // crop area itself stays BORDERLESS. Probes at FOUR points along the
+  // plate outline (visible band = inner ≈24px, clip cuts the outer half):
+  //   · left band  (x≈86,  y=600): inner half of the left vertical — ≈stop0
+  //   · right band (x≈993, y=600): inner half of the right vertical — ≈stop1
+  //   · bottom tip (x=540, y=1505): inner band above the shield's bottom
+  //     vertex (~1517.6) — mid-gradient over the plate fill
+  //   · top arc (x=540, y=95): the inner band OVER THE PHOTO's top edge —
+  //     the border paints after the photo (three-layer order)
+  // …and the REGRESSION LOCK for the owner's round-8 ruling ("the border is
+  // in the crop, which would be incorrect"): at the crop path's bottom
+  // closure (x=540, y≈937..961) the plate fill shows UNBROKEN — the old
+  // round-7 implementation stroked the CROP path and painted the gradient
+  // exactly there.
   const stop0 = palette.borderStops[0].color
   const stop1 = palette.borderStops[palette.borderStops.length - 1].color
   const midHex = (a: string, b: string): string => {
@@ -144,20 +157,20 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
     return `#${[mid(r1, r2), mid(g1, g2), mid(b1, b2)].map((v) => v.toString(16).padStart(2, '0')).join('')}`
   }
   const expectedMid = midHex(stop0, stop1)
-  const toHex = (d: Uint8ClampedArray): string =>
-    '#' + [d[0], d[1], d[2]].map((v) => v.toString(16).padStart(2, '0')).join('')
-  const leftPx = px(line.x1 + 21, 600)
-  const rightPx = px(line.x2 - 11, 600)
-  const bottomPx = px(540, 945)
-  const overPhotoPx = px(540, 928)
+  const leftPx = px(86, 600)
+  const rightPx = px(993, 600)
+  const bottomPx = px(540, 1505)
+  const cropLinePx = px(540, 950)
+  const overPhotoPx = px(540, 95)
   const borderGradient =
     (near(leftPx, stop0, 70) || near(leftPx, stop1, 70)) &&
     (near(rightPx, stop1, 70) || near(rightPx, stop0, 70)) &&
     near(bottomPx, expectedMid, 70) &&
-    !near(bottomPx, plateFill, 12)
+    !near(bottomPx, plateFill, 12) &&
+    near(cropLinePx, plateFill, 12) // the crop closure is NOT stroked (round 8)
   // The over-photo pixel: gradient-colored, and NOT the monogram tile / a
   // photo pixel (any sampled photo pixel would differ from the gradient —
-  // both facts together prove the border covers the photo's edge).
+  // both facts together prove the border covers the photo's top edge).
   const borderOverPhoto = near(overPhotoPx, expectedMid, 70) && !near(overPhotoPx, plateFill, 12)
 
   // OVR text: count white glyphs over the photo (number + job name block,
@@ -179,10 +192,11 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
   }
 
   // Stat columns: glyph pixels in the text fill across the three slot rows
-  // (points ≈1209.7 / labels ≈1283.5 / values ≈1329.3 — round-7 geometry,
-  // all centered on the column centers).
+  // (labels ≈1141.3 / points ≈1261.7 / values ≈1317.8 — round-8 geometry,
+  // all centered on the column centers; the label row sits ABOVE the rating
+  // row per the owner's re-seed).
   let statText = 0
-  for (let y = 1140; y < 1345; y += 4) {
+  for (let y = 1080; y < 1345; y += 4) {
     for (let x = 100; x < 990; x += 5) {
       if (near(px(x, y), palette.textFill, 60)) statText++
     }
@@ -219,6 +233,7 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
       left: toHex(leftPx),
       right: toHex(rightPx),
       bottom: toHex(bottomPx),
+      cropLine: toHex(cropLinePx),
       overPhoto: toHex(overPhotoPx),
       expectL: stop0,
       expectR: stop1,
@@ -232,6 +247,318 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
     bebasEstimateGuard: bebasReal,
     blobOk: blob !== null && blob.type === 'image/png' && blob.size > 20000,
   }
+}
+
+// ---------------------------------------------------------------------------
+// FILE-VS-APP RENDER DIFF (round 8, the owner's fidelity demand: "the svg
+// has a 3-layer background ... But the current design on the app looks like
+// the border is in the crop, which would be incorrect" — and "read card.svg
+// again ... read all layers carefully" → THE FILE IS THE SPEC, proven by a
+// pixel diff, not guesses).
+//
+// The harness rasterizes the ACTUAL src/assets/card.svg in the browser with
+// a tier palette + a test photo + the shared scrim injected into the file's
+// OWN structure (plate → photo → border-over → texts, untouched), then
+// rasterizes the app's two surfaces with the SAME inputs at the same size:
+//   1. the on-page CardSvg component (mounted via React, serialized)
+//   2. the canvas export (drawCard)
+// and asserts pixel IDENTITY (per-channel tolerance + a small differing-
+// pixel ratio) over everything the design governs. TEXT + the Hellz mark
+// regions are MASKED: the file's placeholder strings are rasterized with
+// the <img> fallback font (SVG-in-img cannot load webfonts) while the app
+// fits real loaded fonts — typography is the round-6 audit's job (real
+// metric slot bounds), LAYER GEOMETRY is this diff's job. A wrong border
+// path (crop instead of plate), a wrong clip, a wrong paint order, a stale
+// stroke width, or a full-canvas background would light up thousands of
+// unmasked pixels.
+// ---------------------------------------------------------------------------
+
+interface MaskRect { x: number; y: number; w: number; h: number }
+
+/** Deterministic test photo (data URL — same-origin-safe inside SVG-in-img,
+ *  where external URLs never load): a SMOOTH low-frequency gradient — both
+ *  resampling kernels (canvas high-quality vs SVG image) agree on smooth
+ *  gradients to within the tolerance, so the diff measures GEOMETRY (clip,
+ *  cover-fit bounds, layer order), not browser-internal filtering. Far from
+ *  every palette fill/border color. */
+function makeTestPhoto(): string {
+  const c = document.createElement('canvas')
+  c.width = 480
+  c.height = 360
+  const ctx = c.getContext('2d')!
+  const g = ctx.createLinearGradient(0, 0, 480, 360)
+  g.addColorStop(0, '#2255aa')
+  g.addColorStop(0.55, '#7a4477')
+  g.addColorStop(1, '#dd8822')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, 480, 360)
+  return c.toDataURL('image/png')
+}
+
+// TEXT STRIPPING: Chrome's SVG-as-image mode refuses fonts entirely (even
+// data-URI @font-face) — every <text> rasterizes in an unpredictable
+// fallback whose ink no mask can chase. The render-diff's contract is the
+// owner's complaint domain — the THREE-LAYER BACKGROUND (plate / photo /
+// border) — so both SVG renders are compared with all <text> elements
+// stripped (text geometry is guarded by the round-6 real-metric audit and
+// the parser locks; a missing/extra slot fails those loudly). The canvas
+// export keeps its text (document context = REAL fonts) under the text
+// masks below.
+function stripText(svg: string): string {
+  return svg.replace(/<text\b[^>]*>[\s\S]*?<\/text>/g, '')
+}
+
+/** The card.svg SPEC, rendered with injected tier palette + photo/scrim (or
+ *  the monogram tile+letter) — everything else is the file VERBATIM: same
+ *  style block structure, same layer order (plate → photo → border-over →
+ *  texts), same paths, same stroke width, same clip. */
+function referenceCardSvg(
+  palette: TierPalette,
+  plan: CardPlan,
+  photo: { kind: 'image'; dataUrl: string } | { kind: 'monogram'; letter: string },
+): string {
+  let svg = cardRaw
+  // Tier palette → the file's placeholder colors. ORDER MATTERS: the text
+  // fill goes first (cls-4..8 #e6e6e6), THEN the plate (#cf1a87) — silver's
+  // plateFill IS #e6e6e6 and would otherwise be recolored by the text pass.
+  svg = svg.replaceAll('fill:#e6e6e6', `fill:${palette.textFill}`)
+  svg = svg.replace('.cls-1{fill:#cf1a87}', `.cls-1{fill:${palette.plateFill}}`)
+  for (const [from, to] of [
+    ['stop-color="#6e9aff"', `stop-color="${palette.borderStops[0].color}"`],
+    ['stop-color="#ff12f7"', `stop-color="${palette.borderStops[palette.borderStops.length - 1].color}"`],
+  ]) {
+    svg = svg.replace(from, to)
+  }
+  // Extra defs: the photo clip (the crop path — the file has no image clip
+  // of its own) + the shared scrim gradient.
+  const defs =
+    `<clipPath id="rf-photo-clip"><path d="${plan.card.cropPath}"/></clipPath>` +
+    `<linearGradient id="rf-scrim" gradientUnits="userSpaceOnUse" x1="0" y1="${plan.scrim.y1}" x2="0" y2="${plan.scrim.y2}">` +
+    `<stop offset="0" stop-color="#000000" stop-opacity="${plan.scrim.alpha}"/>` +
+    `<stop offset="1" stop-color="#000000" stop-opacity="0"/></linearGradient>`
+  svg = svg.replace('</defs>', `${defs}</defs>`)
+  // The photo layer: clipped to the crop path, painted right after the
+  // base-plate (BEFORE border-over — the file's three-layer order), scrim
+  // inside the same clip. The crop area stays BORDERLESS (cls-2 fill:none
+  // is the file's own word).
+  const b = plan.photoBBox
+  const inner =
+    photo.kind === 'image'
+      ? `<image href="${photo.dataUrl}" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" preserveAspectRatio="xMidYMid slice"/>`
+      : `<path d="${plan.card.cropPath}" fill="${plan.colors.monogramTile}"/>` +
+        `<text x="${b.x + b.w / 2}" y="${b.y + b.h * 0.45}" text-anchor="middle" dominant-baseline="central" ` +
+        `font-family="Orbitron, sans-serif" font-weight="700" font-size="${b.h * 0.2}" fill="${plan.colors.monogramText}">${photo.letter}</text>`
+  const photoLayer = `<g clip-path="url(#rf-photo-clip)">${inner}` +
+    `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${plan.scrim.y2 - plan.scrim.y1}" fill="url(#rf-scrim)"/></g>`
+  const plateEnd = svg.search(/<path id="base-plate"[^>]*\/>/)
+  if (plateEnd < 0) throw new Error('render-diff: base-plate path not found in card.svg')
+  const insertAt = svg.indexOf('/>', plateEnd) + 2
+  svg = svg.slice(0, insertAt) + photoLayer + svg.slice(insertAt)
+  return svg
+}
+
+/** Rasterize an SVG string at exactly w×h through the browser's own SVG
+ *  engine (Blob → Image → canvas → ImageData). */
+async function rasterizeSvg(svgString: string, w: number, h: number): Promise<ImageData> {
+  const blob = new Blob([svgString], { type: 'image/svg+xml' })
+  const url = URL.createObjectURL(blob)
+  try {
+    const img = new Image()
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('render-diff: SVG rasterization failed'))
+      img.src = url
+    })
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    const ctx = c.getContext('2d')!
+    ctx.drawImage(img, 0, 0, w, h)
+    return ctx.getImageData(0, 0, w, h)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/** Per-pixel diff OUTSIDE the masked regions: returns the differing-pixel
+ *  ratio (per-channel + alpha tolerance) + the diffs' bounding box (the
+ *  diagnosis hook — a structural divergence lights up a solid region). */
+function diffImageData(
+  a: ImageData,
+  b: ImageData,
+  masks: MaskRect[],
+  tol: number,
+): { ratio: number; bbox: MaskRect | null } {
+  if (a.width !== b.width || a.height !== b.height) return { ratio: 1, bbox: { x: 0, y: 0, w: a.width, h: a.height } }
+  const masked = (x: number, y: number): boolean =>
+    masks.some((m) => x >= m.x && x < m.x + m.w && y >= m.y && y < m.y + m.h)
+  let diff = 0
+  let total = 0
+  let minX = a.width
+  let minY = a.height
+  let maxX = -1
+  let maxY = -1
+  for (let y = 0; y < a.height; y++) {
+    for (let x = 0; x < a.width; x++) {
+      if (masked(x, y)) continue
+      total++
+      const i = (y * a.width + x) * 4
+      if (
+        Math.abs(a.data[i] - b.data[i]) > tol ||
+        Math.abs(a.data[i + 1] - b.data[i + 1]) > tol ||
+        Math.abs(a.data[i + 2] - b.data[i + 2]) > tol ||
+        Math.abs(a.data[i + 3] - b.data[i + 3]) > tol
+      ) {
+        diff++
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
+      }
+    }
+  }
+  return {
+    ratio: total === 0 ? 1 : diff / total,
+    bbox: maxX < 0 ? null : { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 },
+  }
+}
+
+/** Text/mark mask boxes in DESIGN space (1080×1600): every slot the app
+ *  fills with fitted real-font type (the file renders placeholders in the
+ *  img fallback font) + the Hellz mark (app-only brand anchor) + the
+ *  monogram letter (fallback-font mismatch). Generous but nowhere near the
+ *  border band or the plate edges. */
+function textMasks(plan: CardPlan, monogram: boolean): MaskRect[] {
+  const masks: MaskRect[] = [
+    // OVR number + job name (left-anchored, over the photo; canvas adds a
+    // text shadow → generous box).
+    { x: plan.ovr.x - 40, y: plan.ovr.y - plan.ovr.size - 40, w: 520, h: plan.ovr.size + 80 },
+    { x: plan.ovr.jobX - 40, y: plan.ovr.jobY - plan.ovr.jobSize - 20, w: 520, h: plan.ovr.jobSize + 60 },
+    // Player name (plate-centered baseline).
+    { x: 140, y: plan.name.y - 100, w: 800, h: 130 },
+    // Hellz mark (canvas-only paint, centered at (540, 1408) size 54).
+    { x: 495, y: 1363, w: 90, h: 90 },
+  ]
+  for (const cell of plan.stats) {
+    // One box per column covering label (y≈1141) / points (y≈1261, 148px) /
+    // value (y≈1317) inks.
+    masks.push({ x: cell.centerX - 90, y: cell.labelY - 70, w: 180, h: cell.valueY - cell.labelY + 95 })
+  }
+  if (monogram) {
+    const b = plan.photoBBox
+    masks.push({ x: b.x + b.w / 2 - 130, y: b.y + b.h * 0.45 - 90, w: 260, h: 180 })
+  }
+  return masks
+}
+
+const scaleMasks = (masks: MaskRect[], s: number): MaskRect[] =>
+  masks.map((m) => ({ x: m.x * s, y: m.y * s, w: m.w * s, h: m.h * s }))
+
+/** Serialize the MOUNTED app CardSvg (React → DOM → standalone SVG string
+ *  with the required xmlns). */
+async function mountedCardSvgString(data: CardExportData): Promise<string> {
+  const host = document.createElement('div')
+  host.style.width = '1080px'
+  document.body.appendChild(host)
+  const root = createRoot(host)
+  root.render(createElement(CardSvg, { data }))
+  await new Promise<void>((resolve) => setTimeout(resolve, 150))
+  const svg = host.querySelector('svg')
+  if (!svg) {
+    root.unmount()
+    host.remove()
+    throw new Error('render-diff: CardSvg did not mount')
+  }
+  let str = new XMLSerializer().serializeToString(svg)
+  if (!str.includes('xmlns=')) {
+    str = str.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"')
+  }
+  root.unmount()
+  host.remove()
+  return str
+}
+
+async function diffFileVsApp(): Promise<Record<string, unknown>> {
+  await Promise.all([
+    document.fonts.load('400 48px Bebas Neue'),
+    document.fonts.load('400 148px Bebas Neue'),
+    document.fonts.load('700 48px Orbitron'),
+  ])
+  await document.fonts.ready
+  const photoDataUrl = makeTestPhoto()
+  const out: Record<string, unknown> = {}
+  // The app data = the FILE's own placeholders (visual column order by the
+  // rating anchors: MATK / MDMG.R alternating) — slot parity between the
+  // file and the app composition.
+  const data: CardExportData = {
+    name: 'PLAYERNAME',
+    charClass: 'JOB CLASS',
+    charFunction: 'dps',
+    ovr: 99,
+    stats: [
+      { label_short: 'MATK', value: '10000', points: 99 },
+      { label_short: 'MDMG.R', value: '208.77', points: 99 },
+      { label_short: 'MATK', value: '10000', points: 99 },
+      { label_short: 'MDMG.R', value: '208.77', points: 99 },
+      { label_short: 'MATK', value: '10000', points: 99 },
+      { label_short: 'MDMG.R', value: '208.77', points: 99 },
+    ],
+    photoSrc: photoDataUrl,
+    monogramLetter: 'A',
+  }
+  for (const c of CASES) {
+    const caseData: CardExportData = { ...data, ovr: c.ovr }
+    // The photo case uses the test-photo data URL for BOTH the reference and
+    // the app (identical inputs); the monogram case (photo null in CASES)
+    // compares the tile fallback (letters stripped with all text).
+    const monogram = c.photo === null
+    const plan = buildCardPlan(caseData, CARD_DESIGN_WIDTH)
+    const palette = TIER_PALETTE[plan.tier]
+
+    // 1. On-page CardSvg vs the file — TEXT-STRIPPED, NO masks: the ENTIRE
+    // three-layer background (plate / photo / border-over) compares
+    // pixel-for-pixel at the file's own 1080×1600 design space.
+    const appSvgData: CardExportData = { ...caseData, photoSrc: monogram ? null : photoDataUrl }
+    const appSvg = await rasterizeSvg(
+      stripText(await mountedCardSvgString(appSvgData)),
+      CARD_DESIGN_WIDTH,
+      CARD_DESIGN_HEIGHT,
+    )
+    const refImg = await rasterizeSvg(
+      stripText(
+        referenceCardSvg(
+          palette,
+          plan,
+          monogram ? { kind: 'monogram', letter: 'A' } : { kind: 'image', dataUrl: photoDataUrl },
+        ),
+      ),
+      CARD_DESIGN_WIDTH,
+      CARD_DESIGN_HEIGHT,
+    )
+    const svgDiff = diffImageData(refImg, appSvg, [], 16)
+
+    // 2. Canvas export (drawCard) vs the file — the canvas paints REAL
+    // fonts (document context), so text rides under the text masks; the
+    // background compares unmasked. Same inputs, 1080×1600 backing store
+    // (27:40 aspect gate satisfied).
+    const canvas = document.createElement('canvas')
+    canvas.width = CARD_DESIGN_WIDTH
+    canvas.height = CARD_DESIGN_HEIGHT
+    await drawCard(canvas, appSvgData)
+    const canvasData = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height)
+    const canvasDiff = diffImageData(refImg, canvasData, textMasks(plan, monogram), 16)
+
+    out[c.tier] = {
+      svgDiffRatio: Number(svgDiff.ratio.toFixed(5)),
+      svgDiffOk: svgDiff.ratio <= 0.002,
+      svgDiffBBox: svgDiff.bbox,
+      canvasDiffRatio: Number(canvasDiff.ratio.toFixed(5)),
+      canvasDiffOk: canvasDiff.ratio <= 0.008,
+      canvasDiffBBox: canvasDiff.bbox,
+    }
+    void fetch(`/__progress?diff=${c.tier}`, { method: 'POST', body: 'ok' }).catch(() => {})
+  }
+  return out
 }
 
 // ---------------------------------------------------------------------------
@@ -430,15 +757,25 @@ async function main(): Promise<void> {
     } catch (err) {
       results.onPage = { fatal: err instanceof Error ? err.message : String(err) }
     }
+    // The FILE-VS-APP render diff (round 8): the app's two surfaces against
+    // the owner's actual card.svg, pixel-identical outside the masked text/
+    // mark regions — the permanent anti-drift guard.
+    try {
+      results.renderDiff = await diffFileVsApp()
+    } catch (err) {
+      results.renderDiff = { fatal: err instanceof Error ? err.message : String(err) }
+    }
     // Static design facts ride along (they pin the design-source wiring).
     results.meta = {
       designSize: `${CARD_DESIGN_WIDTH}x${CARD_DESIGN_HEIGHT}`,
-      sourceFile: 'src/assets/card.svg (single source of truth, round 7 — Bebas/Orbitron split, border-over-photo, transparent PNG)',
+      sourceFile: 'src/assets/card.svg (single source of truth, round 8 — plate-silhouette border 48, semantic KEY slots, label-above-rating, transparent PNG)',
       slotCount: CARD_GEOMETRY.slots.stats.length,
       ovrEffectiveSize: CARD_GEOMETRY.slots.ovr.size,
       plateFillsDistinct: new Set(Object.values(TIER_PALETTE).map((p) => p.plateFill)).size === 4,
-      borderWidthAllTiers: CARD_GEOMETRY.borderStroke.width === 40,
+      borderWidthAllTiers: CARD_GEOMETRY.borderStroke.width === 48,
+      borderStrokesPlate: CARD_GEOMETRY.borderStroke.strokePath === CARD_GEOMETRY.platePath,
       borderClippedToPlate: CARD_GEOMETRY.borderStroke.clipPath === CARD_GEOMETRY.platePath,
+      labelAboveRating: CARD_GEOMETRY.slots.stats.every((s) => s.label.y < s.points.y && s.points.y < s.value.y),
       fontsLoaded,
       aspectGateRejectsSquare: aspectGate,
     }

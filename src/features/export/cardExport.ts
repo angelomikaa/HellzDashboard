@@ -1,13 +1,15 @@
 // cardExport.ts — the card PNG export (plan 07.2-05, CARD-03 / D-09 /
-// D-10 / D-12; checkpoint round 7, owner supersession: ONE card.svg
-// [src/assets/card.svg] becomes the source of truth for card design —
+// D-10 / D-12; checkpoint round 8, owner re-seed: ONE card.svg
+// [src/assets/card.svg] remains the source of truth for card design —
 // placeholder TEXT slots filled by code, crop-path photo area, Bebas Neue
-// everywhere except the player name (Orbitron), detached border over the
-// crop, central column alignment, PNG export with NO background (the
-// shield plate paints; everything outside it is transparent). Zero new npm
-// dependencies (v1.1 invariant): native Canvas 2D + Path2D + the self-hosted
-// Orbitron woff2 + Bebas Neue (Google Fonts @import in src/index.css —
-// graceful fallback to Orbitron if it cannot load) + brand mark.
+// everywhere except the player name (Orbitron), the border stroking the
+// PLATE silhouette over the photo (three-layer semantics — the crop itself
+// stays borderless), central column alignment, PNG export with NO
+// background (the shield plate paints; everything outside it is
+// transparent). Zero new npm dependencies (v1.1 invariant): native Canvas 2D
+// + Path2D + the self-hosted Orbitron woff2 + Bebas Neue (Google Fonts
+// @import in src/index.css — graceful fallback to Orbitron if it cannot
+// load) + brand mark.
 //
 // ROUND 7 (owner verdict on round 6: "the card is overflowing ... keep a
 // matching proportion and readability", then the new seeded card.svg):
@@ -106,8 +108,10 @@ export const CARD_FONTS = { slots: 'Bebas Neue', name: 'Orbitron' } as const
 /** Top legibility scrim for the OVER-PHOTO OVR block: black fading out
  *  downward from the photo's top edge. Covers the OVR number + job name
  *  (65% of the crop area's height). Fractions of the crop bbox; the same
- *  spec is painted by BOTH surfaces from the plan. */
-const SCRIM = { heightFraction: 0.65, alpha: 0.55 } as const
+ *  spec is painted by BOTH surfaces from the plan — and the file-vs-app
+ *  render-diff harness injects the SAME spec into the reference card.svg
+ *  render (an ADDITIVE legibility treatment, not part of the file). */
+export const SCRIM = { heightFraction: 0.65, alpha: 0.55 } as const
 
 /** The Hellz brand mark, centered in the plate tip below the stat slots
  *  (kept from rounds 3-6; card.svg has no mark slot — this is an additive
@@ -120,8 +124,9 @@ const MARK = { y: 1408, size: 54 } as const
 // buildCardPlan(…, w) is exact at any resolution (downloadCard paints at
 // 2× for retina crispness). Content positions are the PARSED SLOT POSITIONS
 // — the owner's placement authority. Stat columns are CENTRALLY aligned:
-// label / points / value share one center x per column (parsed label x),
-// column width = gap to the next column's center minus a gutter.
+// label / points / value share one center x per column (derived from the
+// parsed RATING '99' anchor — the owner centered the placeholder on the
+// grid), column width = gap to the next column's center minus a gutter.
 export type CardPlanPhoto =
   | { kind: 'image'; src: string }
   | { kind: 'monogram'; letter: string }
@@ -558,9 +563,9 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.fill(plate)
 
   // --- Photo: the member screenshot (or fallback) CLIPPED TO THE CROP PATH
-  // (round 5) — the SAME path the on-page SVG clips with. Painted BEFORE
-  // the border so the border sits on top of the photo edges (round 7
-  // deliberate order: plate → photo → scrim → border-over → texts).
+  // (round 5) — the SAME path the on-page SVG clips with. The crop area is
+  // BORDERLESS (round 8 file semantics); the border paints AFTER the photo
+  // as a separate layer (plate → photo → scrim → border-over → texts).
   const crop = new Path2D(scalePath(plan.card.cropPath, s))
   const b = plan.photoBBox
   ctx.save()
@@ -588,16 +593,18 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.fillRect(b.x, b.y, b.w, plan.scrim.y2 - plan.scrim.y1)
   ctx.restore()
 
-  // --- Detached border (round 7, the owner's deliberate design): the tier
-  // gradient stroke ON the crop-path geometry, painted OVER the photo —
-  // covering its edges. CLIPPED to the plate silhouette (the owner's
-  // clip-path-1): the stroke's outer half is cut, the inner half covers the
-  // photo. After the photo, before ALL text.
+  // --- Detached border (round 8, THE FILE'S THREE-LAYER SEMANTICS): the
+  // tier gradient stroke ON THE PLATE SILHOUETTE (the cls-3 path's d — the
+  // border rings the WHOLE shield; the crop area itself stays borderless),
+  // painted OVER the photo — covering the shield's edges. CLIPPED to the
+  // plate silhouette (the owner's clip-path-1): the stroke's outer half is
+  // cut, the inner ≈24px band paints over the photo (top/sides) and the
+  // plate (bottom). After the photo, before ALL text.
   ctx.save()
   ctx.clip(new Path2D(scalePath(plan.card.borderStroke.clipPath, s)))
   ctx.strokeStyle = applyBorderGradient(ctx, plan.palette, plan.card.borderStroke.line, s)
   ctx.lineWidth = plan.card.borderStroke.width * s
-  ctx.stroke(crop)
+  ctx.stroke(new Path2D(scalePath(plan.card.borderStroke.strokePath, s)))
   ctx.restore()
 
   // --- OVR block (over the photo): big number + job name below, NO "OVR"

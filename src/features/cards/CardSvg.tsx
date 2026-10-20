@@ -1,9 +1,10 @@
-// CardSvg — the on-page card (07.2-05 checkpoint round 7, owner
-// supersession: ONE card.svg is the source of truth — placeholder text
-// slots filled by code, photo clipped to the crop path, tier colors via
+// CardSvg — the on-page card (07.2-05 checkpoint round 8, owner re-seed:
+// ONE card.svg is the source of truth — placeholder text slots filled by
+// code, photo clipped to the crop path (borderless), tier colors via
 // code-driven TIER_PALETTE, Bebas Neue everywhere except the player name
-// (Orbitron), detached border stroke over the crop, central column
-// alignment, transparent background outside the shield plate).
+// (Orbitron), the border stroking the PLATE silhouette over the photo,
+// central column alignment, transparent background outside the shield
+// plate).
 //
 // REUSABLE BY DESIGN: this is the ONE card both surfaces consume —
 //   - PromotionCard (Destaques showcase) wraps it with the download button,
@@ -23,11 +24,12 @@
 //   2. The photo (member screenshot or class portrait) is CLIPPED TO THE
 //      parsed crop path (round 5 brought it back — no guideline rects,
 //      just the text to be edited).
-//   3. The detached border (gradient stroke, width 40, painted ON the
-//      crop-path geometry) goes over the photo — covering its edges,
-//      deliberate design choice. CLIPPED to the plate silhouette (the
-//      owner's clip-path-1): the outer half of the stroke is cut, the
-//      inner half covers the photo.
+//   3. The detached border (gradient stroke, width 48) is painted ON THE
+//      PLATE SILHOUETTE — the file's three-layer background (round 8): the
+//      border rings the whole shield, covering the photo's edges, while the
+//      crop area itself stays BORDERLESS. CLIPPED to the plate silhouette
+//      (the owner's clip-path-1): the outer half of the stroke is cut, the
+//      inner band paints over the photo/plate edges.
 //   4. The top scrim backs the over-photo OVR block. All text is Bebas Neue
 //      EXCEPT the player name (Orbitron). Every text slot shrinks-to-fit
 //      its column (real measured metrics) so labels 4–6 chars wide never
@@ -198,13 +200,15 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         <rect x={b.x} y={b.y} width={b.w} height={plan.scrim.y2 - plan.scrim.y1} fill={`url(#${scrimId})`} />
       </g>
 
-      {/* Detached border: the gradient stroke painted ON the crop-path
-          geometry, over the photo (covering its edges — deliberate round-7
-          order: plate → photo → scrim → border-over → text). CLIPPED to the
-          plate silhouette (the owner's clip-path-1): the stroke's outer
-          half is cut, the inner half covers the photo edges. */}
+      {/* Detached border (round 8 FILE SEMANTICS): the gradient stroke ON
+          THE PLATE SILHOUETTE — the border rings the WHOLE shield and
+          covers the photo's edges; the crop area itself stays BORDERLESS
+          (the owner's three-layer background: plate → photo → border →
+          text). CLIPPED to the plate silhouette (the owner's clip-path-1):
+          the stroke's outer half is cut, the inner ≈24px band paints over
+          the photo (top/sides) and the plate (bottom). */}
       <path
-        d={plan.card.cropPath}
+        d={plan.card.borderStroke.strokePath}
         fill="none"
         stroke={`url(#${borderGradId})`}
         strokeWidth={plan.card.borderStroke.width}
