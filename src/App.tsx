@@ -92,7 +92,7 @@ function App() {
               </button>
             </header>
             <nav aria-label="Seções" className="border-b border-line">
-              <div className="mx-auto flex w-full max-w-3xl gap-1 overflow-x-auto px-4">
+              <div className="mx-auto flex w-full max-w-6xl gap-1 overflow-x-auto px-4 xl:max-w-7xl">
                 <button
                   type="button"
                   onClick={() => setTab('painel')}
@@ -174,7 +174,11 @@ function App() {
               </div>
             </nav>
             <main className="flex-1">
-              <div className="mx-auto w-full max-w-3xl px-4 py-6">
+              {/* LAYT-01 (07.2 D-21): the ONE breakpoint system — the shell
+                  widens for data views (max-w-6xl, xl:max-w-7xl). Pages that
+                  need a scannable column (submit wizard, login) cap
+                  themselves internally. */}
+              <div className="mx-auto w-full max-w-6xl px-4 py-6 xl:max-w-7xl">
                 {showValidacoes ? (
                   <ValidacoesPage session={session} />
                 ) : showHighlights ? (

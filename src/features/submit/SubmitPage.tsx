@@ -245,7 +245,10 @@ export function SubmitPage({ session }: SubmitPageProps) {
 
   if (loadError !== null) {
     return (
-      <section className="rounded-lg border border-line bg-surface p-6">
+      // LAYT-01 (07.2 D-21/D-22): the wizard (and its states) stay a
+      // scannable centered column on desktop — never stretched into the
+      // wide shell.
+      <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6">
         <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
           {loadError}
         </p>
@@ -255,7 +258,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
 
   if (data === null) {
     return (
-      <section className="rounded-lg border border-line bg-surface p-6">
+      <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6">
         <p className="text-base text-muted">Carregando…</p>
       </section>
     )
@@ -266,7 +269,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
   // Blocked state: no registered character (no char_class) — UX gate only.
   if (me.char_class === null) {
     return (
-      <section className="rounded-lg border border-line bg-surface p-6">
+      <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6">
         <h2 className="text-xl font-semibold text-content">Enviar Status</h2>
         <p className="mt-4 text-base text-content">
           {isStaff ? BLOCKED_STAFF_COPY : BLOCKED_MEMBER_COPY}
@@ -333,7 +336,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
   )
 
   return (
-    <section className="rounded-lg border border-line bg-surface p-6">
+    <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6">
       {phase === 'submitted' ? (
         <>
           <div role="status">

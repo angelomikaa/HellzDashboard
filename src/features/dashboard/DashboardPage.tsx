@@ -219,12 +219,20 @@ export function DashboardPage({
               cards grouped Geral/Quasi/Especial (D-04/D-05/D-06; strip =
               07.2 D-01/D-02). OVR stays the hero's role — the strip has no
               OVR card. */}
-          <OvrHero
-            ovr={report.ovr}
-            displayName={session.display_name}
-            charClass={report.char_class}
-            charFunction={report.char_function}
-          />
+          {/* LAYT-01 (07.2 D-21): at lg+ the OVR hero and the tier legend
+              share one flex row (justify-between) instead of stacking —
+              subtle, keeps the hierarchy. Mobile keeps the stacked order. */}
+          <div className="lg:flex lg:items-start lg:justify-between lg:gap-6">
+            <OvrHero
+              ovr={report.ovr}
+              displayName={session.display_name}
+              charClass={report.char_class}
+              charFunction={report.char_function}
+            />
+            <div className="lg:shrink-0 lg:pt-1">
+              <TierLegend />
+            </div>
+          </div>
           {/* 07.2 D-01: the 6 EAFC key-stat mini cards, my_card's key_stats
               IN SERVER ORDER. Explainer state = muted line; my_card failure
               = the strip self-hides (grouped view survives). Lives ONLY in
@@ -274,7 +282,6 @@ export function DashboardPage({
               screenshot upload — self-contained surface with its own data
               calls, so the page's report-call discipline stays intact. */}
           <CardPhotoUpload session={session} />
-          <TierLegend />
           {/* 07.2 D-07: foco = the stats most behind the class average among
               key ∪ relevant (priorityKeySet from my_card; empty set when the
               my_card fetch failed — improvementFocus returns [] and the

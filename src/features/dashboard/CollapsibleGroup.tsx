@@ -50,12 +50,14 @@ export function CollapsibleGroup({
       <div
         id={`dashboard-group-${groupName}`}
         className={
-          // Owner gate fix (07.1-02): stat cards cap at 2 columns on desktop —
-          // 3-up inside the max-w-3xl container squished cards (~220px each).
-          // Full desktop layout rework is 07.2 scope; this is the targeted
-          // spacing fix only.
+          // LAYT-01 (07.2 D-21): the wide shell (max-w-6xl/7xl) makes room
+          // for the deliberate desktop reflow — grouped stat cards step up
+          // 1 → 2 (sm) → 3 (lg) → 4 (xl). Same sm/lg/xl system as the rest
+          // of the pass (no ad-hoc breakpoints). The old 07.1-02 cap
+          // comment is retired with it: at 4-across inside max-w-7xl each
+          // card is ~300px — no squish.
           open
-            ? 'mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2'
+            ? 'mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
             : 'hidden'
         }
       >
