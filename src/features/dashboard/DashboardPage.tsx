@@ -38,7 +38,7 @@ import type { NeoFootSession } from '../auth/session'
 import type { Tab } from '../../App'
 import { StatCard } from './StatCard'
 import { KeyStatCard } from './KeyStatCard'
-import { OvrHero } from './OvrHero'
+import { OvrHero, ovrTierFor } from './OvrHero'
 import { TierLegend } from './TierLegend'
 import { FocusStrip } from './FocusStrip'
 import { CollapsibleGroup } from './CollapsibleGroup'
@@ -46,6 +46,7 @@ import { CardPhotoUpload } from './CardPhotoUpload'
 import { keyStatStripModel, priorityKeySet } from './keyStatStrip'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { crestSrcFor } from '../assets/ClassCrest'
+import { TIER_BORDER_DISPLAY } from './tierDisplay'
 import { cardFilename, downloadCard, type CardExportData } from '../export/cardExport'
 
 // Enumeration-safe pt-BR copy (KeyStatsPage pattern): raw server text is
@@ -190,6 +191,11 @@ export function DashboardPage({
   // explainer / cards-in-server-order.
   const strip = keyStatStripModel(myCard)
 
+  // Owner checkpoint round 4 (LAYOUT): OVR + the key-stat mini cards are ONE
+  // wide strip, and the strip carries the OVR tier color. The tier helper is
+  // shared with OvrHero so both halves can never diverge (D-02 bands).
+  const ovrTier = report === null ? null : ovrTierFor(report.ovr)
+
   // Render priority (UI-SPEC state matrix): error > loading > empty >
   // success. The empty state (D-13) replaces EVERYTHING below the fold —
   // no hero, no strip, no legend, no grayed grid — message + CTA only.
@@ -215,43 +221,45 @@ export function DashboardPage({
         </section>
       ) : (
         <>
-          {/* Hero + EAFC key-stat strip + legend + focus strip, then the 57
-              cards grouped Geral/Quasi/Especial (D-04/D-05/D-06; strip =
-              07.2 D-01/D-02). OVR stays the hero's role — the strip has no
-              OVR card. */}
-          {/* LAYT-01 (07.2 D-21): at lg+ the OVR hero and the tier legend
-              share one flex row (justify-between) instead of stacking —
-              subtle, keeps the hierarchy. Mobile keeps the stacked order. */}
-          <div className="lg:flex lg:items-start lg:justify-between lg:gap-6">
-            <OvrHero
-              ovr={report.ovr}
-              displayName={session.display_name}
-              charClass={report.char_class}
-              charFunction={report.char_function}
-            />
-            <div className="lg:shrink-0 lg:pt-1">
-              <TierLegend />
-            </div>
-          </div>
-          {/* 07.2 D-01: the 6 EAFC key-stat mini cards, my_card's key_stats
-              IN SERVER ORDER. Explainer state = muted line; my_card failure
-              = the strip self-hides (grouped view survives). Lives ONLY in
-              this success branch — the D-13 empty state replaces it. */}
-          {strip.kind !== 'hidden' && (
-            <section aria-label="Stats-chave" className="mt-4">
-              {strip.kind === 'cards' ? (
-                <>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                    {strip.stats.map((k) => (
-                      <KeyStatCard key={k.stat_key} stat={k} />
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-muted">{STRIP_EXPLAINER}</p>
+          {/* Owner checkpoint round 4: the OVR hero and the 6 EAFC key-stat
+              mini cards (my_card key_stats IN SERVER ORDER) share ONE wide
+              strip — tier border on the strip, OVR anchored left, key cards
+              filling the rest (6-up at lg, 2/3-up below). The tier legend
+              keeps decoding the colors just under the strip. */}
+          <section
+            aria-label="Resumo do personagem"
+            className={`mt-4 rounded-lg border-2 bg-dominant p-3 ${
+              ovrTier !== null ? TIER_BORDER_DISPLAY[ovrTier] : 'border-line'
+            }`}
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-4">
+              <OvrHero
+                ovr={report.ovr}
+                displayName={session.display_name}
+                charClass={report.char_class}
+                charFunction={report.char_function}
+                layout="strip"
+              />
+              {strip.kind !== 'hidden' && (
+                <div className="min-w-0 flex-1 border-t border-line pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+                  {strip.kind === 'cards' ? (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:h-full lg:grid-cols-6 lg:content-center">
+                      {strip.stats.map((k) => (
+                        <KeyStatCard key={k.stat_key} stat={k} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted lg:flex lg:h-full lg:items-center">
+                      {STRIP_EXPLAINER}
+                    </p>
+                  )}
+                </div>
               )}
-            </section>
-          )}
+            </div>
+          </section>
+          <div className="flex justify-end">
+            <TierLegend />
+          </div>
           {/* 07.2-05 round 3 (owner decision 1): the member's character-
               screenshot upload — self-contained surface with its own data
               calls, so the page's report-call discipline stays intact.
