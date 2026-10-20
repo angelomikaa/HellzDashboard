@@ -18,7 +18,8 @@
 //    every slot except the player name (Orbitron); both surfaces read them
 //    from the plan so the split cannot drift.
 //  - Round-5 palette contract (held): tier colors come from TIER_PALETTE
-//    (code) — dark text on the light metals, white on the pristine magenta.
+//    (code) — dark text on the light metals, and the pristine plate's
+//    rainbow forces the round-10 contrast rule (white → black).
 //  - Round-6/7 fit contract: fitCardText with REAL measured metrics (canvas
 //    measureText) — shrink-to-fit with a readability floor, emergency
 //    glyph-squeeze only past it; labels may be 3–6 chars ('PDMG.R') and
@@ -49,6 +50,7 @@ import {
   type CardExportData,
   type TextMeasurer,
 } from './cardExport'
+import { contrastRatio, resolveCardTextFill } from './cardAssets'
 
 const data: CardExportData = {
   name: 'Maria Silva',
@@ -221,10 +223,13 @@ describe('buildCardPlan — round-5 palette contract (tier colors applied by cod
       const plan = buildCardPlan({ ...data, ovr: ovrByTier[tier] }, CARD_DESIGN_WIDTH)
       expect(plan.tier).toBe(tier)
       expect(plan.palette).toBe(TIER_PALETTE[tier])
-      // Text contrast: dark on the light metals, white on the deep magenta.
-      expect(plan.name.color).toBe(TIER_PALETTE[tier].textFill)
+      // Text contrast: dark on the light metals; the pristine plate carries
+      // the light rainbow, so its white fill fails AA and flips to black
+      // (round 10). The NAME and the stats carry the RESOLVED fill.
+      expect(plan.name.color).toBe(plan.textFill)
+      expect(plan.textFill).toBe(resolveCardTextFill(TIER_PALETTE[tier]))
       if (tier === 'platinum') {
-        expect(plan.name.color).toBe('#ffffff')
+        expect(plan.name.color).toBe('#000000')
       } else {
         expect(plan.name.color).toBe('#241a10')
       }
@@ -240,6 +245,23 @@ describe('buildCardPlan — round-5 palette contract (tier colors applied by cod
     for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
       const plan = buildCardPlan({ ...data, ovr: ovrByTier[tier] }, CARD_DESIGN_WIDTH)
       expect(plan.ovr.color).toBe('#FFFFFF')
+    }
+  })
+
+  it('round-10 contrast rule: pristine renders the plate rainbow and keeps text at AA (white → black)', () => {
+    const platinum = TIER_PALETTE.platinum
+    // The plate carries the same five UI stops as the border.
+    expect(platinum.plateStops).toEqual(platinum.borderStops)
+    expect(platinum.plateStops).toHaveLength(5)
+    // White cannot hold AA anywhere on that plate; black can (the flip).
+    for (const stop of platinum.plateStops ?? []) {
+      expect(contrastRatio('#ffffff', stop.color)).toBeLessThan(4.5)
+      expect(contrastRatio('#000000', stop.color)).toBeGreaterThanOrEqual(4.5)
+    }
+    expect(resolveCardTextFill(platinum)).toBe('#000000')
+    // Metals keep their dark brown — the rule never re-tints a passing fill.
+    for (const tier of ['bronze', 'silver', 'gold'] as const) {
+      expect(resolveCardTextFill(TIER_PALETTE[tier])).toBe('#241a10')
     }
   })
 })

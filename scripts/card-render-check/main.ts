@@ -43,7 +43,7 @@ import {
   estimateBebas,
   type CardExportData,
 } from '../../src/features/export/cardExport'
-import { CARD_DESIGN_HEIGHT, CARD_DESIGN_WIDTH, CARD_GEOMETRY, TIER_PALETTE } from '../../src/features/export/cardAssets'
+import { CARD_DESIGN_HEIGHT, CARD_DESIGN_WIDTH, CARD_GEOMETRY, CARD_PLATE_GRADIENT_LINE, TIER_PALETTE } from '../../src/features/export/cardAssets'
 import { CardSvg } from '../../src/features/cards/CardSvg'
 import cardRaw from '../../src/assets/card.svg?raw'
 
@@ -98,6 +98,31 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
   const px = (x: number, y: number): Uint8ClampedArray => ctx.getImageData(Math.round(x * s), Math.round(y * s), 1, 1).data
 
   const plateFill = palette.plateFill
+  const textFill = plan.textFill
+  // Round 10: the pristine plate carries a gradient, so "the plate color at
+  // a probe" is no longer one constant. Interpolate the palette's own stops
+  // along the same design-space line the renderers use.
+  const plateColorAt = (x: number, y: number): string => {
+    const stops = palette.plateStops
+    if (stops === undefined) return plateFill
+    const { x1, y1, x2, y2 } = CARD_PLATE_GRADIENT_LINE
+    const dx = x2 - x1
+    const dy = y2 - y1
+    const raw = ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)
+    const t = Math.min(1, Math.max(0, raw))
+    for (let i = 1; i < stops.length; i++) {
+      const a = stops[i - 1]
+      const b = stops[i]
+      if (t <= b.offset) {
+        const f = b.offset === a.offset ? 0 : (t - a.offset) / (b.offset - a.offset)
+        const ca = hexToRgb(a.color)
+        const cb = hexToRgb(b.color)
+        const mix = (u: number, v: number): string => Math.round(u + (v - u) * f).toString(16).padStart(2, '0')
+        return `#${mix(ca[0], cb[0])}${mix(ca[1], cb[1])}${mix(ca[2], cb[2])}`
+      }
+    }
+    return stops[stops.length - 1].color
+  }
 
   // Transparency (round 7): the canvas corners sit OUTSIDE the plate
   // silhouette and the PNG has NO background — alpha MUST be 0 there.
@@ -112,7 +137,7 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
   // inside the silhouette, clear of text/lines: between name and stats,
   // and in the plate tip below the stats).
   const platePainted =
-    near(px(540, 1140), plateFill, 8) && near(px(300, 1400), plateFill, 8)
+    near(px(540, 1140), plateColorAt(540, 1140), 8) && near(px(300, 1400), plateColorAt(300, 1400), 8)
 
   // Photo area: the crop path. Sample a grid inside its bbox (skipping the
   // scrimmed top and the OVR block) — the photo is present if ANY sampled
@@ -124,7 +149,7 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
     photo = false
     for (let y = b.y + b.h * 0.45; y < b.y + b.h * 0.95 && !photo; y += 40) {
       for (let x = b.x + b.w * 0.15; x < b.x + b.w * 0.85 && !photo; x += 40) {
-        if (!near(px(x, y), plateFill, 12)) photo = true
+        if (!near(px(x, y), plateColorAt(x, y), 12)) photo = true
       }
     }
   } else {
@@ -148,30 +173,48 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
   // closure (x=540, y≈937..961) the plate fill shows UNBROKEN — the old
   // round-7 implementation stroked the CROP path and painted the gradient
   // exactly there.
-  const stop0 = palette.borderStops[0].color
-  const stop1 = palette.borderStops[palette.borderStops.length - 1].color
-  const midHex = (a: string, b: string): string => {
-    const [r1, g1, b1] = hexToRgb(a)
-    const [r2, g2, b2] = hexToRgb(b)
-    const mid = (u: number, v: number) => Math.round((u + v) / 2)
-    return `#${[mid(r1, r2), mid(g1, g2), mid(b1, b2)].map((v) => v.toString(16).padStart(2, '0')).join('')}`
+  // Round 10: the PLATE can be a gradient too, so the border can no longer be
+  // identified by "the midpoint color of the first/last stops". Interpolate
+  // the border's own stops along the BORDER line (the parsed card.svg line)
+  // and compare each probe against THAT color.
+  const borderColorAt = (x: number, y: number): string => {
+    const { x1, y1, x2, y2 } = plan.card.borderStroke.line
+    const dx = x2 - x1
+    const dy = y2 - y1
+    const t = Math.min(1, Math.max(0, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)))
+    const stops = palette.borderStops
+    for (let i = 1; i < stops.length; i++) {
+      const a = stops[i - 1]
+      const b = stops[i]
+      if (t <= b.offset) {
+        const f = b.offset === a.offset ? 0 : (t - a.offset) / (b.offset - a.offset)
+        const ca = hexToRgb(a.color)
+        const cb = hexToRgb(b.color)
+        const mix = (u: number, v: number): string => Math.round(u + (v - u) * f).toString(16).padStart(2, '0')
+        return `#${mix(ca[0], cb[0])}${mix(ca[1], cb[1])}${mix(ca[2], cb[2])}`
+      }
+    }
+    return stops[stops.length - 1].color
   }
-  const expectedMid = midHex(stop0, stop1)
+  const expectLeft = borderColorAt(86, 600)
+  const expectRight = borderColorAt(993, 600)
+  const expectBottom = borderColorAt(540, 1505)
+  const expectOverPhoto = borderColorAt(540, 95)
   const leftPx = px(86, 600)
   const rightPx = px(993, 600)
   const bottomPx = px(540, 1505)
   const cropLinePx = px(540, 950)
   const overPhotoPx = px(540, 95)
   const borderGradient =
-    (near(leftPx, stop0, 70) || near(leftPx, stop1, 70)) &&
-    (near(rightPx, stop1, 70) || near(rightPx, stop0, 70)) &&
-    near(bottomPx, expectedMid, 70) &&
-    !near(bottomPx, plateFill, 12) &&
-    near(cropLinePx, plateFill, 12) // the crop closure is NOT stroked (round 8)
+    near(leftPx, expectLeft, 70) &&
+    near(rightPx, expectRight, 70) &&
+    near(bottomPx, expectBottom, 70) &&
+    !near(bottomPx, plateColorAt(540, 1505), 12) &&
+    near(cropLinePx, plateColorAt(540, 950), 12) // the crop closure is NOT stroked (round 8)
   // The over-photo pixel: gradient-colored, and NOT the monogram tile / a
   // photo pixel (any sampled photo pixel would differ from the gradient —
   // both facts together prove the border covers the photo's top edge).
-  const borderOverPhoto = near(overPhotoPx, expectedMid, 70) && !near(overPhotoPx, plateFill, 12)
+  const borderOverPhoto = near(overPhotoPx, expectOverPhoto, 70) && !near(overPhotoPx, plateColorAt(540, 95), 12)
 
   // OVR text: count white glyphs over the photo (number + job name block,
   // top-left — the parsed OVR/job slots' region).
@@ -187,7 +230,7 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
   let nameText = 0
   for (let y = 920; y < 1060; y += 4) {
     for (let x = 150; x < 930; x += 6) {
-      if (near(px(x, y), palette.textFill, 60)) nameText++
+      if (near(px(x, y), textFill, 60)) nameText++
     }
   }
 
@@ -198,7 +241,7 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
   let statText = 0
   for (let y = 1080; y < 1345; y += 4) {
     for (let x = 100; x < 990; x += 5) {
-      if (near(px(x, y), palette.textFill, 60)) statText++
+      if (near(px(x, y), textFill, 60)) statText++
     }
   }
 
@@ -235,10 +278,10 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
       bottom: toHex(bottomPx),
       cropLine: toHex(cropLinePx),
       overPhoto: toHex(overPhotoPx),
-      expectL: stop0,
-      expectR: stop1,
-      expectMid: expectedMid,
-      plate: plateFill,
+      expectL: expectLeft,
+      expectR: expectRight,
+      expectMid: expectBottom,
+      plate: plateColorAt(540, 1505),
     },
     ovrTextPixels: ovrText,
     nameTextPixels: nameText,
@@ -321,8 +364,15 @@ function referenceCardSvg(
   // Tier palette → the file's placeholder colors. ORDER MATTERS: the text
   // fill goes first (cls-4..8 #e6e6e6), THEN the plate (#cf1a87) — silver's
   // plateFill IS #e6e6e6 and would otherwise be recolored by the text pass.
-  svg = svg.replaceAll('fill:#e6e6e6', `fill:${palette.textFill}`)
-  svg = svg.replace('.cls-1{fill:#cf1a87}', `.cls-1{fill:${palette.plateFill}}`)
+  // Round 10: text uses the RESOLVED fill (pristine flips to black) and the
+  // plate can be a gradient (the pristine rainbow) instead of a solid.
+  const plateGradient = palette.plateStops
+  svg = svg.replaceAll('fill:#e6e6e6', `fill:${plan.textFill}`)
+  if (plateGradient === undefined) {
+    svg = svg.replace('.cls-1{fill:#cf1a87}', `.cls-1{fill:${palette.plateFill}}`)
+  } else {
+    svg = svg.replace('.cls-1{fill:#cf1a87}', '.cls-1{fill:url(#rf-plate-grad)}')
+  }
   // Border stops: REBUILD the whole stop list from the palette — tiers no
   // longer share the file's stop count (platinum now mirrors the UI's
   // five-stop Impecável rainbow).
@@ -334,9 +384,18 @@ function referenceCardSvg(
     `$1${gradStops}$2`,
   )
   // Extra defs: the photo clip (the crop path — the file has no image clip
-  // of its own) + the shared scrim gradient.
+  // of its own) + the shared scrim gradient + the plate gradient (round 10).
+  const plateGradDef =
+    plateGradient === undefined
+      ? ''
+      : `<linearGradient id="rf-plate-grad" gradientUnits="userSpaceOnUse"` +
+        ` x1="${CARD_PLATE_GRADIENT_LINE.x1}" y1="${CARD_PLATE_GRADIENT_LINE.y1}"` +
+        ` x2="${CARD_PLATE_GRADIENT_LINE.x2}" y2="${CARD_PLATE_GRADIENT_LINE.y2}">` +
+        plateGradient.map((s) => `<stop offset="${s.offset}" stop-color="${s.color}"/>`).join('') +
+        `</linearGradient>`
   const defs =
     `<clipPath id="rf-photo-clip"><path d="${plan.card.cropPath}"/></clipPath>` +
+    plateGradDef +
     `<linearGradient id="rf-scrim" gradientUnits="userSpaceOnUse" x1="0" y1="${plan.scrim.y1}" x2="0" y2="${plan.scrim.y2}">` +
     `<stop offset="0" stop-color="#000000" stop-opacity="${plan.scrim.alpha}"/>` +
     `<stop offset="1" stop-color="#000000" stop-opacity="0"/></linearGradient>`

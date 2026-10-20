@@ -168,9 +168,17 @@ export interface CardGeometry {
 // never read as two different gradients.
 export interface TierPalette {
   plateFill: string
+  /** Optional PLATE gradient (owner checkpoint round 10): the pristine top
+   *  tier paints the same rainbow as its border across the shield itself.
+   *  `plateFill` stays the solid fallback/base for every other tier. */
+  plateStops?: { offset: number; color: string }[]
   borderStops: { offset: number; color: string }[]
   textFill: string
 }
+
+/** The prismatic plate gradient line (design space, 1080×1600): the same
+ *  120°-ish diagonal feel as the UI's tier-impecavel-border. */
+export const CARD_PLATE_GRADIENT_LINE = { x1: 0, y1: 0, x2: 1080, y2: 1600 } as const
 
 export const TIER_PALETTE: Record<Tier, TierPalette> = {
   bronze: {
@@ -200,8 +208,15 @@ export const TIER_PALETTE: Record<Tier, TierPalette> = {
   platinum: {
     plateFill: '#cf1a87',
     // Same five stops as the UI's tier-impecavel-border gradient
-    // (linear-gradient(120deg, #f26d6f, #e9b44c, #3fb950, #58a6ff, #b8c0cc)),
-    // spread along the card's horizontal border line.
+    // (linear-gradient(120deg, #f26d6f, #e9b44c, #3fb950, #58a6ff, #b8c0cc)):
+    // the plate mirrors the ring, and the ring mirrors the UI.
+    plateStops: [
+      { offset: 0, color: '#f26d6f' },
+      { offset: 0.25, color: '#e9b44c' },
+      { offset: 0.5, color: '#3fb950' },
+      { offset: 0.75, color: '#58a6ff' },
+      { offset: 1, color: '#b8c0cc' },
+    ],
     borderStops: [
       { offset: 0, color: '#f26d6f' },
       { offset: 0.25, color: '#e9b44c' },
@@ -211,6 +226,48 @@ export const TIER_PALETTE: Record<Tier, TierPalette> = {
     ],
     textFill: '#ffffff',
   },
+}
+
+// ---------------------------------------------------------------------------
+// Card text contrast (owner checkpoint round 10): white-on-plate fails once
+// the plate carries the light rainbow. Same palette, same decision on both
+// surfaces — the plan stores the RESOLVED fill so the SVG and the PNG export
+// can never disagree.
+
+function channel(v: number): number {
+  const c = v / 255
+  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+}
+
+function luminance(hex: string): number {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex)
+  if (!m) throw new Error(`card palette: expected #rrggbb, got "${hex}"`)
+  const n = Number.parseInt(m[1], 16)
+  return (
+    0.2126 * channel((n >> 16) & 0xff) +
+    0.7152 * channel((n >> 8) & 0xff) +
+    0.0722 * channel(n & 0xff)
+  )
+}
+
+/** WCAG contrast ratio between two #rrggbb colors. */
+export function contrastRatio(a: string, b: string): number {
+  const la = luminance(a)
+  const lb = luminance(b)
+  const [hi, lo] = la >= lb ? [la, lb] : [lb, la]
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+/** Resolves the card text fill: keep the palette's choice when it holds
+ *  WCAG AA (4.5:1) on EVERY plate color; otherwise switch to black when
+ *  black reads better than the light fill. Metals keep their dark brown —
+ *  the rule only rescues light text that the plate can no longer carry. */
+export function resolveCardTextFill(palette: TierPalette): string {
+  const backgrounds = palette.plateStops?.map((s) => s.color) ?? [palette.plateFill]
+  const worst = (fill: string): number =>
+    Math.min(...backgrounds.map((bg) => contrastRatio(fill, bg)))
+  if (worst(palette.textFill) >= 4.5) return palette.textFill
+  return worst('#000000') > worst(palette.textFill) ? '#000000' : palette.textFill
 }
 
 // ---------------------------------------------------------------------------

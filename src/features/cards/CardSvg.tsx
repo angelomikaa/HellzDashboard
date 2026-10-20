@@ -52,6 +52,7 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import {
   buildCardPlan,
+  CARD_PLATE_GRADIENT_LINE,
   estimateBebas,
   estimateOrbitron,
   fitCardText,
@@ -121,6 +122,7 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
   const cropClipId = `card-crop-clip-${uid}`
   const borderClipId = `card-border-clip-${uid}`
   const borderGradId = `card-border-grad-${uid}`
+  const plateGradId = `card-plate-grad-${uid}`
   const scrimId = `card-scrim-${uid}`
   const b = plan.photoBBox
 
@@ -145,6 +147,22 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
             <stop key={i} offset={s.offset} stopColor={s.color} />
           ))}
         </linearGradient>
+        {/* Plate gradient (round 10): pristine paints the UI rainbow across
+            the shield itself; other tiers keep the solid plateFill. */}
+        {plan.palette.plateStops !== undefined && (
+          <linearGradient
+            id={plateGradId}
+            gradientUnits="userSpaceOnUse"
+            x1={CARD_PLATE_GRADIENT_LINE.x1}
+            y1={CARD_PLATE_GRADIENT_LINE.y1}
+            x2={CARD_PLATE_GRADIENT_LINE.x2}
+            y2={CARD_PLATE_GRADIENT_LINE.y2}
+          >
+            {plan.palette.plateStops.map((s, i) => (
+              <stop key={i} offset={s.offset} stopColor={s.color} />
+            ))}
+          </linearGradient>
+        )}
         {/* Photo clip: THE crop path from card.svg (round 5). */}
         <clipPath id={cropClipId}>
           <path d={plan.card.cropPath} />
@@ -161,10 +179,14 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         </linearGradient>
       </defs>
 
-      {/* Plate: shield-shaped tier color fill — NOTHING fills outside it,
-          so the card has no background: transparent PNG download, and the
-          page backdrop shows through the on-page card. */}
-      <path d={plan.card.platePath} fill={plan.palette.plateFill} />
+      {/* Plate: shield-shaped tier fill — the pristine rainbow gradient when
+          the palette declares plateStops, else the solid tier color. NOTHING
+          fills outside it, so the card has no background: transparent PNG
+          download, and the page backdrop shows through the on-page card. */}
+      <path
+        d={plan.card.platePath}
+        fill={plan.palette.plateStops !== undefined ? `url(#${plateGradId})` : plan.palette.plateFill}
+      />
 
       {/* Photo: member screenshot / class portrait CLIPPED TO THE CROP PATH
           (preserveAspectRatio slice over the crop bbox = cover-fit) — or
@@ -274,7 +296,7 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           LINES CENTRALLY ALIGNED on the column center (round 7). Bebas
           Neue, shrink-to-fit per column. */}
       {plan.stats.map((cell, i) => (
-        <g key={i} fontFamily={`${plan.fonts.slots}, ${plan.fonts.name}, sans-serif`} fill={plan.palette.textFill}>
+        <g key={i} fontFamily={`${plan.fonts.slots}, ${plan.fonts.name}, sans-serif`} fill={plan.textFill}>
           <text
             x={cell.centerX}
             y={cell.labelY}

@@ -61,25 +61,18 @@ export function OvrHero({
     </>
   )
 
-  // Strip layout (owner checkpoint round 7): a horizontal OVR block so the
-  // Painel can put the (now Destaques-sized) player card beside it without
-  // spending vertical space on a stacked block.
+  // Strip layout (owner checkpoint rounds 7-10): the OVR number and its tag
+  // are GONE here — the card already carries the real OVR, so the text
+  // beside it is the player's identity: nickname as the title, class · role
+  // as the subtitle.
   if (layout === 'strip') {
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-4">
-          <p
-            className={`text-5xl font-semibold leading-none ${tier !== null ? `font-display ${TIER_TEXT_GLOW[tier]}` : 'text-muted'}`}
-          >
-            {display}
-          </p>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">OVR</p>
-            <h2 className="truncate text-xl font-semibold text-content">{displayName}</h2>
-            <p className="truncate text-sm text-muted">{classLine}</p>
-          </div>
-        </div>
-        {explanation !== null && <p className="text-sm text-muted">{explanation}</p>}
+      <div className="flex flex-col gap-1">
+        <h2 className="font-display text-2xl font-semibold tracking-wide text-content sm:text-3xl">
+          {displayName}
+        </h2>
+        <p className="text-base text-muted sm:text-lg">{classLine}</p>
+        {explanation !== null && <p className="mt-1 text-sm text-muted">{explanation}</p>}
       </div>
     )
   }

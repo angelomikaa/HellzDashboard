@@ -62,7 +62,9 @@ import {
   CARD_DESIGN_HEIGHT,
   CARD_DESIGN_WIDTH,
   CARD_GEOMETRY,
+  CARD_PLATE_GRADIENT_LINE,
   TIER_PALETTE,
+  resolveCardTextFill,
   scalePath,
   scaleRect,
   type CardGeometry,
@@ -167,6 +169,9 @@ export interface CardPlan {
   /** The tier's CODE-DRIVEN palette (plate fill / border stops / text
    *  fill) applied over the one shared geometry. */
   palette: TierPalette
+  /** The RESOLVED plate text color: `resolveCardTextFill(palette)` — white
+   *  flips to black when the plate can no longer carry it (round 10). */
+  textFill: string
   /** The card's FONT SPLIT (round 7): Bebas Neue for every slot EXCEPT the
    *  player name (Orbitron). Both surfaces read the families from here so
    *  the split cannot drift between the SVG and the canvas. */
@@ -239,6 +244,10 @@ export function buildCardPlan(
   const tier = tierOf(data.ovr)
   const card = CARD_GEOMETRY
   const palette = TIER_PALETTE[tier]
+  // Round 10: the plate can carry a gradient (pristine rainbow), so the text
+  // fill is RESOLVED against the plate — one decision shared by both
+  // surfaces through the plan.
+  const textFill = resolveCardTextFill(palette)
   const scale = width / CARD_DESIGN_WIDTH
   const height = (width * CARD_DESIGN_HEIGHT) / CARD_DESIGN_WIDTH
 
@@ -294,7 +303,7 @@ export function buildCardPlan(
     x: plateMidX,
     y: slots.name.y * scale,
     size: slots.name.size * scale,
-    color: palette.textFill,
+    color: textFill,
     maxWidth: 2 * Math.min(plateMidX - plateInnerL, plateInnerR - plateMidX),
   }
 
@@ -331,6 +340,8 @@ export function buildCardPlan(
     tier,
     card,
     palette,
+    /** The RESOLVED plate text color (round 10 contrast rule). */
+    textFill,
     fonts: CARD_FONTS,
     scale,
     photo,
@@ -532,6 +543,18 @@ function applyBorderGradient(
   return grad
 }
 
+/** The plate paint (round 10): pristine's prismatic gradient when the tier
+ *  declares one, otherwise its solid plateFill. The SVG twin reads the same
+ *  palette field, so the on-page card and the PNG cannot diverge. */
+function platePaint(ctx: CanvasRenderingContext2D, plan: CardPlan): string | CanvasGradient {
+  const stops = plan.palette.plateStops
+  if (stops === undefined) return plan.palette.plateFill
+  const line = CARD_PLATE_GRADIENT_LINE
+  const grad = ctx.createLinearGradient(line.x1 * plan.scale, line.y1 * plan.scale, line.x2 * plan.scale, line.y2 * plan.scale)
+  for (const stop of stops) grad.addColorStop(Math.min(1, Math.max(0, stop.offset)), stop.color)
+  return grad
+}
+
 /**
  * Paint the card plan onto a canvas (canvas dims MUST match the 27:40 card
  * design aspect — width : height = 1080 : 1600). Awaits fonts and the
@@ -559,7 +582,7 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   // NO full-canvas fill: the PNG is TRANSPARENT around the shield. Paint
   // only the plate path — tier color inside, nothing outside.
   const plate = new Path2D(scalePath(plan.card.platePath, s))
-  ctx.fillStyle = plan.palette.plateFill
+  ctx.fillStyle = platePaint(ctx, plan)
   ctx.fill(plate)
 
   // --- Photo: the member screenshot (or fallback) CLIPPED TO THE CROP PATH
@@ -631,7 +654,7 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   // column a label / big points number / small raw value stack, ALL THREE
   // LINES CENTRALLY ALIGNED on the column centerX (round 7), all under the
   // SHARED fit contract (real metrics — the round 6-7 overflow fix).
-  ctx.fillStyle = plan.palette.textFill
+  ctx.fillStyle = plan.textFill
   for (const cell of plan.stats) {
     paintFitted(ctx, cell.label, cell.centerX, cell.labelY, plan.fonts.slots, 400, cell.labelSize, cell.labelMaxW, true)
     paintFitted(ctx, cell.points, cell.centerX, cell.pointsY, plan.fonts.slots, 400, cell.pointsSize, cell.pointsMaxW, true)
@@ -696,4 +719,11 @@ export async function downloadCard(data: CardExportData, filename: string): Prom
 
 // Re-exports for consumers that layout-annotate around the plan (design
 // space constants; CardSvg renders everything from the plan).
-export { CARD_DESIGN_WIDTH, CARD_DESIGN_HEIGHT, CARD_GEOMETRY, TIER_PALETTE, type CardRect }
+export {
+  CARD_DESIGN_WIDTH,
+  CARD_DESIGN_HEIGHT,
+  CARD_GEOMETRY,
+  CARD_PLATE_GRADIENT_LINE,
+  TIER_PALETTE,
+  type CardRect,
+}

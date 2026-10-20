@@ -251,7 +251,7 @@ export function DashboardPage({
                 downloading={generating}
                 downloadError={downloadFailed ? DOWNLOAD_ERROR : null}
               />
-              <div className="flex min-w-0 flex-1 flex-col gap-4 lg:justify-center">
+              <div className="flex min-w-0 flex-1 flex-col gap-4 lg:justify-between lg:py-1">
                 <OvrHero
                   ovr={report.ovr}
                   displayName={session.display_name}
