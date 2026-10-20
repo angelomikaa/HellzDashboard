@@ -369,7 +369,7 @@ async function main() {
       hlLenOk,
       promoCards[0] ? `card0=${promoCards[0].highlights.length}` : 'no cards',
     )
-    const HL_KEYS = ['stat_key', 'label', 'value_type', 'value', 'points'].sort()
+    const HL_KEYS = ['stat_key', 'label', 'label_short', 'value_type', 'value', 'points'].sort()
     const hlKeysOk = promoCards.every(
       (c) =>
         Array.isArray(c.highlights) &&
@@ -378,7 +378,10 @@ async function main() {
         ),
     )
     check(
-      '3c. every highlight object has EXACTLY {stat_key,label,value_type,value,points} (no extra fields)',
+      // 07.2-05 round 8 update: 0013's D-13 closed field list added
+      // label_short to every highlight (the round-7 3-letter→4-6-char label
+      // mapping rides it) — the pre-0013 probe expected the old list.
+      '3c. every highlight object has EXACTLY {stat_key,label,label_short,value_type,value,points} (no extra fields)',
       hlKeysOk,
     )
 
@@ -400,9 +403,15 @@ async function main() {
     }
     const overlap = keySet.filter((k) => memberKeys.has(k))
     check(
-      '4b. LEAK-DIFF: ZERO intersection between staff key set and member-visible stat_keys',
-      memberKeys.size > 0 && overlap.length === 0,
-      `member sees ${memberKeys.size} distinct stats, overlap=${JSON.stringify(overlap)}`,
+      // 07.2-05 round 8 update: 0013 (D-03/D-13) SANCTIONED the key reveal —
+      // members see WHICH stats are key (my_card highlights + promotion
+      // highlights carry exactly the class key set; config data still never
+      // serialised). The pre-0013 zero-intersection expectation is obsolete;
+      // the contract is now IDENTITY with the staff key set + no non-key
+      // stat anywhere (config-leak probes stay in force below).
+      '4b. D-13 sanctioned reveal: member-visible stat_keys === staff key set (no non-key stat)',
+      memberKeys.size > 0 && overlap.length === keySet.length && memberKeys.size === keySet.length,
+      `member sees ${memberKeys.size} distinct stats, keys=${keySet.length}`,
     )
     const raw = memberPromo.text || ''
     check(
@@ -461,11 +470,22 @@ async function main() {
     )
     const cardsDuring = sectionDuring && Array.isArray(sectionDuring.cards) ? sectionDuring.cards : []
     check(
-      "7b. deactivated member's card DROPS from the section instantly (2 cards remain)",
+      // 07.2-05 round 8 update (rating UNIFICATION): with the class+function
+      // cohort basis (the my_card semantics), deactivating one of the trio
+      // leaves the remaining pair at n=2 < 3 → points AND OVR become data-
+      // insufficient → their cards are OMITTED SERVER-SIDE (D-13's designed
+      // omission, identical to what my_card/my_report return for the same
+      // starved cohort). The pre-unification probe expected 2 cards only
+      // because the old function-only cmp leaked OTHER classes' members
+      // into the fixture's ranks — the very defect the owner reported.
+      // The D-07 instant-drop contract still holds: c's card is gone, and
+      // 7d proves the cards return on reactivation (compute-on-read).
+      "7b. deactivated member's card DROPS instantly (remaining pair n=2 -> OVR insufficient -> section omitted, D-13)",
       promoDuring.ok &&
-        !!sectionDuring &&
-        cardsDuring.length === 2 &&
-        !cardsDuring.some((c) => c.display_name === DISPLAY[HANDLES.c]),
+        (!sectionDuring || cardsDuring.length === 0) &&
+        !(Array.isArray(promoDuring.json) ? promoDuring.json : []).some((s) =>
+          (s.cards || []).some((c) => c.display_name === DISPLAY[HANDLES.c]),
+        ),
       `cards=${JSON.stringify(cardsDuring.map((c) => c.display_name))}`,
     )
     const reactivate = await rest('/rpc/set_member_active', {

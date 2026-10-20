@@ -23,6 +23,10 @@
  *   D-13     get_promotion(): fixture section cards' highlights are EXACTLY
  *            the class's 6 key stat keys (order-insensitive set equality),
  *            each with label_short, closed field list
+ *   UNIFY    (07.2-05 round 8) my_card points + OVR === get_promotion
+ *            points + OVR for the same member, ALL 6 key stats (exact
+ *            equality — the class+function cohort is the single source of
+ *            truth on both paths)
  *   Cleanup  fixture members/submissions/class/key/relevant/pin_login_
  *            attempts removed in finally; zero-residue census asserted
  *
@@ -679,6 +683,57 @@ async function main() {
       '8c. setup: remove relevant stat -> 2xx returns 0',
       relRemove.ok && Number(relRemove.json) === 0,
       `HTTP ${relRemove.status}`,
+    )
+
+    // ---- Probe 10 (07.2-05 round 8 UNIFICATION): my_card ≡ get_promotion --
+    // Ratings are universal (owner round 8: "Ratings are an universal
+    // measurement, once calculated they must be displayed equally. the card
+    // the player sees in the panel must be the same one available in
+    // destaques"). For the SAME member + latest submission, every key-stat
+    // points value and the OVR my_card returns must EXACTLY equal the
+    // values get_promotion returns — the server-side single source of truth
+    // (get_promotion delegates to the my_card cohort basis: class+function,
+    // points rounded 2dp). Catches the round-7 defect where get_promotion's
+    // cmp ranked on the function-only pool (86 vs 78 for the same value).
+    const parityCard = await callRpc('my_card', memberToken, {})
+    const parityPromo = await callRpc('get_promotion', memberToken, {})
+    const pCard = parityCard.json || {}
+    const pSections = Array.isArray(parityPromo.json) ? parityPromo.json : []
+    const pSection = pSections.find((s) => s.class_name === CLASS)
+    const pCards = pSection && Array.isArray(pSection.cards) ? pSection.cards : []
+    const pCardRow = pCards.find((c) => c.display_name === DISPLAY[HANDLES.a])
+    check(
+      '10a. parity precondition: member a is OVR-ranked in its class top-5 (pristine-rank card exists)',
+      !!pCardRow && typeof pCardRow.ovr === 'number',
+      pCardRow ? `ovr=${pCardRow.ovr}` : 'member a missing from get_promotion',
+    )
+    const myPoints = Object.fromEntries((pCard.key_stats || []).map((k) => [k.stat_key, k]))
+    const promoPoints = Object.fromEntries((pCardRow?.highlights || []).map((h) => [h.stat_key, h]))
+    let pointsParity = true
+    let valueParity = true
+    let detail = []
+    for (const stat_key of KEY_STATS) {
+      const mine = myPoints[stat_key]
+      const promo = promoPoints[stat_key]
+      if (!mine || !promo || mine.points !== promo.points || mine.own_value !== promo.value) {
+        pointsParity = false
+        detail.push(`${stat_key}: mine=${mine?.points}/${mine?.own_value} promo=${promo?.points}/${promo?.value}`)
+      } else if (mine.own_value !== promo.value) {
+        valueParity = false
+        detail.push(`${stat_key}: value ${mine.own_value} ≠ ${promo.value}`)
+      }
+    }
+    check(
+      '10b. my_card points + own_value === get_promotion points + value for ALL 6 key stats (exact)',
+      pointsParity && valueParity,
+      detail.length ? detail.join(' | ') : '6/6 stats identical',
+    )
+    const ovrParity =
+      pCardRow && pCard.ovr && pCard.ovr.value !== null && Number(pCardRow.ovr) === Number(pCard.ovr.value)
+    check(
+      '10c. my_card ovr.value === get_promotion ovr (same member, same cohort math — exact equality)',
+      ovrParity,
+      `mine=${pCard.ovr?.value} promo=${pCardRow?.ovr}`,
     )
 
     // ---- Probe 9: rank engine regression (set_key_stat supersession) ------
