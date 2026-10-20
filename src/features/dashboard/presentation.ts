@@ -58,13 +58,15 @@ export const LOWER_IS_BETTER_STATS: ReadonlySet<string> = new Set([
  *   null implies a n ≥ 3 cohort, which implies a non-null average server-side.
  * - Sort: ascending normalized (most-behind = most-negative first); non-behind
  *   stats only FILL after every behind stat; stable tie-break by input index.
- * - Returns at most 3 (existing strip rhythm). PURE: consumes my_report payload
+ * - Returns at most `limit` (default 6, round 12: the focus row mirrors the
+ *   6-tile key row) — most-behind first. PURE: consumes my_report payload
  *   fields only — points/OVR stay opaque, no rank math (RNK-02).
  */
 export function improvementFocus(
   stats: MyReportStat[],
   priorityKeys: ReadonlySet<string>,
   lowerIsBetter: ReadonlySet<string> = LOWER_IS_BETTER_STATS,
+  limit = 6,
 ): MyReportStat[] {
   return stats
     .map((stat, index) => {
@@ -79,7 +81,7 @@ export function improvementFocus(
     })
     .filter((e): e is { stat: MyReportStat; index: number; normalized: number } => e !== null)
     .sort((a, b) => a.normalized - b.normalized || a.index - b.index)
-    .slice(0, 3)
+    .slice(0, Math.max(0, limit))
     .map((e) => e.stat)
 }
 

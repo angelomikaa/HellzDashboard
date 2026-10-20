@@ -207,14 +207,28 @@ describe('improvementFocus (07.2 D-07: key∪relevant stats, most-behind vs clas
     expect(improvementFocus([noPoints, noOwn, ok], KEYS).map((s) => s.stat_key)).toEqual(['c'])
   })
 
-  it('returns at most 3, most-behind first, stable tie-break by input (catalog) order', () => {
-    const stats = ['d', 'c', 'b', 'a'].map((k) =>
+  it('returns at most 6 (round 12: mirrors the 6-tile key row), most-behind first, stable tie-break by input order', () => {
+    const wideKeys = new Set([...KEYS, 'e', 'f', 'g'])
+    const stats = ['g', 'f', 'e', 'd', 'c', 'b', 'a'].map((k) =>
       stat(50, { stat_key: k, own_value: 90, class_average: 100 }), // identical gaps
     )
-    expect(improvementFocus(stats, KEYS).map((s) => s.stat_key)).toEqual(['d', 'c', 'b'])
+    expect(improvementFocus(stats, wideKeys).map((s) => s.stat_key)).toEqual([
+      'g',
+      'f',
+      'e',
+      'd',
+      'c',
+      'b',
+    ])
+    // The legacy 3-cap stays available as an explicit limit.
+    expect(improvementFocus(stats, wideKeys, undefined, 3).map((s) => s.stat_key)).toEqual([
+      'g',
+      'f',
+      'e',
+    ])
   })
 
-  it('returns what exists when fewer than 3 are eligible, and [] when none are', () => {
+  it('returns what exists when fewer than 6 are eligible, and [] when none are', () => {
     const one = [stat(50, { stat_key: 'a', own_value: 90, class_average: 100 })]
     expect(improvementFocus(one, KEYS).map((s) => s.stat_key)).toEqual(['a'])
     expect(improvementFocus([], KEYS)).toEqual([])

@@ -233,7 +233,7 @@ export function DashboardPage({
               ovrTier !== null ? TIER_BORDER_DISPLAY[ovrTier] : 'border-line'
             }`}
           >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
               {/* Owner checkpoint round 7: the own-card preview is now sized
                   like a Destaques card (≈a third of the content column) and
                   the actions joined it as an icon strip over the photo area
@@ -251,7 +251,10 @@ export function DashboardPage({
                 downloading={generating}
                 downloadError={downloadFailed ? DOWNLOAD_ERROR : null}
               />
-              <div className="flex min-w-0 flex-1 flex-col gap-4 lg:justify-between lg:py-1">
+              {/* Round 12 (owner checkpoint): the column is CENTERED, not
+                  stretched — identity header, the 6 key-stat tiles and the
+                  6 focus tiles read as one rhythm inside the tier frame. */}
+              <div className="flex min-w-0 flex-1 flex-col gap-4 lg:justify-center lg:py-1">
                 <OvrHero
                   ovr={report.ovr}
                   displayName={session.display_name}
