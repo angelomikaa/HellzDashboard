@@ -380,30 +380,29 @@ export function SubmitPage({ session }: SubmitPageProps) {
           </ol>
 
           {step === 1 && (
-            <div className="mt-6 flex flex-col gap-4">
+            <div className="mt-6 flex flex-col gap-5">
               <h2 className="text-xl font-semibold text-content">
                 {`${me.display_name} — ${me.char_class} (${FUNCTION_LABELS[me.char_function]})`}
               </h2>
-              {/* Owner feedback (07.2-06 checkpoint): the OCR area is a TWO
-                  COLUMN section — example shot + upload box on the right
-                  (first in DOM so mobile keeps upload-before-fields), the
-                  fields in the main column. */}
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                <div className="flex w-full shrink-0 flex-col gap-3 sm:order-2 sm:w-64">
-                  <a
-                    href="/examples/basic.svg"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block w-full rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    <img
-                      src="/examples/basic.svg"
-                      alt="Exemplo da tela básica do personagem"
-                      width={691}
-                      height={416}
-                      className="h-32 w-full rounded-md border border-line object-cover sm:h-auto"
-                    />
-                  </a>
+              {/* Capture strip (owner feedback, 07.2-06 checkpoint round 2):
+                  the example shot + the OCR upload box occupy ONE full-width
+                  strip; the fields are ONLY below it. */}
+              <div className="flex w-full flex-col gap-3 rounded-md border border-line bg-surface p-3 sm:flex-row sm:items-center sm:gap-4">
+                <a
+                  href="/examples/basic.svg"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block w-full shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:w-40"
+                >
+                  <img
+                    src="/examples/basic.svg"
+                    alt="Exemplo da tela básica do personagem"
+                    width={691}
+                    height={416}
+                    className="h-24 w-full rounded-md border border-line object-cover"
+                  />
+                </a>
+                <div className="min-w-0 flex-1">
                   {/* OCR entry for the basic header capture (D-06: the basic
                       capture reads ONLY combat_power; nickname/job are admin
                       data, never inputs). */}
@@ -414,8 +413,9 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     onRunStateChange={(running) => handleOcrRunState(1, running)}
                   />
                 </div>
-                <div className="flex flex-1 flex-col gap-4">
-                  <div className="flex flex-col gap-1">
+              </div>
+              <div className="flex max-w-md flex-col gap-4">
+                <div className="flex flex-col gap-1">
                   <label htmlFor="combat-power" className="text-sm font-semibold text-content">
                     Poder de Combate
                   </label>
@@ -457,7 +457,6 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   checked={stepVerified[1]}
                   onChange={(checked) => setStepVerified((v) => ({ ...v, 1: checked }))}
                 />
-                </div>
               </div>
             </div>
           )}

@@ -67,31 +67,32 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
   }
 
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-      {/* Right rail (07.2-06 owner feedback): the example shot AND the OCR
-          upload box live together here; the fields stay in the main column.
+    <div className="flex flex-col gap-5">
+      {/* Capture strip (owner feedback, 07.2-06 checkpoint round 2): the
+          example shot + the OCR upload box share ONE full-width strip at the
+          top; the fields are ONLY below it (never beside the upload UI).
           Tapping the example opens the full-size asset in a new tab — it is a
           static panel-provided reference image, never member screenshot
           data. */}
-      <div className="flex w-full shrink-0 flex-col gap-3 sm:order-2 sm:w-64">
+      <div className="flex w-full flex-col gap-3 rounded-md border border-line bg-surface p-3 sm:flex-row sm:items-center sm:gap-4">
         <a
           href={`/examples/${group}.svg`}
           target="_blank"
           rel="noreferrer"
-          className="block w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-md"
+          className="block w-full shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:w-40"
         >
           <img
             src={`/examples/${group}.svg`}
             alt={`Exemplo da captura de ${groupLabel}`}
             width={691}
             height={416}
-            className="h-32 w-full rounded-md border border-line object-cover sm:h-auto"
+            className="h-24 w-full rounded-md border border-line object-cover"
           />
         </a>
-        {capture}
+        <div className="min-w-0 flex-1">{capture}</div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {entries.map((entry) => {
           const raw = inputs[entry.stat_key] ?? ''
           const engaged = isFieldEngaged(entry.stat_key, blurred, ocrFilledFields)
