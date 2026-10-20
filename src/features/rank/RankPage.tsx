@@ -14,7 +14,7 @@
 // detail showing all 57 values. D-20: per stat the raw value, the 0–99
 // points and the class average — the sanctioned officials visibility
 // expansion. Members NEVER see this page or its data.
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   ApiError,
   fetchCatalog,
@@ -211,7 +211,8 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                 const isExpanded = expandedId === row.member_id
                 const regionId = `rank-detail-${row.member_id}`
                 return (
-                  <tr key={row.member_id} className="border-b border-line">
+                  <Fragment key={row.member_id}>
+                  <tr className="border-b border-line">
                     <td className="px-2 py-2">
                       <ClassCrest charClass={row.char_class} size="sm" />
                     </td>
@@ -240,16 +241,14 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                       </button>
                     </td>
                   </tr>
-                )
-              })}
-              {expandedId !== null &&
-                displayRows
-                  .filter((row) => row.member_id === expandedId)
-                  .map((row) => (
-                    <tr key={`${row.member_id}-detail`}>
+                    {/* Collapsible detail (owner feedback, 07.2-06 checkpoint):
+                        expands directly UNDER its row, not after the whole
+                        list. Same aria-controls region the button targets. */}
+                    {isExpanded && (
+                    <tr>
                       <td colSpan={5} className="px-0 py-0">
                         <div
-                          id={`rank-detail-${row.member_id}`}
+                          id={regionId}
                           className="rounded-md border border-line bg-surface p-3"
                         >
                           {/* All 57 values in payload order, grouped
@@ -314,7 +313,10 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    )}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>

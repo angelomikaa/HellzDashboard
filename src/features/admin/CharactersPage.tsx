@@ -45,6 +45,7 @@ const ADD_CLASS_ERROR = 'Não foi possível adicionar. Verifique a conexão.'
 const ROLE_UPDATED_MESSAGE = 'Papel atualizado. Efetivo no próximo login.'
 const MEMBER_REMOVED_MESSAGE = 'Membro removido.'
 const MEMBER_REACTIVATED_MESSAGE = 'Membro reativado.'
+const NO_FILTER_MATCH = 'Nenhum membro com esses filtros.'
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   member: 'Membro',
@@ -154,6 +155,11 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
   // Staff action awaiting confirm-modal confirmation.
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
 
+  // Owner feedback (07.2-06 checkpoint): quick class/function token filters —
+  // pure view aid over the already-fetched roster (no server round trip).
+  const [filterClass, setFilterClass] = useState('')
+  const [filterFunction, setFilterFunction] = useState<'' | 'dps' | 'mdps' | 'suporte'>('')
+
   const load = useCallback(async () => {
     const [members, classes] = await Promise.all([fetchMembers(session), fetchClasses(session)])
     setData({ members, classes })
@@ -174,6 +180,17 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
 
   // Any in-flight request disables every CTA on the page.
   const busy = addClassState.kind === 'saving' || savingRowId !== null
+
+  // View aid only (owner feedback): apply the token filters to the loaded
+  // roster; null char_class rows match the "Todas" class filter only.
+  const visibleMembers =
+    data === null
+      ? []
+      : data.members.filter(
+          (member) =>
+            (filterClass === '' || member.char_class === filterClass) &&
+            (filterFunction === '' || member.char_function === filterFunction),
+        )
 
   // Confirm-modal copy for the pending staff action (null → dialog closed).
   const confirm = pendingAction === null ? null : confirmConfig(pendingAction)
@@ -359,6 +376,77 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
               Nenhum membro na lista branca ainda.
             </p>
           ) : (
+            <>
+              {/* Owner feedback (07.2-06 checkpoint): token filters by class
+                  and function. Chips only narrow the already-loaded roster —
+                  no data flow change, the D-08 matrix still renders per row. */}
+              <div className="mt-6 flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-muted">Classe</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilterClass('')}
+                    aria-pressed={filterClass === ''}
+                    className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      filterClass === ''
+                        ? 'border-accent bg-accent text-accent-foreground'
+                        : 'border-line text-muted hover-control hover:text-content'
+                    }`}
+                  >
+                    Todas
+                  </button>
+                  {data.classes.map((className) => (
+                    <button
+                      key={className}
+                      type="button"
+                      onClick={() => setFilterClass((prev) => (prev === className ? '' : className))}
+                      aria-pressed={filterClass === className}
+                      className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                        filterClass === className
+                          ? 'border-accent bg-accent text-accent-foreground'
+                          : 'border-line text-muted hover-control hover:text-content'
+                      }`}
+                    >
+                      {className}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-muted">Função</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilterFunction('')}
+                    aria-pressed={filterFunction === ''}
+                    className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      filterFunction === ''
+                        ? 'border-accent bg-accent text-accent-foreground'
+                        : 'border-line text-muted hover-control hover:text-content'
+                    }`}
+                  >
+                    Todas
+                  </button>
+                  {(Object.keys(FUNCTION_LABELS) as Array<keyof typeof FUNCTION_LABELS>).map(
+                    (role) => (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => setFilterFunction((prev) => (prev === role ? '' : role))}
+                        aria-pressed={filterFunction === role}
+                        className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                          filterFunction === role
+                            ? 'border-accent bg-accent text-accent-foreground'
+                            : 'border-line text-muted hover-control hover:text-content'
+                        }`}
+                      >
+                        {FUNCTION_LABELS[role]}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </div>
+              {visibleMembers.length === 0 ? (
+                <p className="mt-6 text-center text-base text-muted">{NO_FILTER_MATCH}</p>
+              ) : (
             <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
               {/* Owner gate round 4 (07.1-02): per-character card list. The
                   old 7-column table needed horizontal expansion (scroll or
@@ -379,7 +467,7 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                   being edited spans both columns so the inline form keeps its
                   comfortable field widths. Mobile/tablet stay 1-up exactly as
                   before. */}
-              {data.members.map((member) => {
+              {visibleMembers.map((member) => {
                 const editing = draft?.memberId === member.id
                 const saving = savingRowId === member.id
                 // Staff controls (06-UI-SPEC Surface 3, D-08 matrix): owner
@@ -598,6 +686,8 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                 )
               })}
             </div>
+              )}
+            </>
           )}
         </>
       )}

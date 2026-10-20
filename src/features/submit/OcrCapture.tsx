@@ -230,7 +230,7 @@ export function OcrCapture({
         disabled={disabled || running}
         aria-busy={running}
         onClick={() => fileInputRef.current?.click()}
-        className="inline-flex h-11 items-center justify-center gap-1 self-start rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-1 self-start rounded-md bg-accent px-4 py-2 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
       >
         {/* Upload icon: arrow-up-from-bracket shape, 16px (05-UI-SPEC). */}
         <svg

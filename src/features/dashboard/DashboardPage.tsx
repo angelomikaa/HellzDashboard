@@ -246,32 +246,6 @@ export function DashboardPage({
                       <KeyStatCard key={k.stat_key} stat={k} />
                     ))}
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    {/* 07.2 D-08: member own-card download — same export
-                        module/contract as the showcase (PNG, transparent,
-                        hellz-<nome>.png). Disabled while OVR is
-                        insufficient (no card to celebrate). */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void handleDownloadCard()
-                      }}
-                      disabled={generating || exportData === null}
-                      aria-label="Baixar meu card (PNG)"
-                      className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    >
-                      {generating ? 'Gerando…' : 'Baixar meu card'}
-                    </button>
-                    {downloadFailed && (
-                      <p
-                        role="alert"
-                        aria-live="polite"
-                        className="text-xs font-semibold text-destructive"
-                      >
-                        {DOWNLOAD_ERROR}
-                      </p>
-                    )}
-                  </div>
                 </>
               ) : (
                 <p className="text-sm text-muted">{STRIP_EXPLAINER}</p>
@@ -280,8 +254,37 @@ export function DashboardPage({
           )}
           {/* 07.2-05 round 3 (owner decision 1): the member's character-
               screenshot upload — self-contained surface with its own data
-              calls, so the page's report-call discipline stays intact. */}
-          <CardPhotoUpload session={session} />
+              calls, so the page's report-call discipline stays intact.
+              Owner feedback (07.2-06 checkpoint): the own-card download lives
+              WITH the preview card (injected via previewActions), not under
+              the key-stat strip where it read as disconnected. */}
+          <CardPhotoUpload
+            session={session}
+            previewActions={
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleDownloadCard()
+                  }}
+                  disabled={generating || exportData === null}
+                  aria-label="Baixar meu card (PNG)"
+                  className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  {generating ? 'Gerando…' : 'Baixar meu card'}
+                </button>
+                {downloadFailed && (
+                  <p
+                    role="alert"
+                    aria-live="polite"
+                    className="text-center text-xs font-semibold text-destructive"
+                  >
+                    {DOWNLOAD_ERROR}
+                  </p>
+                )}
+              </>
+            }
+          />
           {/* 07.2 D-07: foco = the stats most behind the class average among
               key ∪ relevant (priorityKeySet from my_card; empty set when the
               my_card fetch failed — improvementFocus returns [] and the

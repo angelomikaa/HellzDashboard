@@ -380,36 +380,42 @@ export function SubmitPage({ session }: SubmitPageProps) {
           </ol>
 
           {step === 1 && (
-            <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start">
-              {/* Example "basic" header shot beside the intro (INPT-01). */}
-              <a
-                href="/examples/basic.svg"
-                target="_blank"
-                rel="noreferrer"
-                className="block w-full shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:order-2 sm:w-32"
-              >
-                <img
-                  src="/examples/basic.svg"
-                  alt="Exemplo da tela básica do personagem"
-                  width={691}
-                  height={416}
-                  className="h-32 w-full rounded-md border border-line object-cover sm:h-auto"
-                />
-              </a>
-              <div className="flex flex-1 flex-col gap-4">
-                <h2 className="text-xl font-semibold text-content">
-                  {`${me.display_name} — ${me.char_class} (${FUNCTION_LABELS[me.char_function]})`}
-                </h2>
-                {/* OCR entry for the basic header capture (D-06: the basic
-                    capture reads ONLY combat_power; nickname/job are admin
-                    data, never inputs). */}
-                <OcrCapture
-                  capture="basic"
-                  onOutcomes={(outcomes) => applyOcrOutcomes(1, outcomes)}
-                  onReadFailed={() => handleOcrReadFailed(1)}
-                  onRunStateChange={(running) => handleOcrRunState(1, running)}
-                />
-                <div className="flex flex-col gap-1">
+            <div className="mt-6 flex flex-col gap-4">
+              <h2 className="text-xl font-semibold text-content">
+                {`${me.display_name} — ${me.char_class} (${FUNCTION_LABELS[me.char_function]})`}
+              </h2>
+              {/* Owner feedback (07.2-06 checkpoint): the OCR area is a TWO
+                  COLUMN section — example shot + upload box on the right
+                  (first in DOM so mobile keeps upload-before-fields), the
+                  fields in the main column. */}
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                <div className="flex w-full shrink-0 flex-col gap-3 sm:order-2 sm:w-64">
+                  <a
+                    href="/examples/basic.svg"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-full rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    <img
+                      src="/examples/basic.svg"
+                      alt="Exemplo da tela básica do personagem"
+                      width={691}
+                      height={416}
+                      className="h-32 w-full rounded-md border border-line object-cover sm:h-auto"
+                    />
+                  </a>
+                  {/* OCR entry for the basic header capture (D-06: the basic
+                      capture reads ONLY combat_power; nickname/job are admin
+                      data, never inputs). */}
+                  <OcrCapture
+                    capture="basic"
+                    onOutcomes={(outcomes) => applyOcrOutcomes(1, outcomes)}
+                    onReadFailed={() => handleOcrReadFailed(1)}
+                    onRunStateChange={(running) => handleOcrRunState(1, running)}
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-4">
+                  <div className="flex flex-col gap-1">
                   <label htmlFor="combat-power" className="text-sm font-semibold text-content">
                     Poder de Combate
                   </label>
@@ -451,22 +457,13 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   checked={stepVerified[1]}
                   onChange={(checked) => setStepVerified((v) => ({ ...v, 1: checked }))}
                 />
+                </div>
               </div>
             </div>
           )}
 
           {(step === 2 || step === 3 || step === 4) && (
             <div className="mt-6">
-              {/* OCR entry above the example-shot list: the capture key
-                  mirrors the step's group (general/quasi/special). */}
-              <div className="mb-4">
-                <OcrCapture
-                  capture={STEP_GROUP[step]}
-                  onOutcomes={(outcomes) => applyOcrOutcomes(step, outcomes)}
-                  onReadFailed={() => handleOcrReadFailed(step)}
-                  onRunStateChange={(running) => handleOcrRunState(step, running)}
-                />
-              </div>
               <StatGroupStep
                 group={STEP_GROUP[step]}
                 entries={groupEntries(STEP_GROUP[step])}
@@ -475,6 +472,14 @@ export function SubmitPage({ session }: SubmitPageProps) {
                 ocrRunning={ocrRunningStep === step}
                 failedFields={failedFields[step]}
                 ocrFilledFields={ocrFilledFields[step]}
+                capture={
+                  <OcrCapture
+                    capture={STEP_GROUP[step]}
+                    onOutcomes={(outcomes) => applyOcrOutcomes(step, outcomes)}
+                    onReadFailed={() => handleOcrReadFailed(step)}
+                    onRunStateChange={(running) => handleOcrRunState(step, running)}
+                  />
+                }
               />
               <div className="mt-4">
                 <StepVerifyCheckbox

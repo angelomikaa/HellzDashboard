@@ -17,7 +17,7 @@
 // pre-fills exactly as for typed values — the parent passes the step's
 // ocrFilledFields set and the shared rule (fieldValidation.ts) engages the
 // display for blurred OR OCR-filled fields. Same rule, same display.
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { StatCatalogEntry } from '../../lib/api'
 import type { GroupInputs, WizardGroup } from './wizard'
 import { INVALID_HINT, isFieldEngaged, statFieldFeedback } from './fieldValidation'
@@ -50,9 +50,13 @@ interface StatGroupStepProps {
   /** stat_keys of this step's fields the LATEST read pre-filled — they are
    *  validation-engaged exactly like blurred fields (D-05-UAT-9) */
   ocrFilledFields: ReadonlySet<string>
+  /** Owner feedback (07.2-06 checkpoint): the upload/OCR entry renders in the
+   *  RIGHT rail under the example shot — the wizard reads
+   *  example + upload | fields, never upload above fields. */
+  capture?: ReactNode
 }
 
-export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, failedFields, ocrFilledFields }: StatGroupStepProps) {
+export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, failedFields, ocrFilledFields, capture }: StatGroupStepProps) {
   // Hints appear after the first blur of a field; from then on the feedback
   // updates live so fixing a bad value immediately clears the error.
   const [blurred, setBlurred] = useState<Record<string, boolean>>({})
@@ -64,24 +68,28 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-      {/* Example shot: tappable thumbnail above the list on mobile, side
-          panel (>=128px) on sm: and up. Tapping opens the full-size asset in
-          a new tab — it is a static panel-provided reference image, never
-          member screenshot data. */}
-      <a
-        href={`/examples/${group}.svg`}
-        target="_blank"
-        rel="noreferrer"
-        className="block w-full shrink-0 sm:order-2 sm:w-32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-md"
-      >
-        <img
-          src={`/examples/${group}.svg`}
-          alt={`Exemplo da captura de ${groupLabel}`}
-          width={691}
-          height={416}
-          className="h-32 w-full rounded-md border border-line object-cover sm:h-auto"
-        />
-      </a>
+      {/* Right rail (07.2-06 owner feedback): the example shot AND the OCR
+          upload box live together here; the fields stay in the main column.
+          Tapping the example opens the full-size asset in a new tab — it is a
+          static panel-provided reference image, never member screenshot
+          data. */}
+      <div className="flex w-full shrink-0 flex-col gap-3 sm:order-2 sm:w-64">
+        <a
+          href={`/examples/${group}.svg`}
+          target="_blank"
+          rel="noreferrer"
+          className="block w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-md"
+        >
+          <img
+            src={`/examples/${group}.svg`}
+            alt={`Exemplo da captura de ${groupLabel}`}
+            width={691}
+            height={416}
+            className="h-32 w-full rounded-md border border-line object-cover sm:h-auto"
+          />
+        </a>
+        {capture}
+      </div>
 
       <div className="flex flex-1 flex-col gap-4">
         {entries.map((entry) => {

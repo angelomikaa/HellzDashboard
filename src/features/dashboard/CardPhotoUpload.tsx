@@ -23,7 +23,7 @@
 // class-portrait fallback / ASST-01 monogram) — the exact component the
 // Destaques showcase uses and plan 07.2-03 will reuse for the member
 // Painel EAFC strip + own-card download.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   deleteCardPhoto,
   fetchCardPhoto,
@@ -76,7 +76,16 @@ async function compressToJpeg(file: File, maxDim = 1200, quality = 0.85): Promis
   }
 }
 
-export function CardPhotoUpload({ session }: { session: NeoFootSession }) {
+export function CardPhotoUpload({
+  session,
+  previewActions,
+}: {
+  session: NeoFootSession
+  // Owner feedback (07.2-06 checkpoint, 2026-10-20): the own-card download
+  // belongs WITH the card preview — DashboardPage injects the button here so
+  // the action sits under the card it exports.
+  previewActions?: ReactNode
+}) {
   // Photo: object URL of the stored screenshot (null = none uploaded — the
   // designed empty state). Card: the my_card payload for the live preview.
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
@@ -239,6 +248,9 @@ export function CardPhotoUpload({ session }: { session: NeoFootSession }) {
               Pré-visualização do seu card
             </p>
             <CardSvg data={preview} className="h-auto w-full" />
+            {previewActions !== undefined && (
+              <div className="mt-3 flex flex-col items-stretch gap-2">{previewActions}</div>
+            )}
           </div>
         )}
       </div>
