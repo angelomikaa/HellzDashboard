@@ -13,12 +13,15 @@ import {
   fetchCatalog,
   fetchClasses,
   fetchClassTop5,
+  fetchKeyRelevantStats,
   fetchKeyStats,
   setKeyStat,
+  setRelevantStat,
   type ClassTop5Row,
   type StatCatalogEntry,
 } from '../../lib/api'
 import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER } from '../../lib/groups'
+import { KEY_CHIP, RELEVANT_CHIP } from '../dashboard/tierDisplay'
 import type { NeoFootSession } from '../auth/session'
 
 // Enumeration-safe pt-BR copy (UI contract): never raw server error text.
@@ -30,6 +33,19 @@ const LIMIT_ERROR = 'Máximo de 6 stats por classe — remova uma antes de adici
 const SELECT_CLASS_PROMPT = 'Selecione uma classe para configurar.'
 const EMPTY_TOP5 = 'Nenhum jogador com OVR calculado ainda.'
 const INSUFFICIENT_OVR = '— dados insuficientes'
+// 07.2-03 D-05 server exception tokens (0013 set_relevant_stat) mapped to
+// enumeration-safe copy — the raw body is never rendered.
+const ALREADY_KEY_ERROR =
+  'Este stat já é chave — remova-o das chaves antes de marcá-lo como relevante.'
+const KEY_SET_INCOMPLETE_ERROR = 'Defina os 6 stats-chave da classe antes de escolher relevantes.'
+// Disabled-chip gating hint (D-05 rule 2). Worded so the 'Defina os 6
+// stats-chave' server-token copy above stays the ONLY occurrence of that
+// phrase (acceptance gate: the gating copy appears exactly once).
+const RELEVANT_GATE_HINT = 'Escolha os 6 stats-chave antes de marcar relevantes.'
+const KEY_IN_RELEVANT_HINT = 'Este stat já é chave — ele já está marcado acima.'
+// 07.2 D-06 legend: the red/yellow marking made legible (under the subtitle).
+const TIER_LEGEND =
+  'Vermelho = chave (define o OVR) · Amarelo = relevante (guia o foco de melhoria)'
 
 // D-02: exactly 6 key stats per class — client blocks the 7th; the server's
 // 'key_stat_limit' (0009) is the race-proof backstop, not the only gate.
@@ -40,6 +56,9 @@ function toggleErrorCopy(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.kind === 'unauthorized' || err.status === 403) return SESSION_ERROR
     if (err.message.includes('key_stat_limit')) return LIMIT_ERROR
+    // 07.2-03 D-05 relevant-toggle tokens (0013 set_relevant_stat).
+    if (err.message.includes('already_key')) return ALREADY_KEY_ERROR
+    if (err.message.includes('key_set_incomplete')) return KEY_SET_INCOMPLETE_ERROR
     return SAVE_ERROR
   }
   return NETWORK_ERROR
@@ -52,8 +71,10 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
 
   const [selectedClass, setSelectedClass] = useState('')
 
-  // Per-class server views: keyStats = current config, top5 = the D-05 preview.
+  // Per-class server views: keyStats = current key config, relevantStats =
+  // the 07.2 relevant tier (D-04), top5 = the D-05 preview.
   const [keyStats, setKeyStats] = useState<string[] | null>(null)
+  const [relevantStats, setRelevantStats] = useState<string[] | null>(null)
   const [top5, setTop5] = useState<ClassTop5Row[] | null>(null)
   const [classError, setClassError] = useState<string | null>(null)
 
@@ -82,19 +103,22 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
     }
   }, [session])
 
-  // Per-class load: key stats + top-5 preview, on every class change. The
-  // isStale guard (the cancelled-flag pattern from DashboardPage's mount
-  // effect, CR-01) makes an out-of-order response for a previously selected
-  // class a no-op instead of overwriting the current class's view — the
-  // officer must never see one class's config under another class's heading.
+  // Per-class load: key stats + relevant tier + top-5 preview, on every
+  // class change. The isStale guard (the cancelled-flag pattern from
+  // DashboardPage's mount effect, CR-01) makes an out-of-order response for
+  // a previously selected class a no-op instead of overwriting the current
+  // class's view — the officer must never see one class's config under
+  // another class's heading.
   const loadClassData = useCallback(
     async (className: string, isStale?: () => boolean) => {
-      const [keys, preview] = await Promise.all([
+      const [keys, relevants, preview] = await Promise.all([
         fetchKeyStats(session, className),
+        fetchKeyRelevantStats(session, className),
         fetchClassTop5(session, className),
       ])
       if (isStale?.()) return // stale response — drop
       setKeyStats(keys)
+      setRelevantStats(relevants)
       setTop5(preview)
     },
     [session],
@@ -104,6 +128,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
     if (selectedClass === '') return
     let cancelled = false
     setKeyStats(null)
+    setRelevantStats(null)
     setTop5(null)
     setClassError(null)
     setToggleError(null)
@@ -128,14 +153,49 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
     try {
       // The RPC returns the class's current count — server truth for n/6.
       await setKeyStat(session, selectedClass, statKey, enabled)
-      // Optimistic local mirror of the toggle, then refresh-after-save: both
-      // server views are re-read so the preview reflects the new config. A
-      // refresh failure keeps the stale view — the toggle itself succeeded.
-      // No staleness guard needed here (CR-01): the class selector is
-      // disabled while toggling, so selectedClass can't change mid-toggle and
-      // the captured class can never diverge from the selector.
+      // Optimistic local mirror of the toggle, then refresh-after-save: ALL
+      // server views are re-read so the preview AND the Relevantes section
+      // reflect the new config (07.2 D-05 rule 4 — promoting a relevant stat
+      // into a vacant key slot demotes it server-side; the refresh mirrors
+      // that here). A refresh failure keeps the stale view — the toggle
+      // itself succeeded. No staleness guard needed here (CR-01): the class
+      // selector is disabled while toggling, so selectedClass can't change
+      // mid-toggle and the captured class can never diverge from the selector.
       setKeyStats((keys) =>
         enabled ? [...(keys ?? []), statKey] : (keys ?? []).filter((k) => k !== statKey),
+      )
+      try {
+        await loadClassData(selectedClass)
+      } catch {
+        /* stale view; the save itself succeeded */
+      }
+    } catch (err: unknown) {
+      setToggleError(toggleErrorCopy(err))
+    } finally {
+      setToggling(false)
+    }
+  }
+
+  // 07.2-03 D-04/D-05: relevant-tier toggle (0013 set_relevant_stat — the
+  // SAME refresh-after-save discipline; the single `toggling` busy flag
+  // disables every chip AND the class selector across BOTH sections, so a
+  // mid-toggle class switch stays impossible). D-05 rule 1 (key XOR
+  // relevant) and rule 2 (key set must be complete) are enforced here only
+  // as UX — the server RPC is the race-proof gate; a violated rule surfaces
+  // as its mapped copy via toggleErrorCopy.
+  async function handleRelevantToggle(statKey: string, enabled: boolean) {
+    if (selectedClass === '' || relevantStats === null || keyStats === null || toggling) return
+    setToggling(true)
+    setToggleError(null)
+    try {
+      await setRelevantStat(session, selectedClass, statKey, enabled)
+      // Optimistic local mirror, then the SAME refresh-after-save: the key
+      // section must re-mirror too (promotion demotes — D-05 rule 4 runs
+      // server-side inside set_key_stat).
+      setRelevantStats((relevants) =>
+        enabled
+          ? [...(relevants ?? []), statKey]
+          : (relevants ?? []).filter((k) => k !== statKey),
       )
       try {
         await loadClassData(selectedClass)
@@ -173,6 +233,9 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
       <p className="mt-1 text-sm text-muted">
         Escolha os 6 stats que definem o OVR de cada classe.
       </p>
+      {/* 07.2 D-06 legend: the red/yellow marking made legible — key chips
+          are the accent red, relevant chips the dedicated relevant yellow. */}
+      <p className="mt-1 text-sm text-muted">{TIER_LEGEND}</p>
 
       {loadError !== null ? (
         <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-destructive">
@@ -217,7 +280,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
             >
               {classError}
             </p>
-          ) : keyStats === null || top5 === null ? (
+          ) : keyStats === null || relevantStats === null || top5 === null ? (
             <p className="mt-6 text-base text-muted">Carregando…</p>
           ) : (
             <>
@@ -267,6 +330,75 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                   </div>
                 </div>
               ))}
+
+              {/* 07.2-03 Relevantes section (D-04/D-05/D-06): the same class
+                  selector, same cohort shape, ONE page — a second section
+                  under the key-stat chip groups. Chip states encode the key
+                  XOR relevant rule: KEY stats are DISABLED here in the red
+                  KEY_CHIP marking (a stat is key XOR relevant — clicking is
+                  impossible rather than erroring); RELEVANT stats carry the
+                  yellow RELEVANT_CHIP marking and toggle off; everything
+                  else is a normal chip, gated until the class's 6-key set
+                  is complete (D-05 rule 2 — the server RPC is the
+                  race-proof backstop). RELV-01: the relevant marking never
+                  reaches member cards — this page and the foco strip are
+                  the tier's only surfaces. */}
+              <div className="mt-8 border-t border-line pt-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-muted">Relevantes</h3>
+                  <span className="text-sm font-semibold text-muted">
+                    {relevantStats.length} relevantes
+                  </span>
+                </div>
+                {GROUP_ORDER.map((group) => (
+                  <div key={group} className="mt-4">
+                    <h4 className="text-sm font-semibold text-muted">
+                      {GROUP_LABELS[group]}
+                    </h4>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {catalog
+                        .filter((entry) => entry.group_name === group)
+                        .map((entry) => {
+                          const isKey = keyStats.includes(entry.stat_key)
+                          const isRelevant = relevantStats.includes(entry.stat_key)
+                          // D-05 rule 2: NEW relevant selections only after
+                          // the 6-key set is complete; EXISTING relevant
+                          // stats remain removable (rule 3 — a key vacancy
+                          // never demotes them).
+                          const blocked =
+                            !isKey && !isRelevant && keyStats.length !== MAX_KEY_STATS
+                          return (
+                            <button
+                              key={entry.stat_key}
+                              type="button"
+                              aria-pressed={isRelevant}
+                              disabled={busy || isKey || blocked}
+                              title={
+                                isKey
+                                  ? KEY_IN_RELEVANT_HINT
+                                  : blocked
+                                    ? RELEVANT_GATE_HINT
+                                    : undefined
+                              }
+                              onClick={() =>
+                                void handleRelevantToggle(entry.stat_key, !isRelevant)
+                              }
+                              className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+                                isKey
+                                  ? `bg-surface ${KEY_CHIP}`
+                                  : isRelevant
+                                    ? `bg-surface ${RELEVANT_CHIP}`
+                                    : 'border-line bg-surface text-content hover-control'
+                              }`}
+                            >
+                              {entry.label}
+                            </button>
+                          )
+                        })}
+                    </div>
+                  </div>
+                ))}
+              </div>
 
               {/* Top-5-by-OVR preview (D-05): compute-on-read — refreshes
                   after every toggle via loadClassData above. */}
