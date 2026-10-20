@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: Completed 07.2-04-PLAN.md
-last_updated: "2026-10-20T08:02:02.909Z"
+stopped_at: 07.2-06 tasks 1-2 complete — awaiting owner layout checkpoint (task 3)
+last_updated: "2026-10-20T13:45:00.000Z"
 last_activity: 2026-10-20
 progress:
   total_phases: 6
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 07.2 (premium-showcase-game-grounding-inserted) — EXECUTING
-Plan: 5 of 6 complete (07.2-01, 07.2-02, 07.2-05, 07.2-03, 07.2-04) — next: 07.2-06 (final plan)
-Status: Ready to execute
-Last activity: 2026-10-20 -- 07.2-04 complete (officials Ranking tab live: three role-primary OVR boards (D-18), server-order-verbatim staff table with view-aid sort, 57-stat detail with value/points/class average (D-19/D-20); App 'ranking' staff tab UX-gated, server-enforced)
+Plan: 5 of 6 complete (07.2-01, 07.2-02, 07.2-05, 07.2-03, 07.2-04) — 07.2-06 tasks 1-2 done, task 3 (owner desktop/mobile walk) PENDING
+Status: Awaiting owner layout sign-off
+Last activity: 2026-10-20 -- 07.2-06 tasks 1-2 (LAYT-01): wide shell max-w-6xl/xl:max-w-7xl, grouped stats 1→2→3→4 across, OVR hero + legend row at lg, submit wizard capped at max-w-2xl, D-17 class icons in Validações/Personagens, Personagens members 2-up register at xl (NOT the owner-rejected 7-column table), build green + 352/352 tests green
 
 ## Accumulated Context
 
@@ -73,6 +73,8 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 07.2]: 07.2-04: role-rank board labels consumed via the shared FUNCTION_LABELS map (role vocabulary lives in ONE place per the Phase 07 decision) instead of duplicated literals in RankPage — the labels can never drift from the dps/mdps/suporte vocabulary
 - [Phase 07.2]: 07.2-04: detail grouping uses a client-side catalog join (fetchCatalog stat_key→group_name map) because the closed role_rank payload has NO per-stat group_name (0013 census); unmapped keys fall back to Geral — the catalog is already a sanctioned staff read (Stats-Chave)
 - [Phase 07.2]: 07.2-04: the staff view-aid column sort is isolated in a pure rankView.ts module that member surfaces never import; 'server' passes the payload through verbatim (same reference), unit-locked by 4 vitest cases (T-072-11 accepted) — member-facing server-order discipline stays structurally enforceable
+- [Phase 07.2]: 07.2-06: Personagens desktop width = a 2-up CARD register at xl (the editing card spans both columns), NOT the plan's "real table with columns" — the owner explicitly rejected the 7-column table in the 07.1-02 round-4 gate ("ruining the aesthetic"), so LAYT-01's goal (use the wide shell, no squish) is met without re-introducing a rejected layout; the D-08 control-matrix code is untouched
+- [Phase 07.2]: 07.2-06: the grouped-stat grid lives in CollapsibleGroup.tsx (not DashboardPage.tsx as the plan's files_modified implied) — widened there with the same sm/lg/xl system; ClassCrest now accepts char_class null (staff rows can be whitelisted before a character exists) and renders the neutral '—' monogram tile
 
 ### Blockers/Concerns (open — carry to next milestone)
 
