@@ -22,14 +22,22 @@ import {
   ApiError,
   createClass,
   fetchClasses,
-  fetchMembers,
+  fetchStaffMembers,
+  addMember,
+  resetMemberPin,
+  fetchIdentityHistory,
+  correctIdentity,
   setMemberActive,
   setMemberRole,
   updateCharacter,
   type MemberRow,
+  type StaffMember,
+  type IdentityHistoryRow,
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { FUNCTION_LABELS } from '../../lib/groups'
+import { validateIdentityDraft, OFFICIAL_CLASSES } from '../submit/identity'
+import type { CharFunction } from '../submit/identity'
 import { ClassCrest } from '../assets/ClassCrest'
 import { ConfirmDialog } from './ConfirmDialog'
 
@@ -45,6 +53,8 @@ const ADD_CLASS_ERROR = 'Não foi possível adicionar. Verifique a conexão.'
 const ROLE_UPDATED_MESSAGE = 'Papel atualizado. Efetivo no próximo login.'
 const MEMBER_REMOVED_MESSAGE = 'Membro removido.'
 const MEMBER_REACTIVATED_MESSAGE = 'Membro reativado.'
+const RESET_PIN_SUCCESS = 'PIN redefinido. O membro definirá um novo PIN no próximo acesso.'
+const ADD_MEMBER_SUCCESS = 'Membro adicionado. O PIN será criado no primeiro acesso.'
 const NO_FILTER_MATCH = 'Nenhum membro com esses filtros.'
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
@@ -85,6 +95,7 @@ type PendingAction =
   | { kind: 'demote'; member: MemberRow }
   | { kind: 'deactivate'; member: MemberRow }
   | { kind: 'activate'; member: MemberRow }
+  | { kind: 'resetPin'; member: MemberRow }
 
 interface ConfirmConfig {
   title: string
@@ -96,6 +107,13 @@ interface ConfirmConfig {
 function confirmConfig(action: PendingAction): ConfirmConfig {
   const name = action.member.display_name
   switch (action.kind) {
+    case 'resetPin':
+      return {
+        title: `Redefinir o PIN de ${name}?`,
+        body: 'O membro vai criar um novo PIN no próximo acesso.',
+        confirmLabel: 'Redefinir PIN',
+        destructive: true,
+      }
     case 'promote':
       return {
         title: 'Conceder papel de oficial',
@@ -133,12 +151,18 @@ function confirmConfig(action: PendingAction): ConfirmConfig {
   }
 }
 
-export function CharactersPage({ session }: { session: NeoFootSession }) {
+export function CharactersPage({
+  session,
+  onOpenIdentityReview,
+}: {
+  session: NeoFootSession
+  onOpenIdentityReview?: () => void
+}) {
   // Role-differentiated controls (D-08). The page itself is staff-only via the
   // App shell nav (UX-only gating; enforcement is the staff RLS policies).
   const isOwner = session.member_role === 'owner'
   const isStaff = isOwner || session.member_role === 'officer'
-  const [data, setData] = useState<{ members: MemberRow[]; classes: string[] } | null>(null)
+  const [data, setData] = useState<{ members: StaffMember[]; classes: string[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Add-class form (REG-02)
@@ -159,9 +183,34 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
   // pure view aid over the already-fetched roster (no server round trip).
   const [filterClass, setFilterClass] = useState('')
   const [filterFunction, setFilterFunction] = useState<'' | 'dps' | 'mdps' | 'suporte'>('')
+  const [pinFilter, setPinFilter] = useState<'all' | 'pending' | 'active'>('all')
+
+  // Add-member panel (WHIT-01/06/07).
+  const [addHandle, setAddHandle] = useState('')
+  const [addDisplayName, setAddDisplayName] = useState('')
+  const [addMemberStatus, setAddMemberStatus] = useState<
+    | { kind: 'idle' }
+    | { kind: 'saving' }
+    | { kind: 'success'; message: string }
+    | { kind: 'error'; message: string }
+  >({ kind: 'idle' })
+
+  // Identity correction panel (IDEN-03).
+  const [identityMemberId, setIdentityMemberId] = useState<string | null>(null)
+  const [identityDraft, setIdentityDraft] = useState<{
+    char_id: string
+    nickname: string
+    char_class: string
+    char_function: CharFunction
+  } | null>(null)
+  const [identityHistory, setIdentityHistory] = useState<IdentityHistoryRow[] | null>(null)
+  const [identityLoading, setIdentityLoading] = useState(false)
+  const [identityError, setIdentityError] = useState<string | null>(null)
+  const [identitySaving, setIdentitySaving] = useState(false)
+  const [identityFeedback, setIdentityFeedback] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [members, classes] = await Promise.all([fetchMembers(session), fetchClasses(session)])
+    const [members, classes] = await Promise.all([fetchStaffMembers(session), fetchClasses(session)])
     setData({ members, classes })
   }, [session])
 
@@ -183,10 +232,20 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
 
   // View aid only (owner feedback): apply the token filters to the loaded
   // roster; null char_class rows match the "Todas" class filter only.
+  const pinFilteredMembers =
+    data === null
+      ? []
+      : data.members.filter((member) =>
+          pinFilter === 'all'
+            ? true
+            : pinFilter === 'pending'
+              ? !member.pin_set
+              : member.pin_set,
+        )
   const visibleMembers =
     data === null
       ? []
-      : data.members.filter(
+      : pinFilteredMembers.filter(
           (member) =>
             (filterClass === '' || member.char_class === filterClass) &&
             (filterFunction === '' || member.char_function === filterFunction),
@@ -279,15 +338,19 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
         await setMemberRole(session, memberId, 'member')
       } else if (pendingAction.kind === 'deactivate') {
         await setMemberActive(session, memberId, false)
-      } else {
+      } else if (pendingAction.kind === 'activate') {
         await setMemberActive(session, memberId, true)
+      } else {
+        await resetMemberPin(session, memberId)
       }
       const message =
         pendingAction.kind === 'promote' || pendingAction.kind === 'demote'
           ? ROLE_UPDATED_MESSAGE
           : pendingAction.kind === 'deactivate'
             ? MEMBER_REMOVED_MESSAGE
-            : MEMBER_REACTIVATED_MESSAGE
+            : pendingAction.kind === 'activate'
+              ? MEMBER_REACTIVATED_MESSAGE
+              : RESET_PIN_SUCCESS
       setPendingAction(null)
       setSavedRow({ id: memberId, text: message })
       // Refresh so the role/active change persists on screen. A refresh
@@ -302,10 +365,99 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
       setSaveError({
         id: memberId,
         text:
-          err instanceof ApiError && err.kind === 'unauthorized' ? SESSION_ERROR : SAVE_ERROR,
+          err instanceof ApiError &&
+          (err.kind === 'unauthorized' || err.message.includes('forbidden'))
+            ? SESSION_ERROR
+            : SAVE_ERROR,
       })
     } finally {
       setSavingRowId(null)
+    }
+  }
+
+  async function handleAddMember(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (busy) return
+    const handle = addHandle.trim()
+    const displayName = addDisplayName.trim()
+    if (handle === '' || displayName === '') return
+    setAddMemberStatus({ kind: 'saving' })
+    try {
+      await addMember(session, handle, displayName)
+      setAddHandle('')
+      setAddDisplayName('')
+      setAddMemberStatus({ kind: 'success', message: ADD_MEMBER_SUCCESS })
+      try {
+        await load()
+      } catch {
+        /* stale list */
+      }
+    } catch (err) {
+      setAddMemberStatus({
+        kind: 'error',
+        message: addMemberErrorFor(err),
+      })
+    }
+  }
+
+  function openIdentityPanel(member: StaffMember) {
+    setIdentityMemberId(member.id)
+    setIdentityDraft({
+      char_id: member.char_id ?? member.identity?.char_id ?? '',
+      nickname: member.identity?.nickname ?? member.display_name,
+      char_class: member.identity?.char_class ?? member.char_class ?? '',
+      char_function: (member.identity?.char_function ?? member.char_function) as CharFunction,
+    })
+    setIdentityHistory(null)
+    setIdentityError(null)
+    setIdentityFeedback(null)
+    setIdentityLoading(true)
+    fetchIdentityHistory(session, member.id)
+      .then((rows) => setIdentityHistory(rows))
+      .catch((err: unknown) => {
+        setIdentityError(err instanceof ApiError && err.kind === 'unauthorized' ? SESSION_ERROR : NETWORK_ERROR)
+      })
+      .finally(() => setIdentityLoading(false))
+  }
+
+  async function handleIdentitySave() {
+    if (identityMemberId === null || identityDraft === null || identitySaving) return
+    const problems = validateIdentityDraft({
+      char_id: identityDraft.char_id,
+      nickname: identityDraft.nickname,
+      char_class: identityDraft.char_class,
+      char_function: identityDraft.char_function,
+    })
+    if (problems.length > 0) {
+      setIdentityError(problems[0])
+      return
+    }
+    setIdentitySaving(true)
+    setIdentityError(null)
+    try {
+      await correctIdentity(session, identityMemberId, {
+        char_id: identityDraft.char_id.trim(),
+        nickname: identityDraft.nickname.trim(),
+        char_class: identityDraft.char_class.trim(),
+        char_function: identityDraft.char_function,
+      })
+      setIdentityFeedback('Identidade atualizada.')
+      try {
+        await load()
+      } catch {
+        /* stale */
+      }
+      // refresh history
+      try {
+        const rows = await fetchIdentityHistory(session, identityMemberId)
+        setIdentityHistory(rows)
+      } catch {
+        /* ignore */
+      }
+    } catch (err) {
+      setIdentityError(identityErrorFor(err))
+    } finally {
+      setIdentitySaving(false)
     }
   }
 
@@ -370,6 +522,77 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
               )}
             </>
           )}
+
+          {/* Add member (WHIT-01/06/07) */}
+          <form
+            onSubmit={handleAddMember}
+            noValidate
+            className="mt-6 flex flex-col gap-3 rounded-lg border border-line bg-surface p-4 sm:flex-row sm:items-end"
+          >
+            <div className="flex flex-1 flex-col gap-2">
+              <label htmlFor="add-handle" className="text-sm font-semibold text-content">
+                Discord handle
+              </label>
+              <input
+                id="add-handle"
+                type="text"
+                autoComplete="off"
+                value={addHandle}
+                onChange={(e) => setAddHandle(e.target.value)}
+                disabled={busy || addMemberStatus.kind === 'saving'}
+                className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </div>
+            <div className="flex flex-1 flex-col gap-2">
+              <label htmlFor="add-display-name" className="text-sm font-semibold text-content">
+                Nome do personagem
+              </label>
+              <input
+                id="add-display-name"
+                type="text"
+                autoComplete="off"
+                value={addDisplayName}
+                onChange={(e) => setAddDisplayName(e.target.value)}
+                disabled={busy || addMemberStatus.kind === 'saving'}
+                className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={busy || addMemberStatus.kind === 'saving' || addHandle.trim() === '' || addDisplayName.trim() === ''}
+              className="h-11 shrink-0 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Adicionar membro
+            </button>
+          </form>
+          {addMemberStatus.kind === 'success' && (
+            <p className="mt-2 text-sm font-semibold text-success">{addMemberStatus.message}</p>
+          )}
+          {addMemberStatus.kind === 'error' && (
+            <p role="alert" aria-live="polite" className="mt-2 text-sm font-semibold text-destructive">
+              {addMemberStatus.message}
+            </p>
+          )}
+
+          {/* PIN filter (D-18) */}
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-muted">PIN</span>
+            {(['all', 'pending', 'active'] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setPinFilter(f)}
+                aria-pressed={pinFilter === f}
+                className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  pinFilter === f
+                    ? 'border-accent bg-accent text-accent-foreground'
+                    : 'border-line text-muted hover-control hover:text-content'
+                }`}
+              >
+                {f === 'all' ? 'Todos' : f === 'pending' ? 'PIN pendente' : 'PIN ativo'}
+              </button>
+            ))}
+          </div>
 
           {data.members.length === 0 ? (
             <p className="mt-6 text-center text-base text-muted">
@@ -445,7 +668,13 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                 </div>
               </div>
               {visibleMembers.length === 0 ? (
-                <p className="mt-6 text-center text-base text-muted">{NO_FILTER_MATCH}</p>
+                <p className="mt-6 text-center text-base text-muted">
+                  {pinFilter === 'pending' && pinFilteredMembers.length === 0
+                    ? 'Nenhum membro com PIN pendente.'
+                    : pinFilter === 'active' && pinFilteredMembers.length === 0
+                      ? 'Nenhum membro com PIN ativo.'
+                      : NO_FILTER_MATCH}
+                </p>
               ) : (
             <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
               {/* Owner gate round 4 (07.1-02): per-character card list. The
@@ -580,6 +809,28 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                         <span className="text-base font-semibold text-content">
                           {member.display_name}
                         </span>
+                        {member.char_id && (
+                          <span className="font-mono text-sm text-muted">{member.char_id}</span>
+                        )}
+                        {member.identity?.nickname && member.identity.nickname !== member.display_name && (
+                          <span className="text-sm text-muted">{member.identity.nickname}</span>
+                        )}
+                        <span
+                          className={`rounded-full border border-line px-2 py-0.5 text-sm font-semibold ${
+                            member.pin_set ? 'text-muted' : 'text-amber-400'
+                          }`}
+                        >
+                          {member.pin_set ? 'PIN ativo' : 'PIN pendente'}
+                        </span>
+                        {member.has_pending_proof && (
+                          <button
+                            type="button"
+                            onClick={onOpenIdentityReview}
+                            className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-amber-400 hover-control"
+                          >
+                            Identidade pendente
+                          </button>
+                        )}
                         <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
                           {ROLE_LABELS[member.role]}
                         </span>
@@ -609,14 +860,26 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                           Salvar
                         </button>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => startEdit(member)}
-                          disabled={busy}
-                          className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Editar
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => startEdit(member)}
+                            disabled={busy}
+                            className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Editar
+                          </button>
+                          {isStaff && (
+                            <button
+                              type="button"
+                              onClick={() => openIdentityPanel(member)}
+                              disabled={busy}
+                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Identidade
+                            </button>
+                          )}
+                        </>
                       )}
                       {!editing && hasStaffControls && (
                         <>
@@ -662,6 +925,16 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
                               Reativar
                             </button>
                           )}
+                          {isOwner && (
+                            <button
+                              type="button"
+                              onClick={() => openConfirm({ kind: 'resetPin', member })}
+                              disabled={busy}
+                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Redefinir PIN
+                            </button>
+                          )}
                         </>
                       )}
                       {/* Per-row feedback for the shared state machine (edit
@@ -689,6 +962,120 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
               )}
             </>
           )}
+          {identityMemberId !== null && (
+            <div className="mt-6 rounded-lg border border-line bg-surface p-4">
+              <h3 className="text-base font-semibold text-content">Identidade</h3>
+              {identityLoading ? (
+                <p className="mt-2 text-sm text-muted">Carregando…</p>
+              ) : (
+                <>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm font-semibold text-content">ID</label>
+                      <input
+                        type="text"
+                        value={identityDraft?.char_id ?? ''}
+                        onChange={(e) =>
+                          setIdentityDraft((d) => (d ? { ...d, char_id: e.target.value } : d))
+                        }
+                        className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm font-semibold text-content">Nick</label>
+                      <input
+                        type="text"
+                        value={identityDraft?.nickname ?? ''}
+                        onChange={(e) =>
+                          setIdentityDraft((d) => (d ? { ...d, nickname: e.target.value } : d))
+                        }
+                        className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm font-semibold text-content">Classe</label>
+                      <select
+                        value={identityDraft?.char_class ?? ''}
+                        onChange={(e) =>
+                          setIdentityDraft((d) => (d ? { ...d, char_class: e.target.value } : d))
+                        }
+                        className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
+                      >
+                        <option value="">—</option>
+                        {OFFICIAL_CLASSES.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm font-semibold text-content">Função</label>
+                      <select
+                        value={identityDraft?.char_function ?? 'dps'}
+                        onChange={(e) =>
+                          setIdentityDraft((d) =>
+                            d ? { ...d, char_function: e.target.value as CharFunction } : d,
+                          )
+                        }
+                        className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
+                      >
+                        {(Object.keys(FUNCTION_LABELS) as Array<keyof typeof FUNCTION_LABELS>).map(
+                          (role) => (
+                            <option key={role} value={role}>
+                              {FUNCTION_LABELS[role]}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                    </div>
+                  </div>
+                  {identityError && (
+                    <p role="alert" className="mt-2 text-sm font-semibold text-destructive">
+                      {identityError}
+                    </p>
+                  )}
+                  {identityFeedback && (
+                    <p className="mt-2 text-sm font-semibold text-success">{identityFeedback}</p>
+                  )}
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleIdentitySave()}
+                      disabled={identitySaving}
+                      className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground"
+                    >
+                      Salvar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIdentityMemberId(null)}
+                      className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                  <div className="mt-4">
+                    <h4 className="text-sm font-semibold text-content">Histórico</h4>
+                    {identityHistory === null ? (
+                      <p className="text-sm text-muted">—</p>
+                    ) : identityHistory.length === 0 ? (
+                      <p className="text-sm text-muted">Sem histórico.</p>
+                    ) : (
+                      <ul className="mt-2 space-y-1">
+                        {identityHistory.map((h) => (
+                          <li key={h.id} className="text-sm text-muted">
+                            <span className="font-mono">{h.char_id}</span> — {h.nickname} — {h.char_class} —{' '}
+                            {h.char_function} — {h.source}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </>
       )}
       {confirm !== null && (
@@ -706,3 +1093,80 @@ export function CharactersPage({ session }: { session: NeoFootSession }) {
     </section>
   )
 }
+
+// ---- Testable helpers (node env) ----
+export type PinFilter = 'all' | 'pending' | 'active'
+
+export function pinBadgeLabel(pin_set: boolean): string {
+  return pin_set ? 'PIN ativo' : 'PIN pendente'
+}
+
+export function pinBadgeTone(pin_set: boolean): 'amber' | 'muted' {
+  return pin_set ? 'muted' : 'amber'
+}
+
+export function canResetPin(session: NeoFootSession, member: MemberRow): boolean {
+  return session.member_role === 'owner' && member.role !== 'owner'
+}
+
+export function filterMembersByPin(members: StaffMember[], filter: PinFilter): StaffMember[] {
+  return members.filter((member) =>
+    filter === 'all' ? true : filter === 'pending' ? !member.pin_set : member.pin_set,
+  )
+}
+
+export function pinFilterEmptyMessage(filter: PinFilter): string {
+  if (filter === 'pending') return 'Nenhum membro com PIN pendente.'
+  if (filter === 'active') return 'Nenhum membro com PIN ativo.'
+  return 'Nenhum membro com esses filtros.'
+}
+
+export function addMemberErrorFor(error: unknown): string {
+  const message =
+    typeof (error as { message?: unknown })?.message === 'string'
+      ? (error as { message: string }).message
+      : String(error ?? '')
+  if (message.includes('already_member')) return 'Este handle já está ativo.'
+  if (message.includes('dummy_handle')) return 'Handle reservado para dados de teste.'
+  if (error instanceof ApiError && (error.kind === 'unauthorized' || message.includes('forbidden')))
+    return SESSION_ERROR
+  return 'Nao foi possivel adicionar. Verifique a conexao.'
+}
+
+export function identityErrorFor(error: unknown): string {
+  const message =
+    typeof (error as { message?: unknown })?.message === 'string'
+      ? (error as { message: string }).message
+      : String(error ?? '')
+  if (message.includes('duplicate_char_id'))
+    return 'Este ID ja esta em uso (duplicate_char_id).'
+  if (error instanceof ApiError && (error.kind === 'unauthorized' || message.includes('forbidden')))
+    return SESSION_ERROR
+  return SAVE_ERROR
+}
+
+export function sortIdentityHistory(rows: IdentityHistoryRow[]): IdentityHistoryRow[] {
+  return [...rows].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  )
+}
+
+export function resetPinConfirm(name: string): { title: string; body: string } {
+  return {
+    title: `Redefinir o PIN de ${name}?`,
+    body: 'O membro vai criar um novo PIN no proximo acesso.',
+  }
+}
+
+// aliases
+export const mapAddMemberError = addMemberErrorFor
+export const addMemberErrorMessage = addMemberErrorFor
+export const addMemberError = addMemberErrorFor
+export const pinBadge = pinBadgeLabel
+export const pinStatusBadge = pinBadgeLabel
+export const pinBadgeText = pinBadgeLabel
+export const filterByPin = filterMembersByPin
+export const applyPinFilter = filterMembersByPin
+export const pinEmptyMessage = pinFilterEmptyMessage
+export const mapIdentityError = identityErrorFor
+export const identityErrorMessage = identityErrorFor
