@@ -1,23 +1,32 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import hellzMark from '../../assets/hellz-mark.svg'
+import { PinBoxes } from './PinBoxes'
 import { isValidSession, saveSession, type NeoFootSession } from './session'
 
 type LoginStatus =
   | { kind: 'idle' }
   | { kind: 'submitting' }
+  | { kind: 'needs-setup' }
   | { kind: 'error'; message: string }
   | { kind: 'locked'; message: string }
+
+export interface LoginPageProps {
+  onLogin: (session: NeoFootSession) => void
+  /** 409 pin_setup_required -> first-access claim, carrying the typed handle. */
+  onFirstAccess: (handle: string) => void
+  onRequestAccess: () => void
+}
 
 const NETWORK_ERROR = 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 
 // Plan 01-03 / D-01: Discord handle + 4-digit PIN. No OAuth, no Discord API, no email.
-// The PIN lives only in the transient form state + the HTTPS request body (T-01-03):
-// never stored, never logged, masked as type="password".
-export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => void }) {
+// Phase 8 (08-03, D-02): the PIN is entered in the shared 2FA-style PinBoxes —
+// four masked boxes, no auto-submit. The PIN lives only in the transient form
+// state + the HTTPS request body (T-08-18): never stored, logged or in a URL.
+export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPageProps) {
   const [discordHandle, setDiscordHandle] = useState('')
   const [pin, setPin] = useState('')
   const [status, setStatus] = useState<LoginStatus>({ kind: 'idle' })
-  const pinInputRef = useRef<HTMLInputElement>(null)
 
   const submitting = status.kind === 'submitting'
   const locked = status.kind === 'locked'
@@ -26,10 +35,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (disabled) return
-    if (discordHandle.length === 0 || !/^\d{4}$/.test(pin)) {
-      pinInputRef.current?.focus()
-      return
-    }
+    if (discordHandle.trim().length === 0 || !/^\d{4}$/.test(pin)) return
     setStatus({ kind: 'submitting' })
     try {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-pin`, {
@@ -42,7 +48,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ discord_handle: discordHandle, pin }),
+        body: JSON.stringify({ discord_handle: discordHandle.trim(), pin }),
       })
 
       if (res.ok) {
@@ -84,7 +90,21 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
           })
         }
         setPin('')
-        pinInputRef.current?.focus()
+        return
+      }
+
+      if (res.status === 409 && body.error === 'pin_setup_required') {
+        // Unclaimed handle (WHIT-01/02): route into first access instead of a
+        // dead-end wrong-PIN message. The handle travels in component state
+        // only — no token, no URL.
+        setStatus({ kind: 'needs-setup' })
+        return
+      }
+
+      if (res.status === 409 && body.error === 'pin_already_set') {
+        // Claim race: someone set the PIN between this attempt and now.
+        setStatus({ kind: 'error', message: 'PIN já criado. Entre com seu PIN.' })
+        setPin('')
         return
       }
 
@@ -126,24 +146,21 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
               className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="pin" className="text-sm font-semibold text-content">
-              PIN (4 dígitos)
-            </label>
-            <input
-              id="pin"
-              ref={pinInputRef}
-              type="password"
-              inputMode="numeric"
-              maxLength={4}
-              autoComplete="off"
-              pattern="\d{4}"
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              disabled={locked}
-              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            />
-          </div>
+          <PinBoxes value={pin} onChange={setPin} disabled={disabled} autoFocus />
+          {status.kind === 'needs-setup' && (
+            <div className="rounded-md border border-line bg-dominant px-3 py-3">
+              <p className="text-sm font-semibold text-content">
+                Este personagem ainda não tem PIN.
+              </p>
+              <button
+                type="button"
+                onClick={() => onFirstAccess(discordHandle.trim())}
+                className="mt-2 h-10 w-full rounded-md bg-accent text-sm font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Criar meu PIN
+              </button>
+            </div>
+          )}
           {(status.kind === 'error' || status.kind === 'locked') && (
             <p
               role="alert"
@@ -162,6 +179,22 @@ export function LoginPage({ onLogin }: { onLogin: (session: NeoFootSession) => v
             Entrar
           </button>
         </form>
+        <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
+          <button
+            type="button"
+            onClick={() => onFirstAccess(discordHandle.trim())}
+            className="text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Primeiro acesso
+          </button>
+          <button
+            type="button"
+            onClick={onRequestAccess}
+            className="text-sm font-semibold text-muted hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Solicitar acesso
+          </button>
+        </div>
       </div>
     </main>
   )
