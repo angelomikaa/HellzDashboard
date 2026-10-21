@@ -38,9 +38,12 @@ export interface RequestAccessPageProps {
   initialRequestId?: string
   onBack: () => void
   onStartApplication: (draft: ProspectDraft) => void
+  /** Identification path: when the handle is unclaimed (verify-pin 409), hand
+   *  off to the first-access claim flow instead of the re-link form. */
+  onFirstAccess?: (handle: string) => void
 }
 
-type Step = 'chooser' | 'form'
+type Step = 'chooser' | 'identify' | 'form'
 
 type Status =
   | { kind: 'idle' }
@@ -54,12 +57,15 @@ export function RequestAccessPage({
   initialRequestId,
   onBack,
   onStartApplication,
+  onFirstAccess,
 }: RequestAccessPageProps) {
   const [step, setStep] = useState<Step>('chooser')
   const [requestType, setRequestType] = useState<RequestType>('member')
   const [showStatus, setShowStatus] = useState(false)
 
   const [handle, setHandle] = useState(initialHandle)
+  const [identifyHandle, setIdentifyHandle] = useState(initialHandle)
+  const [identifyStatus, setIdentifyStatus] = useState<Status>({ kind: 'idle' })
   const [pin, setPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
   const [proof, setProof] = useState<string | null>(null)
@@ -83,9 +89,53 @@ export function RequestAccessPage({
 
   function start(type: RequestType): void {
     setRequestType(type)
+    if (type === 'member') {
+      // Identificação path: probe the handle first. An unclaimed handle (409
+      // pin_setup_required) routes to the first-access claim flow; otherwise
+      // the member re-link form opens with the handle prefilled.
+      setIdentifyHandle(handle)
+      setIdentifyStatus({ kind: 'idle' })
+      setStep('identify')
+      return
+    }
     setStep('form')
     setStatus({ kind: 'idle' })
     setRequestId(null)
+  }
+
+  async function submitIdentify(e: FormEvent<HTMLFormElement>): Promise<void> {
+    e.preventDefault()
+    const h = identifyHandle.trim()
+    if (h.length === 0) return
+    setIdentifyStatus({ kind: 'submitting' })
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-pin`, {
+        method: 'POST',
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ discord_handle: h, pin: '0000' }),
+      })
+      const body: { error?: string } = await res.json().catch(() => ({}))
+      if (res.status === 409 && body.error === 'pin_setup_required') {
+        // Unclaimed handle -> first-access claim flow.
+        onFirstAccess?.(h)
+        if (!onFirstAccess) {
+          setIdentifyStatus({ kind: 'error', message: 'Fluxo de primeiro acesso indisponível.', backToLogin: false })
+        }
+        return
+      }
+      // Claimed or unknown handle -> member re-link form.
+      setHandle(h)
+      setRequestType('member')
+      setStep('form')
+      setStatus({ kind: 'idle' })
+      setRequestId(null)
+    } catch {
+      setIdentifyStatus({ kind: 'error', message: 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.', backToLogin: false })
+    }
   }
 
   async function readProof(canvas: HTMLCanvasElement): Promise<void> {
@@ -220,10 +270,10 @@ export function RequestAccessPage({
               className="rounded-md border border-line bg-dominant px-4 py-3 text-left hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <span className="block text-base font-semibold text-content">
-                Já sou da guilda
+                Identificação
               </span>
               <span className="mt-1 block text-sm text-muted">
-                Vincular um personagem. Sem envio de status.
+                Já sou da guilda: vincular personagem (reivindicar PIN ou reenviar identidade).
               </span>
             </button>
             <button
@@ -232,10 +282,10 @@ export function RequestAccessPage({
               className="rounded-md border border-line bg-dominant px-4 py-3 text-left hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <span className="block text-base font-semibold text-content">
-                Quero entrar na guilda
+                Recrutamento
               </span>
               <span className="mt-1 block text-sm text-muted">
-                Aplicação completa com os status do personagem.
+                Quero entrar na guilda: aplicação completa com os status do personagem.
               </span>
             </button>
           </div>
@@ -265,11 +315,61 @@ export function RequestAccessPage({
 
   const prospect = requestType === 'prospect'
 
+  if (step === 'identify') {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
+        <div className="w-full max-w-md rounded-lg border border-line bg-surface p-6">
+          <h1 className="text-center text-2xl font-bold leading-[1.2] text-content">
+            Identificação
+          </h1>
+          <p className="mt-1 text-center text-sm font-medium text-muted">
+            Informe seu handle para verificar se já possui cadastro.
+          </p>
+          <form onSubmit={submitIdentify} className="mt-4 flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="identify-handle" className="text-sm font-semibold text-content">
+                Usuário do Discord
+              </label>
+              <input
+                id="identify-handle"
+                type="text"
+                autoComplete="off"
+                value={identifyHandle}
+                onChange={(e) => setIdentifyHandle(e.target.value)}
+                disabled={identifyStatus.kind === 'submitting'}
+                className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              />
+            </div>
+            {identifyStatus.kind === 'error' && (
+              <p role="alert" className="text-sm font-semibold text-destructive">
+                {identifyStatus.message}
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={identifyStatus.kind === 'submitting' || identifyHandle.trim().length === 0}
+              className="h-11 w-full rounded-md bg-accent text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {identifyStatus.kind === 'submitting' ? 'Verificando...' : 'Continuar'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setStep('chooser'); setIdentifyStatus({ kind: 'idle' }) }}
+              className="text-sm font-semibold text-muted hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Voltar
+            </button>
+          </form>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
       <div className="w-full max-w-lg rounded-lg border border-line bg-surface p-6">
         <h1 className="text-center text-2xl font-bold leading-[1.2] text-content">
-          {prospect ? 'Quero entrar na guilda' : 'Já sou da guilda'}
+          {prospect ? 'Recrutamento' : 'Identificação'}
         </h1>
         <p className="mt-1 text-center text-sm font-medium text-muted">
           {prospect

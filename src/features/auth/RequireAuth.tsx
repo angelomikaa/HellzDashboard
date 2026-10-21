@@ -78,6 +78,7 @@ export function RequireAuth({ children, initialView }: RequireAuthProps) {
         initialRequestId={view.requestId}
         onBack={() => setView({ kind: 'login' })}
         onStartApplication={(draft) => setView({ kind: 'application', draft })}
+        onFirstAccess={(handle) => setView({ kind: 'first-access', handle })}
       />
     )
   }

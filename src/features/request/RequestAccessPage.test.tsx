@@ -53,8 +53,8 @@ describe('RequestAccessPage — chooser structure', () => {
     const html = renderToStaticMarkup(
       <RequestAccessPage onBack={() => {}} onStartApplication={() => {}} />,
     )
-    expect(html).toContain('Já sou da guilda')
-    expect(html).toContain('Quero entrar na guilda')
+    expect(html).toContain('Identificação')
+    expect(html).toContain('Recrutamento')
     expect(html).toContain(
       'O envio de status precisa ser concluído de uma vez; nada é salvo antes do envio final.',
     )

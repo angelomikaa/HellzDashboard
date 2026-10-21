@@ -182,15 +182,8 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPage
         <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
           <button
             type="button"
-            onClick={() => onFirstAccess(discordHandle.trim())}
-            className="text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Primeiro acesso
-          </button>
-          <button
-            type="button"
             onClick={onRequestAccess}
-            className="text-sm font-semibold text-muted hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             Solicitar acesso
           </button>
