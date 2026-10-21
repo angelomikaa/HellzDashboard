@@ -2,16 +2,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NeoFootSession } from '../features/auth/session'
 import {
   ApiError,
+  addMember,
+  approveRequest,
+  correctIdentity,
   createClass,
   createSubmission,
+  deleteIdentityProof,
   fetchCatalog,
   fetchClasses,
   fetchClassTop5,
+  fetchIdentityHistory,
+  fetchIdentityProof,
+  fetchIdentityQueue,
   fetchKeyStats,
   fetchMe,
   fetchMembers,
   fetchMyReport,
   fetchMySubmissions,
+  fetchStaffMembers,
+  fetchStaffRequests,
+  identityProofUrl,
+  rejectRequest,
+  resetMemberPin,
+  reviewIdentity,
   setKeyStat,
   updateCharacter,
 } from './api'
@@ -317,5 +330,183 @@ describe('my_report client contract (Phase 4 data contract)', () => {
     expect(err).toBeInstanceOf(ApiError)
     expect(err.kind).toBe('server')
     expect(err.message).toContain('malformed my_report response')
+  })
+})
+
+// Plan 08-05 task 1: the Phase 8 staff surface wrappers. Every call is an
+// RPC-only POST with the exact 0014 parameter names; list wrappers reject a
+// malformed (non-array) payload; PIN material never appears in any request.
+describe('Phase 8 staff API wrappers (0014 RPC census)', () => {
+  it('fetchStaffMembers posts an empty body and validates the array shape', async () => {
+    const rows = [
+      {
+        id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        discord_handle: 'ahrya',
+        display_name: 'Ahrya',
+        role: 'member',
+        active: true,
+        char_class: 'Gypsy',
+        char_function: 'dps',
+        char_id: '32980',
+        pin_set: false,
+        claimed_at: null,
+        has_pending_proof: true,
+        identity: null,
+      },
+    ]
+    nextResponse = () => res(200, JSON.stringify(rows))
+    await expect(fetchStaffMembers(session)).resolves.toEqual(rows)
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/staff_members')
+    expect(calls[0].init.method).toBe('POST')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({})
+  })
+
+  it('list wrappers throw ApiError on a non-array payload (broken deploy)', async () => {
+    nextResponse = () => res(200, JSON.stringify({ not: 'an array' }))
+    const err = await fetchStaffMembers(session).catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err.kind).toBe('server')
+    expect(err.message).toContain('malformed staff_members response')
+
+    nextResponse = () => res(200, '')
+    await expect(fetchIdentityQueue(session)).rejects.toThrow(/malformed staff_identity_queue/)
+    await expect(fetchStaffRequests(session)).rejects.toThrow(/malformed staff_requests/)
+    await expect(fetchIdentityHistory(session, session.member_id)).rejects.toThrow(
+      /malformed staff_identity_history/,
+    )
+  })
+
+  it('addMember sends p_handle/p_display_name and unwraps the member id', async () => {
+    nextResponse = () => res(200, JSON.stringify('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'))
+    await expect(addMember(session, ' ahrya ', ' Ahrya ')).resolves.toBe(
+      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    )
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/add_member')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      p_handle: ' ahrya ',
+      p_display_name: ' Ahrya ',
+    })
+
+    nextResponse = () => res(200, '')
+    await expect(addMember(session, 'x', 'X')).rejects.toThrow(/malformed add_member/)
+  })
+
+  it('resetMemberPin sends only p_member (never a PIN or hash)', async () => {
+    nextResponse = () => res(200, '')
+    await resetMemberPin(session, 'cccccccc-cccc-cccc-cccc-cccccccccccc')
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/reset_member_pin')
+    const body = JSON.parse(calls[0].init.body as string)
+    expect(body).toEqual({ p_member: 'cccccccc-cccc-cccc-cccc-cccccccccccc' })
+    expect(JSON.stringify(body)).not.toContain('pin_hash')
+    expect(JSON.stringify(body)).not.toContain('p_pin')
+  })
+
+  it('reviewIdentity sends the boolean decision', async () => {
+    nextResponse = () => res(200, '')
+    await reviewIdentity(session, 'dddddddd-dddd-dddd-dddd-dddddddddddd', true)
+    await reviewIdentity(session, 'dddddddd-dddd-dddd-dddd-dddddddddddd', false)
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/review_identity')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      p_proof: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+      p_confirm: true,
+    })
+    expect(JSON.parse(calls[1].init.body as string).p_confirm).toBe(false)
+  })
+
+  it('approveRequest sends the chosen function and unwraps the member id', async () => {
+    nextResponse = () => res(200, JSON.stringify('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'))
+    await expect(
+      approveRequest(session, 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'suporte'),
+    ).resolves.toBe('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee')
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/approve_request')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      p_request: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      p_function: 'suporte',
+    })
+
+    nextResponse = () => res(200, '')
+    await expect(
+      approveRequest(session, 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'dps'),
+    ).rejects.toThrow(/malformed approve_request/)
+  })
+
+  it('rejectRequest sends only p_request', async () => {
+    nextResponse = () => res(200, '')
+    await rejectRequest(session, 'ffffffff-ffff-ffff-ffff-ffffffffffff')
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/reject_request')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      p_request: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    })
+  })
+
+  it('correctIdentity sends the five 0014 parameter keys', async () => {
+    nextResponse = () => res(200, '')
+    await correctIdentity(session, session.member_id, {
+      char_id: '32980',
+      nickname: 'Ahrya',
+      char_class: 'Gypsy',
+      char_function: 'mdps',
+    })
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/correct_identity')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      p_member: session.member_id,
+      p_char_id: '32980',
+      p_nickname: 'Ahrya',
+      p_char_class: 'Gypsy',
+      p_char_function: 'mdps',
+    })
+  })
+
+  it('fetchIdentityHistory scopes to the member', async () => {
+    nextResponse = () => res(200, JSON.stringify([]))
+    await fetchIdentityHistory(session, session.member_id)
+    expect(calls[0].url).toBe(
+      'https://test-project.supabase.co/rest/v1/rpc/staff_identity_history',
+    )
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ p_member: session.member_id })
+  })
+})
+
+describe('identity proof storage helpers (private bucket, staff-only)', () => {
+  it('identityProofUrl builds the authenticated object route and rejects traversal', () => {
+    expect(identityProofUrl(session, 'claims/abc/1.jpg')).toBe(
+      'https://test-project.supabase.co/storage/v1/object/authenticated/identity-proofs/claims/abc/1.jpg',
+    )
+    expect(identityProofUrl(session, '../members')).toBe('')
+    expect(identityProofUrl(session, '/card-photos/x.jpg')).toBe('')
+    expect(identityProofUrl(session, 'claims/abc/1.jpg?token=x')).toBe('')
+  })
+
+  it('fetchIdentityProof returns a blob and degrades to null on any failure', async () => {
+    vi.stubGlobal('fetch', async () => ({
+      ok: true,
+      status: 200,
+      blob: async () => new Blob(['jpeg']),
+    }))
+    const blob = await fetchIdentityProof(session, 'claims/abc/1.jpg')
+    expect(blob).toBeInstanceOf(Blob)
+
+    vi.stubGlobal('fetch', async () => ({ ok: false, status: 404 }))
+    await expect(fetchIdentityProof(session, 'claims/abc/1.jpg')).resolves.toBeNull()
+    await expect(fetchIdentityProof(session, '../nope')).resolves.toBeNull()
+  })
+
+  it('deleteIdentityProof DELETEs the object route and treats 404 as success', async () => {
+    nextResponse = () => res(200, '')
+    await deleteIdentityProof(session, 'claims/abc/1.jpg')
+    expect(calls[0].url).toBe(
+      'https://test-project.supabase.co/storage/v1/object/identity-proofs/claims/abc/1.jpg',
+    )
+    expect(calls[0].init.method).toBe('DELETE')
+
+    nextResponse = () => res(404, 'not found')
+    await expect(deleteIdentityProof(session, 'claims/abc/1.jpg')).resolves.toBeUndefined()
+
+    nextResponse = () => res(500, 'boom')
+    await expect(deleteIdentityProof(session, 'claims/abc/1.jpg')).rejects.toBeInstanceOf(ApiError)
+    // An unsafe key never issues a request.
+    const before = calls.length
+    await deleteIdentityProof(session, '../escape')
+    expect(calls.length).toBe(before)
   })
 })

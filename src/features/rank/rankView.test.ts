@@ -9,6 +9,7 @@ function row(partial: Partial<RoleRankRow>): RoleRankRow {
   return {
     member_id: 'id',
     display_name: 'nome',
+    char_id: null,
     char_class: 'Classe',
     char_function: 'dps',
     ovr: null,

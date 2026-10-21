@@ -311,7 +311,12 @@ export interface OfficerQueueRow {
   submitted_at: string
   display_name: string
   discord_handle: string
+  // 08-01/0014 identity patch (all nullable for legacy rows without identity):
+  // the submission's captured ID/nickname. char_class below is the 0014
+  // coalesce(submission class, member class).
   char_class: string | null
+  char_id: string | null
+  nickname: string | null
   char_function: 'dps' | 'mdps' | 'suporte'
   stats: QueueStat[] // all 57 catalog entries, ordered group_name, label
 }
@@ -459,6 +464,9 @@ export interface RoleRankStat {
 export interface RoleRankRow {
   member_id: string
   display_name: string
+  // 08-01/0014: display_name is the newest identity nickname and char_id the
+  // newest identity ID (D-21/D-23). Nullable for members without identity yet.
+  char_id: string | null
   char_class: string
   char_function: 'dps' | 'mdps' | 'suporte'
   ovr: number | null
@@ -904,3 +912,314 @@ export async function fetchRequestStatus(discordHandle: string): Promise<Request
   return asRequestStatus(payload)
 }
 
+
+// ---------------------------------------------------------------------------
+// Phase 8 staff surfaces (08-05) — the staff operating layer built on
+// migration 0014. Every wrapper is an RPC-only call: the staff/owner gate lives
+// INSIDE the SECURITY DEFINER function (member_role in officer|owner AND the
+// caller's active row), so this client adds NO enforcement — the UI gating is
+// UX-only (house pattern). PINs never cross this boundary: staff_members
+// serialises `pin_set` (pin_hash is not null) and NO wrapper selects or sends a
+// hash (T-08-31/T-08-32). Payload types are the CLOSED 0014 census, field for
+// field (see supabase/migrations/0014_whitelist_requests_identity.sql §6).
+// ---------------------------------------------------------------------------
+
+export interface StaffIdentitySnapshot {
+  id: number
+  created_at: string
+  char_id: string
+  nickname: string
+  char_class: string | null
+  char_function: 'dps' | 'mdps' | 'suporte' | null
+  source: 'submission' | 'correction' | 'claim' | 'request'
+}
+
+/** staff_members() row: MemberRow + the D-18 PIN/claim state and the newest
+ *  identity record. `identity` is null until the member's first identity
+ *  (claim, validated submission, request approval or staff correction). */
+export interface StaffMember extends MemberRow {
+  char_id: string | null
+  pin_set: boolean
+  claimed_at: string | null
+  has_pending_proof: boolean
+  identity: StaffIdentitySnapshot | null
+}
+
+export interface IdentityQueueRow {
+  proof_id: string
+  member_id: string
+  discord_handle: string
+  display_name: string
+  char_id: string
+  nickname: string
+  char_class: string | null
+  proof_path: string
+  created_at: string
+}
+
+export interface IdentityHistoryRow {
+  id: number
+  created_at: string
+  char_id: string
+  nickname: string
+  char_class: string | null
+  char_function: 'dps' | 'mdps' | 'suporte' | null
+  source: 'submission' | 'correction' | 'claim' | 'request'
+  created_by: string | null
+}
+
+export interface StaffRequestStat {
+  stat_key: string
+  label: string
+  label_short: string
+  value_type: 'flat' | 'percentual'
+  group_name: 'general' | 'quasi' | 'special'
+  value: number | null // null when the applicant did not provide the stat
+}
+
+/** staff_requests() row (D-14): pending application + server-computed OVR.
+ *  `ovr`/`data_sufficient` come from the live class+function cohort; the
+ *  applicant's own stats never join it. */
+export interface StaffRequestRow {
+  request_id: string
+  discord_handle: string
+  request_type: 'member' | 'prospect'
+  char_id: string
+  nickname: string
+  char_class: string
+  char_function: 'dps' | 'mdps' | 'suporte'
+  proof_path: string
+  created_at: string
+  member_id: string | null
+  ovr: number | null
+  data_sufficient: boolean
+  stats: StaffRequestStat[]
+}
+
+/** A jsonb-array RPC result must be an array; anything else is a broken
+ *  deploy, surfaced as ApiError instead of a crash at `.map` (fetchMyReport
+ *  precedent). */
+function requireArray<T>(value: unknown, rpc: string): T[] {
+  if (!Array.isArray(value)) {
+    throw new ApiError(0, 'server', `malformed ${rpc} response`)
+  }
+  return value as T[]
+}
+
+/** A single-uuid RPC result must be a non-empty string. */
+function requireUuid(value: unknown, rpc: string): string {
+  if (typeof value !== 'string' || value === '') {
+    throw new ApiError(0, 'server', `malformed ${rpc} response`)
+  }
+  return value
+}
+
+/** Staff roster (WHIT-05/D-18/D-22). RPC gate: staff + active. Ordered by
+ *  display_name server-side; the roster carries pin_set/claimed_at/char_id,
+ *  has_pending_proof and the newest identity — NEVER pin_hash. */
+export async function fetchStaffMembers(session: NeoFootSession): Promise<StaffMember[]> {
+  const res = await restFetch(session, '/rpc/staff_members', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  return requireArray<StaffMember>(await parseBody<unknown>(res), 'staff_members')
+}
+
+/** Handle-only member creation (WHIT-01/06/07). RPC gate: staff + active;
+ *  exceptions already_member/dummy_handle/invalid_handle/invalid_display_name.
+ *  An inactive handle is reactivated in place. Returns the member id. */
+export async function addMember(
+  session: NeoFootSession,
+  handle: string,
+  displayName: string,
+): Promise<string> {
+  const res = await restFetch(session, '/rpc/add_member', {
+    method: 'POST',
+    body: JSON.stringify({ p_handle: handle, p_display_name: displayName }),
+  })
+  return requireUuid(await parseBody<unknown>(res), 'add_member')
+}
+
+/** OWNER-only PIN reset (WHIT-06, D-16/D-17): nulls the claim + lockout rows
+ *  so the member re-claims via Primeiro acesso. RPC gate: owner +
+ *  is_active_owner(); owner targets raise forbidden. No PIN ever crosses here. */
+export async function resetMemberPin(session: NeoFootSession, memberId: string): Promise<void> {
+  await restFetch(session, '/rpc/reset_member_pin', {
+    method: 'POST',
+    body: JSON.stringify({ p_member: memberId }),
+  })
+}
+
+/** Pending identity proofs for the Identidade block (D-05/IDEN-03). Newest
+ *  first; proof_path is the private-bucket object key. */
+export async function fetchIdentityQueue(session: NeoFootSession): Promise<IdentityQueueRow[]> {
+  const res = await restFetch(session, '/rpc/staff_identity_queue', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  return requireArray<IdentityQueueRow>(await parseBody<unknown>(res), 'staff_identity_queue')
+}
+
+/** Confirmar / Não confere (D-05/D-15). Confirming clears the pending state;
+ *  rejecting also deactivates the member and clears the claim. Either decision
+ *  clears storage_path server-side, so the caller purges the object. */
+export async function reviewIdentity(
+  session: NeoFootSession,
+  proofId: string,
+  confirm: boolean,
+): Promise<void> {
+  await restFetch(session, '/rpc/review_identity', {
+    method: 'POST',
+    body: JSON.stringify({ p_proof: proofId, p_confirm: confirm }),
+  })
+}
+
+/** Pending membership applications (WHIT-09, D-14) with the server-computed
+ *  applicant OVR and the full stat payload. */
+export async function fetchStaffRequests(session: NeoFootSession): Promise<StaffRequestRow[]> {
+  const res = await restFetch(session, '/rpc/staff_requests', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  return requireArray<StaffRequestRow>(await parseBody<unknown>(res), 'staff_requests')
+}
+
+/** Approve a pending request (WHIT-09/10, D-09). p_function is the
+ *  officer-confirmed build role (dps|mdps|suporte) — the ONLY role-assignment
+ *  point for self-requesters. Prospect stats become the first validated
+ *  submission. Returns the member id. */
+export async function approveRequest(
+  session: NeoFootSession,
+  requestId: string,
+  charFunction: 'dps' | 'mdps' | 'suporte',
+): Promise<string> {
+  const res = await restFetch(session, '/rpc/approve_request', {
+    method: 'POST',
+    body: JSON.stringify({ p_request: requestId, p_function: charFunction }),
+  })
+  return requireUuid(await parseBody<unknown>(res), 'approve_request')
+}
+
+/** Reject a pending request (WHIT-10, D-10). Pending-only; records the
+ *  decision and clears proof_path so the caller purges the image. No reason is
+ *  stored or returned. */
+export async function rejectRequest(session: NeoFootSession, requestId: string): Promise<void> {
+  await restFetch(session, '/rpc/reject_request', {
+    method: 'POST',
+    body: JSON.stringify({ p_request: requestId }),
+  })
+}
+
+/** Staff identity correction (IDEN-03, D-21/D-22): APPENDS a history row and
+ *  updates the member pointers (char_function is staff-only, D-20). */
+export async function correctIdentity(
+  session: NeoFootSession,
+  memberId: string,
+  identity: {
+    char_id: string
+    nickname: string
+    char_class: string
+    char_function: 'dps' | 'mdps' | 'suporte'
+  },
+): Promise<void> {
+  await restFetch(session, '/rpc/correct_identity', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_member: memberId,
+      p_char_id: identity.char_id,
+      p_nickname: identity.nickname,
+      p_char_class: identity.char_class,
+      p_char_function: identity.char_function,
+    }),
+  })
+}
+
+/** Append-only identity history, newest first (D-22). */
+export async function fetchIdentityHistory(
+  session: NeoFootSession,
+  memberId: string,
+): Promise<IdentityHistoryRow[]> {
+  const res = await restFetch(session, '/rpc/staff_identity_history', {
+    method: 'POST',
+    body: JSON.stringify({ p_member: memberId }),
+  })
+  return requireArray<IdentityHistoryRow>(
+    await parseBody<unknown>(res),
+    'staff_identity_history',
+  )
+}
+
+// --- identity proof storage (D-05/D-15) ------------------------------------
+// Private `identity-proofs` bucket (0014 storage seed): staff-only SELECT and
+// DELETE on storage.objects; no client INSERT/UPDATE (Edge Functions upload
+// with the service role). The stored proof_path is the bucket-relative object
+// key (`claims/<member_id>/<uuid>.jpg` | `requests/pending/<uuid>.jpg`).
+
+const IDENTITY_PROOF_BUCKET = 'identity-proofs'
+
+/** Bucket-relative object key, or null for anything that is not a plain
+ *  bucket-internal key (defense in depth: foreign bucket, traversal, query
+ *  junk and empty values never reach a URL). */
+function proofStorageKey(path: string): string | null {
+  const key = path.trim()
+  if (key === '' || key.startsWith('/')) return null
+  if (key.includes('..') || key.includes('?') || key.includes('#') || key.includes('//')) {
+    return null
+  }
+  return key
+}
+
+/**
+ * Authenticated object URL for one proof (private bucket download route).
+ * NOTE: an <img> tag cannot send the gateway/apikey/Authorization headers, so
+ * the review panels fetch the bytes with fetchIdentityProof below (blob ->
+ * object URL) instead of pointing src at this string.
+ */
+export function identityProofUrl(_session: NeoFootSession, path: string): string {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  if (!supabaseUrl) {
+    throw new ApiError(0, 'network', 'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+  const key = proofStorageKey(path)
+  if (key === null) return ''
+  return `${supabaseUrl}/storage/v1/object/authenticated/${IDENTITY_PROOF_BUCKET}/${key}`
+}
+
+/**
+ * Proof bytes for the staff preview (staff-only object route, T-08-33). Any
+ * failure resolves null: the card degrades to the claimed-fields text instead
+ * of breaking the queue. Blob discipline matches fetchCardPhotoByPath.
+ */
+export async function fetchIdentityProof(
+  session: NeoFootSession,
+  path: string,
+): Promise<Blob | null> {
+  const key = proofStorageKey(path)
+  if (key === null) return null
+  try {
+    const res = await storageFetch(session, `authenticated/${IDENTITY_PROOF_BUCKET}/${key}`)
+    if (!res.ok) return null
+    return await res.blob()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Best-effort proof purge after a decision (D-15). The decision RPC already
+ * cleared proof_path server-side; this removes the object itself. A 404 (gone
+ * already) is success; every other failure throws so callers can swallow it.
+ * DELETE targets the plain object route (`/object/<bucket>/<key>`) — the
+ * `/authenticated` prefix is download-only and would 404 without deleting.
+ */
+export async function deleteIdentityProof(
+  session: NeoFootSession,
+  path: string,
+): Promise<void> {
+  const key = proofStorageKey(path)
+  if (key === null) return
+  const res = await storageFetch(session, `${IDENTITY_PROOF_BUCKET}/${key}`, { method: 'DELETE' })
+  if (res.ok || res.status === 404) return
+  const kind = res.status === 401 ? 'unauthorized' : 'server'
+  throw new ApiError(res.status, kind, `HTTP ${res.status} removing identity proof`)
+}
