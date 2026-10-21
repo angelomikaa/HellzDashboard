@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
-status: executing
-stopped_at: Phase 07.2 complete (6/6) — roadmap re-planned from owner feedback; next: Phase 8 planning
-last_updated: "2026-10-20T13:45:00.000Z"
-last_activity: 2026-10-20
+status: planning
+stopped_at: Phase 8 context gathered
+last_updated: "2026-10-21T03:03:57.092Z"
+last_activity: "2026-10-20 -- 07.2-06 complete (desktop pass + owner feedback fixes: download beside preview, inline rank details, Personagens filters, two-column OCR step). Owner feedback round 2 triaged per owner decisions: capture + membership → Phase 8 (migration 0014), unified key/relevant → Phase 9 (inside set_key_stat v2), Destaques slider → Phase 10 (members-only; public visitor homepage deferred)"
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 12
   completed_plans: 12
   percent: 100
@@ -70,6 +70,7 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase ?]: 07.2-03: download photo chain = member's uploaded screenshot (blob object URL) -> class portrait -> monogram, per the 07.2-05 round-7 owner photo-consistency decision (not the plan's literal crestSrc-only)
 - [Phase ?]: 07.2-03: focusCandidates deleted (function + 5 tests) after the FocusStrip rewire 
  zero references remaining; D-07 foco now selects via improvementFocus over priorityKeySet (key union relevant from my_card)
+
 - [Phase 07.2]: 07.2-04: role-rank board labels consumed via the shared FUNCTION_LABELS map (role vocabulary lives in ONE place per the Phase 07 decision) instead of duplicated literals in RankPage — the labels can never drift from the dps/mdps/suporte vocabulary
 - [Phase 07.2]: 07.2-04: detail grouping uses a client-side catalog join (fetchCatalog stat_key→group_name map) because the closed role_rank payload has NO per-stat group_name (0013 census); unmapped keys fall back to Geral — the catalog is already a sanctioned staff read (Stats-Chave)
 - [Phase 07.2]: 07.2-04: the staff view-aid column sort is isolated in a pure rankView.ts module that member surfaces never import; 'server' passes the payload through verbatim (same reference), unit-locked by 4 vitest cases (T-072-11 accepted) — member-facing server-order discipline stays structurally enforceable
@@ -98,9 +99,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-20T08:02:02.851Z
-Stopped at: Completed 07.2-04-PLAN.md
-Resume file: None
+Last session: 2026-10-21T03:03:56.923Z
+Stopped at: Phase 8 context gathered
+Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/08-CONTEXT.md
 
 ## Performance Metrics
 
