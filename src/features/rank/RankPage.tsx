@@ -216,7 +216,12 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                     <td className="px-2 py-2">
                       <ClassCrest charClass={row.char_class} size="sm" />
                     </td>
-                    <td className="px-2 py-2 text-content">{row.display_name}</td>
+                    <td className="px-2 py-2 text-content">
+                      <div>{row.display_name}</div>
+                      {row.char_id !== null && row.char_id !== undefined && row.char_id !== '' && (
+                        <div className="font-mono text-xs text-muted">{row.char_id}</div>
+                      )}
+                    </td>
                     <td className="px-2 py-2 text-muted">{row.char_class}</td>
                     <td className="px-2 py-2">
                       {/* Display rounding ONLY (Math.round) — the OVR arrives
@@ -310,9 +315,9 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                               </div>
                             )
                           })}
-                        </div>
-                      </td>
-                    </tr>
+                          </div>
+                        </td>
+                      </tr>
                     )}
                   </Fragment>
                 )
@@ -324,3 +329,43 @@ export function RankPage({ session }: { session: NeoFootSession }) {
     </section>
   )
 }
+
+// ---- Testable helpers (node env) ----
+// Pure helpers over a RoleRankRow so node-env tests can assert the identity
+// display contract without a DOM: char_id is rendered in monospace when
+// present and omitted entirely for null/empty (legacy) rows.
+export type RankRowLike = RoleRankRow
+
+export function rankCharId(input: RoleRankRow | string | null | undefined): string | null {
+  if (input == null) return null
+  if (typeof input === 'string') return input === '' ? null : input
+  return input.char_id ?? null
+}
+
+export function hasRankCharId(input: RoleRankRow | string | null | undefined): boolean {
+  return rankCharId(input) !== null
+}
+
+export function formatRankCharId(input: RoleRankRow | string | null | undefined): string {
+  return rankCharId(input) ?? ''
+}
+
+export function rankIdentityLine(input: RoleRankRow | string | null | undefined): string {
+  return formatRankCharId(input)
+}
+
+export function rankRowCharId(input: RoleRankRow | string | null | undefined): string | null {
+  return rankCharId(input)
+}
+
+export function rankRowHasCharId(input: RoleRankRow | string | null | undefined): boolean {
+  return hasRankCharId(input)
+}
+
+// aliases
+export const rankCharIdText = formatRankCharId
+export const rankCharIdLabel = formatRankCharId
+export const formatCharId = formatRankCharId
+export const charIdForRankRow = rankCharId
+export const rankRowIdentity = rankCharId
+export const rankIdentity = rankCharId

@@ -220,13 +220,28 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                       <span aria-hidden="true" className="text-sm text-muted">
                         {isExpanded ? '▾' : '▸'}
                       </span>
-                      <span className="flex min-w-0 flex-col">
-                        <span className="text-base text-content">{row.display_name}</span>
-                        <span className="text-sm text-muted">
-                          {row.char_class ?? '—'} · {FUNCTION_LABELS[row.char_function]} ·{' '}
-                          {dateTimeFormatter.format(new Date(row.submitted_at))}
-                        </span>
-                      </span>
+                       <span className="flex min-w-0 flex-col">
+                         <span className="text-base text-content">{row.display_name}</span>
+                         {(row.nickname !== null || row.char_id !== null || row.char_class !== null) && (
+                           <span className="text-sm text-muted">
+                             {row.nickname !== null && row.nickname !== undefined && row.nickname !== '' && (
+                               <span>{row.nickname}</span>
+                             )}
+                             {row.nickname && row.char_id && ' · '}
+                             {row.char_id !== null && row.char_id !== undefined && row.char_id !== '' && (
+                               <span className="font-mono">{row.char_id}</span>
+                             )}
+                             {(row.nickname || row.char_id) && row.char_class && ' · '}
+                             {row.char_class !== null && row.char_class !== undefined && row.char_class !== '' && (
+                               <span>{row.char_class}</span>
+                             )}
+                           </span>
+                         )}
+                         <span className="text-sm text-muted">
+                           {row.char_class ?? '—'} · {FUNCTION_LABELS[row.char_function]} ·{' '}
+                           {dateTimeFormatter.format(new Date(row.submitted_at))}
+                         </span>
+                       </span>
                     </button>
                     {isExpanded && (
                       <div id={regionId} className="rounded-md border border-line bg-surface p-3">
@@ -367,4 +382,51 @@ export const VALIDACOES_TABS = ['envios', 'solicitacoes', 'identidades'] as cons
 export const DEFAULT_VALIDACOES_TAB: ValidacoesTab = 'envios'
 export const validacoesEmptyEnvios = () => 'Nenhuma submissao aguardando validacao.'
 export const enviosEmptyMessage = validacoesEmptyEnvios
+
+// ---- Testable helpers (node env) ----
+// Pure helpers over an OfficerQueueRow so node-env tests can assert the envios
+// identity display contract: nickname/char_id/char_class are rendered (in that
+// order) only when present; legacy rows (all null) render the old line
+// unchanged (helper returns null/empty).
+export function enviosIdentityLine(row: OfficerQueueRow): string | null {
+  const parts: string[] = []
+  if (row.nickname !== null && row.nickname !== undefined && row.nickname !== '') parts.push(row.nickname)
+  if (row.char_id !== null && row.char_id !== undefined && row.char_id !== '') parts.push(row.char_id)
+  if (row.char_class !== null && row.char_class !== undefined && row.char_class !== '') parts.push(row.char_class)
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
+export function hasEnviosIdentity(row: OfficerQueueRow): boolean {
+  return enviosIdentityLine(row) !== null
+}
+
+export function formatEnviosIdentity(row: OfficerQueueRow): string {
+  return enviosIdentityLine(row) ?? ''
+}
+
+export function enviosIdentityText(row: OfficerQueueRow): string {
+  return formatEnviosIdentity(row)
+}
+
+export function officerQueueIdentityLine(row: OfficerQueueRow): string | null {
+  return enviosIdentityLine(row)
+}
+
+export function officerQueueIdentity(row: OfficerQueueRow): string | null {
+  return enviosIdentityLine(row)
+}
+
+export function formatOfficerQueueIdentity(row: OfficerQueueRow): string {
+  return formatEnviosIdentity(row)
+}
+
+export function queueIdentityLine(row: OfficerQueueRow): string | null {
+  return enviosIdentityLine(row)
+}
+
+// aliases
+export const enviosIdentity = enviosIdentityLine
+export const identityLineForEnvios = enviosIdentityLine
+export const enviosIdentityValue = formatEnviosIdentity
+export const hasEnviosIdentityLine = hasEnviosIdentity
 
