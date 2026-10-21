@@ -86,7 +86,7 @@ Each task was committed atomically:
 2. **Task 2: Session-less prospect application wizard** - `661f635` (feat)
 3. **Key-link note on the prospect submit call site** - `1156d1e` (docs)
 
-**Plan metadata:** `pending` (docs: complete plan)
+**Plan metadata:** `de8599e` (docs: complete plan)
 
 ## Files Created/Modified
 - `src/features/submit/ocr/apply.ts` — shared `applyOcrOutcomes` (writes every displayed key, replaces one step's filled/failed sets wholesale)
