@@ -175,6 +175,26 @@ interface OcrCaptureProps {
   onOutcomes: (outcomes: OcrFieldOutcome[]) => void
   onReadFailed: () => void
   onRunStateChange: (running: boolean) => void
+  /** Optional same-image hook (08-04): invoked ONCE per accepted upload,
+   *  before readScreenshot, with the decoded source. Basic captures use it to
+   *  run readBasicProfile without a second upload. Advisory only: a rejection
+   *  never blocks the stat read. */
+  onImage?: (canvas: HTMLCanvasElement) => Promise<void>
+}
+
+/** The decoded source as a canvas (bitmaps are drawn once; canvases pass
+ *  through). Kept inside the lazy/browser boundary — never called at render. */
+function imageToCanvas(image: ImageBitmap | HTMLCanvasElement): HTMLCanvasElement {
+  if (typeof HTMLCanvasElement !== 'undefined' && image instanceof HTMLCanvasElement) {
+    return image
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width
+  canvas.height = image.height
+  const context = canvas.getContext('2d')
+  if (context === null) throw new Error('[ocr] canvas 2d context unavailable')
+  context.drawImage(image as CanvasImageSource, 0, 0, canvas.width, canvas.height)
+  return canvas
 }
 
 export function OcrCapture({
@@ -183,6 +203,7 @@ export function OcrCapture({
   onOutcomes,
   onReadFailed,
   onRunStateChange,
+  onImage,
 }: OcrCaptureProps) {
   const [status, setStatus] = useState<OcrStatus>('idle')
   const [cropBitmap, setCropBitmap] = useState<ImageBitmap | null>(null)
@@ -196,6 +217,17 @@ export function OcrCapture({
   /** THE lazy boundary (criterion 3): tesseract enters the app only here. */
   async function runRead(image: ImageBitmap | HTMLCanvasElement): Promise<void> {
     try {
+      // Same-image hook (08-04): the identity profile pass runs FIRST and
+      // sequentially — profile and stat reads share one worker, and
+      // readBasicProfile switches the worker's page-segmentation mode.
+      // Its failure is advisory: the stat read below always continues.
+      if (onImage !== undefined) {
+        try {
+          await onImage(imageToCanvas(image))
+        } catch {
+          // Identity stays untouched; manual entry covers the gap (D-18).
+        }
+      }
       const { readScreenshot } = await import('./ocr')
       const outcomes = await readScreenshot(capture, image)
       onOutcomes(outcomes)

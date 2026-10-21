@@ -7,6 +7,7 @@
 // claims from this JWT). Missing Authorization -> empty results (RLS sees no
 // claims); missing apikey -> 401.
 import { isValidSession, type NeoFootSession } from '../features/auth/session'
+import type { SubmissionIdentity } from '../features/submit/identity'
 
 export class ApiError extends Error {
   status: number
@@ -90,6 +91,41 @@ export async function fetchCatalog(session: NeoFootSession): Promise<StatCatalog
   return (await parseBody<StatCatalogEntry[]>(res)) ?? []
 }
 
+/**
+ * Session-less catalog read for the prospect application wizard (08-04,
+ * WHIT-08): the SAME five public columns as fetchCatalog, but with the anon
+ * bearer. Migration 0014 grants anon SELECT only on this label projection
+ * (stat_key/label/label_short/group_name/value_type) — key-stat CONFIG lives
+ * in class_key_stats and stays unreachable (T-08-29).
+ */
+export async function fetchPublicCatalog(): Promise<StatCatalogEntry[]> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !anonKey) {
+    throw new ApiError(0, 'network', 'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+  let res: Response
+  try {
+    res = await fetch(
+      `${supabaseUrl}/rest/v1/stat_catalog?select=stat_key,label,label_short,group_name,value_type&order=stat_key`,
+      {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+      },
+    )
+  } catch (err) {
+    throw new ApiError(0, 'network', err instanceof Error ? err.message : 'network error')
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    const kind = res.status === 401 ? 'unauthorized' : 'server'
+    throw new ApiError(res.status, kind, `HTTP ${res.status}: ${body.slice(0, 200)}`)
+  }
+  return (await parseBody<StatCatalogEntry[]>(res)) ?? []
+}
+
 export async function fetchClasses(session: NeoFootSession): Promise<string[]> {
   const res = await restFetch(session, '/classes?select=class_name&order=class_name')
   const rows = await parseBody<{ class_name: string }[]>(res)
@@ -149,12 +185,15 @@ export async function createClass(session: NeoFootSession, className: string): P
 export async function createSubmission(
   session: NeoFootSession,
   stats: { stat_key: string; value: number }[],
+  identity?: SubmissionIdentity,
 ): Promise<string> {
   // Atomic append-only RPC (INPT-04): member_id is derived from the JWT
-  // server-side; unknown stat keys are rejected server-side.
+  // server-side; unknown stat keys are rejected server-side. The optional
+  // identity is stored ON the submission and promoted only at validation
+  // (0014); old call sites keep compiling and send p_identity: null.
   const res = await restFetch(session, '/rpc/create_submission', {
     method: 'POST',
-    body: JSON.stringify({ p_stats: stats }),
+    body: JSON.stringify({ p_stats: stats, p_identity: identity ?? null }),
   })
   // PostgREST returns the function result as a JSON-encoded uuid string.
   return parseBody<string>(res)

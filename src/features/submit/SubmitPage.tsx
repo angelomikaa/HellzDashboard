@@ -17,7 +17,7 @@
 // classless inserts, but Phase 3 rank RPCs compute per class, so there is
 // nothing meaningful to ingest for an unregistered character (P2D in
 // 02-RESEARCH; T-02-17 accepted with the Phase 3 guard).
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ApiError,
   createSubmission,
@@ -28,12 +28,22 @@ import {
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { FUNCTION_LABELS } from '../../lib/groups'
+import { prefillIdentity } from '../request/requestFlow'
 import { HistoryList } from './HistoryList'
 import { OcrCapture } from './OcrCapture'
 import { ReviewStep } from './ReviewStep'
 import { OCR_FIELD_FAILURE, StatGroupStep } from './StatGroupStep'
 import { INVALID_HINT, statFieldFeedback } from './fieldValidation'
+import {
+  OFFICIAL_CLASSES,
+  validateIdentity,
+  validateIdentityDraft,
+  type BasicProfileFields,
+  type CharFunction,
+  type SubmissionIdentity,
+} from './identity'
 import type { OcrFieldOutcome } from './ocr'
+import { applyOcrOutcomes } from './ocr/apply'
 import {
   WIZARD_GROUPS,
   buildStatsPayload,
@@ -50,6 +60,63 @@ const SUBMIT_ERROR = 'Não foi possível enviar. Verifique sua conexão e tente 
 // Running skeleton placeholder for the step-1 combat_power input (D-17 —
 // same copy StatGroupStep uses for its rows).
 const OCR_READING_PLACEHOLDER = 'Lendo captura…'
+
+// Identity block (08-04, IDEN-01/02). OCR remains advisory: the green hint
+// marks a field the latest Basic read filled, and typing clears it.
+const IDENTITY_OCR_HINT = 'Preenchido pela leitura — confira.'
+export const DUPLICATE_CHAR_ID_COPY =
+  'Este ID já está cadastrado. Confira no jogo ou fale com um oficial.'
+export const UNKNOWN_CLASS_COPY = 'Selecione uma classe oficial.'
+
+export type IdentityField = 'char_id' | 'nickname' | 'char_class' | 'char_function'
+type TextIdentityField = 'char_id' | 'nickname' | 'char_class'
+type IdentityTouched = Partial<Record<IdentityField, boolean>>
+
+// The pointed build role is a human choice (D-03/D-19) — labels match the
+// request form's select.
+const FUNCTION_OPTIONS: ReadonlyArray<{ value: CharFunction; label: string }> = [
+  { value: 'dps', label: 'DPS' },
+  { value: 'mdps', label: 'M-DPS' },
+  { value: 'suporte', label: 'Suporte' },
+]
+
+const IDENTITY_FIELD_IDS: Record<IdentityField, string> = {
+  char_id: 'submit-char-id',
+  nickname: 'submit-nickname',
+  char_class: 'submit-char-class',
+  char_function: 'submit-char-function',
+}
+
+/**
+ * The pre-submit identity gate: [] from validateIdentityDraft = valid. When
+ * invalid, validateIdentity supplies the ordered first field + pt-BR copy so
+ * the page can focus the offending input (the server re-validates anyway).
+ */
+export function identitySubmitBlock(
+  identity: SubmissionIdentity,
+): { field: IdentityField; message: string } | null {
+  if (validateIdentityDraft(identity).length === 0) return null
+  const first = validateIdentity(identity)
+  return first.ok ? null : { field: first.field, message: first.message }
+}
+
+/**
+ * Map a create_submission failure (0014 raises duplicate_char_id /
+ * unknown_class / invalid_identity / invalid_function). REST errors carry the
+ * server token inside ApiError.message, matching the repo's existing
+ * `.includes(token)` convention. Everything else keeps the safe generic copy.
+ */
+export function submitErrorFor(error: unknown): { message: string; field?: IdentityField } {
+  if (error instanceof ApiError) {
+    if (error.message.includes('duplicate_char_id')) {
+      return { field: 'char_id', message: DUPLICATE_CHAR_ID_COPY }
+    }
+    if (error.message.includes('unknown_class')) {
+      return { field: 'char_class', message: UNKNOWN_CLASS_COPY }
+    }
+  }
+  return { message: SUBMIT_ERROR }
+}
 
 const BLOCKED_MEMBER_COPY =
   'Seu personagem ainda não foi registrado. Peça a um oficial para registrá-lo na aba Personagens.'
@@ -110,6 +177,27 @@ export function SubmitPage({ session }: SubmitPageProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
   const [inputs, setInputs] = useState<GroupInputs>({})
 
+  // Editable identity (08-04, IDEN-01/02): mandatory on every submission.
+  // Classe/Função prefill from the member row; ID/Nick start blank and are
+  // typed or OCR-filled. char_function is NEVER inferred from the screenshot
+  // (D-03/D-19) — the player's select is the only writer.
+  const [identity, setIdentity] = useState<SubmissionIdentity>({
+    char_id: '',
+    nickname: '',
+    char_class: '',
+    char_function: 'dps',
+  })
+  const [identityError, setIdentityError] = useState<{
+    field: IdentityField
+    message: string
+  } | null>(null)
+  const [identityOcrFilled, setIdentityOcrFilled] = useState<ReadonlySet<IdentityField>>(new Set())
+  // Touched fields are the OCR prefill guard (D-06 parity with the request
+  // form): a human edit always wins over a later Basic read.
+  const identityTouchedRef = useRef<IdentityTouched>({})
+  // Stale-read guard: only the latest Basic read may prefill (re-upload).
+  const identityReadToken = useRef(0)
+
   // Per-step verification gate (D-08): Continuar on each capture step (and
   // Enviar on Revisão, via allStepsVerified) requires the step's checkbox.
   const [stepVerified, setStepVerified] = useState<Record<1 | 2 | 3 | 4, boolean>>({
@@ -155,7 +243,22 @@ export function SubmitPage({ session }: SubmitPageProps) {
     ;(async () => {
       try {
         const [me, catalog] = await Promise.all([fetchMe(session), fetchCatalog(session)])
-        if (!cancelled) setData({ me, catalog })
+        if (!cancelled) {
+          setData({ me, catalog })
+          // Registry values are the starting point only: never overwrite a
+          // field the player already edited while the load was in flight.
+          setIdentity((current) => ({
+            ...current,
+            char_class:
+              current.char_class === '' && identityTouchedRef.current.char_class !== true
+                ? (me.char_class ?? '')
+                : current.char_class,
+            char_function:
+              identityTouchedRef.current.char_function === true
+                ? current.char_function
+                : me.char_function,
+          }))
+        }
       } catch (err) {
         if (cancelled) return
         setLoadError(
@@ -167,6 +270,74 @@ export function SubmitPage({ session }: SubmitPageProps) {
       cancelled = true
     }
   }, [session])
+
+  /** Focus the first invalid identity field after the step-1 commit. Deferred
+   *  one task because submit can start on Revisão, where those inputs are
+   *  unmounted until React applies the setStep(1) render. */
+  function focusIdentityField(field: IdentityField): void {
+    if (typeof document === 'undefined') return
+    const id = IDENTITY_FIELD_IDS[field]
+    setTimeout(() => document.getElementById(id)?.focus(), 0)
+  }
+
+  /** Identity text edits: mark the field human-owned (OCR can never overwrite
+   *  it afterwards), clear its OCR hint/error, and invalidate the Personagem
+   *  verification — an edit always un-checks the stale attestation (D-08). */
+  function handleIdentityChange(field: TextIdentityField, value: string) {
+    identityTouchedRef.current = { ...identityTouchedRef.current, [field]: true }
+    setIdentity((current) => ({ ...current, [field]: value }))
+    setIdentityError(null)
+    setIdentityOcrFilled((prev) => {
+      if (!prev.has(field)) return prev
+      const next = new Set(prev)
+      next.delete(field)
+      return next
+    })
+    setStepVerified((v) => ({ ...v, 1: false }))
+  }
+
+  /** Build-role choice (never OCR-derived). */
+  function handleIdentityFunction(value: CharFunction) {
+    identityTouchedRef.current = { ...identityTouchedRef.current, char_function: true }
+    setIdentity((current) => ({ ...current, char_function: value }))
+    setIdentityError(null)
+    setStepVerified((v) => ({ ...v, 1: false }))
+  }
+
+  /** Same-image Basic profile read (08-04): fills ONLY untouched fields and
+   *  records which ones came from the read. Failures are advisory — OcrCapture
+   *  swallows them and the stat read continues; identity stays editable. */
+  async function readIdentityProfile(canvas: HTMLCanvasElement): Promise<void> {
+    const token = ++identityReadToken.current
+    const { readBasicProfile } = await import('./ocr')
+    const read: BasicProfileFields = await readBasicProfile(canvas)
+    if (token !== identityReadToken.current) return
+    const touched = identityTouchedRef.current
+    const filled: TextIdentityField[] = []
+    if (touched.char_id !== true && read.char_id !== null) filled.push('char_id')
+    if (touched.nickname !== true && read.nickname !== null) filled.push('nickname')
+    if (touched.char_class !== true && read.char_class !== null) filled.push('char_class')
+    if (filled.length === 0) return
+    setIdentity((current) => ({
+      ...prefillIdentity(
+        {
+          char_id: current.char_id,
+          nickname: current.nickname,
+          char_class: current.char_class,
+        },
+        read,
+        touched,
+      ),
+      char_function: current.char_function,
+    }))
+    setIdentityOcrFilled((prev) => {
+      const next = new Set(prev)
+      for (const field of filled) next.add(field)
+      return next
+    })
+    setIdentityError(null)
+    setStepVerified((v) => ({ ...v, 1: false }))
+  }
 
   /** Owning capture step for a stat (the single group→step mapping):
    *  combat_power → step 1; otherwise the catalog group maps
@@ -199,8 +370,9 @@ export function SubmitPage({ session }: SubmitPageProps) {
     }
   }
 
-  /** Restart as a NEW submission: fresh inputs, nothing prefilled or
-   *  overwritten (append-only, INPT-04). */
+  /** Restart as a NEW submission: fresh stats, nothing prefilled or
+   *  overwritten (append-only, INPT-04). The identity stays — it describes
+   *  the same character, and the player can still edit it. */
   function restartWizard() {
     setInputs({})
     setStepVerified({ 1: false, 2: false, 3: false, 4: false })
@@ -210,6 +382,9 @@ export function SubmitPage({ session }: SubmitPageProps) {
     setCombatPowerBlurred(false)
     setMissingRequired(null)
     setSubmitError(null)
+    setIdentityError(null)
+    setIdentityOcrFilled(new Set())
+    identityReadToken.current += 1
     setStep(1)
     setPhase('wizard')
   }
@@ -224,6 +399,18 @@ export function SubmitPage({ session }: SubmitPageProps) {
     if (submitting || data === null) return
     setMissingRequired(null)
     setSubmitError(null)
+    setIdentityError(null)
+
+    // IDEN-01/02: identity is mandatory on EVERY submission. Block, jump to
+    // Personagem and focus the first offender; the server re-validates.
+    const identityBlock = identitySubmitBlock(identity)
+    if (identityBlock !== null) {
+      setIdentityError(identityBlock)
+      setStep(1)
+      focusIdentityField(identityBlock.field)
+      return
+    }
+
     const result = buildStatsPayload(data.catalog, inputs)
     if (!result.ok) {
       // Defense in depth: the step gates should have prevented this — the
@@ -233,11 +420,19 @@ export function SubmitPage({ session }: SubmitPageProps) {
     }
     setSubmitting(true)
     try {
-      await createSubmission(session, result.stats)
+      await createSubmission(session, result.stats, identity)
       setPhase('submitted')
-    } catch {
-      // The wizard state is KEPT — nothing the player typed is lost.
-      setSubmitError(SUBMIT_ERROR)
+    } catch (err) {
+      // The wizard state is KEPT — nothing the player typed is lost
+      // (duplicate ID is an inline identity error, not a dead end).
+      const mapped = submitErrorFor(err)
+      if (mapped.field !== undefined) {
+        setIdentityError({ field: mapped.field, message: mapped.message })
+        setStep(1)
+        focusIdentityField(mapped.field)
+      } else {
+        setSubmitError(mapped.message)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -294,24 +489,14 @@ export function SubmitPage({ session }: SubmitPageProps) {
    *  step-scoped: fields of other steps are never touched. Filled fields
    *  are recorded in ocrFilledFields so the shared per-field validation
    *  engages for them exactly as for manual blur (D-05-UAT-9). */
-  function applyOcrOutcomes(step: 1 | 2 | 3 | 4, outcomes: OcrFieldOutcome[]) {
+  function applyStepOcrOutcomes(step: 1 | 2 | 3 | 4, outcomes: OcrFieldOutcome[]) {
     const displayed: string[] =
       step === 1 ? ['combat_power'] : groupEntries(STEP_GROUP[step]).map((e) => e.stat_key)
-    const byKey = new Map(outcomes.map((o) => [o.stat_key, o]))
-    const newFailed = new Set<string>()
-    const newFilled = new Set<string>()
-    for (const statKey of displayed) {
-      const outcome = byKey.get(statKey)
-      if (outcome !== undefined && outcome.status === 'filled') {
-        handleChange(statKey, outcome.raw)
-        newFilled.add(statKey)
-      } else {
-        handleChange(statKey, '')
-        newFailed.add(statKey)
-      }
-    }
-    setFailedFields((prev) => ({ ...prev, [step]: newFailed }))
-    setOcrFilledFields((prev) => ({ ...prev, [step]: newFilled }))
+    // Shared applier (also used by the prospect wizard): writes every
+    // displayed key through handleChange and replaces this step's claims.
+    const { filled, failed } = applyOcrOutcomes(displayed, outcomes, handleChange)
+    setFailedFields((prev) => ({ ...prev, [step]: failed }))
+    setOcrFilledFields((prev) => ({ ...prev, [step]: filled }))
   }
 
   /** D-18: nothing was read — the step's failure claims are cleared (no
@@ -401,18 +586,161 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   />
                 </a>
                 <div className="min-w-0 flex-1">
-                  {/* OCR entry for the basic header capture (D-06: the basic
-                      capture reads ONLY combat_power; nickname/job are admin
-                      data, never inputs). */}
+                  {/* OCR entry for the basic header capture (08-04: the same
+                      upload reads combat_power AND the identity profile;
+                      nickname/ID/class remain editable advisory prefill). */}
                   <OcrCapture
                     capture="basic"
-                    onOutcomes={(outcomes) => applyOcrOutcomes(1, outcomes)}
+                    onOutcomes={(outcomes) => applyStepOcrOutcomes(1, outcomes)}
                     onReadFailed={() => handleOcrReadFailed(1)}
                     onRunStateChange={(running) => handleOcrRunState(1, running)}
+                    // One upload, two passes: identity profile + combat power.
+                    onImage={readIdentityProfile}
                   />
                 </div>
               </div>
               <div className="flex max-w-md flex-col gap-4">
+                {/* Identity (08-04, IDEN-01/02): mandatory on every
+                    submission. The Basic read prefills the untouched fields
+                    (green hint) and every field stays human-editable; Classe/
+                    Função start from the registry row and char_function is
+                    NEVER OCR-derived (D-03/D-19). */}
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="submit-char-id" className="text-sm font-semibold text-content">
+                    ID do personagem
+                  </label>
+                  <input
+                    id="submit-char-id"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={12}
+                    value={identity.char_id}
+                    onChange={(e) =>
+                      handleIdentityChange('char_id', e.target.value.replace(/\D/g, '').slice(0, 12))
+                    }
+                    aria-invalid={identityError?.field === 'char_id' || undefined}
+                    disabled={ocrRunningStep === 1}
+                    className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+                      identityError?.field === 'char_id' ? 'border-destructive!' : 'border-line'
+                    }`}
+                  />
+                  {identityOcrFilled.has('char_id') && (
+                    <p className="text-sm font-semibold text-success">{IDENTITY_OCR_HINT}</p>
+                  )}
+                  {identityError?.field === 'char_id' && (
+                    <p
+                      role="alert"
+                      aria-live="polite"
+                      className="text-sm font-semibold text-destructive"
+                    >
+                      {identityError.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="submit-nickname" className="text-sm font-semibold text-content">
+                    Nick
+                  </label>
+                  <input
+                    id="submit-nickname"
+                    type="text"
+                    autoComplete="off"
+                    maxLength={80}
+                    value={identity.nickname}
+                    onChange={(e) => handleIdentityChange('nickname', e.target.value)}
+                    aria-invalid={identityError?.field === 'nickname' || undefined}
+                    disabled={ocrRunningStep === 1}
+                    className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+                      identityError?.field === 'nickname' ? 'border-destructive!' : 'border-line'
+                    }`}
+                  />
+                  {identityOcrFilled.has('nickname') && (
+                    <p className="text-sm font-semibold text-success">{IDENTITY_OCR_HINT}</p>
+                  )}
+                  {identityError?.field === 'nickname' && (
+                    <p
+                      role="alert"
+                      aria-live="polite"
+                      className="text-sm font-semibold text-destructive"
+                    >
+                      {identityError.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="submit-char-class" className="text-sm font-semibold text-content">
+                    Classe
+                  </label>
+                  <select
+                    id="submit-char-class"
+                    value={identity.char_class}
+                    onChange={(e) => handleIdentityChange('char_class', e.target.value)}
+                    aria-invalid={identityError?.field === 'char_class' || undefined}
+                    disabled={ocrRunningStep === 1}
+                    className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+                      identityError?.field === 'char_class' ? 'border-destructive!' : 'border-line'
+                    }`}
+                  >
+                    <option value="">Selecione a classe</option>
+                    {OFFICIAL_CLASSES.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  {identityOcrFilled.has('char_class') && (
+                    <p className="text-sm font-semibold text-success">{IDENTITY_OCR_HINT}</p>
+                  )}
+                  {identityError?.field === 'char_class' && (
+                    <p
+                      role="alert"
+                      aria-live="polite"
+                      className="text-sm font-semibold text-destructive"
+                    >
+                      {identityError.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="submit-char-function"
+                    className="text-sm font-semibold text-content"
+                  >
+                    Função
+                  </label>
+                  <select
+                    id="submit-char-function"
+                    value={identity.char_function}
+                    onChange={(e) => handleIdentityFunction(e.target.value as CharFunction)}
+                    aria-invalid={identityError?.field === 'char_function' || undefined}
+                    disabled={ocrRunningStep === 1}
+                    className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+                      identityError?.field === 'char_function'
+                        ? 'border-destructive!'
+                        : 'border-line'
+                    }`}
+                  >
+                    {FUNCTION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {identityError?.field === 'char_function' && (
+                    <p
+                      role="alert"
+                      aria-live="polite"
+                      className="text-sm font-semibold text-destructive"
+                    >
+                      {identityError.message}
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex flex-col gap-1">
                   <label htmlFor="combat-power" className="text-sm font-semibold text-content">
                     Poder de Combate
@@ -472,7 +800,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                 capture={
                   <OcrCapture
                     capture={STEP_GROUP[step]}
-                    onOutcomes={(outcomes) => applyOcrOutcomes(step, outcomes)}
+                    onOutcomes={(outcomes) => applyStepOcrOutcomes(step, outcomes)}
                     onReadFailed={() => handleOcrReadFailed(step)}
                     onRunStateChange={(running) => handleOcrRunState(step, running)}
                   />
