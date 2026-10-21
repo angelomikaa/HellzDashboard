@@ -14,9 +14,9 @@
 // filter, same empty state.
 //
 // 07.2-05 presentation rework (D-14 full-bleed immersive register): the page
-// root becomes a full-bleed dark hero — backdrop-neon-grid spanning the full
-// content width with a centered content column inside (max-w-6xl, the D-21
-// pre-pass for this surface), an oversized 'Destaques' hero with the 'Os
+// root becomes a full-bleed dark hero — the neon grid now comes from the app
+// shell (owner decision 2026-10-21), with a centered content column inside
+// (max-w-6xl, the D-21 pre-pass for this surface), an oversized 'Destaques' hero with the 'Os
 // Impecáveis da Hellz' subline in a static glow-accent pill (static only,
 // 07.1 D-05 — nothing animates), and per-class sections as dramatic bordered
 // panels headed by the class crest (D-17 game grounding, D-16 monogram
@@ -104,16 +104,16 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
   }
 
   return (
-    // D-14: full-bleed immersive register — the grid backdrop spans the full
-    // content width; the content itself sits in a centered column (max-w-6xl,
-    // D-21 pre-pass for this surface — plan 06 widens the app container).
+    // D-14: full-bleed immersive register — the neon grid backdrop now comes
+    // from the app shell (owner decision 2026-10-21: app-wide background), so
+    // this container no longer paints its own — no double grid.
     //
     // Checkpoint round 2 spacing normalization: ONE rhythm scale across the
     // page — gap-8 between major page blocks (hero ↔ sections, section ↔
     // section), gap-6 inside a section (header ↔ grid, grid gutters),
     // p-6/sm:p-8 section padding, symmetric pt-8/pb-8 page framing. No more
     // mixed mt-4/gap-5/p-5/pb-6 steps.
-    <div className="backdrop-neon-grid flex flex-col gap-8">
+    <div className="flex flex-col gap-8">
       <header className="flex flex-col items-center gap-4 pt-8 text-center sm:pt-12">
         <h1 className="font-display text-5xl font-semibold tracking-wide text-content sm:text-6xl">
           Destaques

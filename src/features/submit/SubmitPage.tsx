@@ -35,7 +35,6 @@ import { ReviewStep } from './ReviewStep'
 import { OCR_FIELD_FAILURE, StatGroupStep } from './StatGroupStep'
 import { INVALID_HINT, statFieldFeedback } from './fieldValidation'
 import {
-  OFFICIAL_CLASSES,
   validateIdentity,
   validateIdentityDraft,
   type BasicProfileFields,
@@ -72,11 +71,14 @@ export type IdentityField = 'char_id' | 'nickname' | 'char_class' | 'char_functi
 type TextIdentityField = 'char_id' | 'nickname' | 'char_class'
 type IdentityTouched = Partial<Record<IdentityField, boolean>>
 
-// The pointed build role is a human choice (D-03/D-19) — labels match the
-// request form's select.
+// The pointed build role is a human choice (D-03/D-19) — owner round 2026-10-21:
+// descriptive labels beat the short tokens (DPS/M-DPS confused players).
+// The class selector is GONE from the UI (owner decision): char_class is the
+// member's registered class (registry prefill, validated server-side) — a job
+// change goes through staff identity correction, not the submission form.
 const FUNCTION_OPTIONS: ReadonlyArray<{ value: CharFunction; label: string }> = [
-  { value: 'dps', label: 'DPS' },
-  { value: 'mdps', label: 'M-DPS' },
+  { value: 'dps', label: 'DPS Físico' },
+  { value: 'mdps', label: 'DPS Mágico' },
   { value: 'suporte', label: 'Suporte' },
 ]
 
@@ -602,9 +604,10 @@ export function SubmitPage({ session }: SubmitPageProps) {
               <div className="flex max-w-md flex-col gap-4">
                 {/* Identity (08-04, IDEN-01/02): mandatory on every
                     submission. The Basic read prefills the untouched fields
-                    (green hint) and every field stays human-editable; Classe/
-                    Função start from the registry row and char_function is
-                    NEVER OCR-derived (D-03/D-19). */}
+                    (green hint) and every field stays human-editable. The
+                    class selector is intentionally absent (owner decision
+                    2026-10-21): char_class rides along as the registry row's
+                    class, and char_function is NEVER OCR-derived (D-03/D-19). */}
                 <div className="flex flex-col gap-1">
                   <label htmlFor="submit-char-id" className="text-sm font-semibold text-content">
                     ID do personagem
@@ -660,41 +663,6 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     <p className="text-sm font-semibold text-success">{IDENTITY_OCR_HINT}</p>
                   )}
                   {identityError?.field === 'nickname' && (
-                    <p
-                      role="alert"
-                      aria-live="polite"
-                      className="text-sm font-semibold text-destructive"
-                    >
-                      {identityError.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="submit-char-class" className="text-sm font-semibold text-content">
-                    Classe
-                  </label>
-                  <select
-                    id="submit-char-class"
-                    value={identity.char_class}
-                    onChange={(e) => handleIdentityChange('char_class', e.target.value)}
-                    aria-invalid={identityError?.field === 'char_class' || undefined}
-                    disabled={ocrRunningStep === 1}
-                    className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
-                      identityError?.field === 'char_class' ? 'border-destructive!' : 'border-line'
-                    }`}
-                  >
-                    <option value="">Selecione a classe</option>
-                    {OFFICIAL_CLASSES.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                  {identityOcrFilled.has('char_class') && (
-                    <p className="text-sm font-semibold text-success">{IDENTITY_OCR_HINT}</p>
-                  )}
-                  {identityError?.field === 'char_class' && (
                     <p
                       role="alert"
                       aria-live="polite"

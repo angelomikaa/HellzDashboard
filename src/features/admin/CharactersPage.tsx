@@ -17,10 +17,9 @@
 // removal, owner rows untouchable), so the per-viewer rendering below is
 // UX-only gating per the house pattern (02-02 precedent). Role changes take
 // effect at the next login (D-10) — the success copy says so.
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import {
   ApiError,
-  createClass,
   fetchClasses,
   fetchStaffMembers,
   addMember,
@@ -47,7 +46,6 @@ const NETWORK_ERROR =
   'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 const SESSION_ERROR = 'Sua sessão expirou ou você não tem permissão. Entre novamente.'
 const SAVE_ERROR = 'Falha ao salvar — tente novamente.'
-const ADD_CLASS_ERROR = 'Não foi possível adicionar. Verifique a conexão.'
 
 // Staff-action feedback copy (06-UI-SPEC Surface 3, locked verbatim).
 const ROLE_UPDATED_MESSAGE = 'Papel atualizado. Efetivo no próximo login.'
@@ -71,12 +69,6 @@ interface Draft {
   charClass: string
   charFunction: 'dps' | 'mdps' | 'suporte'
 }
-
-type AddClassState =
-  | { kind: 'idle' }
-  | { kind: 'saving' }
-  | { kind: 'saved'; name: string }
-  | { kind: 'error' }
 
 // Per-row feedback for the shared state machine: the success text differs per
 // action (edit vs role change vs removal/reactivation), so the row state
@@ -165,10 +157,6 @@ export function CharactersPage({
   const [data, setData] = useState<{ members: StaffMember[]; classes: string[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Add-class form (REG-02)
-  const [newClassName, setNewClassName] = useState('')
-  const [addClassState, setAddClassState] = useState<AddClassState>({ kind: 'idle' })
-
   // Inline edit (REG-01) — a single row is editable at a time. The same
   // per-row state machine + single-flight lock serves the staff controls.
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -184,6 +172,13 @@ export function CharactersPage({
   const [filterClass, setFilterClass] = useState('')
   const [filterFunction, setFilterFunction] = useState<'' | 'dps' | 'mdps' | 'suporte'>('')
   const [pinFilter, setPinFilter] = useState<'all' | 'pending' | 'active'>('all')
+  // 2026-10-21 round: each filter category hides behind a collapsible divider
+  // (collapsed by default) so the token rows stop eating the page.
+  const [openFilters, setOpenFilters] = useState<Record<'pin' | 'class' | 'function', boolean>>({
+    pin: false,
+    class: false,
+    function: false,
+  })
 
   // Add-member panel (WHIT-01/06/07).
   const [addHandle, setAddHandle] = useState('')
@@ -228,7 +223,7 @@ export function CharactersPage({
   }, [load])
 
   // Any in-flight request disables every CTA on the page.
-  const busy = addClassState.kind === 'saving' || savingRowId !== null
+  const busy = savingRowId !== null
 
   // View aid only (owner feedback): apply the token filters to the loaded
   // roster; null char_class rows match the "Todas" class filter only.
@@ -253,28 +248,6 @@ export function CharactersPage({
 
   // Confirm-modal copy for the pending staff action (null → dialog closed).
   const confirm = pendingAction === null ? null : confirmConfig(pendingAction)
-
-  async function handleAddClass(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const name = newClassName.trim()
-    if (name === '' || busy) return
-    setAddClassState({ kind: 'saving' })
-    try {
-      await createClass(session, name)
-      setNewClassName('')
-      setAddClassState({ kind: 'saved', name })
-      // Refresh the dropdown so the new class is immediately selectable. A
-      // refresh failure keeps the stale list — the insert itself succeeded.
-      try {
-        const classes = await fetchClasses(session)
-        setData((d) => (d ? { ...d, classes } : d))
-      } catch {
-        /* stale dropdown; success copy still shown */
-      }
-    } catch {
-      setAddClassState({ kind: 'error' })
-    }
-  }
 
   function startEdit(member: MemberRow) {
     setSavedRow(null)
@@ -474,54 +447,9 @@ export function CharactersPage({
         <p className="mt-6 text-base text-muted">Carregando…</p>
       ) : (
         <>
-          {/* Add-class form (REG-02) — OWNER-only (D-09, folded todo
-              owner-only-class-management): server policy staff_insert_classes
-              is owner-only (0011) — this gate is UX-only per the house
-              pattern. Officers get no form, no placeholder: the section
-              simply doesn't exist in their DOM. */}
-          {isOwner && (
-            <>
-              <form
-                onSubmit={handleAddClass}
-                noValidate
-                className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end"
-              >
-                <div className="flex flex-1 flex-col gap-2">
-                  <label htmlFor="new-class" className="text-sm font-semibold text-content">
-                    Nova classe
-                  </label>
-                  <input
-                    id="new-class"
-                    type="text"
-                    autoComplete="off"
-                    value={newClassName}
-                    onChange={(e) => setNewClassName(e.target.value)}
-                    disabled={busy}
-                    className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={busy || newClassName.trim() === ''}
-                  className="h-11 shrink-0 rounded-md border border-line px-4 text-base font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Adicionar Classe
-                </button>
-              </form>
-              {addClassState.kind === 'saved' && (
-                <p className="mt-2 text-sm font-semibold text-success">{`Classe "${addClassState.name}" adicionada.`}</p>
-              )}
-              {addClassState.kind === 'error' && (
-                <p
-                  role="alert"
-                  aria-live="polite"
-                  className="mt-2 text-sm font-semibold text-destructive"
-                >
-                  {ADD_CLASS_ERROR}
-                </p>
-              )}
-            </>
-          )}
+          {/* Add-class UI REMOVED (owner decision 2026-10-21): classes are
+              added via code/seed when needed — the owner-only staff_insert_
+              classes policy stays, only the form is gone. */}
 
           {/* Add member (WHIT-01/06/07) */}
           <form
@@ -574,38 +502,53 @@ export function CharactersPage({
             </p>
           )}
 
-          {/* PIN filter (D-18) */}
-          <div className="mt-6 flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-muted">PIN</span>
-            {(['all', 'pending', 'active'] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setPinFilter(f)}
-                aria-pressed={pinFilter === f}
-                className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                  pinFilter === f
-                    ? 'border-accent bg-accent text-accent-foreground'
-                    : 'border-line text-muted hover-control hover:text-content'
-                }`}
-              >
-                {f === 'all' ? 'Todos' : f === 'pending' ? 'PIN pendente' : 'PIN ativo'}
-              </button>
-            ))}
-          </div>
-
           {data.members.length === 0 ? (
             <p className="mt-6 text-center text-base text-muted">
               Nenhum membro na lista branca ainda.
             </p>
           ) : (
             <>
-              {/* Owner feedback (07.2-06 checkpoint): token filters by class
-                  and function. Chips only narrow the already-loaded roster —
-                  no data flow change, the D-08 matrix still renders per row. */}
-              <div className="mt-6 flex flex-col gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-muted">Classe</span>
+              {/* Owner feedback (07.2-06 checkpoint): token filters by class and
+                  function. 2026-10-21 round: the token rows were too cramped —
+                  each category now lives behind its own collapsible divider
+                  (collapsed by default; the header always shows the active
+                  selection). Chips only narrow the already-loaded roster — no
+                  data flow change, the D-08 matrix still renders per row. */}
+              <div className="mt-6 flex flex-col gap-2">
+                <FilterDisclosure
+                  id="pin"
+                  label="PIN"
+                  value={pinFilter === 'all' ? 'Todos' : pinFilter === 'pending' ? 'PIN pendente' : 'PIN ativo'}
+                  open={openFilters.pin}
+                  onToggle={() =>
+                    setOpenFilters((prev) => ({ ...prev, pin: !prev.pin }))
+                  }
+                >
+                  {(['all', 'pending', 'active'] as const).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setPinFilter(f)}
+                      aria-pressed={pinFilter === f}
+                      className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                        pinFilter === f
+                          ? 'border-accent bg-accent text-accent-foreground'
+                          : 'border-line text-muted hover-control hover:text-content'
+                      }`}
+                    >
+                      {f === 'all' ? 'Todos' : f === 'pending' ? 'PIN pendente' : 'PIN ativo'}
+                    </button>
+                  ))}
+                </FilterDisclosure>
+                <FilterDisclosure
+                  id="class"
+                  label="Classe"
+                  value={filterClass === '' ? 'Todas' : filterClass}
+                  open={openFilters.class}
+                  onToggle={() =>
+                    setOpenFilters((prev) => ({ ...prev, class: !prev.class }))
+                  }
+                >
                   <button
                     type="button"
                     onClick={() => setFilterClass('')}
@@ -633,9 +576,16 @@ export function CharactersPage({
                       {className}
                     </button>
                   ))}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-muted">Função</span>
+                </FilterDisclosure>
+                <FilterDisclosure
+                  id="function"
+                  label="Função"
+                  value={filterFunction === '' ? 'Todas' : FUNCTION_LABELS[filterFunction]}
+                  open={openFilters.function}
+                  onToggle={() =>
+                    setOpenFilters((prev) => ({ ...prev, function: !prev.function }))
+                  }
+                >
                   <button
                     type="button"
                     onClick={() => setFilterFunction('')}
@@ -665,7 +615,7 @@ export function CharactersPage({
                       </button>
                     ),
                   )}
-                </div>
+                </FilterDisclosure>
               </div>
               {visibleMembers.length === 0 ? (
                 <p className="mt-6 text-center text-base text-muted">
@@ -872,7 +822,12 @@ export function CharactersPage({
                           {isStaff && (
                             <button
                               type="button"
-                              onClick={() => openIdentityPanel(member)}
+                              onClick={() =>
+                                identityMemberId === member.id
+                                  ? setIdentityMemberId(null)
+                                  : openIdentityPanel(member)
+                              }
+                              aria-expanded={identityMemberId === member.id}
                               disabled={busy}
                               className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                             >
@@ -955,126 +910,132 @@ export function CharactersPage({
                         </span>
                       )}
                     </div>
+                    {/* Identity panel INLINE with the character (owner
+                        decision 2026-10-21): opening "Identidade" expands
+                        the correction form + history right under the row,
+                        not at the bottom of the page. */}
+                    {identityMemberId === member.id && (
+                      <div className="mt-4 border-t border-line pt-4">
+                        <h3 className="text-base font-semibold text-content">Identidade</h3>
+                        {identityLoading ? (
+                          <p className="mt-2 text-sm text-muted">Carregando…</p>
+                        ) : (
+                          <>
+                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                              <div className="flex flex-col gap-1">
+                                <label className="text-sm font-semibold text-content">ID</label>
+                                <input
+                                  type="text"
+                                  value={identityDraft?.char_id ?? ''}
+                                  onChange={(e) =>
+                                    setIdentityDraft((d) => (d ? { ...d, char_id: e.target.value } : d))
+                                  }
+                                  className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-sm font-semibold text-content">Nick</label>
+                                <input
+                                  type="text"
+                                  value={identityDraft?.nickname ?? ''}
+                                  onChange={(e) =>
+                                    setIdentityDraft((d) => (d ? { ...d, nickname: e.target.value } : d))
+                                  }
+                                  className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-sm font-semibold text-content">Classe</label>
+                                <select
+                                  value={identityDraft?.char_class ?? ''}
+                                  onChange={(e) =>
+                                    setIdentityDraft((d) => (d ? { ...d, char_class: e.target.value } : d))
+                                  }
+                                  className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
+                                >
+                                  <option value="">—</option>
+                                  {OFFICIAL_CLASSES.map((c) => (
+                                    <option key={c} value={c}>
+                                      {c}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-sm font-semibold text-content">Função</label>
+                                <select
+                                  value={identityDraft?.char_function ?? 'dps'}
+                                  onChange={(e) =>
+                                    setIdentityDraft((d) =>
+                                      d ? { ...d, char_function: e.target.value as CharFunction } : d,
+                                    )
+                                  }
+                                  className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
+                                >
+                                  {(Object.keys(FUNCTION_LABELS) as Array<keyof typeof FUNCTION_LABELS>).map(
+                                    (role) => (
+                                      <option key={role} value={role}>
+                                        {FUNCTION_LABELS[role]}
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              </div>
+                            </div>
+                            {identityError && (
+                              <p role="alert" className="mt-2 text-sm font-semibold text-destructive">
+                                {identityError}
+                              </p>
+                            )}
+                            {identityFeedback && (
+                              <p className="mt-2 text-sm font-semibold text-success">
+                                {identityFeedback}
+                              </p>
+                            )}
+                            <div className="mt-4 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleIdentitySave()}
+                                disabled={identitySaving}
+                                className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground"
+                              >
+                                Salvar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setIdentityMemberId(null)}
+                                className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content"
+                              >
+                                Fechar
+                              </button>
+                            </div>
+                            <div className="mt-4">
+                              <h4 className="text-sm font-semibold text-content">Histórico</h4>
+                              {identityHistory === null ? (
+                                <p className="text-sm text-muted">—</p>
+                              ) : identityHistory.length === 0 ? (
+                                <p className="text-sm text-muted">Sem histórico.</p>
+                              ) : (
+                                <ul className="mt-2 space-y-1">
+                                  {identityHistory.map((h) => (
+                                    <li key={h.id} className="text-sm text-muted">
+                                      <span className="font-mono">{h.char_id}</span> — {h.nickname} — {h.char_class} —{' '}
+                                      {h.char_function} — {h.source}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </article>
                 )
               })}
             </div>
               )}
             </>
-          )}
-          {identityMemberId !== null && (
-            <div className="mt-6 rounded-lg border border-line bg-surface p-4">
-              <h3 className="text-base font-semibold text-content">Identidade</h3>
-              {identityLoading ? (
-                <p className="mt-2 text-sm text-muted">Carregando…</p>
-              ) : (
-                <>
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-semibold text-content">ID</label>
-                      <input
-                        type="text"
-                        value={identityDraft?.char_id ?? ''}
-                        onChange={(e) =>
-                          setIdentityDraft((d) => (d ? { ...d, char_id: e.target.value } : d))
-                        }
-                        className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-semibold text-content">Nick</label>
-                      <input
-                        type="text"
-                        value={identityDraft?.nickname ?? ''}
-                        onChange={(e) =>
-                          setIdentityDraft((d) => (d ? { ...d, nickname: e.target.value } : d))
-                        }
-                        className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-semibold text-content">Classe</label>
-                      <select
-                        value={identityDraft?.char_class ?? ''}
-                        onChange={(e) =>
-                          setIdentityDraft((d) => (d ? { ...d, char_class: e.target.value } : d))
-                        }
-                        className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
-                      >
-                        <option value="">—</option>
-                        {OFFICIAL_CLASSES.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-semibold text-content">Função</label>
-                      <select
-                        value={identityDraft?.char_function ?? 'dps'}
-                        onChange={(e) =>
-                          setIdentityDraft((d) =>
-                            d ? { ...d, char_function: e.target.value as CharFunction } : d,
-                          )
-                        }
-                        className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
-                      >
-                        {(Object.keys(FUNCTION_LABELS) as Array<keyof typeof FUNCTION_LABELS>).map(
-                          (role) => (
-                            <option key={role} value={role}>
-                              {FUNCTION_LABELS[role]}
-                            </option>
-                          ),
-                        )}
-                      </select>
-                    </div>
-                  </div>
-                  {identityError && (
-                    <p role="alert" className="mt-2 text-sm font-semibold text-destructive">
-                      {identityError}
-                    </p>
-                  )}
-                  {identityFeedback && (
-                    <p className="mt-2 text-sm font-semibold text-success">{identityFeedback}</p>
-                  )}
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleIdentitySave()}
-                      disabled={identitySaving}
-                      className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground"
-                    >
-                      Salvar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIdentityMemberId(null)}
-                      className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content"
-                    >
-                      Fechar
-                    </button>
-                  </div>
-                  <div className="mt-4">
-                    <h4 className="text-sm font-semibold text-content">Histórico</h4>
-                    {identityHistory === null ? (
-                      <p className="text-sm text-muted">—</p>
-                    ) : identityHistory.length === 0 ? (
-                      <p className="text-sm text-muted">Sem histórico.</p>
-                    ) : (
-                      <ul className="mt-2 space-y-1">
-                        {identityHistory.map((h) => (
-                          <li key={h.id} className="text-sm text-muted">
-                            <span className="font-mono">{h.char_id}</span> — {h.nickname} — {h.char_class} —{' '}
-                            {h.char_function} — {h.source}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
           )}
         </>
       )}
@@ -1096,6 +1057,60 @@ export function CharactersPage({
 
 // ---- Testable helpers (node env) ----
 export type PinFilter = 'all' | 'pending' | 'active'
+
+/** Collapsible filter divider (owner feedback 2026-10-21): the token rows
+ *  were too cramped, so each filter category hides behind its own divider —
+ *  collapsed by default, the header always shows the active selection. Same
+ *  disclosure pattern as the dashboard CollapsibleGroup: the body stays in
+ *  the DOM (aria-controls resolves in both states) and only the className
+ *  swaps, never `hidden` + a display rule together. */
+function FilterDisclosure({
+  id,
+  label,
+  value,
+  open,
+  onToggle,
+  children,
+}: {
+  id: string
+  label: string
+  value: string
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={`filter-${id}`}
+        className="flex h-11 w-full items-center justify-between rounded-md border border-line bg-surface px-3 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <span>{label}</span>
+        <span className="flex items-center gap-2">
+          <span className="font-normal text-muted">{value}</span>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            width="16"
+            height="16"
+            className={`shrink-0 text-muted transition-transform ${open ? 'rotate-90' : ''}`}
+          >
+            <path fill="currentColor" d="M6 3l5 5-5 5z" />
+          </svg>
+        </span>
+      </button>
+      <div
+        id={`filter-${id}`}
+        className={open ? 'mt-2 flex flex-wrap items-center gap-2' : 'hidden'}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
 
 export function pinBadgeLabel(pin_set: boolean): string {
   return pin_set ? 'PIN ativo' : 'PIN pendente'
