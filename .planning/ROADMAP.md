@@ -102,7 +102,7 @@ Plans:
   5. Trust-boundary hygiene holds: handles with the dummy sentinel prefix are rejected at add time, and legacy placeholder-PIN whitelist rows are converted to the claim flow (their next login routes to first-login PIN setup, and their lockout rows are cleared)
   6. (Owner feedback 2026-10-20) A player can submit a membership request without staff help; officers approve/reject it in Validações; approval reuses the handle-only `add_member` path and a pending request grants zero data access — a requester can check their own status
   7. (Owner feedback 2026-10-20) Each submission captures the in-game ID, nickname and job(s) with OCR pre-fill + manual correction, stored PER SUBMISSION (append-only history) so job swaps are traceable; the latest validated submission supplies the card nickname, and staff can view the identity history (members cannot)
-**Plans**: 6 plans created (08-01..08-06); execution pending
+**Plans**: 6 plans created (08-01..08-06); 2/6 executed (08-01 migration + 08-02 Edge Functions live) — 08-03 next
 
 Cross-cutting constraints: deploy order invariant — migration 0014 (nullable `pin_hash` + the identity-capture columns/table; renumbered: Phase 7's catalog migration took 0012, Phase 07.2 takes 0013) → patched `verify-pin` + new `setup-pin` Edge Functions live → first `add_member` use (the null-hash branch must precede the bcrypt compare or pinless members 500); `add_member` stays the ONLY write surface on `members` (no new RLS policy, no direct INSERT); inactive members must NEVER receive `pin_setup_required` (uniform 401 — branch ordering is a smoke-probed must-have); membership requests are a separate table with RPC-only writes (insert = anon-safe request; approve/reject = staff-gated SECURITY DEFINER) — a pending request is never a member row.
 **UI hint**: yes
@@ -151,7 +151,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 (8 is independent and coul
 | 5. OCR Auto-Read Layer | v1.0 | 5/5 | Complete | 2026-10-12 |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | v1.0 | 7/7 | Complete | 2026-10-13 |
 | 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 4/4 | Complete    | 2026-10-15 |
-| 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 1/6 | In Progress|  |
+| 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 2/6 | In Progress|  |
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 0/0 | Not started | - |
 | 10. Personalized Home Landing Tab | v1.1 | 0/0 | Not started | - |
 

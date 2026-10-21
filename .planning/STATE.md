@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: Completed 08-01-PLAN.md (migration 0014 + identity-proofs storage live; smoke-identity 81/81 twice)
-last_updated: "2026-10-21T05:46:21.768Z"
-last_activity: "2026-10-21 -- 08-01 executed: migration 0014 + identity-proofs storage seed applied LIVE, schema_migrations 0014 recorded, smoke-identity 81/81 twice with zero residue, rank/card/officer/lifecycle/promotion/rls regressions green, build green"
+stopped_at: Completed 08-02-PLAN.md (verify-pin 409 + setup-pin + request-access deployed LIVE; smoke-identity 117/117 twice)
+last_updated: "2026-10-21T06:28:05.538Z"
+last_activity: "2026-10-21 -- 08-02 executed: verify-pin 409 unclaimed branch + setup-pin + request-access deployed LIVE in dependency order; smoke-identity 117/117 twice with zero residue; build + deno check green"
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 18
-  completed_plans: 13
-  percent: 72
+  completed_plans: 14
+  percent: 78
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 08 (whitelist-lifecycle-self-request-whitelisting-first-login-pi) — EXECUTING
-Plan: 2 of 6 (08-01 complete; 08-02 next)
-Status: 0014 + identity-proofs storage live and smoke-green; Edge Functions (08-02) not yet deployed
-Last activity: 2026-10-21 -- 08-01 executed: migration 0014 + storage seed applied LIVE, schema_migrations 0014 recorded, smoke-identity 81/81 twice + rank/card/officer/lifecycle/promotion/rls regressions green
+Plan: 3 of 6 (08-02 complete; 08-03 next)
+Status: Auth boundary LIVE — verify-pin 409 unclaimed, setup-pin claim, request-access intake all deployed and smoke-green (117/117 twice)
+Last activity: 2026-10-21 -- 08-02 executed: Edge Functions deployed in dependency order, live probes green, no secrets in any output
 
 ## Accumulated Context
 
@@ -81,11 +81,17 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 08]: 08-01: create_submission became SECURITY DEFINER (live 403 proved an invoker body cannot call the internal assert_char_id_available guard). The JWT member_id claim is still the only identity, an explicit active-member check replaces the 0004 insert policy, and the one-pending discard is scoped to the caller's own rows. — Granting the guard to authenticated would let members probe char_id existence; definer + explicit scoping matches every other member-facing RPC in the codebase.
 - [Phase 08]: 08-01: get_promotion in migration 0014 was copied from the LIVE supersession seed (promotion-rating-unification.sql), not migration 0013 - the 0013 body would have regressed photo_path and the class+function rating parity shipped in 07.2 round 8 — The live function is the source of truth; every 0014 copy is byte-faithful to what production actually runs.
 - [Phase 08]: 08-01: approve_request calls assert_char_id_available(char_id, existing_member_id, p_request) - passing null for p_request (as the plan literally said) would always raise duplicate_char_id against the request's own pending row
+- [Phase 08]: 08-02: deployed verify-pin, setup-pin and request-access with 'supabase functions deploy <fn> --project-ref <ref> --use-api' one at a time in dependency order - no Docker in this environment and --use-api bundles the shared modules remotely
+- [Phase 08]: 08-02: the verify-pin 409 unclaimed branch records a failure through the existing record_pin_failure counter (no second throttle) and burns a dummy bcrypt compare, so an unclaimed handle is rate-limited exactly like a wrong PIN and the body stays {error:'pin_setup_required'} only
+- [Phase 08]: 08-02: setup-pin refuses a handle whose pin_hash is already set BEFORE the proof upload, so a replay can never leave an orphan object; the smoke proves it by comparing the claims/<member_id>/ object count around the replay
+- [Phase 08]: 08-02: request-access returns only {request_id,status:'pending'} - the id is what the UI polls request_status with and it carries no identity; the superseded proof object is purged server-side after the new request commits
+- [Phase 08]: 08-02: the Supabase gateway answers 503 for ~4 MB function bodies before the function runs, so the client cap is a <=2 MB JPEG and the server 413 is proved with a 2.3 MB image (effective residual risk tracked in deferred-items.md alongside the pre-existing record_pin_failure first-failure off-by-one)
 
 ### Blockers/Concerns (open — carry to next milestone)
 
 - **[Pre-release] HARD GATE (SEED-02): run the dummy purge before ANY release** — `node scripts/apply-seed.mjs supabase/seeds/dummy/purge-dummies.sql` then the zero-dummy verification query (four zeros across members/submissions/submission_stats/pin_login_attempts). Dummies are LIVE and resident by owner decision 7; shipping without the purge exposes dummy names on Destaques and distorts every real member's ranks.
 - **[Operational] Do NOT revoke JWT signing key 6f7657c3** (standby) — revoking it kills every member session instantly
+- **[Security, pre-existing] Lockout counts one attempt late for a handle with no prior row** — `record_pin_failure`'s INSERT branch returns `0`, so the first wrong PIN reads as "5 remaining" and a fresh handle locks on the 6th failure. Discovered by 08-02 probes; needs a function replacement (migration), tracked as item 1 in `.planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/deferred-items.md`
 - **[Pre-launch] Rotate placeholder whitelist rows/PINs before inviting real members** (credentials/hashes recoverable from git history, WR-06; standing action since 03-02). Supabase access token rotation DONE 2026-10-16 (old token was revoked; owner issued a fresh one — value held in session env only, never stored)
 - **[Pre-launch] Owner must replace `public/examples/*.svg`** placeholder example shots with real game screenshots before inviting real members (acknowledged 02-03 UAT step 8)
 - **[Pending live op] Catalog re-seed of the 6 reclassified flat damage stats** (pve_dmg_bonus, pvp_dmg_bonus, mdmg_bonus, pdmg_bonus, pve_dmg_reduction, pvp_dmg_reduction → 'flat', D-05-UAT-10) via apply-seed.mjs was auth-gated and never run — live catalog still shows the superseded value_type for those six
@@ -102,9 +108,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-21T05:46:21.714Z
-Stopped at: Completed 08-01-PLAN.md (migration 0014 + identity-proofs storage live; smoke-identity 81/81 twice)
-Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/08-02-PLAN.md
+Last session: 2026-10-21T06:28:05.466Z
+Stopped at: Completed 08-02-PLAN.md (verify-pin 409 + setup-pin + request-access deployed LIVE; smoke-identity 117/117 twice)
+Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/08-03-PLAN.md
 
 ## Performance Metrics
 
@@ -120,6 +126,7 @@ Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-f
 | 07.2 | 07.2-03 | ~73 min (RED→GREEN TDD) | 3 | 10 | 2026-10-20 |
 | 07.2 | 07.2-04 | ~45 min | 2 | 4 | 2026-10-20 |
 | 08 | 08-01 | ~31 min | 3 | 3 | 2026-10-21 |
+| 08 | 08-02 | ~35 min | 4 | 5 | 2026-10-21 |
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*
