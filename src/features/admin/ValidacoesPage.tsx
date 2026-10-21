@@ -17,6 +17,8 @@ import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER, type GroupKey } from '../..
 import { formatStatValue } from '../../lib/parseStatValue'
 import { ClassCrest } from '../assets/ClassCrest'
 import { ConfirmDialog } from './ConfirmDialog'
+import { IdentityReview } from './IdentityReview'
+import { RequestReview } from './RequestReview'
 import type { NeoFootSession } from '../auth/session'
 
 // Enumeration-safe pt-BR copy (UI contract): never expose HTTP codes, gateway
@@ -42,7 +44,10 @@ const DEFAULT_OPEN_GROUPS: Record<GroupKey, boolean> = {
   special: false,
 }
 
+export type ValidacoesTab = 'envios' | 'solicitacoes' | 'identidades'
+
 export function ValidacoesPage({ session }: { session: NeoFootSession }) {
+  const [tab, setTab] = useState<ValidacoesTab>('envios')
   const [rows, setRows] = useState<OfficerQueueRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -155,6 +160,29 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
       <h2 className="text-xl font-semibold text-content">Validações</h2>
       <p className="mt-1 text-sm text-muted">Revise e valide os envios pendentes da guilda.</p>
 
+      <div className="mt-4 flex gap-2" role="tablist" aria-label="Validações">
+        {(['envios', 'solicitacoes', 'identidades'] as ValidacoesTab[]).map((t) => {
+          const label = t === 'envios' ? 'Envios' : t === 'solicitacoes' ? 'Solicitações' : 'Identidades'
+          return (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={`h-10 rounded-md px-4 text-sm font-semibold ${
+                tab === t
+                  ? 'bg-accent text-accent-foreground'
+                  : 'border border-line text-content hover-control'
+              }`}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className={tab === 'envios' ? 'mt-6' : 'mt-6 hidden'} role="tabpanel">
       {error !== null ? (
         <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-destructive">
           {error}
@@ -297,6 +325,15 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
           )}
         </>
       )}
+      </div>
+
+      <div className={tab === 'solicitacoes' ? 'mt-6' : 'mt-6 hidden'} role="tabpanel">
+        <RequestReview session={session} />
+      </div>
+
+      <div className={tab === 'identidades' ? 'mt-6' : 'mt-6 hidden'} role="tabpanel">
+        <IdentityReview session={session} />
+      </div>
 
       {/* Destructive confirm: locked copy, destructive-styled confirm button. */}
       <ConfirmDialog
@@ -318,3 +355,16 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
     </section>
   )
 }
+
+// ---- Testable helpers (node env) ----
+export type ValidacoesTabAlias = ValidacoesTab
+export function validacoesTabLabel(tab: ValidacoesTab): string {
+  if (tab === 'envios') return 'Envios'
+  if (tab === 'solicitacoes') return 'Solicitações'
+  return 'Identidades'
+}
+export const VALIDACOES_TABS = ['envios', 'solicitacoes', 'identidades'] as const
+export const DEFAULT_VALIDACOES_TAB: ValidacoesTab = 'envios'
+export const validacoesEmptyEnvios = () => 'Nenhuma submissao aguardando validacao.'
+export const enviosEmptyMessage = validacoesEmptyEnvios
+
