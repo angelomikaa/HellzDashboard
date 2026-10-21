@@ -4,14 +4,28 @@
 // including the supersede retry (previous PIN) and the status copy. The pages
 // render these outcomes; keeping the rules here makes them testable without a
 // DOM (the repo ships node-env Vitest only).
-import { FunctionError, type RequestAccessInput, type RequestStatus } from '../../lib/api'
+import {
+  FunctionError,
+  type RequestAccessInput,
+  type RequestStatus,
+  type StatCatalogEntry,
+} from '../../lib/api'
 import {
   CHAR_FUNCTIONS,
   OFFICIAL_CLASSES,
   validateIdentity,
   type BasicProfileFields,
   type CharFunction,
+  type SubmissionIdentity,
 } from '../submit/identity'
+import {
+  WIZARD_GROUPS,
+  buildStatsPayload,
+  groupComplete,
+  type GroupInputs,
+  type StatPayloadItem,
+  type WizardGroup,
+} from '../submit/wizard'
 
 export const REQUEST_HANDLE_ERROR = 'Informe seu usuário do Discord.'
 export const REQUEST_PIN_ERROR = 'Informe um PIN de 4 dígitos.'
@@ -355,3 +369,172 @@ export function formatRequestDate(iso: string): string {
 /** Official class options for the applicant's select (15 seeded names). */
 export const REQUEST_CLASS_OPTIONS = OFFICIAL_CLASSES
 export const REQUEST_FUNCTION_OPTIONS = CHAR_FUNCTIONS
+
+// ---------------------------------------------------------------------------
+// Prospect application flow (08-04, WHIT-08/09, IDEN-03)
+//
+// The wizard page renders these rules; the network call is injected so the
+// live request-access contract can be asserted without a DOM. The applicant's
+// identity was confirmed on the request form (no second proof) and is sent
+// read-only with the stats.
+// ---------------------------------------------------------------------------
+
+export const PROSPECT_MISSING_COPY = 'Preencha todos os campos obrigatórios.'
+export const PROSPECT_PENDING_COPY = 'Você já tem uma solicitação em análise.'
+export const PROSPECT_DUPLICATE_COPY =
+  'Este ID já está cadastrado. Confira no jogo ou fale com um oficial.'
+export const PROSPECT_CLASS_COPY = 'Selecione uma classe oficial.'
+export const PROSPECT_NETWORK_COPY =
+  'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
+export const PROSPECT_GENERIC_COPY = 'Não foi possível enviar a solicitação. Tente novamente.'
+export const PROSPECT_MEMBER_COPY = 'Este handle já pertence a um membro ativo. Entre com seu PIN.'
+
+export type ProspectStep = 1 | 2 | 3 | 4 | 5
+
+/** The single group→step mapping (same as SubmitPage: combat_power is step 1). */
+export const PROSPECT_STEP_GROUP: Record<2 | 3 | 4, WizardGroup> = {
+  2: 'general',
+  3: 'quasi',
+  4: 'special',
+}
+
+/** Same group→entries rule as SubmitPage: combat_power belongs to step 1. */
+export function prospectGroupEntries(
+  catalog: StatCatalogEntry[],
+  group: WizardGroup,
+): StatCatalogEntry[] {
+  return catalog.filter(
+    (entry) =>
+      entry.group_name === group && !(group === 'general' && entry.stat_key === 'combat_power'),
+  )
+}
+
+/**
+ * Continuar gate: step 1 (optional combat_power) and step 5 always pass;
+ * each stat group requires every required field to parse (wizard rule).
+ */
+export function prospectCanContinue(
+  catalog: StatCatalogEntry[],
+  step: ProspectStep,
+  inputs: GroupInputs,
+): boolean {
+  if (step === 1 || step === 5) return true
+  const group = PROSPECT_STEP_GROUP[step]
+  return groupComplete(prospectGroupEntries(catalog, group), group, inputs)
+}
+
+/** The identity the applicant confirmed on the request form (read-only). */
+export function prospectIdentity(draft: ProspectDraft): SubmissionIdentity {
+  return {
+    char_id: draft.char_id,
+    nickname: draft.nickname,
+    char_class: draft.char_class,
+    char_function: draft.char_function,
+  }
+}
+
+/** The LIVE request-access prospect contract (08-02): pin and confirm_pin are
+ *  both the same 4 digits; stats ride along with the identity. */
+export function buildProspectPayload(
+  draft: ProspectDraft,
+  stats: StatPayloadItem[],
+): RequestAccessInput {
+  return {
+    discord_handle: draft.handle,
+    pin: draft.pin,
+    confirm_pin: draft.pin,
+    request_type: 'prospect',
+    char_id: draft.char_id,
+    nickname: draft.nickname,
+    char_class: draft.char_class,
+    char_function: draft.char_function,
+    proof_data_url: draft.proof_data_url,
+    stats,
+  }
+}
+
+export interface ProspectErrorCopy {
+  message: string
+  /** identity fields are read-only in the wizard — the page shows the message
+   *  next to the summary and offers the way back to the request form */
+  field?: 'char_id' | 'char_class'
+}
+
+export function prospectErrorCopy(error: FunctionError): ProspectErrorCopy {
+  switch (error.code) {
+    case 'request_pending':
+      return { message: PROSPECT_PENDING_COPY }
+    case 'duplicate_char_id':
+      return { message: PROSPECT_DUPLICATE_COPY, field: 'char_id' }
+    case 'unknown_class':
+      return { message: PROSPECT_CLASS_COPY, field: 'char_class' }
+    case 'already_member':
+      return { message: PROSPECT_MEMBER_COPY }
+    case 'network':
+      return { message: PROSPECT_NETWORK_COPY }
+    default:
+      return { message: PROSPECT_GENERIC_COPY }
+  }
+}
+
+/** Owning step of the first missing required label (jump-to-fix). */
+export function prospectStepForMissing(
+  catalog: StatCatalogEntry[],
+  labels: string[],
+): ProspectStep {
+  for (const label of labels) {
+    const entry = catalog.find((candidate) => candidate.label === label)
+    if (entry === undefined) continue
+    if (entry.stat_key === 'combat_power') return 1
+    const index = WIZARD_GROUPS.indexOf(entry.group_name)
+    if (index >= 0) return (index + 2) as 2 | 3 | 4
+  }
+  return 5
+}
+
+export type ProspectSubmitOutcome =
+  | { ok: true; requestId: string }
+  | { ok: false; kind: 'missing'; missingRequired: string[] }
+  | { ok: false; kind: 'blocked'; message: string; field?: 'char_id' | 'char_class' }
+
+export interface ProspectSubmitDeps {
+  requestAccess: (input: RequestAccessInput) => Promise<{ request_id: string; status: 'pending' }>
+}
+
+/**
+ * Validate the (already confirmed) identity, build the stats payload with the
+ * wizard rules, then POST request-access once. The >=56 guard mirrors the
+ * live Edge validation; buildStatsPayload already guarantees the 56 required
+ * fields, so it is defense in depth, not a UX gate. Never touches
+ * create_submission and never mints a session (T-08-28).
+ */
+export async function submitProspectApplication(
+  draft: ProspectDraft,
+  catalog: StatCatalogEntry[],
+  inputs: GroupInputs,
+  deps: ProspectSubmitDeps,
+): Promise<ProspectSubmitOutcome> {
+  const identity = validateIdentity(prospectIdentity(draft))
+  if (!identity.ok) {
+    const field =
+      identity.field === 'char_id' || identity.field === 'char_class' ? identity.field : undefined
+    return { ok: false, kind: 'blocked', message: identity.message, field }
+  }
+
+  const built = buildStatsPayload(catalog, inputs)
+  if (!built.ok) return { ok: false, kind: 'missing', missingRequired: built.missingRequired }
+  if (built.stats.length < 56) {
+    return { ok: false, kind: 'blocked', message: PROSPECT_MISSING_COPY }
+  }
+
+  try {
+    const result = await deps.requestAccess(buildProspectPayload(draft, built.stats))
+    return { ok: true, requestId: result.request_id }
+  } catch (error) {
+    if (error instanceof FunctionError) {
+      const copy = prospectErrorCopy(error)
+      return { ok: false, kind: 'blocked', message: copy.message, field: copy.field }
+    }
+    return { ok: false, kind: 'blocked', message: PROSPECT_NETWORK_COPY }
+  }
+}

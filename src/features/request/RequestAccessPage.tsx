@@ -33,6 +33,9 @@ export type { ProspectDraft } from './requestFlow'
 
 export interface RequestAccessPageProps {
   initialHandle?: string
+  /** Set when returning from the prospect application wizard (08-04): the
+   *  success panel shows the protocol of the request just submitted. */
+  initialRequestId?: string
   onBack: () => void
   onStartApplication: (draft: ProspectDraft) => void
 }
@@ -48,6 +51,7 @@ const OCR_FAILED = 'Não foi possível ler o print. Envie outro print.'
 
 export function RequestAccessPage({
   initialHandle = '',
+  initialRequestId,
   onBack,
   onStartApplication,
 }: RequestAccessPageProps) {
@@ -66,7 +70,7 @@ export function RequestAccessPage({
   const [needsPreviousPin, setNeedsPreviousPin] = useState(false)
   const [previousPin, setPreviousPin] = useState('')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
-  const [requestId, setRequestId] = useState<string | null>(null)
+  const [requestId, setRequestId] = useState<string | null>(initialRequestId ?? null)
   const [proofKey, setProofKey] = useState(0)
 
   const touchedRef = useRef<TouchedFields>({})
