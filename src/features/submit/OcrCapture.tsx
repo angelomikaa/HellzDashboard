@@ -21,6 +21,12 @@
 // (2026-10-12, D-05-UAT-5): the cancel is no longer silent — the step
 // surfaces a cancelled-feedback status line (and the overlay's decline
 // button is relabelled accordingly) that clears on the next upload.
+//
+// Clipboard-first click (owner checkpoint round 14): on Windows a screenshot
+// (PrtScn / Win+Shift+S) lands in the clipboard, so clicking the dropzone
+// tries navigator.clipboard.read() FIRST and only opens the file picker
+// when there is no image (or the API/permission is unavailable). The read
+// stays inside the user gesture and the bytes never leave the device.
 import { useRef, useState, type DragEvent } from 'react'
 import { CropOverlay } from './CropOverlay'
 import type { CaptureKey, OcrFieldOutcome } from './ocr'
@@ -100,6 +106,7 @@ export async function decodeUpload(file: Blob): Promise<ImageBitmap> {
 
 // Locked UI-SPEC copy (definition site — comments describe, never quote).
 const CTA_LABEL = 'Faça upload dos seus status aqui'
+const CTA_HINT = 'Arraste o print ou clique para colar a captura'
 
 const STATUS_READING = 'Lendo captura…'
 const STATUS_DONE = 'Leitura concluída — confira os valores abaixo.'
@@ -135,6 +142,31 @@ export function statusMessage(status: OcrStatus): StatusLine | null {
     case 'cancelled':
       return { text: STATUS_CANCELLED, tone: 'muted' }
   }
+}
+
+/**
+ * The clipboard image as a File, or null when there is nothing usable.
+ * Windows screenshots (PrtScn / Win+Shift+S) arrive as an `image/*` item;
+ * ANY failure — missing API, denied permission, unfocused document, a
+ * clipboard holding only text — degrades to null so the caller can fall
+ * back to the file picker. Never throws.
+ */
+export async function clipboardImage(): Promise<File | null> {
+  const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard
+  if (typeof clipboard?.read !== 'function') return null
+  try {
+    const items = await clipboard.read()
+    for (const item of items) {
+      const type = item.types.find((t) => t.startsWith('image/'))
+      if (type === undefined) continue
+      const blob = await item.getType(type)
+      const ext = type === 'image/jpeg' ? 'jpg' : type.slice('image/'.length)
+      return new File([blob], `captura.${ext}`, { type })
+    }
+  } catch {
+    // Expected: the picker is the fallback path, not an error state.
+  }
+  return null
 }
 
 interface OcrCaptureProps {
@@ -226,6 +258,24 @@ export function OcrCapture({
     onRunStateChange(false)
   }
 
+  /**
+   * Click = clipboard first (round 14): a Windows screenshot is already in
+   * the clipboard, so one click reads it without opening the picker. The
+   * picker only appears when the clipboard has no image — or when there is
+   * no Clipboard API / permission.
+   */
+  function handleZoneClick(): void {
+    if (running || disabled) return
+    void (async () => {
+      const fromClipboard = await clipboardImage()
+      if (fromClipboard !== null) {
+        await handleFile(fromClipboard)
+        return
+      }
+      fileInputRef.current?.click()
+    })()
+  }
+
   return (
     <div className="flex flex-col gap-2">
       {/* Dropzone (owner feedback, 07.2-06 checkpoint round 3): drag a print
@@ -235,7 +285,7 @@ export function OcrCapture({
         type="button"
         disabled={disabled || running}
         aria-busy={running}
-        onClick={() => fileInputRef.current?.click()}
+        onClick={handleZoneClick}
         onDragEnter={(e: DragEvent<HTMLButtonElement>) => {
           e.preventDefault()
           if (!disabled && !running) setDragActive(true)
@@ -282,7 +332,7 @@ export function OcrCapture({
           {running ? 'Lendo captura…' : CTA_LABEL}
         </span>
         <span className="text-sm text-muted">
-          Arraste o print aqui ou clique para selecionar
+          {CTA_HINT}
         </span>
       </button>
       <input
