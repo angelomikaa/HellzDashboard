@@ -6,7 +6,7 @@
 // Authorization: Bearer <session.access_token> (RLS reads the member/role
 // claims from this JWT). Missing Authorization -> empty results (RLS sees no
 // claims); missing apikey -> 401.
-import type { NeoFootSession } from '../features/auth/session'
+import { isValidSession, type NeoFootSession } from '../features/auth/session'
 
 export class ApiError extends Error {
   status: number
@@ -615,3 +615,253 @@ export async function fetchCardPhotoByPath(
     return null
   }
 }
+
+// ---------------------------------------------------------------------------
+// Phase 8 (08-03) — the unauthenticated Edge/RPC surface.
+//
+// These are the ONLY pre-session data paths. Both headers ride every call —
+// apikey (gateway auth) and Authorization: Bearer <anon> (no member JWT yet).
+// The PIN, confirmation and proof image live only in component state and this
+// request body: they are never persisted, logged or put in a URL (T-08-18).
+// FunctionError carries the server's machine token plus lockout counters so
+// pages render pt-BR copy without parsing message strings. Nothing here mints
+// data access: setup-pin returns only the standard session shape, and a
+// request stays staff-gated (T-08-20).
+// ---------------------------------------------------------------------------
+
+export type RequestType = 'member' | 'prospect'
+export type RequestState = 'pending' | 'approved' | 'rejected' | 'superseded'
+
+export interface FunctionErrorExtras {
+  attemptsRemaining?: number
+  retryAfterSeconds?: number
+}
+
+export class FunctionError extends Error {
+  status: number
+  code: string
+  attemptsRemaining?: number
+  retryAfterSeconds?: number
+
+  constructor(status: number, code = 'network', message = code, extras?: FunctionErrorExtras) {
+    super(message)
+    this.name = 'FunctionError'
+    this.status = status
+    this.code = code
+    this.attemptsRemaining = extras?.attemptsRemaining
+    this.retryAfterSeconds = extras?.retryAfterSeconds
+  }
+}
+
+export interface SetupPinInput {
+  discord_handle: string
+  pin: string
+  confirm_pin: string
+  char_id: string
+  nickname: string
+  char_class: string
+  proof_data_url: string
+}
+
+export interface RequestAccessInput {
+  discord_handle: string
+  pin: string
+  confirm_pin: string
+  request_type: RequestType
+  char_id: string
+  nickname: string
+  char_class: string
+  char_function: 'dps' | 'mdps' | 'suporte'
+  proof_data_url: string
+  stats?: { stat_key: string; value: number }[]
+  previous_pin?: string
+}
+
+export interface RequestStatus {
+  status: RequestState
+  request_type: RequestType
+  created_at: string
+  decided_at: string | null
+}
+
+const REQUEST_STATES: readonly RequestState[] = ['pending', 'approved', 'rejected', 'superseded']
+const REQUEST_TYPES: readonly RequestType[] = ['member', 'prospect']
+
+/** Env for the anon surface: same project URL/anon key as REST. */
+function anonEnv(): { supabaseUrl: string; anonKey: string } {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !anonKey) {
+    throw new FunctionError(
+      0,
+      'network',
+      'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY',
+    )
+  }
+  return { supabaseUrl, anonKey }
+}
+
+/** JSON object or null (empty body, JSON null, arrays and junk all -> null). */
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  if (text.trim() === '') return null
+  try {
+    const value = JSON.parse(text) as unknown
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return null
+    return value as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+/**
+ * POST to /functions/v1/<fn> with the anon bearer (never a session).
+ * Non-2xx -> FunctionError with the server's `error` token; a 2xx body that
+ * is not a JSON object is `invalid_response` (shape drift must not reach the
+ * render path).
+ */
+async function edgeFetch<T>(
+  fn: 'setup-pin' | 'request-access' | 'verify-pin',
+  body: unknown,
+): Promise<T> {
+  const { supabaseUrl, anonKey } = anonEnv()
+  let res: Response
+  try {
+    res = await fetch(`${supabaseUrl}/functions/v1/${fn}`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    throw new FunctionError(0, 'network', err instanceof Error ? err.message : 'network error')
+  }
+
+  const text = await res.text().catch(() => '')
+  const parsed = parseJsonObject(text)
+  if (!res.ok) {
+    const code = typeof parsed?.error === 'string' ? parsed.error : 'server_error'
+    const message = typeof parsed?.message === 'string' ? parsed.message : code
+    throw new FunctionError(res.status, code, message, {
+      attemptsRemaining: optionalNumber(parsed?.attempts_remaining),
+      retryAfterSeconds: optionalNumber(parsed?.retry_after_seconds),
+    })
+  }
+  if (parsed === null) {
+    throw new FunctionError(res.status, 'invalid_response', 'empty or non-JSON response')
+  }
+  return parsed as T
+}
+
+/**
+ * First-access claim: validates handle/PIN/proof server-side and returns the
+ * standard session. The caller persists it with saveSession (pages do it).
+ */
+export async function setupPin(input: SetupPinInput): Promise<NeoFootSession> {
+  const body = await edgeFetch<{ session?: unknown }>('setup-pin', input)
+  // A 2xx without a well-formed session is a contract breach, not a login.
+  if (!isValidSession(body.session)) {
+    throw new FunctionError(200, 'invalid_response', 'malformed session')
+  }
+  return body.session
+}
+
+/**
+ * Submit a membership/relink request. Returns the pending request id only —
+ * no session, no PIN echo, no member data.
+ */
+export async function requestAccess(
+  input: RequestAccessInput,
+): Promise<{ request_id: string; status: 'pending' }> {
+  const body = await edgeFetch<{ request_id?: unknown; status?: unknown }>(
+    'request-access',
+    input,
+  )
+  if (typeof body.request_id !== 'string' || body.request_id.length === 0) {
+    throw new FunctionError(200, 'invalid_response', 'malformed request_id')
+  }
+  if (body.status !== 'pending') {
+    throw new FunctionError(200, 'invalid_response', 'unexpected request status')
+  }
+  return { request_id: body.request_id, status: 'pending' }
+}
+
+/** Narrow the four-key status payload; anything else is a contract breach. */
+function asRequestStatus(value: unknown): RequestStatus {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new FunctionError(200, 'invalid_response', 'malformed request_status')
+  }
+  const row = value as Record<string, unknown>
+  const status = row.status
+  const requestType = row.request_type
+  const createdAt = row.created_at
+  const decidedAt = row.decided_at
+  if (
+    typeof status !== 'string' ||
+    !REQUEST_STATES.includes(status as RequestState) ||
+    typeof requestType !== 'string' ||
+    !REQUEST_TYPES.includes(requestType as RequestType) ||
+    typeof createdAt !== 'string' ||
+    createdAt.length === 0 ||
+    (decidedAt !== null && typeof decidedAt !== 'string')
+  ) {
+    throw new FunctionError(200, 'invalid_response', 'malformed request_status')
+  }
+  // Build a closed four-key object: extra columns can never reach the UI
+  // (T-08-21 — status lookup is identity-free by contract).
+  return {
+    status: status as RequestState,
+    request_type: requestType as RequestType,
+    created_at: createdAt,
+    decided_at: decidedAt as string | null,
+  }
+}
+
+/**
+ * Handle-only status lookup (anon RPC). `null` means no request exists.
+ * Returns exactly status/type/created_at/decided_at — never identity fields.
+ */
+export async function fetchRequestStatus(discordHandle: string): Promise<RequestStatus | null> {
+  const { supabaseUrl, anonKey } = anonEnv()
+  let res: Response
+  try {
+    res = await fetch(`${supabaseUrl}/rest/v1/rpc/request_status`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_handle: discordHandle }),
+    })
+  } catch (err) {
+    throw new FunctionError(0, 'network', err instanceof Error ? err.message : 'network error')
+  }
+
+  const text = await res.text().catch(() => '')
+  if (!res.ok) {
+    const parsed = parseJsonObject(text)
+    const code = typeof parsed?.error === 'string' ? parsed.error : 'server_error'
+    const message = typeof parsed?.message === 'string' ? parsed.message : code
+    throw new FunctionError(res.status, code, message, {
+      retryAfterSeconds: optionalNumber(parsed?.retry_after_seconds),
+    })
+  }
+  // PostgREST returns an empty body or JSON null when no request exists.
+  if (text.trim() === '' || text.trim() === 'null') return null
+  let payload: unknown
+  try {
+    payload = JSON.parse(text)
+  } catch {
+    throw new FunctionError(res.status, 'invalid_response', 'malformed request_status')
+  }
+  if (payload === null) return null
+  return asRequestStatus(payload)
+}
+
