@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
-status: executing
-stopped_at: Completed 08-05-PLAN.md (staff lifecycle surface; 520 tests green, build green, lint 0 errors)
+status: complete-pending-verification
+stopped_at: Completed 08-06-PLAN.md (legacy conversion + full battery green; phase pending verification)
 last_updated: "2026-10-21T07:59:00.000Z"
 last_activity: 2026-10-21
 progress:
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 08 (whitelist-lifecycle-self-request-whitelisting-first-login-pi) â€” EXECUTING
-Plan: 6 of 6 (08-05 complete; 08-06 next)
-Status: Staff lifecycle surface live - Personagens add/reset/identity, Validações 3 tabs, rank char_id (520 tests green)
-Last activity: 2026-10-21 -- 08-05 executed: staff API census, Personagens lifecycle, request/identity review panels, rank char_id (520 tests green, build green)
+Plan: 6 of 6 (08-06 complete; phase pending /gsd-verify-work)
+Status: Phase 8 implementation complete (6/6 plans); legacy roster converted; all smoke suites green; ready for /gsd-verify-work
+Last activity: 2026-10-21 -- 08-06 executed: legacy conversion applied (1 officer handle unclaimed; owner+dummies intact), smoke-identity 117/117 twice, full battery green (rls 39? lifecycle 11, officer, promotion, rank, card)
 
 ## Accumulated Context
 

@@ -158,6 +158,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IDEN-01 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
 | IDEN-02 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
 | IDEN-03 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+
+## Phase 8 evidence pointers (2026-10-21)
+
+- WHIT-01/07: 08-01 migration 0014 (add_member) + 08-05 CharactersPage add-member flow + smoke-identity 2a-2e
+- WHIT-02/03/04: 08-02 verify-pin 409 + setup-pin claim + Edge smoke 16a-16i + lockout reuse
+- WHIT-05: 08-05 CharactersPage PIN badges/filter (pin_set) + smoke-identity WHIT-05
+- WHIT-06: 08-01 reset_member_pin + 08-05 owner-only reset + smoke-identity 3a-3c
+- WHIT-08/09: 08-01 request tables/RPCs + 08-03/04 client flows + 08-05 RequestReview + smoke-identity 5/9/10
+- WHIT-10: 08-01 request_status + 08-03 RequestStatusPage + smoke-identity 5b-5c
+- IDEN-01/02: 08-01 create_submission(p_identity) + 08-04 SubmitPage identity + smoke-identity 11a-11e
+- IDEN-03: 08-01 staff_identity_queue/history + 08-05 IdentityReview + smoke-identity 12a-12d
+- Legacy conversion: 08-06 seed (1 officer handle unclaimed; owner + 72 dummies intact); smoke suites all green.
 | SCALE-01 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
 | SCALE-02 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
 | SCALE-03 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
