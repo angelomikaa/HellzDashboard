@@ -262,16 +262,24 @@ export function DashboardPage({
                   charFunction={report.char_function}
                   layout="strip"
                 />
-                {strip.kind !== 'hidden' &&
-                  (strip.kind === 'cards' ? (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-                      {strip.stats.map((k) => (
-                        <KeyStatCard key={k.stat_key} stat={k} />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted">{STRIP_EXPLAINER}</p>
-                  ))}
+                {/* Round 13 (owner checkpoint): the key-stat row gets the
+                    same micro-heading as "Foco de melhoria" — one divider +
+                    label per group, so the two rows read as sibling
+                    sections and never as one mashed grid. */}
+                {strip.kind !== 'hidden' && (
+                  <div className="border-t border-line pt-3">
+                    <h2 className="text-sm font-semibold text-muted">Stats-chave</h2>
+                    {strip.kind === 'cards' ? (
+                      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+                        {strip.stats.map((k) => (
+                          <KeyStatCard key={k.stat_key} stat={k} />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-muted">{STRIP_EXPLAINER}</p>
+                    )}
+                  </div>
+                )}
                 {/* Owner checkpoint round 11: foco de melhoria moved INSIDE
                     the hero column — identity, key stats and the improvement
                     loop now read as one block beside the card.
