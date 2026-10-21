@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /**
- * NeoFoot Phase 8 live identity/whitelist smoke matrix (plan 08-01 task 2).
+ * NeoFoot Phase 8 live identity/whitelist smoke matrix (plan 08-01 task 2,
+ * extended by 08-02 task 4 with the Edge Function HTTP surface).
  *
- * Server-level probes only (Edge probes land in 08-02). Proves migration 0014
- * + seeds/live/identity-proofs-storage.sql against the LIVE project:
+ * Server-level probes prove migration 0014 + seeds/live/identity-proofs-storage.sql
+ * against the LIVE project; Edge probes prove the deployed verify-pin/setup-pin/
+ * request-access contract end to end:
  *
  *   shape      members.pin_hash nullable; the four new tables exist; RLS on
  *              membership_requests/membership_request_stats/identity_proofs
@@ -32,6 +34,11 @@
  *   storage    anon upload denied, member read denied, staff read allowed
  *   catalog    anon can read the five label columns; class_key_stats stays
  *              hidden from anon
+ *   edge       08-02: verify-pin unclaimed 409 (single key, one lockout burn),
+ *              setup-pin validation + happy claim + replay orphan check, post-
+ *              claim lockout, request-access member (previous_pin + supersede +
+ *              proof purge) and prospect (56 stats, zero members, approval),
+ *              method handling and intake guards
  *
  * Credentials: SUPABASE_URL/ANON_KEY from env or the gitignored .env VITE_*
  * values; SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF STRICTLY from session
@@ -140,6 +147,11 @@ const CHAR_IDS = {
   memberreq: '6600002',
   reject: '6600003',
   super: '6600004',
+  // 08-02 edge probes
+  edgeClaim: '6600005',
+  edgeMemberOld: '6600006',
+  edgeMemberNew: '6600007',
+  edgeProspect: '6600008',
 }
 const FIXTURE_CHAR_IDS = Object.values(CHAR_IDS)
 
@@ -148,6 +160,17 @@ const JPEG_1PX = Buffer.from(
   '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EH//2Q==',
   'base64',
 )
+const JPEG_DATA_URL = `data:image/jpeg;base64,${JPEG_1PX.toString('base64')}`
+const PNG_DATA_URL = `data:image/png;base64,${JPEG_1PX.toString('base64')}`
+// Oversized-but-deliverable proof: 2.3 MB of JPEG-prefixed bytes (base64 body
+// stays under the platform request cap) decodes to more than the 2 MB limit.
+const BIG_PROOF = (() => {
+  const buf = Buffer.alloc(2_300_000)
+  buf[0] = 0xff
+  buf[1] = 0xd8
+  buf[2] = 0xff
+  return `data:image/jpeg;base64,${buf.toString('base64')}`
+})()
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -203,6 +226,31 @@ async function loginProbe(handle) {
     return { status: 0, ok: false, text: String(err) }
   }
 }
+
+// 08-02: HTTP surface for the three auth Edge Functions. Sends the anon key as
+// both apikey and bearer (the functions' verify_jwt gate accepts the anon JWT).
+async function edge(name, body, { method = 'POST' } = {}) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    method,
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${ANON_KEY}`,
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const text = await res.text()
+  let parsed = null
+  try {
+    parsed = text ? JSON.parse(text) : null
+  } catch {
+    parsed = null
+  }
+  return { status: res.status, ok: res.ok, body: parsed, text }
+}
+
+// base64url JWT payload decode — assertions only, the token is never printed.
+const jwtClaims = (token) => JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'))
 
 async function rest(path, { method = 'GET', token = null, body = null } = {}) {
   const headers = { apikey: ANON_KEY }
@@ -315,6 +363,15 @@ const statArray = (statKeys, base) => statKeys.map((stat_key, i) => ({ stat_key,
 // ---------------------------------------------------------------------------
 
 const uploadedPaths = new Set()
+// 08-02 edge probes: every proof object the Edge Functions create or supersede.
+// Kept separate from uploadedPaths so the census can prove they are gone after
+// cleanup even though uploadedPaths is cleared.
+const edgeStoragePaths = new Set()
+function trackProof(path) {
+  if (typeof path !== 'string' || path.length === 0) return
+  uploadedPaths.add(path)
+  edgeStoragePaths.add(path)
+}
 
 async function fixtureIds() {
   const rows = await mgmtQuery(`select id from members where discord_handle like 'smoke-idn-%';`)
@@ -325,6 +382,20 @@ async function cleanup() {
   const ids = await fixtureIds()
   const idList = ids.length ? ids.map((i) => sqlStr(i)).join(',') : 'null'
   const charList = FIXTURE_CHAR_IDS.map(sqlStr).join(',')
+
+  // 08-02: the Edge Functions generate their own storage paths, so harvest them
+  // from the DB before the rows are deleted. Every proof object must go through
+  // the Storage API (SQL deletes on storage.objects are blocked by a trigger).
+  const proofPaths = await mgmtQuery(
+    `select storage_path as path from identity_proofs where member_id in (${idList});`,
+  )
+  const requestPaths = await mgmtQuery(
+    `select proof_path as path from membership_requests
+      where lower(discord_handle) like 'smoke-idn-%' and proof_path is not null;`,
+  )
+  for (const row of [...(Array.isArray(proofPaths) ? proofPaths : []), ...(Array.isArray(requestPaths) ? requestPaths : [])]) {
+    trackProof(row?.path)
+  }
 
   await mgmtQuery(
     `delete from member_identity_history where member_id in (${idList}) or created_by in (${idList});`,
@@ -355,6 +426,9 @@ async function zeroResidueCensus() {
   const ids = await fixtureIds()
   const idList = ids.length ? ids.map((i) => sqlStr(i)).join(',') : 'null'
   const charList = FIXTURE_CHAR_IDS.map(sqlStr).join(',')
+  const edgePathList = edgeStoragePaths.size
+    ? [...edgeStoragePaths].map(sqlStr).join(',')
+    : 'null'
   const row = await one(
     `select
        (select count(*) from members where discord_handle like 'smoke-idn-%') as members,
@@ -369,7 +443,12 @@ async function zeroResidueCensus() {
        (select count(*) from classes where class_name = ${sqlStr(CLASS)}) as classes,
        (select count(*) from class_key_stats where class_name = ${sqlStr(CLASS)}) as key_rows,
        (select count(*) from storage.objects
-         where bucket_id = 'identity-proofs' and name like '%' || ${sqlStr(RUN_ID)} || '%') as storage_objects;`,
+         where bucket_id = 'identity-proofs' and name like '%' || ${sqlStr(RUN_ID)} || '%') as storage_objects,
+       (select count(*) from storage.objects
+         where bucket_id = 'identity-proofs'
+           and name like 'claims/%' and split_part(name, '/', 2) in (${idList})) as edge_claim_objects,
+       (select count(*) from storage.objects
+         where bucket_id = 'identity-proofs' and name in (${edgePathList})) as edge_proof_objects;`,
   )
   if (!row) throw new Error('zero-residue census returned no row')
   for (const [label, key] of [
@@ -383,6 +462,8 @@ async function zeroResidueCensus() {
     ['classes', 'classes'],
     ['key rows', 'key_rows'],
     ['storage objects', 'storage_objects'],
+    ['edge claim objects', 'edge_claim_objects'],
+    ['edge proof objects', 'edge_proof_objects'],
   ]) {
     check(`census: zero fixture ${label}`, Number(row[key]) === 0, `${label}=${row[key]}`)
   }
@@ -1237,6 +1318,468 @@ async function main() {
       (anonKeyStats.ok && Array.isArray(anonKeyStats.json) && anonKeyStats.json.length === 0) ||
         [401, 403].includes(anonKeyStats.status),
       `HTTP ${anonKeyStats.status} body=${anonKeyStats.text.slice(0, 80)}`,
+    )
+
+    // =====================================================================
+    // 16. Edge Functions (08-02): unclaimed 409, setup-pin claim, request-access
+    // =====================================================================
+    const E = {
+      unclaimed: 'smoke-idn-edge-unclaimed',
+      claim: 'smoke-idn-edge-claim',
+      inactive: 'smoke-idn-edge-inactive',
+      member: 'smoke-idn-edge-member',
+      prospect: 'smoke-idn-edge-prospect',
+    }
+    const EDGE_PIN = '4321'
+
+    await mgmtQuery(
+      `insert into members (discord_handle, display_name, pin_hash, role, active, char_class, char_function) values
+         (${sqlStr(E.unclaimed)}, 'SMOKE IDN Edge Unclaimed', null, 'member', true, ${sqlStr(CLASS)}, 'dps'),
+         (${sqlStr(E.claim)}, 'SMOKE IDN Edge Claim', null, 'member', true, ${sqlStr(CLASS)}, 'dps'),
+         (${sqlStr(E.inactive)}, 'SMOKE IDN Edge Inactive', null, 'member', false, ${sqlStr(CLASS)}, 'dps'),
+         (${sqlStr(E.member)}, 'SMOKE IDN Edge Member', ${sqlStr(pinHash)}, 'member', false, ${sqlStr(CLASS)}, 'dps');`,
+    )
+    await mgmtQuery(
+      `update members set char_id = ${sqlStr(CHAR_IDS.edgeMemberOld)} where discord_handle = ${sqlStr(E.member)};`,
+    )
+
+    // ---- 16a-c. verify-pin unclaimed -------------------------------------
+    const unclaimedAttempt = await edge('verify-pin', { discord_handle: E.unclaimed, pin: EDGE_PIN })
+    // Second call: pin_login_attempts starts absent, and record_pin_failure's
+    // INSERT branch returns the column default (0) on the very first failure —
+    // the second 409 proves the counter row is created and then incremented.
+    const unclaimedAttempt2 = await edge('verify-pin', { discord_handle: E.unclaimed, pin: EDGE_PIN })
+    const unclaimedKeys = unclaimedAttempt.body && typeof unclaimedAttempt.body === 'object'
+      ? Object.keys(unclaimedAttempt.body)
+      : []
+    check(
+      '16a. verify-pin-unclaimed: active + pin_hash null -> 409 EXACTLY {error:pin_setup_required}',
+      unclaimedAttempt.status === 409 &&
+        unclaimedKeys.length === 1 &&
+        unclaimedAttempt.body?.error === 'pin_setup_required' &&
+        unclaimedAttempt2.status === 409,
+      `HTTP ${unclaimedAttempt.status}/${unclaimedAttempt2.status} keys=${unclaimedKeys.join('|')}`,
+    )
+    check(
+      '16b. verify-pin-unclaimed: no session minted and no identity echo',
+      !unclaimedAttempt.text.includes('access_token') &&
+        !unclaimedAttempt.text.includes('session') &&
+        !unclaimedAttempt.text.includes(E.unclaimed),
+      `len=${unclaimedAttempt.text.length}`,
+    )
+    const unclaimedState = await one(
+      `select failed_count from pin_login_attempts where discord_handle = ${sqlStr(E.unclaimed)};`,
+    )
+    check(
+      '16c. verify-pin-unclaimed: each 409 is recorded (counter row + failed_count 1 after two)',
+      !!unclaimedState && Number(unclaimedState.failed_count) === 1,
+      `failed=${unclaimedState?.failed_count}`,
+    )
+
+    // ---- 16d-i. setup-pin validation -------------------------------------
+    const setupBase = {
+      discord_handle: E.claim,
+      pin: EDGE_PIN,
+      confirm_pin: EDGE_PIN,
+      char_id: CHAR_IDS.edgeClaim,
+      nickname: 'SMOKE IDN Edge Claimed',
+      char_class: CLASS,
+    }
+    const noProof = await edge('setup-pin', setupBase)
+    check(
+      '16d. setup-pin validation: missing proof -> 400 invalid_proof',
+      noProof.status === 400 && noProof.body?.error === 'invalid_proof',
+      `HTTP ${noProof.status} err=${noProof.body?.error}`,
+    )
+    const pngProof = await edge('setup-pin', { ...setupBase, proof_data_url: PNG_DATA_URL })
+    check(
+      '16e. setup-pin validation: PNG data URL -> 400 invalid_proof (JPEG only)',
+      pngProof.status === 400 && pngProof.body?.error === 'invalid_proof',
+      `HTTP ${pngProof.status} err=${pngProof.body?.error}`,
+    )
+    const bigProof = await edge('setup-pin', { ...setupBase, proof_data_url: BIG_PROOF })
+    check(
+      '16f. setup-pin validation: >2 MB JPEG proof (3 MB base64 body) -> 413',
+      bigProof.status === 413,
+      `HTTP ${bigProof.status} err=${bigProof.body?.error}`,
+    )
+    const mismatchPins = await edge('setup-pin', {
+      ...setupBase,
+      confirm_pin: '0000',
+      proof_data_url: JPEG_DATA_URL,
+    })
+    check(
+      '16g. setup-pin validation: mismatched pins -> 400 invalid_request',
+      mismatchPins.status === 400 && mismatchPins.body?.error === 'invalid_request',
+      `HTTP ${mismatchPins.status} err=${mismatchPins.body?.error}`,
+    )
+    const unknownClass = await edge('setup-pin', {
+      ...setupBase,
+      char_class: 'smoke_idn_nope',
+      proof_data_url: JPEG_DATA_URL,
+    })
+    check(
+      '16h. setup-pin validation: unknown class -> 400 unknown_class',
+      unknownClass.status === 400 && unknownClass.body?.error === 'unknown_class',
+      `HTTP ${unknownClass.status} err=${unknownClass.body?.error}`,
+    )
+    const inactiveSetup = await edge('setup-pin', {
+      ...setupBase,
+      discord_handle: E.inactive,
+      proof_data_url: JPEG_DATA_URL,
+    })
+    check(
+      '16i. setup-pin validation: inactive handle -> 401 invalid_credentials (uniform shape)',
+      inactiveSetup.status === 401 &&
+        inactiveSetup.body?.error === 'invalid_credentials' &&
+        typeof inactiveSetup.body?.attempts_remaining === 'number',
+      `HTTP ${inactiveSetup.status} remaining=${inactiveSetup.body?.attempts_remaining}`,
+    )
+
+    // ---- 16j-n. setup-pin happy path + orphan cleanup ---------------------
+    const setupRes = await edge('setup-pin', { ...setupBase, proof_data_url: JPEG_DATA_URL })
+    const setupSession = setupRes.body?.session
+    const setupClaims = setupSession?.access_token ? jwtClaims(setupSession.access_token) : null
+    check(
+      '16j. setup-pin-happy: 200 session, JWT member_role=member, member_id matches',
+      setupRes.status === 200 &&
+        !!setupSession?.access_token &&
+        setupClaims?.member_role === 'member' &&
+        setupClaims?.member_id === setupSession?.member_id &&
+        setupSession?.member_role === 'member',
+      `HTTP ${setupRes.status} role=${setupClaims?.member_role}`,
+    )
+    const edgeClaimId = setupSession?.member_id
+    const edgeClaimRow = await one(
+      `select id, pin_hash, claimed_at, char_id, display_name
+         from members where discord_handle = ${sqlStr(E.claim)};`,
+    )
+    check(
+      '16k. setup-pin-happy: DB pin_hash bcrypt ($2), claimed_at, char_id + nickname applied',
+      !!edgeClaimRow &&
+        String(edgeClaimRow.pin_hash).startsWith('$2') &&
+        edgeClaimRow.pin_hash !== EDGE_PIN &&
+        edgeClaimRow.claimed_at !== null &&
+        edgeClaimRow.char_id === CHAR_IDS.edgeClaim &&
+        edgeClaimRow.display_name === 'SMOKE IDN Edge Claimed' &&
+        edgeClaimRow.id === edgeClaimId,
+      `hash_prefix=${String(edgeClaimRow?.pin_hash).slice(0, 4)} char_id=${edgeClaimRow?.char_id}`,
+    )
+    const edgeClaimProof = await one(
+      `select status, storage_path from identity_proofs where member_id = ${sqlStr(edgeClaimId)};`,
+    )
+    trackProof(edgeClaimProof?.storage_path)
+    const edgeClaimObject = await one(
+      `select count(*) as n from storage.objects
+        where bucket_id = 'identity-proofs' and name = ${sqlStr(edgeClaimProof?.storage_path)};`,
+    )
+    check(
+      '16l. setup-pin-happy: pending proof row + the uploaded object exist',
+      edgeClaimProof?.status === 'pending' &&
+        Number(edgeClaimObject?.n) === 1 &&
+        String(edgeClaimProof?.storage_path).startsWith(`claims/${edgeClaimId}/`),
+      `status=${edgeClaimProof?.status} objects=${edgeClaimObject?.n}`,
+    )
+    const claimStorageBefore = Number(
+      (await one(
+        `select count(*) as n from storage.objects
+          where bucket_id = 'identity-proofs' and name like ${sqlStr(`claims/${edgeClaimId}/%`)};`,
+      ))?.n,
+    )
+    const replaySetup = await edge('setup-pin', {
+      ...setupBase,
+      pin: '9999',
+      confirm_pin: '9999',
+      char_id: '6600099',
+      proof_data_url: JPEG_DATA_URL,
+    })
+    check(
+      '16m. setup-pin-orphan-cleanup: replay -> 409 pin_already_set',
+      replaySetup.status === 409 && replaySetup.body?.error === 'pin_already_set',
+      `HTTP ${replaySetup.status} err=${replaySetup.body?.error}`,
+    )
+    const claimStorageAfter = Number(
+      (await one(
+        `select count(*) as n from storage.objects
+          where bucket_id = 'identity-proofs' and name like ${sqlStr(`claims/${edgeClaimId}/%`)};`,
+      ))?.n,
+    )
+    const claimProofRows = await one(
+      `select count(*) as n from identity_proofs where member_id = ${sqlStr(edgeClaimId)};`,
+    )
+    check(
+      '16n. setup-pin-orphan-cleanup: second upload object absent (storage unchanged)',
+      claimStorageAfter === claimStorageBefore && Number(claimProofRows?.n) === 1,
+      `before=${claimStorageBefore} after=${claimStorageAfter} proofs=${claimProofRows?.n}`,
+    )
+
+    // ---- 16o-r. verify-pin after claim + lockout --------------------------
+    const edgeLogin = await edge('verify-pin', { discord_handle: E.claim, pin: EDGE_PIN })
+    check(
+      '16o. verify-pin after claim: correct PIN -> 200 session',
+      edgeLogin.status === 200 && !!edgeLogin.body?.session?.access_token,
+      `HTTP ${edgeLogin.status}`,
+    )
+    const remaining = []
+    let firstWrong = null
+    for (let i = 0; i < 5; i += 1) {
+      const bad = await edge('verify-pin', { discord_handle: E.claim, pin: '0000' })
+      if (i === 0) firstWrong = bad
+      remaining.push(bad.status === 401 ? bad.body?.attempts_remaining : `HTTP ${bad.status}`)
+    }
+    check(
+      '16p. verify-pin-lockout: wrong PIN -> 401 invalid_credentials with attempts_remaining',
+      firstWrong?.status === 401 &&
+        firstWrong.body?.error === 'invalid_credentials' &&
+        firstWrong.body?.attempts_remaining === 4,
+      `remaining=${firstWrong?.body?.attempts_remaining}`,
+    )
+    const lockedAttempt = await edge('verify-pin', { discord_handle: E.claim, pin: EDGE_PIN })
+    const lockRow = await one(
+      `select failed_count, locked_until from pin_login_attempts where discord_handle = ${sqlStr(E.claim)};`,
+    )
+    check(
+      '16q. verify-pin-lockout: 5 wrong PINs count down 4->0 then 429 locked',
+      remaining.every((value, i) => value === 4 - i) &&
+        lockedAttempt.status === 429 &&
+        lockedAttempt.body?.error === 'locked' &&
+        typeof lockedAttempt.body?.retry_after_seconds === 'number' &&
+        lockRow?.locked_until !== null,
+      `remaining=${remaining.join(',')} HTTP ${lockedAttempt.status}`,
+    )
+    const ownerResetEdge = await rpc('reset_member_pin', ownerToken, { p_member: edgeClaimId })
+    const resetEdgeAttempts = await one(
+      `select count(*) as n from pin_login_attempts where discord_handle = ${sqlStr(E.claim)};`,
+    )
+    check(
+      '16r. verify-pin-lockout: owner reset clears the handle lockout rows (fixture cleanup)',
+      ownerResetEdge.ok && Number(resetEdgeAttempts?.n) === 0,
+      `HTTP ${ownerResetEdge.status} attempts=${resetEdgeAttempts?.n}`,
+    )
+
+    // ---- 16s-aa. request-access member (identity re-link) -----------------
+    const memberReqBody = {
+      discord_handle: E.member,
+      pin: EDGE_PIN,
+      confirm_pin: EDGE_PIN,
+      request_type: 'member',
+      char_id: CHAR_IDS.edgeMemberNew,
+      nickname: 'SMOKE IDN Edge Member',
+      char_class: CLASS,
+      char_function: 'dps',
+      proof_data_url: JPEG_DATA_URL,
+    }
+    const edgeMemberReq1 = await edge('request-access', memberReqBody)
+    check(
+      '16s. request-access-member: 200 {request_id,status:pending}, NEVER a session',
+      edgeMemberReq1.status === 200 &&
+        typeof edgeMemberReq1.body?.request_id === 'string' &&
+        edgeMemberReq1.body?.status === 'pending' &&
+        !edgeMemberReq1.text.includes('access_token') &&
+        !edgeMemberReq1.text.includes('session'),
+      `HTTP ${edgeMemberReq1.status} status=${edgeMemberReq1.body?.status}`,
+    )
+    const edgeMemberReq1Row = await one(
+      `select id, status, proof_path, member_id from membership_requests
+        where id = ${sqlStr(edgeMemberReq1.body?.request_id)};`,
+    )
+    trackProof(edgeMemberReq1Row?.proof_path)
+    const edgeMemberCount = await one(
+      `select count(*) as n, min(active::text) as active
+         from members where discord_handle = ${sqlStr(E.member)};`,
+    )
+    check(
+      '16t. request-access-member: no member row created or reactivated by the request',
+      Number(edgeMemberCount?.n) === 1 &&
+        edgeMemberCount?.active === 'false' &&
+        edgeMemberReq1Row?.member_id === null,
+      `members=${edgeMemberCount?.n} active=${edgeMemberCount?.active}`,
+    )
+    const edgeStatus = await rpc('request_status', null, { p_handle: E.member })
+    const edgeStatusKeys = edgeStatus.ok && edgeStatus.json ? Object.keys(edgeStatus.json).sort() : []
+    check(
+      '16u. request-access-member: anon request_status -> pending with only the four keys',
+      edgeStatus.ok &&
+        edgeStatus.json?.status === 'pending' &&
+        JSON.stringify(edgeStatusKeys) ===
+          JSON.stringify(['created_at', 'decided_at', 'request_type', 'status'].sort()),
+      `keys=${JSON.stringify(edgeStatusKeys)}`,
+    )
+    const anonEdgeReqRows = await rest('/membership_requests?select=status&limit=5', { token: null })
+    check(
+      '16v. request-access-member: anon direct SELECT on requests -> 0 rows (or 401)',
+      (anonEdgeReqRows.ok && Array.isArray(anonEdgeReqRows.json) && anonEdgeReqRows.json.length === 0) ||
+        [401, 403].includes(anonEdgeReqRows.status),
+      `HTTP ${anonEdgeReqRows.status}`,
+    )
+    const edgeMemberReq2 = await edge('request-access', memberReqBody)
+    check(
+      '16w. request-access-member: second call without previous_pin -> 409 request_pending',
+      edgeMemberReq2.status === 409 && edgeMemberReq2.body?.error === 'request_pending',
+      `HTTP ${edgeMemberReq2.status} err=${edgeMemberReq2.body?.error}`,
+    )
+    const edgeMemberReqWrong = await edge('request-access', {
+      ...memberReqBody,
+      previous_pin: '0000',
+    })
+    const edgeMemberReqWrong2 = await edge('request-access', {
+      ...memberReqBody,
+      previous_pin: '0000',
+    })
+    check(
+      '16x. request-access-member: wrong previous_pin -> 401 invalid_previous_pin (attempts decrease)',
+      edgeMemberReqWrong.status === 401 &&
+        edgeMemberReqWrong.body?.error === 'invalid_previous_pin' &&
+        typeof edgeMemberReqWrong.body?.attempts_remaining === 'number' &&
+        edgeMemberReqWrong2.status === 401 &&
+        edgeMemberReqWrong2.body?.attempts_remaining < edgeMemberReqWrong.body?.attempts_remaining,
+      `HTTP ${edgeMemberReqWrong.status} remaining=${edgeMemberReqWrong.body?.attempts_remaining}->${edgeMemberReqWrong2.body?.attempts_remaining}`,
+    )
+    const edgeMemberReq3 = await edge('request-access', {
+      ...memberReqBody,
+      previous_pin: EDGE_PIN,
+    })
+    const edgeMemberReq3Row = await one(
+      `select id, status, proof_path, char_id from membership_requests
+        where id = ${sqlStr(edgeMemberReq3.body?.request_id)};`,
+    )
+    trackProof(edgeMemberReq3Row?.proof_path)
+    const edgeMemberReq1After = await one(
+      `select status, proof_path from membership_requests
+        where id = ${sqlStr(edgeMemberReq1Row?.id)};`,
+    )
+    check(
+      '16y. request-access-member: correct previous_pin -> 200 and the old request is superseded',
+      edgeMemberReq3.status === 200 &&
+        edgeMemberReq3Row?.status === 'pending' &&
+        edgeMemberReq3Row?.id !== edgeMemberReq1Row?.id &&
+        edgeMemberReq3Row?.char_id === CHAR_IDS.edgeMemberNew &&
+        edgeMemberReq1After?.status === 'superseded' &&
+        edgeMemberReq1After?.proof_path === null,
+      `HTTP ${edgeMemberReq3.status} old=${edgeMemberReq1After?.status}`,
+    )
+    const edgeOldObject = await storageGet(edgeMemberReq1Row?.proof_path, svc)
+    check(
+      '16z. request-access-member: the superseded proof object is purged from storage',
+      !edgeOldObject.ok,
+      `HTTP ${edgeOldObject.status}`,
+    )
+
+    // ---- 16ab-ac. request-access prospect (full application) --------------
+    const prospectStats = statArray(statKeys.slice(0, 56), 700)
+    const prospectBody = {
+      discord_handle: E.prospect,
+      pin: EDGE_PIN,
+      confirm_pin: EDGE_PIN,
+      request_type: 'prospect',
+      char_id: CHAR_IDS.edgeProspect,
+      nickname: 'SMOKE IDN Edge Prospect',
+      char_class: CLASS,
+      char_function: 'dps',
+      proof_data_url: JPEG_DATA_URL,
+      stats: prospectStats,
+    }
+    const edgeProspectReq = await edge('request-access', prospectBody)
+    const edgeProspectRow = await one(
+      `select id, status, request_type, proof_path from membership_requests
+        where id = ${sqlStr(edgeProspectReq.body?.request_id)};`,
+    )
+    trackProof(edgeProspectRow?.proof_path)
+    const edgeProspectStats = await one(
+      `select count(*) as n from membership_request_stats
+        where request_id = ${sqlStr(edgeProspectReq.body?.request_id)};`,
+    )
+    const edgeProspectMemberBefore = await one(
+      `select count(*) as n from members where discord_handle = ${sqlStr(E.prospect)};`,
+    )
+    check(
+      '16ab. request-access-prospect: 200 pending, 56 stats stored, ZERO member rows',
+      edgeProspectReq.status === 200 &&
+        edgeProspectRow?.status === 'pending' &&
+        edgeProspectRow?.request_type === 'prospect' &&
+        Number(edgeProspectStats?.n) === 56 &&
+        Number(edgeProspectMemberBefore?.n) === 0,
+      `HTTP ${edgeProspectReq.status} stats=${edgeProspectStats?.n} members=${edgeProspectMemberBefore?.n}`,
+    )
+    const edgeProspectStatus = await rpc('request_status', null, { p_handle: E.prospect })
+    check(
+      '16ac. request-access-prospect: request_status pending (no stats leaked)',
+      edgeProspectStatus.ok &&
+        edgeProspectStatus.json?.status === 'pending' &&
+        !/stat_key|char_id|nickname|pin_hash|discord_handle|"stats"/.test(edgeProspectStatus.text),
+      `status=${edgeProspectStatus.json?.status}`,
+    )
+
+    // ---- 16ad-ae. approval-path isolation --------------------------------
+    const edgeProspectApprove = await rpc('approve_request', officerToken, {
+      p_request: edgeProspectReq.body?.request_id,
+      p_function: 'dps',
+    })
+    const edgeProspectMemberId = edgeProspectApprove.json
+    const edgeProspectMember = await one(
+      `select role, active, char_id,
+              (select count(*) from submissions s where s.member_id = m.id) as total,
+              (select count(*) from submissions s where s.member_id = m.id and s.status = 'validated') as validated
+         from members m where id = ${sqlStr(edgeProspectMemberId)};`,
+    )
+    check(
+      '16ad. approval-path: approved prospect -> member with role member and only validated submissions',
+      edgeProspectApprove.ok &&
+        edgeProspectMember?.role === 'member' &&
+        edgeProspectMember?.active === true &&
+        edgeProspectMember?.char_id === CHAR_IDS.edgeProspect &&
+        Number(edgeProspectMember?.total) >= 1 &&
+        Number(edgeProspectMember?.validated) === Number(edgeProspectMember?.total),
+      `HTTP ${edgeProspectApprove.status} validated=${edgeProspectMember?.validated}/${edgeProspectMember?.total}`,
+    )
+    const edgeMemberBefore = await one(
+      `select id, (select count(*) from submissions s where s.member_id = m.id) as subs
+         from members m where discord_handle = ${sqlStr(E.member)};`,
+    )
+    const edgeMemberApprove = await rpc('approve_request', officerToken, {
+      p_request: edgeMemberReq3Row?.id,
+      p_function: 'dps',
+    })
+    const edgeMemberAfter = await one(
+      `select id, role, active, char_id,
+              (select count(*) from submissions s where s.member_id = m.id) as subs
+         from members m where discord_handle = ${sqlStr(E.member)};`,
+    )
+    check(
+      '16ae. approval-path: member-type approval creates NO submission',
+      edgeMemberApprove.ok &&
+        Number(edgeMemberAfter?.subs) === Number(edgeMemberBefore?.subs) &&
+        Number(edgeMemberAfter?.subs) === 0 &&
+        edgeMemberAfter?.active === true &&
+        edgeMemberAfter?.role === 'member' &&
+        edgeMemberAfter?.char_id === CHAR_IDS.edgeMemberNew,
+      `subs=${edgeMemberAfter?.subs} active=${edgeMemberAfter?.active}`,
+    )
+
+    // ---- 16af-ai. method surface + intake guards -------------------------
+    const getSetup = await edge('setup-pin', undefined, { method: 'GET' })
+    check('16af. GET setup-pin -> 405', getSetup.status === 405, `HTTP ${getSetup.status}`)
+    const optionsSetup = await edge('setup-pin', undefined, { method: 'OPTIONS' })
+    check('16ag. OPTIONS setup-pin -> 200', optionsSetup.status === 200, `HTTP ${optionsSetup.status}`)
+    const activeMemberRequest = await edge('request-access', {
+      ...memberReqBody,
+      discord_handle: H.a,
+      char_id: '6600098',
+    })
+    check(
+      '16ah. request-access on an ACTIVE member -> 409 already_member',
+      activeMemberRequest.status === 409 && activeMemberRequest.body?.error === 'already_member',
+      `HTTP ${activeMemberRequest.status} err=${activeMemberRequest.body?.error}`,
+    )
+    const dummyRequest = await edge('request-access', {
+      ...memberReqBody,
+      discord_handle: 'dummy-edge',
+      char_id: '6600097',
+    })
+    check(
+      '16ai. request-access dummy- handle -> 400 dummy_handle',
+      dummyRequest.status === 400 && dummyRequest.body?.error === 'dummy_handle',
+      `HTTP ${dummyRequest.status} err=${dummyRequest.body?.error}`,
     )
   } finally {
     try {
