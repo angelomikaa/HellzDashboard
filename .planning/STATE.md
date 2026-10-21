@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: Completed 08-04-PLAN.md (identity capture + session-less prospect wizard; 491 tests green, build green)
+stopped_at: Completed 08-05-PLAN.md (staff lifecycle surface; 520 tests green, build green, lint 0 errors)
 last_updated: "2026-10-21T07:59:00.000Z"
 last_activity: 2026-10-21
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 18
-  completed_plans: 16
-  percent: 88
+  completed_plans: 17
+  percent: 94
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 08 (whitelist-lifecycle-self-request-whitelisting-first-login-pi) â€” EXECUTING
-Plan: 5 of 6 (08-04 complete; 08-05 next)
-Status: Identity-stamped submissions and the session-less prospect application wizard are live in the client (491 tests green)
-Last activity: 2026-10-21 -- 08-04 executed: mandatory SubmitPage identity + OCR profile prefill + p_identity, shared applyOcrOutcomes, anon catalog reader, ProspectApplicationPage through request-access, RequireAuth application view
+Plan: 6 of 6 (08-05 complete; 08-06 next)
+Status: Staff lifecycle surface live - Personagens add/reset/identity, Validações 3 tabs, rank char_id (520 tests green)
+Last activity: 2026-10-21 -- 08-05 executed: staff API census, Personagens lifecycle, request/identity review panels, rank char_id (520 tests green, build green)
 
 ## Accumulated Context
 
