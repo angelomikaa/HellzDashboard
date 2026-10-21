@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: planning
-stopped_at: Phase 8 context gathered
-last_updated: "2026-10-21T03:03:57.092Z"
-last_activity: "2026-10-20 -- 07.2-06 complete (desktop pass + owner feedback fixes: download beside preview, inline rank details, Personagens filters, two-column OCR step). Owner feedback round 2 triaged per owner decisions: capture + membership → Phase 8 (migration 0014), unified key/relevant → Phase 9 (inside set_key_stat v2), Destaques slider → Phase 10 (members-only; public visitor homepage deferred)"
+stopped_at: Phase 8 plans created (6/6), manual plan check pending
+last_updated: "2026-10-21T04:59:37.771Z"
+last_activity: "2026-10-21 -- Phase 8 planned: 6/6 plans authored (08-01..08-06) covering migration 0014 whitelist/requests/identity, verify-pin 409 + setup-pin + request-access, first access, submit identity + prospect wizard, staff boards/review, legacy conversion + lockout cleanup; decisions D-03/06/11/14/15/18/24 revised in plans. Manual plan check pending"
 progress:
   total_phases: 6
   completed_phases: 3
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 **Core value:** Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
-**Current focus:** Phase 07.2 — premium-showcase-game-grounding-inserted
+**Current focus:** Phase 8 — Whitelist Lifecycle, Self-Request & Character Identity
 
 ## Current Position
 
-Phase: 07.2 (premium-showcase-game-grounding-inserted) — COMPLETE (6/6 plans, owner-approved after 8 design rounds + layout feedback round 1)
-Plan: all 6 complete — next: Phase 8 (whitelist self-request + PIN setup + character identity capture)
-Status: Ready for Phase 8 planning
-Last activity: 2026-10-20 -- 07.2-06 complete (desktop pass + owner feedback fixes: download beside preview, inline rank details, Personagens filters, two-column OCR step). Owner feedback round 2 triaged per owner decisions: capture + membership → Phase 8 (migration 0014), unified key/relevant → Phase 9 (inside set_key_stat v2), Destaques slider → Phase 10 (members-only; public visitor homepage deferred)
+Phase: 8 (whitelist lifecycle, self-request whitelisting, first-login PIN setup & character identity capture)
+Plan: 6/6 authored (08-01..08-06) — execution not started
+Status: Plans created; manual plan check pending
+Last activity: 2026-10-21 -- Phase 8 planned: 6/6 plans authored (08-01..08-06) covering migration 0014 whitelist/requests/identity, verify-pin 409 + setup-pin + request-access, first access, submit identity + prospect wizard, staff boards/review, legacy conversion + lockout cleanup; decisions D-03/06/11/14/15/18/24 revised in plans. Manual plan check pending
 
 ## Accumulated Context
 
@@ -66,7 +66,7 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 07.2]: 07.2-05 round 7 SUPERSEDING DESIGN (owner, 2026-10-19 — round-6 rejected: "orbitron being a much wider font than bebas neue ... i seeded a new card"): the owner re-seeded card.svg (committed 47d4a5a) and locked SIX rules, all implemented (7a003f2/1e98d2b/2b8f59a) and LIVE (token probe 200 → apply-seed.mjs, verified): (1) BORDER DETACHED FROM THE PLATE AND OVER THE CROP — deliberate design: paint order plate → photo (clipped to crop-path) → scrim → border gradient stroke (width 40, CLIPPED to the plate silhouette, inner half covering the photo's edges) → texts, identical on both surfaces; (2) FONT SPLIT — Bebas Neue (Google Fonts @import in index.css, degrades to Orbitron if offline) for OVR (matrix 8.503×21.169 ≈180px resolved once in the parser), job, stat labels/points/values; Orbitron ONLY the player name (0.656 matrix ≈72px); the on-page plan re-derives its column centers with the gated measurer once fonts land; (3) 4–6 CHAR LABELS — the owner's APPROVED 57-stat label_short mapping applied LIVE via apply-seed.mjs (unnumbered; spot-verified MATK/MDMG.R/PVP.R/HIT/IG.PDEF/HP/POWER; 57 unique, max len 7, zero empty; committed artifact card-labels-4-6char.sql + labelShortMapping.test.ts; HIT stays 3 chars owner-flagged, HP/SP stay 2, IG.PDEF/IG.MDEF run 7 — flagged for spot-correction); (4) CENTRAL ALIGNMENT — stat column centers DERIVED as points anchor + width('99')/2 (the owner centered the '99' placeholders on the grid, even ~141px pitch parse-locked); all three lines text-anchor middle/textAlign center; the name centers on the PLATE MIDLINE (the parsed x anchors the placeholder's left edge — centering at it hung the name off-plate, headless-audit-proven); (5) PNG EXPORT — toBlob('image/png'), hellz-*.png, NO background (nothing paints outside the plate silhouette — corner alpha 0 verified); (6) PHOTO CONSISTENCY — get_promotion gained photo_path (server-composed card-photos storage path, byte-faithful 0013 supersession seed applied LIVE, smoke-card probe 7f added): PromotionCard fetches it as a BLOB (T-072-13) with the same fallback chain as the Painel own-card (submitted photo → class portrait → ASST-01 monogram). GATES: build green, full suite 345 green, card-render-check ALL PASS at 2160×3200 ×4 palettes (transparent corners, border-over-photo pixel-probes, fonts.check Bebas+Orbitron, on-page SVG audit 0 violations at 360/720 + stress, scale-tracking 2.0000)
 - [Phase 07.2]: 07.2-05 round 8 (owner, 2026-10-19 — round-7 "mostly approved — one thing to be investigated" + rating bug): TWO divergences root-caused and fixed, both PROVEN not guessed. (A) BORDER FIDELITY: the owner re-seeded card.svg (semantic KEY groups, label-above-rating, 48px border, extended gradient) and ruled the app's border render wrong — root cause PROVEN: both surfaces stroked the CROP path for border-over while the file (old and new) strokes the PLATE SILHOUETTE (cls-3 d == base-plate d, clipped to clip-path-1; "border in the crop" = a gradient line across the plate's middle at y≈937); parser rebuilt on the file's semantics (KEY groups, role by class+y-order — id-drift safe; columns by RATING anchor; strokePath parsed separately from the clip; no hardcoded y-splits) and both surfaces now stroke the plate silhouette; THE PERMANENT GUARD: file-vs-app RENDER DIFF in scripts/card-render-check — the actual card.svg rasterized in-browser (palette + photo/scrim injected into the file's own structure; fonts embedded were IMPOSSIBLE — Chrome SVG-as-image refuses even data-URI fonts, so text is stripped and the diff covers the full 3-layer background with ZERO masks) → 0 differing pixels on ALL 4 tiers for the on-page CardSvg, ≤0.07% (photo-resample AA) for the canvas export; border probes re-pointed (left/right verticals, bottom tip, top arc over photo, crop-closure regression lock at y≈950); full suite 346 green, build green, harness "ALL CARD GATES PASS". (B) RATING UNIFICATION: my_card computes points/OVR in the CLASS+FUNCTION cohort (0013:318-324, my_report semantics) while get_promotion's cmp joined char_function ONLY (0010:287-297) — the same value ranked against all classes of one function (deflation: 86 vs 78) and points unrounded; get_promotion now DELEGATES to the my_card basis (cohort carries char_class, cmp joins class+function, points round(...,2)) — applied LIVE via apply-seed.mjs (token probe 200 → body verified: unified cmp + rounding + photo_path kept); PARITY PROBE (smoke-card 10a/10b/10c): my_card points/own_value/ovr === get_promotion for ALL 6 key stats, exact equality — CARD SMOKE 58/58, promotion smoke 21/21 (3 stale pre-0013 probes re-pointed: label_short closed list, D-13 sanctioned reveal, designed n<3 omission after deactivation — the old expectation only passed via the function-only dummy leak), rank smoke green; client display paths verified identical (both surfaces Math.round + the SAME CardSvg)
 - [Phase 07.2]: 07.2-05 APPROVED by the owner (2026-10-19, after 8 visual feedback rounds): final design = ONE owner-seeded src/assets/card.svg (single source of truth) + code tier palettes, border ON the plate silhouette (proven by 0-differing-pixel file-vs-app render diff — permanent guard in scripts/card-render-check), Bebas Neue everywhere except Orbitron player name, transparent PNG export, member photo uploads LIVE on the RLS-guarded card-photos bucket, get_promotion unified to the my_card rating basis LIVE. Gates at approval: build ✓, 346/346 tests ✓, headless render check incl. file-vs-app pixel diff ✓, live smokes 58/58 + 21/21 + rank ✓. Next: Wave 4 (07.2-03 + 07.2-04); 07.2-03 consumes CardSvg/buildCardPlan directly. Owner-flagged follow-up: 4–6 char label edge cases (HIT stays 3, IG.PDEF/IG.MDEF run 7) may need spot-correction via one apply-seed.mjs run
-- [Phase ?]: 07.2-03: member own-card download built against the CURRENT 07.2-05 export contract (photoSrc/monogramLetter, transparent PNG, hellz-<nome>.png) � the plan's export snapshot predated the owner's 8 card-design rounds; aria-label 'Baixar meu card (PNG)'
+- [Phase ?]: 07.2-03: member own-card download built against the CURRENT 07.2-05 export contract (photoSrc/monogramLetter, transparent PNG, hellz-<nome>.png) — the plan's export snapshot predated the owner's 8 card-design rounds; aria-label 'Baixar meu card (PNG)'
 - [Phase ?]: 07.2-03: download photo chain = member's uploaded screenshot (blob object URL) -> class portrait -> monogram, per the 07.2-05 round-7 owner photo-consistency decision (not the plan's literal crestSrc-only)
 - [Phase ?]: 07.2-03: focusCandidates deleted (function + 5 tests) after the FocusStrip rewire 
  zero references remaining; D-07 foco now selects via improvementFocus over priorityKeySet (key union relevant from my_card)
@@ -99,9 +99,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-21T03:03:56.923Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/08-CONTEXT.md
+Last session: 2026-10-21T04:59:37.771Z
+Stopped at: Phase 8 plans created (6/6); manual plan check pending
+Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/08-01-PLAN.md
 
 ## Performance Metrics
 

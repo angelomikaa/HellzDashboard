@@ -23,8 +23,8 @@
 <summary>🚧 v1.1 Home, Whitelist & Fine Ranks (Phases 7–10) — IN PROGRESS</summary>
 
 - [x] Phase 7: Dummy-Data Seed & Catalog Alignment — owner-roster seed ships FIRST (owner decision 7: see how v1.0 wraps around data while v1.1 is developed), build-role vocabulary (ROLE-05) + official job-tree catalog (ROLE-12) aligned so dummies carry correct roles from day one (4/4 plans) — completed 2026-10-14
-- [ ] Phase 8: Whitelist Lifecycle & First-Login PIN Setup — handle-only registration, player-picked PIN on first login, owner PIN reset, reactivation (0/0 plans)
-- [ ] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0014; renumbered +1 by Phase 7 taking 0012 and Phase 8 taking 0013): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (0/0 plans)
+- [ ] Phase 8: Whitelist Lifecycle, Self-Request & Character Identity — handle-only registration, player-picked PIN on first login, owner PIN reset, reactivation, two self-request loops, per-submission identity (6 plans created)
+- [ ] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0015; renumbered: Phase 7 took 0012, Phase 07.2 takes 0013, Phase 8 takes 0014): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (0/0 plans)
 - [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (0/0 plans)
 
 </details>
@@ -102,7 +102,7 @@ Plans:
   5. Trust-boundary hygiene holds: handles with the dummy sentinel prefix are rejected at add time, and legacy placeholder-PIN whitelist rows are converted to the claim flow (their next login routes to first-login PIN setup, and their lockout rows are cleared)
   6. (Owner feedback 2026-10-20) A player can submit a membership request without staff help; officers approve/reject it in Validações; approval reuses the handle-only `add_member` path and a pending request grants zero data access — a requester can check their own status
   7. (Owner feedback 2026-10-20) Each submission captures the in-game ID, nickname and job(s) with OCR pre-fill + manual correction, stored PER SUBMISSION (append-only history) so job swaps are traceable; the latest validated submission supplies the card nickname, and staff can view the identity history (members cannot)
-**Plans**: TBD
+**Plans**: 6 plans created (08-01..08-06); execution pending
 
 Cross-cutting constraints: deploy order invariant — migration 0014 (nullable `pin_hash` + the identity-capture columns/table; renumbered: Phase 7's catalog migration took 0012, Phase 07.2 takes 0013) → patched `verify-pin` + new `setup-pin` Edge Functions live → first `add_member` use (the null-hash branch must precede the bcrypt compare or pinless members 500); `add_member` stays the ONLY write surface on `members` (no new RLS policy, no direct INSERT); inactive members must NEVER receive `pin_setup_required` (uniform 401 — branch ordering is a smoke-probed must-have); membership requests are a separate table with RPC-only writes (insert = anon-safe request; approve/reject = staff-gated SECURITY DEFINER) — a pending request is never a member row.
 **UI hint**: yes
@@ -151,7 +151,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 (8 is independent and coul
 | 5. OCR Auto-Read Layer | v1.0 | 5/5 | Complete | 2026-10-12 |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | v1.0 | 7/7 | Complete | 2026-10-13 |
 | 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 4/4 | Complete    | 2026-10-15 |
-| 8. Whitelist Lifecycle & First-Login PIN Setup | v1.1 | 0/0 | Not started | - |
+| 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 0/6 | Planned | - |
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 0/0 | Not started | - |
 | 10. Personalized Home Landing Tab | v1.1 | 0/0 | Not started | - |
 

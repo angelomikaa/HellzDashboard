@@ -16,8 +16,8 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 - [ ] **WHIT-05**: Officers can see which whitelist members haven't claimed a PIN (server-derived flag, staff-only surface; never the hash)
 - [ ] **WHIT-06**: Owner can reset a member's PIN via an owner-only RPC (reuses the hash-pin flow) — resolves the forgotten-PIN lockout gap left by player-picked PINs
 - [ ] **WHIT-07**: Adding a removed (inactive) handle reactivates the member (history preserved) instead of erroring
-- [ ] **WHIT-08** (owner feedback 2026-10-20): A visitor/player can SUBMIT a membership request (handle + display name + optional message) without staff involvement; the request is stored server-side with a `pending` status and never grants access by itself
-- [ ] **WHIT-09** (owner feedback 2026-10-20): Officers/owners see pending membership requests in Validações and approve or reject them; approval runs the existing `add_member` path (handle-only registration, first-login PIN flow), rejection is recorded with no access granted
+- [ ] **WHIT-08** (owner feedback 2026-10-20): A player can request access from the public panel through two loops — an existing member re-requests with handle + PIN + one basic screenshot (identity only, no stats), and a prospect completes the full stat wizard; both store a server-side `pending` request that never grants access by itself
+- [ ] **WHIT-09** (owner feedback 2026-10-20): Officers/owners review requests in Validações with a ranking-style OVR row (identity, type badge, proof behind expansion) and approve or reject; approval creates the member with the request PIN active and the pointed role pre-filled for confirmation, prospect approval creates the first `validated` submission while member-type approval creates none, and every decision purges the proof object
 - [ ] **WHIT-10** (owner feedback 2026-10-20): A requester can check their own request status; pending/rejected requesters are told they must be whitelisted by an officer and cannot reach any member data
 
 ### Character Identity Capture
@@ -145,13 +145,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ROLE-12 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
 | SEED-01 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
 | SEED-02 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
-| WHIT-01 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
-| WHIT-02 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
-| WHIT-03 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
-| WHIT-04 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
-| WHIT-05 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
-| WHIT-06 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
-| WHIT-07 | Phase 8 — Whitelist Lifecycle & First-Login PIN Setup | Pending |
+| WHIT-01 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| WHIT-02 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| WHIT-03 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| WHIT-04 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| WHIT-05 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| WHIT-06 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| WHIT-07 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| WHIT-08 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| WHIT-09 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| WHIT-10 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| IDEN-01 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| IDEN-02 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| IDEN-03 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
 | SCALE-01 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
 | SCALE-02 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
 | SCALE-03 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
@@ -165,10 +171,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ROLE-10 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
 | ROLE-11 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
 | HOME-03 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| KEYU-01 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| KEYU-02 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
+| KEYU-03 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
 | HOME-01 | Phase 10 — Personalized Home Landing Tab | Pending |
 | HOME-02 | Phase 10 — Personalized Home Landing Tab | Pending |
+| SHWC-01 | Phase 10 — Personalized Home Landing Tab | Pending |
 
 **Coverage:**
-- v1.1 requirements: 27 total
-- Mapped to phases: 27 ✓
+- v1.1 requirements: 37 total
+- Mapped to phases: 37 ✓
 - Unmapped: 0 ✓
