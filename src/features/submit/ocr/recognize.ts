@@ -63,6 +63,18 @@ import {
   type RowGrammar,
 } from './structure'
 import { sanityAccepts } from './sanity'
+import { parseBasicProfileText, type BasicProfileFields } from '../identity'
+
+/** One full Basic-screen profile read (08-03 D-03): OCR text + parsed identity. */
+export interface BasicProfileRead extends BasicProfileFields {
+  raw_text: string
+}
+
+// Letters + digits + the label separators the Basic header renders. Sparse
+// text finds the nickname band, "Job <class>" and "ID <digits>" as separate
+// boxes in ONE pass (no region map — D-19 recalibration model).
+const PROFILE_WHITELIST =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 :./-'
 
 /** One region's read outcome: machine-generated pre-fill for the wizard. */
 export type OcrFieldOutcome =
@@ -342,4 +354,41 @@ export async function readScreenshot(
     }
   }
   return outcomes
+}
+
+/** Parse-only seam for unit tests (the worker path is browser-only). */
+export function profileFromRawText(text: string): BasicProfileFields {
+  return parseBasicProfileText(text)
+}
+
+/**
+ * Read the character identity (nickname / ID / job) from a Basic screenshot in
+ * ONE full-canvas OCR pass, parsing the text with the pure identity module.
+ *
+ * Used by first access (D-03) and the member request form. The existing worker
+ * is shared; PSM is switched to SPARSE_TEXT for this read and restored to the
+ * wizard's SINGLE_BLOCK in `finally`, so a later readScreenshot is unaffected.
+ * Any worker error propagates (D-18: callers show the designed retry copy and
+ * NEVER guess an identity).
+ */
+export async function readBasicProfile(
+  image: ImageBitmap | HTMLCanvasElement,
+): Promise<BasicProfileRead> {
+  const worker = await getWorker()
+  const canvas =
+    image instanceof HTMLCanvasElement ? image : imageToData(image).canvas
+
+  await worker.setParameters({
+    tessedit_pageseg_mode: PSM.SPARSE_TEXT,
+    tessedit_char_whitelist: PROFILE_WHITELIST,
+  })
+  try {
+    const { data } = await worker.recognize(canvas)
+    const raw = data.text || ''
+    return { ...profileFromRawText(raw), raw_text: raw }
+  } finally {
+    // Restore the wizard's block segmentation; ocrRect sets its own whitelist
+    // before every read, but PSM is worker-global.
+    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK })
+  }
 }
