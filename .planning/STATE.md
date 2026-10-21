@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: Completed 08-02-PLAN.md (verify-pin 409 + setup-pin + request-access deployed LIVE; smoke-identity 117/117 twice)
-last_updated: "2026-10-21T06:28:05.538Z"
-last_activity: "2026-10-21 -- 08-02 executed: verify-pin 409 unclaimed branch + setup-pin + request-access deployed LIVE in dependency order; smoke-identity 117/117 twice with zero residue; build + deno check green"
+stopped_at: Completed 08-03-PLAN.md (first access + request flow + status lookup; 405 tests green, build green)
+last_updated: "2026-10-21T07:09:21.588Z"
+last_activity: 2026-10-21
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 18
-  completed_plans: 14
-  percent: 78
+  completed_plans: 15
+  percent: 83
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 08 (whitelist-lifecycle-self-request-whitelisting-first-login-pi) — EXECUTING
-Plan: 3 of 6 (08-02 complete; 08-03 next)
-Status: Auth boundary LIVE — verify-pin 409 unclaimed, setup-pin claim, request-access intake all deployed and smoke-green (117/117 twice)
-Last activity: 2026-10-21 -- 08-02 executed: Edge Functions deployed in dependency order, live probes green, no secrets in any output
+Plan: 4 of 6 (08-03 complete; 08-04 next)
+Status: Unauthenticated client surface complete — first access, request flow and status lookup wired into login (405 tests green)
+Last activity: 2026-10-21 -- 08-03 executed: identity OCR + PinBoxes + ProofField, anon Edge wrappers, login 409 routing, member request/supersede and status lookup
 
 ## Accumulated Context
 
@@ -86,6 +86,8 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 08]: 08-02: setup-pin refuses a handle whose pin_hash is already set BEFORE the proof upload, so a replay can never leave an orphan object; the smoke proves it by comparing the claims/<member_id>/ object count around the replay
 - [Phase 08]: 08-02: request-access returns only {request_id,status:'pending'} - the id is what the UI polls request_status with and it carries no identity; the superseded proof object is purged server-side after the new request commits
 - [Phase 08]: 08-02: the Supabase gateway answers 503 for ~4 MB function bodies before the function runs, so the client cap is a <=2 MB JPEG and the server 413 is proved with a 2.3 MB image (effective residual risk tracked in deferred-items.md alongside the pre-existing record_pin_failure first-failure off-by-one)
+- [Phase 08]: 08-03: node-env Vitest only - all flow rules extracted into pure modules (pin/proof/firstAccess/requestFlow) and components asserted with renderToStaticMarkup instead of adding a DOM testing library (08-CONTEXT no-new-deps rule) — Keeps the client testable without new dependencies and keeps components thin
+- [Phase 08]: 08-03: first-access identity is OCR evidence only (incomplete read blocks submit); the request form prefills the same fields but keeps them editable, and a touched field is never overwritten by a later OCR pass — D-03 claim integrity vs D-06 staff-reviewed applications
 
 ### Blockers/Concerns (open — carry to next milestone)
 
@@ -108,9 +110,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-21T06:28:05.466Z
-Stopped at: Completed 08-02-PLAN.md (verify-pin 409 + setup-pin + request-access deployed LIVE; smoke-identity 117/117 twice)
-Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/08-03-PLAN.md
+Last session: 2026-10-21T07:09:14.425Z
+Stopped at: Completed 08-03-PLAN.md (first access + request flow + status lookup; 405 tests green, build green)
+Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/08-04-PLAN.md
 
 ## Performance Metrics
 
@@ -127,6 +129,7 @@ Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-f
 | 07.2 | 07.2-04 | ~45 min | 2 | 4 | 2026-10-20 |
 | 08 | 08-01 | ~31 min | 3 | 3 | 2026-10-21 |
 | 08 | 08-02 | ~35 min | 4 | 5 | 2026-10-21 |
+| 08 | 08-03 | ~30 min | 4 | 22 | 2026-10-21 |
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*
