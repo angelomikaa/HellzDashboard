@@ -151,6 +151,9 @@ export function ProspectApplicationPage({
     setIdentityError(null)
     setSubmitting(true)
     try {
+      // The one write path: POST request-access with
+      // { request_type: 'prospect', ...draft identity, stats } — never
+      // create_submission, and never a session (T-08-28).
       const outcome = await submitProspectApplication(draft, catalog, inputs, { requestAccess })
       if (outcome.ok) {
         onSubmitted(outcome.requestId)
