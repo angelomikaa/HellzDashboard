@@ -91,7 +91,7 @@
 }
 
 @utility backdrop-neon-grid {
-  /* sci-fi grid backdrop — login and Destaques ONLY (D-04); additive over bg-dominant */
+  /* sci-fi grid backdrop — app-wide over bg-dominant (owner decision 2026-10-21) */
   background-image:
     radial-gradient(ellipse 80% 50% at 50% -10%, rgb(220 53 56 / 0.08), transparent),
     repeating-linear-gradient(0deg, rgb(220 53 56 / 0.03) 0 1px, transparent 1px 48px),
