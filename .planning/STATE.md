@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
-status: planning
-stopped_at: Phase 8 plans created (6/6), manual plan check pending
-last_updated: "2026-10-21T04:59:37.771Z"
-last_activity: "2026-10-21 -- Phase 8 planned: 6/6 plans authored (08-01..08-06) covering migration 0014 whitelist/requests/identity, verify-pin 409 + setup-pin + request-access, first access, submit identity + prospect wizard, staff boards/review, legacy conversion + lockout cleanup; decisions D-03/06/11/14/15/18/24 revised in plans. Manual plan check pending"
+status: executing
+stopped_at: Completed 08-01-PLAN.md (migration 0014 + identity-proofs storage live; smoke-identity 81/81 twice)
+last_updated: "2026-10-21T05:46:21.768Z"
+last_activity: "2026-10-21 -- 08-01 executed: migration 0014 + identity-proofs storage seed applied LIVE, schema_migrations 0014 recorded, smoke-identity 81/81 twice with zero residue, rank/card/officer/lifecycle/promotion/rls regressions green, build green"
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
-  percent: 100
+  total_plans: 18
+  completed_plans: 13
+  percent: 72
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 **Core value:** Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
-**Current focus:** Phase 8 — Whitelist Lifecycle, Self-Request & Character Identity
+**Current focus:** Phase 08 — whitelist-lifecycle-self-request-whitelisting-first-login-pi
 
 ## Current Position
 
-Phase: 8 (whitelist lifecycle, self-request whitelisting, first-login PIN setup & character identity capture)
-Plan: 6/6 authored (08-01..08-06) — execution not started
-Status: Plans created; manual plan check pending
-Last activity: 2026-10-21 -- Phase 8 planned: 6/6 plans authored (08-01..08-06) covering migration 0014 whitelist/requests/identity, verify-pin 409 + setup-pin + request-access, first access, submit identity + prospect wizard, staff boards/review, legacy conversion + lockout cleanup; decisions D-03/06/11/14/15/18/24 revised in plans. Manual plan check pending
+Phase: 08 (whitelist-lifecycle-self-request-whitelisting-first-login-pi) — EXECUTING
+Plan: 2 of 6 (08-01 complete; 08-02 next)
+Status: 0014 + identity-proofs storage live and smoke-green; Edge Functions (08-02) not yet deployed
+Last activity: 2026-10-21 -- 08-01 executed: migration 0014 + storage seed applied LIVE, schema_migrations 0014 recorded, smoke-identity 81/81 twice + rank/card/officer/lifecycle/promotion/rls regressions green
 
 ## Accumulated Context
 
@@ -78,6 +78,9 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 07.2]: 07.2-06: the grouped-stat grid lives in CollapsibleGroup.tsx (not DashboardPage.tsx as the plan's files_modified implied) — widened there with the same sm/lg/xl system; ClassCrest now accepts char_class null (staff rows can be whitelisted before a character exists) and renders the neutral '—' monogram tile
 - [Phase 07.2]: 07.2-06 owner feedback round 1 (2026-10-20) — IN-SCOPE FIXES SHIPPED (6240ade): own-card download moved INSIDE the card preview (CardPhotoUpload.previewActions — it read as disconnected under the key-stat strip); Ranking details expand inline under their row (Fragment, aria-controls region preserved); Personagens class/function token filters (pure view aid, no server round trip); Enviar Status OCR is a two-column section (example + upload right rail, fields main column; mobile keeps upload-first)
 - [Phase 07.2]: ROADMAP RE-PLANNED from owner feedback round 2 (owner decisions 2026-10-20): (a) ID/nickname/job capture = PER-SUBMISSION history, latest validated supplies the card nickname → Phase 8 (migration 0014, D-06 superseded; fixes the Painel card showing the seeded 'owner nickname' instead of the in-game name); (b) membership self-request + officer manual whitelist → Phase 8 (WHIT-08/09/10, request table RPC-only, approval reuses add_member); (c) unified key/relevant ordered set (first 6 keys, 7th+ relevants, deselect promotes oldest relevant) → Phase 9 INSIDE set_key_stat v2 (KEYU-01/02/03 — never a separate migration); (d) Destaques scroll-snap slider → Phase 10 (SHWC-01, members-only — public visitor homepage explicitly DEFERRED)
+- [Phase 08]: 08-01: create_submission became SECURITY DEFINER (live 403 proved an invoker body cannot call the internal assert_char_id_available guard). The JWT member_id claim is still the only identity, an explicit active-member check replaces the 0004 insert policy, and the one-pending discard is scoped to the caller's own rows. — Granting the guard to authenticated would let members probe char_id existence; definer + explicit scoping matches every other member-facing RPC in the codebase.
+- [Phase 08]: 08-01: get_promotion in migration 0014 was copied from the LIVE supersession seed (promotion-rating-unification.sql), not migration 0013 - the 0013 body would have regressed photo_path and the class+function rating parity shipped in 07.2 round 8 — The live function is the source of truth; every 0014 copy is byte-faithful to what production actually runs.
+- [Phase 08]: 08-01: approve_request calls assert_char_id_available(char_id, existing_member_id, p_request) - passing null for p_request (as the plan literally said) would always raise duplicate_char_id against the request's own pending row
 
 ### Blockers/Concerns (open — carry to next milestone)
 
@@ -99,9 +102,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-21T04:59:37.771Z
-Stopped at: Phase 8 plans created (6/6); manual plan check pending
-Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/08-01-PLAN.md
+Last session: 2026-10-21T05:46:21.714Z
+Stopped at: Completed 08-01-PLAN.md (migration 0014 + identity-proofs storage live; smoke-identity 81/81 twice)
+Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/08-02-PLAN.md
 
 ## Performance Metrics
 
@@ -116,6 +119,7 @@ Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-f
 | 07.2 | 07.2-05 | multi-session (3 days, ~8 owner visual rounds) | 4 | 75 | 2026-10-19 |
 | 07.2 | 07.2-03 | ~73 min (RED→GREEN TDD) | 3 | 10 | 2026-10-20 |
 | 07.2 | 07.2-04 | ~45 min | 2 | 4 | 2026-10-20 |
+| 08 | 08-01 | ~31 min | 3 | 3 | 2026-10-21 |
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*

@@ -9,22 +9,22 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 
 ### Whitelist Lifecycle
 
-- [ ] **WHIT-01**: Officer or owner can add a member with handle-only registration (handle + display name; role forced `member`; no PIN set yet; rejects the dummy sentinel prefix)
-- [ ] **WHIT-02**: Player logging in with an unclaimed handle is routed to a first-login PIN setup flow (choose own 4-digit PIN, double-entry confirmation, server-side `^\d{4}$` validation)
-- [ ] **WHIT-03**: Successful PIN setup atomically claims the PIN (double-claim → `already_set`) and mints the standard 7-day session, landing the player directly in the panel
-- [ ] **WHIT-04**: PIN-setup attempts are rate-limited by the existing lockout machinery (`pin_login_attempts` + `record_pin_failure` + `_shared/lockout.ts`) — no second rate-limit mechanism
-- [ ] **WHIT-05**: Officers can see which whitelist members haven't claimed a PIN (server-derived flag, staff-only surface; never the hash)
-- [ ] **WHIT-06**: Owner can reset a member's PIN via an owner-only RPC (reuses the hash-pin flow) — resolves the forgotten-PIN lockout gap left by player-picked PINs
-- [ ] **WHIT-07**: Adding a removed (inactive) handle reactivates the member (history preserved) instead of erroring
-- [ ] **WHIT-08** (owner feedback 2026-10-20): A player can request access from the public panel through two loops — an existing member re-requests with handle + PIN + one basic screenshot (identity only, no stats), and a prospect completes the full stat wizard; both store a server-side `pending` request that never grants access by itself
-- [ ] **WHIT-09** (owner feedback 2026-10-20): Officers/owners review requests in Validações with a ranking-style OVR row (identity, type badge, proof behind expansion) and approve or reject; approval creates the member with the request PIN active and the pointed role pre-filled for confirmation, prospect approval creates the first `validated` submission while member-type approval creates none, and every decision purges the proof object
-- [ ] **WHIT-10** (owner feedback 2026-10-20): A requester can check their own request status; pending/rejected requesters are told they must be whitelisted by an officer and cannot reach any member data
+- [x] **WHIT-01**: Officer or owner can add a member with handle-only registration (handle + display name; role forced `member`; no PIN set yet; rejects the dummy sentinel prefix)
+- [x] **WHIT-02**: Player logging in with an unclaimed handle is routed to a first-login PIN setup flow (choose own 4-digit PIN, double-entry confirmation, server-side `^\d{4}$` validation)
+- [x] **WHIT-03**: Successful PIN setup atomically claims the PIN (double-claim → `already_set`) and mints the standard 7-day session, landing the player directly in the panel
+- [x] **WHIT-04**: PIN-setup attempts are rate-limited by the existing lockout machinery (`pin_login_attempts` + `record_pin_failure` + `_shared/lockout.ts`) — no second rate-limit mechanism
+- [x] **WHIT-05**: Officers can see which whitelist members haven't claimed a PIN (server-derived flag, staff-only surface; never the hash)
+- [x] **WHIT-06**: Owner can reset a member's PIN via an owner-only RPC (reuses the hash-pin flow) — resolves the forgotten-PIN lockout gap left by player-picked PINs
+- [x] **WHIT-07**: Adding a removed (inactive) handle reactivates the member (history preserved) instead of erroring
+- [x] **WHIT-08** (owner feedback 2026-10-20): A player can request access from the public panel through two loops — an existing member re-requests with handle + PIN + one basic screenshot (identity only, no stats), and a prospect completes the full stat wizard; both store a server-side `pending` request that never grants access by itself
+- [x] **WHIT-09** (owner feedback 2026-10-20): Officers/owners review requests in Validações with a ranking-style OVR row (identity, type badge, proof behind expansion) and approve or reject; approval creates the member with the request PIN active and the pointed role pre-filled for confirmation, prospect approval creates the first `validated` submission while member-type approval creates none, and every decision purges the proof object
+- [x] **WHIT-10** (owner feedback 2026-10-20): A requester can check their own request status; pending/rejected requesters are told they must be whitelisted by an officer and cannot reach any member data
 
 ### Character Identity Capture
 
-- [ ] **IDEN-01** (owner feedback 2026-10-20): Every submission captures the in-game character ID, nickname and job(s) alongside combat power — OCR pre-fill plus mandatory manual correction, same discipline as the stat fields
-- [ ] **IDEN-02** (owner feedback 2026-10-20): The captured values are stored PER SUBMISSION (append-only history), so a job swap leaves a trace; the latest validated submission supplies the nickname used on the member/destaques cards
-- [ ] **IDEN-03** (owner feedback 2026-10-20): Staff can see a member's job/nickname history (who swapped when); members never see other members' identity history
+- [x] **IDEN-01** (owner feedback 2026-10-20): Every submission captures the in-game character ID, nickname and job(s) alongside combat power — OCR pre-fill plus mandatory manual correction, same discipline as the stat fields
+- [x] **IDEN-02** (owner feedback 2026-10-20): The captured values are stored PER SUBMISSION (append-only history), so a job swap leaves a trace; the latest validated submission supplies the nickname used on the member/destaques cards
+- [x] **IDEN-03** (owner feedback 2026-10-20): Staff can see a member's job/nickname history (who swapped when); members never see other members' identity history
 
 ### Personalized Home
 
@@ -145,19 +145,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ROLE-12 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
 | SEED-01 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
 | SEED-02 | Phase 7 — Dummy-Data Seed & Catalog Alignment | Complete |
-| WHIT-01 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| WHIT-02 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| WHIT-03 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| WHIT-04 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| WHIT-05 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| WHIT-06 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| WHIT-07 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| WHIT-08 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| WHIT-09 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| WHIT-10 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| IDEN-01 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| IDEN-02 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
-| IDEN-03 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Pending |
+| WHIT-01 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| WHIT-02 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| WHIT-03 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| WHIT-04 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| WHIT-05 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| WHIT-06 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| WHIT-07 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| WHIT-08 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| WHIT-09 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| WHIT-10 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| IDEN-01 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| IDEN-02 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| IDEN-03 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
 | SCALE-01 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
 | SCALE-02 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |
 | SCALE-03 | Phase 9 — Fine Ranks (Scale & Role-Differentiated Key Stats) | Pending |

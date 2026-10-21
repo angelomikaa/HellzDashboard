@@ -151,7 +151,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 (8 is independent and coul
 | 5. OCR Auto-Read Layer | v1.0 | 5/5 | Complete | 2026-10-12 |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | v1.0 | 7/7 | Complete | 2026-10-13 |
 | 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 4/4 | Complete    | 2026-10-15 |
-| 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 0/6 | Planned | - |
+| 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 1/6 | In Progress|  |
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 0/0 | Not started | - |
 | 10. Personalized Home Landing Tab | v1.1 | 0/0 | Not started | - |
 
