@@ -2,45 +2,21 @@
 // POST { discord_handle, pin } -> 200 { session } with a 7-day custom-claim JWT.
 // The PIN and pin_hash are never logged and never appear in any response path.
 import bcrypt from 'npm:bcryptjs@3'
-import { SignJWT } from 'npm:jose@4'
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import {
+  DUMMY_HASH,
+  corsHeaders,
+  envConfig,
+  json,
+  mintSession,
+  rowToState,
+} from '../_shared/session.ts'
 import {
   isLocked,
   retryAfterSeconds,
   resetState,
   MAX_ATTEMPTS,
-  LOCKOUT_MINUTES,
-  type LockoutState,
 } from '../_shared/lockout.ts'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
-const SESSION_SECONDS = 7 * 24 * 60 * 60 // D-06: 7-day session
-
-// WR-01: bcrypt only runs on the wrong-PIN path, so the ~100ms latency gap is a
-// timing oracle for whether a handle exists in the whitelist. Missing/inactive
-// handles burn equal time with a dummy compare; the result is discarded.
-const DUMMY_HASH = '$2b$10$do3wEW4Kw.b6.cPViR4gful21a5LL997L3/TZ61hX.B0g/.7haOUO'
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
-
-function rowToState(
-  row: { failed_count: number | null; locked_until: string | null } | null,
-): LockoutState {
-  return {
-    failedCount: row?.failed_count ?? 0,
-    lockedUntil: row?.locked_until ? new Date(row.locked_until) : null,
-  }
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -66,18 +42,12 @@ Deno.serve(async (req: Request) => {
 
   // WR-05: fail fast on missing function env secrets — a missing secret must
   // never mint HS256 tokens signed with the literal string "undefined".
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  const jwtSecret = Deno.env.get('NEFOOT_JWT_SECRET')
-  const jwtKid = Deno.env.get('NEFOOT_JWT_KEY_ID')
-  if (!supabaseUrl || !serviceRoleKey || !jwtSecret || !jwtKid) {
+  const cfg = envConfig()
+  if (!cfg) {
     return json({ error: 'server_misconfigured' }, 500)
   }
 
-  const admin = createClient(
-    supabaseUrl,
-    serviceRoleKey,
-  )
+  const admin = createClient(cfg.supabaseUrl, cfg.serviceRoleKey)
 
   const now = new Date()
 
@@ -145,6 +115,21 @@ Deno.serve(async (req: Request) => {
     return await invalidCredentials()
   }
 
+  // D-04/WHIT-02: an ACTIVE handle with no PIN yet is a whitelisted player who
+  // has not claimed access. Never mint a session here. The branch sits AFTER the
+  // inactive gate (inactive handles keep the uniform 401) and BEFORE the real
+  // compare (a null hash must never reach bcrypt). Timing is equalized with the
+  // dummy compare and the existing per-handle counter throttles enumeration.
+  if (member.pin_hash === null) {
+    bcrypt.compareSync(pin, DUMMY_HASH)
+    try {
+      await recordFailure()
+    } catch {
+      // Infra hiccup must not mask the setup signal (the counter stays untouched).
+    }
+    return json({ error: 'pin_setup_required' }, 409)
+  }
+
   if (!bcrypt.compareSync(pin, member.pin_hash)) return await invalidCredentials()
 
   // WR-03: the success-path reset must not silently fail — the correct-PIN user
@@ -158,33 +143,18 @@ Deno.serve(async (req: Request) => {
   })
   if (clearErr) return json({ error: 'server_error' }, 500)
 
-  // Mint the 7-day custom-claim JWT (D-06). `role: 'authenticated'` drives the PostgREST
-  // role switch; RLS reads identity from the member_id/member_role custom claims.
-  // Signed HS256 with NEFOOT_JWT_SECRET — a project JWT signing key registered via the
-  // Management API (the legacy project secret is no longer exposed by the platform).
-  // The kid header lets PostgREST select the right key; both are function env secrets.
-  const nowSec = Math.floor(Date.now() / 1000)
-  const secret = new TextEncoder().encode(jwtSecret)
-  const kid = jwtKid
-  const token = await new SignJWT({
-    role: 'authenticated',
-    member_id: member.id,
-    member_role: member.role,
-  })
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT', kid })
-    .setSubject(member.id)
-    .setIssuedAt(nowSec)
-    .setIssuer('nefoot-verify-pin')
-    .setExpirationTime(nowSec + SESSION_SECONDS)
-    .sign(secret)
-
-  return json({
-    session: {
-      access_token: token,
-      member_id: member.id,
+  // Mint the 7-day custom-claim JWT (D-06) through the shared module — the exact
+  // same block setup-pin uses, so both functions return an identical session.
+  let session
+  try {
+    session = await mintSession({
+      id: member.id,
       display_name: member.display_name,
-      member_role: member.role,
-      expires_at: nowSec + SESSION_SECONDS,
-    },
-  })
+      role: member.role,
+    })
+  } catch {
+    return json({ error: 'server_error' }, 500)
+  }
+
+  return json({ session })
 })
