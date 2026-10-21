@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-stopped_at: Completed 08-03-PLAN.md (first access + request flow + status lookup; 405 tests green, build green)
-last_updated: "2026-10-21T07:09:21.588Z"
+stopped_at: Completed 08-04-PLAN.md (identity capture + session-less prospect wizard; 491 tests green, build green)
+last_updated: "2026-10-21T07:59:00.000Z"
 last_activity: 2026-10-21
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 18
-  completed_plans: 15
-  percent: 83
+  completed_plans: 16
+  percent: 88
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 08 (whitelist-lifecycle-self-request-whitelisting-first-login-pi) — EXECUTING
-Plan: 4 of 6 (08-03 complete; 08-04 next)
-Status: Unauthenticated client surface complete — first access, request flow and status lookup wired into login (405 tests green)
-Last activity: 2026-10-21 -- 08-03 executed: identity OCR + PinBoxes + ProofField, anon Edge wrappers, login 409 routing, member request/supersede and status lookup
+Plan: 5 of 6 (08-04 complete; 08-05 next)
+Status: Identity-stamped submissions and the session-less prospect application wizard are live in the client (491 tests green)
+Last activity: 2026-10-21 -- 08-04 executed: mandatory SubmitPage identity + OCR profile prefill + p_identity, shared applyOcrOutcomes, anon catalog reader, ProspectApplicationPage through request-access, RequireAuth application view
 
 ## Accumulated Context
 
@@ -88,6 +88,10 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 08]: 08-02: the Supabase gateway answers 503 for ~4 MB function bodies before the function runs, so the client cap is a <=2 MB JPEG and the server 413 is proved with a 2.3 MB image (effective residual risk tracked in deferred-items.md alongside the pre-existing record_pin_failure first-failure off-by-one)
 - [Phase 08]: 08-03: node-env Vitest only - all flow rules extracted into pure modules (pin/proof/firstAccess/requestFlow) and components asserted with renderToStaticMarkup instead of adding a DOM testing library (08-CONTEXT no-new-deps rule) — Keeps the client testable without new dependencies and keeps components thin
 - [Phase 08]: 08-03: first-access identity is OCR evidence only (incomplete read blocks submit); the request form prefills the same fields but keeps them editable, and a touched field is never overwritten by a later OCR pass — D-03 claim integrity vs D-06 staff-reviewed applications
+- [Phase 08]: 08-04: identity is mandatory on every submission and sent as `create_submission(p_identity)`; the client validates with the same `validateIdentityDraft` rules the RPC enforces (char_id/nickname/class/function), so a malformed identity fails inline before the wizard is discarded
+- [Phase 08]: 08-04: one Basic upload now feeds both stat OCR and identity prefill (`OcrCapture.onImage` → `readBasicProfile`); prefill only touches empty/untouched fields, never sets `char_function`, and an unmatched class resets to blank instead of guessing
+- [Phase 08]: 08-04: prospect flow rules live in `requestFlow.ts` with `requestAccess` injected (payload, gating, error copy, submit) — the page stays thin and the contract is unit-testable without network stubs; the wizard has no per-step attestations (ReviewStep gets `allStepsVerified`)
+- [Phase 08]: 08-04: the anonymous browser reads `stat_catalog` through the 0014 column-limited anon grant only (`fetchPublicCatalog`); key-stat config never crosses that boundary (T-08-29)
 
 ### Blockers/Concerns (open — carry to next milestone)
 
@@ -110,9 +114,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-21T07:09:14.425Z
-Stopped at: Completed 08-03-PLAN.md (first access + request flow + status lookup; 405 tests green, build green)
-Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/08-04-PLAN.md
+Last session: 2026-10-21T07:59:00.000Z
+Stopped at: Completed 08-04-PLAN.md (identity capture + session-less prospect wizard; 491 tests green, build green)
+Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-first-login-pi/08-05-PLAN.md
 
 ## Performance Metrics
 
@@ -130,6 +134,7 @@ Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-f
 | 08 | 08-01 | ~31 min | 3 | 3 | 2026-10-21 |
 | 08 | 08-02 | ~35 min | 4 | 5 | 2026-10-21 |
 | 08 | 08-03 | ~30 min | 4 | 22 | 2026-10-21 |
+| 08 | 08-04 | ~49 min | 2 | 10 | 2026-10-21 |
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*
