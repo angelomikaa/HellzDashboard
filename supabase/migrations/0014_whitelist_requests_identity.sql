@@ -1158,11 +1158,19 @@ comment on function public.staff_identity_history(uuid) is
 --     identity payload. The 1-arg signature is DROPPED so PostgREST never has
 --     to choose between two candidates: the 2-arg function's default keeps the
 --     old client call working unchanged during deploy.
+--     SECURITY DEFINER (deviation from 0010's invoker rights): the identity
+--     branch calls the internal assert_char_id_available guard, and an invoker
+--     body cannot execute a function whose EXECUTE was revoked from
+--     authenticated (live 403 on the first apply). The JWT member_id claim is
+--     still the only trusted identity, the active-member check replaces the
+--     0004 insert policy, and every write is scoped to the caller's own rows.
 drop function if exists public.create_submission(jsonb);
 
 create or replace function public.create_submission(p_stats jsonb, p_identity jsonb default null)
 returns uuid
 language plpgsql
+security definer
+set search_path = public
 as $$
 declare
   v_member uuid;
@@ -1175,6 +1183,12 @@ begin
   v_member := (auth.jwt()->>'member_id')::uuid;
   if v_member is null then
     raise exception 'no_member_claim';
+  end if;
+  -- SECURITY DEFINER (needed to call the internal assert_char_id_available
+  -- guard): the 0004 insert policy's active-member check is enforced here
+  -- explicitly instead of row-by-row by RLS.
+  if not exists (select 1 from members m where m.id = v_member and m.active) then
+    raise exception 'forbidden';
   end if;
   if jsonb_typeof(p_stats) <> 'array' or jsonb_array_length(p_stats) = 0 then
     raise exception 'empty_stats';
@@ -1216,8 +1230,9 @@ begin
   end if;
 
   -- D-11 one-pending rule: a new submission discards the player's previous
-  -- pending row (status mark only — never a delete, INPT-04). The invoker-RPC
-  -- update passes the submissions_discard_own_pending policy row by row.
+  -- pending row (status mark only — never a delete, INPT-04). Scoped to the
+  -- caller's own rows: the old invoker-rights update relied on
+  -- submissions_discard_own_pending; this definer body has to scope it itself.
   update submissions set status = 'discarded'
   where member_id = v_member and status = 'pending';
   insert into submissions (member_id, char_id, nickname, char_class, char_function)
@@ -1231,7 +1246,7 @@ end;
 $$;
 
 comment on function public.create_submission(jsonb, jsonb) is
-  'Member-invocable atomic submission (INPT-04, IDEN-01/02). Full 0010 body (one-pending discard + stats insert) plus an OPTIONAL identity object {char_id,nickname,char_class,char_function}: validated (numeric ID, nickname 1..80, existing class, build-role whitelist), cross-table uniqueness checked, and STORED ON THE SUBMISSION (promoted only at validation). p_identity defaults null so the old client call keeps working (the 1-arg overload is dropped to keep PostgREST resolution unambiguous). Exceptions: no_member_claim/empty_stats/unknown_stat_key/invalid_identity/unknown_class/invalid_function/duplicate_char_id. Invoker rights: submissions RLS still gates the insert/discard row by row.';
+  'Member-invocable atomic submission (INPT-04, IDEN-01/02). Full 0010 body (one-pending discard + stats insert) plus an OPTIONAL identity object {char_id,nickname,char_class,char_function}: validated (numeric ID, nickname 1..80, existing class, build-role whitelist), cross-table uniqueness checked, and STORED ON THE SUBMISSION (promoted only at validation). p_identity defaults null so the old client call keeps working (the 1-arg overload is dropped to keep PostgREST resolution unambiguous). Exceptions: no_member_claim/forbidden/empty_stats/unknown_stat_key/invalid_identity/unknown_class/invalid_function/duplicate_char_id. SECURITY DEFINER because the identity branch must call the internal assert_char_id_available guard (no client EXECUTE); the caller is pinned to the JWT member_id claim, an active-member check replaces the 0004 insert policy, and the one-pending discard is scoped to the caller''s own rows.';
 
 -- 7.2 set_submission_status v2 — full copy of 0011:131-163 plus identity
 --     promotion on validation. members.char_function is NEVER auto-applied

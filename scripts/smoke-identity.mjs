@@ -1153,14 +1153,28 @@ async function main() {
       `name=${rankIdent?.display_name}`,
     )
 
+    // Destaques sources the card name from the NEWEST identity history row, not
+    // from the denormalized members column. Probe with an OVR-eligible member:
+    // the ident fixture's staff-only correction moved it to mdps, whose cohort
+    // is too small for OVR (n<3), so that member can never reach the top-5.
+    const aId = (await memberIds([H.a]))[H.a]
+    const aCorrected = await rpc('correct_identity', officerToken, {
+      p_member: aId,
+      p_char_id: CHAR_IDS.aIdentity,
+      p_nickname: 'A Ident Corrected',
+      p_char_class: CLASS,
+      p_char_function: 'dps',
+    })
     const promo = await rpc('get_promotion', memberToken, {})
     const promoSection = (Array.isArray(promo.json) ? promo.json : []).find((s) => s.class_name === CLASS)
     const promoCards = promoSection && Array.isArray(promoSection.cards) ? promoSection.cards : []
-    const promoA = promoCards.find((c) => c.display_name === 'A Ident')
-    const promoIdent = promoCards.find((c) => c.display_name === 'Ident Corrected')
+    const promoA = promoCards.find((c) => c.display_name === 'A Ident Corrected')
     check(
       '13c. get_promotion card display_name comes from the latest identity history',
-      promo.ok && !!promoA && !!promoIdent,
+      aCorrected.ok &&
+        promo.ok &&
+        !!promoA &&
+        !promoCards.some((c) => c.display_name === 'A Ident' || c.display_name === 'Ident Corrected'),
       `cards=${JSON.stringify(promoCards.map((c) => c.display_name))}`,
     )
     check(
