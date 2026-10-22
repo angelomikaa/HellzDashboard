@@ -177,7 +177,7 @@ describe('rank engine client functions (03-03 RPC contracts)', () => {
     nextResponse = () => res(200, JSON.stringify([{ stat_key: 'crit' }, { stat_key: 'atk' }]))
     const keys = await fetchKeyStats(session, 'Assassin')
     expect(calls[0].url).toBe(
-      'https://test-project.supabase.co/rest/v1/class_key_stats?class_name=eq.Assassin&select=stat_key',
+      'https://test-project.supabase.co/rest/v1/class_key_stats?class_name=eq.Assassin&select=stat_key,selection_order&order=selection_order',
     )
     expect(calls[0].init.method).toBeUndefined() // GET
     expect(keys).toEqual(['crit', 'atk'])
@@ -187,7 +187,15 @@ describe('rank engine client functions (03-03 RPC contracts)', () => {
     nextResponse = () => res(200, '[]')
     await fetchKeyStats(session, 'Soul Fighter') // space must not break the filter
     expect(calls[0].url).toContain(
-      'class_key_stats?class_name=eq.Soul%20Fighter&select=stat_key',
+      'class_key_stats?class_name=eq.Soul%20Fighter&select=stat_key,selection_order&order=selection_order',
+    )
+  })
+
+  it('fetchKeyStats includes char_function filter when a build role is supplied', async () => {
+    nextResponse = () => res(200, JSON.stringify([{ stat_key: 'crit' }]))
+    await fetchKeyStats(session, 'Assassin', 'dps')
+    expect(calls[0].url).toContain(
+      'class_key_stats?class_name=eq.Assassin&select=stat_key,selection_order&order=selection_order&char_function=eq.dps',
     )
   })
 
@@ -196,13 +204,14 @@ describe('rank engine client functions (03-03 RPC contracts)', () => {
     await expect(fetchKeyStats(session, 'Assassin')).resolves.toEqual([])
   })
 
-  it('setKeyStat posts the exact RPC param names and unwraps the returned count', async () => {
+  it('setKeyStat posts to set_key_stat_v2 with p_class/p_function/p_stat_key/p_enabled and unwraps the count', async () => {
     nextResponse = () => res(200, JSON.stringify(4))
-    const count = await setKeyStat(session, 'Assassin', 'crit', true)
-    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/set_key_stat')
+    const count = await setKeyStat(session, 'Assassin', 'dps', 'crit', true)
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/set_key_stat_v2')
     expect(calls[0].init.method).toBe('POST')
     expect(JSON.parse(calls[0].init.body as string)).toEqual({
       p_class: 'Assassin',
+      p_function: 'dps',
       p_stat_key: 'crit',
       p_enabled: true,
     })
@@ -211,7 +220,7 @@ describe('rank engine client functions (03-03 RPC contracts)', () => {
 
   it('setKeyStat sends p_enabled false for a removal', async () => {
     nextResponse = () => res(200, JSON.stringify(5))
-    await setKeyStat(session, 'Assassin', 'crit', false)
+    await setKeyStat(session, 'Assassin', 'mdps', 'crit', false)
     expect(JSON.parse(calls[0].init.body as string).p_enabled).toBe(false)
   })
 
@@ -228,19 +237,19 @@ describe('rank engine client functions (03-03 RPC contracts)', () => {
     expect(top5).toEqual(rows)
   })
 
-  it('surfaces a 400 key_stat_limit as ApiError kind server with the marker in the message', async () => {
-    nextResponse = () => res(400, 'key_stat_limit')
-    const err = await setKeyStat(session, 'Assassin', 'seventh', true).catch((e) => e)
+  it('surfaces a 400 unknown_function as ApiError kind server with the marker in the message', async () => {
+    nextResponse = () => res(400, 'unknown_function')
+    const err = await setKeyStat(session, 'Assassin', 'dps', 'seventh', true).catch((e) => e)
     expect(err).toBeInstanceOf(ApiError)
     expect(err.status).toBe(400)
     expect(err.kind).toBe('server')
-    expect(err.message).toContain('key_stat_limit')
+    expect(err.message).toContain('unknown_function')
   })
 
   it('sends both gateway headers on every rank-engine call', async () => {
     nextResponse = () => res(200, '[]')
     await fetchKeyStats(session, 'Assassin')
-    await setKeyStat(session, 'Assassin', 'crit', true)
+    await setKeyStat(session, 'Assassin', 'dps', 'crit', true)
     await fetchClassTop5(session, 'Assassin')
     for (const call of calls) {
       const headers = call.init.headers as Record<string, string>

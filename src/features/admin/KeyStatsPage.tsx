@@ -1,9 +1,13 @@
 // Stats-Chave — officer/owner key-stat configuration (03-UI, D-01/D-04).
-// The tab is UX-only gating (App re-checks isStaff at the content level —
-// the App-stays-mounted lesson from 02-02); real enforcement is server-side:
-// the staff_select_key_stats RLS policy (member GET -> []) and the internal
-// officer/owner+active gates inside the 0009 SECURITY DEFINER RPCs. A member
-// session can never receive key-stat data because the endpoints refuse it.
+// Phase 9 (09-02): unified KEYU ordered selection set per (class, build-role):
+// first 6 selected = keys, 7th+ = relevants; deselecting a key promotes the
+// oldest relevant (server-enforced via set_key_stat_v2).
+//
+// The tab is UX-only gating (App re-checks isStaff at the content level);
+// real enforcement is server-side: the staff_select_key_stats RLS policy
+// (member GET -> []) and the internal officer/owner+active gates inside the
+// 0018 SECURITY DEFINER set_key_stat_v2. A member session can never receive
+// key-stat config because the endpoints refuse it.
 // ALL rank math is Postgres (AGENTS.md): this page only toggles config and
 // renders the compute-on-read class_top5 preview — it never imports the
 // 03-01 spec module or computes points client-side.
@@ -16,53 +20,65 @@ import {
   fetchKeyRelevantStats,
   fetchKeyStats,
   setKeyStat,
-  setRelevantStat,
   type ClassTop5Row,
   type StatCatalogEntry,
 } from '../../lib/api'
 import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER } from '../../lib/groups'
-import { KEY_CHIP, RELEVANT_CHIP } from '../dashboard/tierDisplay'
 import type { NeoFootSession } from '../auth/session'
+
+// Renders one ordered-set chip for a catalog entry within a (class, build-role)
+// combo. Phase 9 KEYU: no block-at-7 — chips stay clickable past 6; the 7th+
+// selection becomes a relevant automatically server-side. Shows selection_order
+// as a suffix: keys get `(n)` (1-6), relevants get `Rn` (7th+).
+function renderStatChip({
+  entry,
+  selected,
+  order,
+  isKey,
+  busy,
+  handleToggle,
+}: {
+  entry: StatCatalogEntry
+  selected: boolean
+  order: number
+  isKey: boolean
+  busy: boolean
+  handleToggle: (statKey: string, enabled: boolean) => void
+}) {
+  return (
+    <button
+      key={entry.stat_key}
+      type="button"
+      aria-pressed={selected}
+      disabled={busy}
+      onClick={() => void handleToggle(entry.stat_key, !selected)}
+      className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+        selected
+          ? isKey
+            ? 'border-accent bg-accent text-accent-foreground hover-primary'
+            : 'border-accent bg-accent text-accent-foreground hover-primary opacity-80'
+          : 'border-line bg-surface text-content hover-control'
+      }`}
+    >
+      {entry.label}{isKey ? ` (${order})` : order > 6 ? ` R${order - 6}` : ''}
+    </button>
+  )
+}
 
 // Enumeration-safe pt-BR copy (UI contract): never raw server error text.
 const NETWORK_ERROR =
   'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 const SESSION_ERROR = 'Sua sessão expirou ou você não tem permissão. Entre novamente.'
 const SAVE_ERROR = 'Não foi possível salvar. Tente novamente.'
-const LIMIT_ERROR = 'Máximo de 6 stats por classe — remova uma antes de adicionar outra.'
-const SELECT_CLASS_PROMPT = 'Selecione uma classe para configurar.'
+const SELECT_CLASS_PROMPT = 'Selecione uma classe e função para configurar.'
 const EMPTY_TOP5 = 'Nenhum jogador com OVR calculado ainda.'
 const INSUFFICIENT_OVR = '— dados insuficientes'
-// 07.2-03 D-05 server exception tokens (0013 set_relevant_stat) mapped to
-// enumeration-safe copy — the raw body is never rendered.
-const ALREADY_KEY_ERROR =
-  'Este stat já é chave — remova-o das chaves antes de marcá-lo como relevante.'
-const KEY_SET_INCOMPLETE_ERROR = 'Defina os 6 stats-chave da classe antes de escolher relevantes.'
-// Disabled-chip gating hint (D-05 rule 2). Worded so the 'Defina os 6
-// stats-chave' server-token copy above stays the ONLY occurrence of that
-// phrase (acceptance gate: the gating copy appears exactly once).
-const RELEVANT_GATE_HINT = 'Escolha os 6 stats-chave antes de marcar relevantes.'
-const KEY_IN_RELEVANT_HINT = 'Este stat já é chave — ele já está marcado acima.'
-// 07.2 D-06 legend: the red/yellow marking made legible (under the subtitle).
+// Phase 9: block-at-7 and key/relevant gating copy eliminated (KEYU-01).
+// Remaining: SESSION_ERROR / NETWORK_ERROR / SAVE_ERROR only.
 const TIER_LEGEND =
-  'Vermelho = chave (define o OVR) · Amarelo = relevante (guia o foco de melhoria)'
+  'Vermelho = chave (define o OVR) · a partir da 7ª seleção = relevante (guia o foco de melhoria)'
 
-// D-02: exactly 6 key stats per class — client blocks the 7th; the server's
-// 'key_stat_limit' (0009) is the race-proof backstop, not the only gate.
-const MAX_KEY_STATS = 6
-
-/** Map a toggle failure to enumeration-safe copy (never the raw body). */
-function toggleErrorCopy(err: unknown): string {
-  if (err instanceof ApiError) {
-    if (err.kind === 'unauthorized' || err.status === 403) return SESSION_ERROR
-    if (err.message.includes('key_stat_limit')) return LIMIT_ERROR
-    // 07.2-03 D-05 relevant-toggle tokens (0013 set_relevant_stat).
-    if (err.message.includes('already_key')) return ALREADY_KEY_ERROR
-    if (err.message.includes('key_set_incomplete')) return KEY_SET_INCOMPLETE_ERROR
-    return SAVE_ERROR
-  }
-  return NETWORK_ERROR
-}
+export type BuildRole = 'dps' | 'mdps' | 'suporte'
 
 export function KeyStatsPage({ session }: { session: NeoFootSession }) {
   const [classes, setClasses] = useState<string[] | null>(null)
@@ -70,16 +86,16 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [selectedClass, setSelectedClass] = useState('')
+  const [selectedFunction, setSelectedFunction] = useState<BuildRole | ''>('')
 
-  // Per-class server views: keyStats = current key config, relevantStats =
-  // the 07.2 relevant tier (D-04), top5 = the D-05 preview.
+  // Per-(class, function) server views: keyStats = current ordered set
+  // (first 6 = keys, 7th+ = relevants), top5 = preview. relevantStats kept
+  // for the coverage count (KEYU: unified set, no separate relevant tier).
   const [keyStats, setKeyStats] = useState<string[] | null>(null)
   const [relevantStats, setRelevantStats] = useState<string[] | null>(null)
   const [top5, setTop5] = useState<ClassTop5Row[] | null>(null)
   const [classError, setClassError] = useState<string | null>(null)
 
-  // Any in-flight toggle disables every chip AND the class selector on the
-  // page (global busy flag) — see the CR-01 notes below.
   const [toggling, setToggling] = useState(false)
   const [toggleError, setToggleError] = useState<string | null>(null)
 
@@ -103,20 +119,16 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
     }
   }, [session])
 
-  // Per-class load: key stats + relevant tier + top-5 preview, on every
-  // class change. The isStale guard (the cancelled-flag pattern from
-  // DashboardPage's mount effect, CR-01) makes an out-of-order response for
-  // a previously selected class a no-op instead of overwriting the current
-  // class's view — the officer must never see one class's config under
-  // another class's heading.
+  // Per-(class, function) load: ordered key set + top-5 preview, on every
+  // class or function change.
   const loadClassData = useCallback(
-    async (className: string, isStale?: () => boolean) => {
+    async (className: string, charFunction: BuildRole | '', isStale?: () => boolean) => {
       const [keys, relevants, preview] = await Promise.all([
-        fetchKeyStats(session, className),
-        fetchKeyRelevantStats(session, className),
+        fetchKeyStats(session, className, charFunction || undefined),
+        fetchKeyRelevantStats(session, className, charFunction || undefined),
         fetchClassTop5(session, className),
       ])
-      if (isStale?.()) return // stale response — drop
+      if (isStale?.()) return
       setKeyStats(keys)
       setRelevantStats(relevants)
       setTop5(preview)
@@ -125,17 +137,14 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
   )
 
   useEffect(() => {
-    if (selectedClass === '') return
+    if (selectedClass === '' || selectedFunction === '') return
     let cancelled = false
     setKeyStats(null)
     setRelevantStats(null)
     setTop5(null)
     setClassError(null)
     setToggleError(null)
-    // The cancelled flag guards ALL state writes for this class's fetch
-    // (success path via isStale, error path via the catch) — not just the
-    // error copy.
-    loadClassData(selectedClass, () => cancelled).catch((err: unknown) => {
+    loadClassData(selectedClass, selectedFunction, () => cancelled).catch((err: unknown) => {
       if (cancelled) return
       setClassError(
         err instanceof ApiError && err.kind === 'unauthorized' ? SESSION_ERROR : NETWORK_ERROR,
@@ -144,61 +153,20 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
     return () => {
       cancelled = true
     }
-  }, [selectedClass, loadClassData])
+  }, [selectedClass, selectedFunction, loadClassData])
 
   async function handleToggle(statKey: string, enabled: boolean) {
-    if (selectedClass === '' || keyStats === null || toggling) return
+    if (selectedClass === '' || selectedFunction === '' || keyStats === null || toggling) return
     setToggling(true)
     setToggleError(null)
     try {
-      // The RPC returns the class's current count — server truth for n/6.
-      await setKeyStat(session, selectedClass, statKey, enabled)
-      // Optimistic local mirror of the toggle, then refresh-after-save: ALL
-      // server views are re-read so the preview AND the Relevantes section
-      // reflect the new config (07.2 D-05 rule 4 — promoting a relevant stat
-      // into a vacant key slot demotes it server-side; the refresh mirrors
-      // that here). A refresh failure keeps the stale view — the toggle
-      // itself succeeded. No staleness guard needed here (CR-01): the class
-      // selector is disabled while toggling, so selectedClass can't change
-      // mid-toggle and the captured class can never diverge from the selector.
+      // set_key_stat_v2 returns the class's current key-stat count (order ≤ 6).
+      await setKeyStat(session, selectedClass, selectedFunction, statKey, enabled)
       setKeyStats((keys) =>
         enabled ? [...(keys ?? []), statKey] : (keys ?? []).filter((k) => k !== statKey),
       )
       try {
-        await loadClassData(selectedClass)
-      } catch {
-        /* stale view; the save itself succeeded */
-      }
-    } catch (err: unknown) {
-      setToggleError(toggleErrorCopy(err))
-    } finally {
-      setToggling(false)
-    }
-  }
-
-  // 07.2-03 D-04/D-05: relevant-tier toggle (0013 set_relevant_stat — the
-  // SAME refresh-after-save discipline; the single `toggling` busy flag
-  // disables every chip AND the class selector across BOTH sections, so a
-  // mid-toggle class switch stays impossible). D-05 rule 1 (key XOR
-  // relevant) and rule 2 (key set must be complete) are enforced here only
-  // as UX — the server RPC is the race-proof gate; a violated rule surfaces
-  // as its mapped copy via toggleErrorCopy.
-  async function handleRelevantToggle(statKey: string, enabled: boolean) {
-    if (selectedClass === '' || relevantStats === null || keyStats === null || toggling) return
-    setToggling(true)
-    setToggleError(null)
-    try {
-      await setRelevantStat(session, selectedClass, statKey, enabled)
-      // Optimistic local mirror, then the SAME refresh-after-save: the key
-      // section must re-mirror too (promotion demotes — D-05 rule 4 runs
-      // server-side inside set_key_stat).
-      setRelevantStats((relevants) =>
-        enabled
-          ? [...(relevants ?? []), statKey]
-          : (relevants ?? []).filter((k) => k !== statKey),
-      )
-      try {
-        await loadClassData(selectedClass)
+        await loadClassData(selectedClass, selectedFunction)
       } catch {
         /* stale view; the save itself succeeded */
       }
@@ -210,7 +178,8 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
   }
 
   const busy = toggling
-  const selectedCount = keyStats?.length ?? 0
+  const keyCount = keyStats ? keyStats.filter((_, i) => i < 6).length : 0 // keys = first 6 of ordered set
+  const relevantCount = keyStats ? Math.max(0, keyStats.length - 6) : 0
 
   return (
     <section className="rounded-lg border border-line bg-surface p-6" aria-busy={busy}>
@@ -220,21 +189,15 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
         </h2>
         {keyStats !== null && (
           <span
-            className={`text-sm font-semibold ${
-              selectedCount >= MAX_KEY_STATS ? 'text-success' : 'text-muted'
-            }`}
+            className={`text-sm font-semibold ${keyCount >= 6 ? 'text-success' : 'text-muted'}`}
           >
-            {selectedCount >= MAX_KEY_STATS
-              ? `${selectedCount}/${MAX_KEY_STATS} — completa`
-              : `${selectedCount}/${MAX_KEY_STATS}`}
+            {keyCount >= 6 ? `${keyCount}/6 — completa` : `${keyCount}/6`}
           </span>
         )}
       </div>
       <p className="mt-1 text-sm text-muted">
-        Escolha os 6 stats que definem o OVR de cada classe.
+        Escolha os 6 stats que definem o OVR de cada classe + função de build.
       </p>
-      {/* 07.2 D-06 legend: the red/yellow marking made legible — key chips
-          are the accent red, relevant chips the dedicated relevant yellow. */}
       <p className="mt-1 text-sm text-muted">{TIER_LEGEND}</p>
 
       {loadError !== null ? (
@@ -245,11 +208,6 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
         <p className="mt-6 text-base text-muted">Carregando…</p>
       ) : (
         <>
-          {/* Class selector (same markup pattern as Personagens' Classe
-              select). Disabled while toggling (CR-01): a mid-toggle class
-              switch would run the refresh-after-save with the class captured
-              at click time and deterministically overwrite the newly selected
-              class's view with the old class's data. */}
           <div className="mt-6 flex max-w-72 flex-col gap-2">
             <label htmlFor="keystats-class" className="text-sm font-semibold text-content">
               Classe
@@ -257,7 +215,10 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
             <select
               id="keystats-class"
               value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
+              onChange={(e) => {
+                setSelectedClass(e.target.value)
+                setSelectedFunction('')
+              }}
               disabled={busy}
               className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -270,6 +231,28 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
             </select>
           </div>
 
+          {selectedClass !== '' && (
+            <div className="mt-6 flex max-w-72 flex-col gap-2">
+              <label htmlFor="keystats-function" className="text-sm font-semibold text-content">
+                Função de build
+              </label>
+              <select
+                id="keystats-function"
+                value={selectedFunction}
+                onChange={(e) => setSelectedFunction(e.target.value as BuildRole)}
+                disabled={busy || selectedClass === ''}
+                className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <option value="">—</option>
+                {Object.entries(FUNCTION_LABELS).map(([key, label]) => (
+                  <option key={key} value={key as BuildRole}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {selectedClass === '' ? (
             <p className="mt-6 text-center text-base text-muted">{SELECT_CLASS_PROMPT}</p>
           ) : classError !== null ? (
@@ -279,6 +262,10 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
               className="mt-6 text-sm font-semibold text-destructive"
             >
               {classError}
+            </p>
+          ) : selectedFunction === '' ? (
+            <p className="mt-6 text-center text-base text-muted">
+              Selecione a função de build para ver os stats-chave.
             </p>
           ) : keyStats === null || relevantStats === null || top5 === null ? (
             <p className="mt-6 text-base text-muted">Carregando…</p>
@@ -294,10 +281,16 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                 </p>
               )}
 
-              {/* Catalog as grouped toggle chips (D-04): fixed order, same
-                  group headings as the wizard. */}
+              <div className="mt-6 flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-sm font-semibold text-muted">
+                  Stats-chave ({keyCount}/6 configurados)
+                </h3>
+                <span className="text-sm font-semibold text-muted">
+                  {relevantCount} relevante{relevantCount !== 1 ? 's' : ''}
+                </span>
+              </div>
               {GROUP_ORDER.map((group) => (
-                <div key={group} className="mt-6">
+                <div key={group} className="mt-4">
                   <h3 className="text-sm font-semibold text-muted">
                     {GROUP_LABELS[group]}
                   </h3>
@@ -306,99 +299,20 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                       .filter((entry) => entry.group_name === group)
                       .map((entry) => {
                         const selected = keyStats.includes(entry.stat_key)
-                        // Client-side block-at-7 (D-02 UX): at 6 selected, the
-                        // unselected chips are disabled; the server rejects a
-                        // tampered 7th with 'key_stat_limit'.
-                        const blocked = !selected && selectedCount >= MAX_KEY_STATS
-                        return (
-                          <button
-                            key={entry.stat_key}
-                            type="button"
-                            aria-pressed={selected}
-                            disabled={busy || blocked}
-                            onClick={() => void handleToggle(entry.stat_key, !selected)}
-                            className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
-                              selected
-                                ? 'border-accent bg-accent text-accent-foreground hover-primary'
-                                : 'border-line bg-surface text-content hover-control'
-                            }`}
-                          >
-                            {entry.label}
-                          </button>
-                        )
+                        const order = keyStats.indexOf(entry.stat_key) + 1
+                        const isKey = order <= 6
+                        return renderStatChip({
+                          entry,
+                          selected,
+                          order,
+                          isKey,
+                          busy,
+                          handleToggle,
+                        })
                       })}
                   </div>
                 </div>
               ))}
-
-              {/* 07.2-03 Relevantes section (D-04/D-05/D-06): the same class
-                  selector, same cohort shape, ONE page — a second section
-                  under the key-stat chip groups. Chip states encode the key
-                  XOR relevant rule: KEY stats are DISABLED here in the red
-                  KEY_CHIP marking (a stat is key XOR relevant — clicking is
-                  impossible rather than erroring); RELEVANT stats carry the
-                  yellow RELEVANT_CHIP marking and toggle off; everything
-                  else is a normal chip, gated until the class's 6-key set
-                  is complete (D-05 rule 2 — the server RPC is the
-                  race-proof backstop). RELV-01: the relevant marking never
-                  reaches member cards — this page and the foco strip are
-                  the tier's only surfaces. */}
-              <div className="mt-8 border-t border-line pt-4">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-muted">Relevantes</h3>
-                  <span className="text-sm font-semibold text-muted">
-                    {relevantStats.length} relevantes
-                  </span>
-                </div>
-                {GROUP_ORDER.map((group) => (
-                  <div key={group} className="mt-4">
-                    <h4 className="text-sm font-semibold text-muted">
-                      {GROUP_LABELS[group]}
-                    </h4>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {catalog
-                        .filter((entry) => entry.group_name === group)
-                        .map((entry) => {
-                          const isKey = keyStats.includes(entry.stat_key)
-                          const isRelevant = relevantStats.includes(entry.stat_key)
-                          // D-05 rule 2: NEW relevant selections only after
-                          // the 6-key set is complete; EXISTING relevant
-                          // stats remain removable (rule 3 — a key vacancy
-                          // never demotes them).
-                          const blocked =
-                            !isKey && !isRelevant && keyStats.length !== MAX_KEY_STATS
-                          return (
-                            <button
-                              key={entry.stat_key}
-                              type="button"
-                              aria-pressed={isRelevant}
-                              disabled={busy || isKey || blocked}
-                              title={
-                                isKey
-                                  ? KEY_IN_RELEVANT_HINT
-                                  : blocked
-                                    ? RELEVANT_GATE_HINT
-                                    : undefined
-                              }
-                              onClick={() =>
-                                void handleRelevantToggle(entry.stat_key, !isRelevant)
-                              }
-                              className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
-                                isKey
-                                  ? `bg-surface ${KEY_CHIP}`
-                                  : isRelevant
-                                    ? `bg-surface ${RELEVANT_CHIP}`
-                                    : 'border-line bg-surface text-content hover-control'
-                              }`}
-                            >
-                              {entry.label}
-                            </button>
-                          )
-                        })}
-                    </div>
-                  </div>
-                ))}
-              </div>
 
               {/* Top-5-by-OVR preview (D-05): compute-on-read — refreshes
                   after every toggle via loadClassData above. */}
@@ -409,12 +323,6 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                 ) : (
                   <ol className="mt-2 flex flex-col gap-2">
                     {top5.map((row, index) => (
-                      // display_name has NO unique constraint (0001) — two
-                      // same-class members can share a nickname, so a
-                      // name-only React key can collide and drop rows.
-                      // Composite with the position (WR-01); returning the
-                      // member id from class_top5 instead would need a
-                      // migration (server change, out of scope here).
                       <li
                         key={`${row.display_name}-${index}`}
                         className="flex flex-wrap items-baseline justify-between gap-2 text-base text-content"
@@ -427,9 +335,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                           </span>
                         </span>
                         <span className="font-semibold">
-                          {row.ovr === null
-                            ? INSUFFICIENT_OVR
-                            : `OVR ${Math.round(row.ovr)}`}
+                          {row.ovr === null ? INSUFFICIENT_OVR : `OVR ${Math.round(row.ovr)}`}
                         </span>
                       </li>
                     ))}
@@ -442,4 +348,15 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
       )}
     </section>
   )
+}
+
+export function toggleErrorCopy(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.kind === 'unauthorized' || err.status === 403) return SESSION_ERROR
+    if (err.message.includes('forbidden')) return SESSION_ERROR
+    if (err.message.includes('unknown_class') || err.message.includes('unknown_function'))
+      return SAVE_ERROR
+    return SAVE_ERROR
+  }
+  return NETWORK_ERROR
 }

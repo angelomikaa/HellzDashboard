@@ -10,15 +10,13 @@ import type { ReactNode } from 'react'
 import type { MyReportStat } from '../../lib/api'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { TIER_BORDER_DISPLAY, TIER_TEXT_DISPLAY } from './tierDisplay'
-import { percentilePhrase, tierForPoints } from './presentation'
+import { tierForPoints } from './presentation'
 
 export function StatCard({ stat }: { stat: MyReportStat }) {
   // State matrix (locked order): missing > insufficient > tiered.
   const missing = stat.own_value === null
   const tier = stat.points !== null ? tierForPoints(stat.points) : null
   const borderClass = !missing && tier !== null ? TIER_BORDER_DISPLAY[tier] : 'border-line'
-  const phrase =
-    !missing && stat.points !== null ? percentilePhrase(stat.points, stat.label) : null
 
   // Badge slot (D-14/D-15): empty when the stat is missing; the muted
   // insufficient-data chip when the cohort is too small; the tier-colored
@@ -57,7 +55,6 @@ export function StatCard({ stat }: { stat: MyReportStat }) {
         </span>
         {badge}
       </div>
-      {phrase !== null && <p className="mt-2 text-sm text-muted">{phrase}</p>}
       <p className="mt-1 text-sm text-muted">
         Média: {stat.class_average === null ? '—' : formatStatValue(stat.class_average, stat.value_type)}
         {' · '}Melhor: {stat.best === null ? '—' : formatStatValue(stat.best, stat.value_type)}

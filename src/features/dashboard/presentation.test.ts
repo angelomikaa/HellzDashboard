@@ -3,7 +3,6 @@ import type { MyReportStat } from '../../lib/api'
 import {
   improvementFocus,
   LOWER_IS_BETTER_STATS,
-  percentilePhrase,
   tierForOvr,
   tierForPoints,
   TIER_BG,
@@ -86,40 +85,6 @@ describe('tierForOvr (D-02 EAFC bands on the 51-99 OVR scale)', () => {
   it('85 and 99 -> platinum (boundary: 85 enters platinum)', () => {
     expect(tierForOvr(85)).toBe('platinum')
     expect(tierForOvr(99)).toBe('platinum')
-  })
-})
-
-describe('percentilePhrase (D-09/D-10/D-11: 10% steps, direct melhores/piores tone)', () => {
-  it('72 -> entre os 30% melhores (ceil(2.8)=3)', () => {
-    expect(percentilePhrase(72, 'CRIT')).toBe('Você está entre os 30% melhores em CRIT.')
-  })
-
-  it('85 -> entre os 20% melhores (ceil(1.5)=2)', () => {
-    expect(percentilePhrase(85, 'CRIT')).toBe('Você está entre os 20% melhores em CRIT.')
-  })
-
-  it('99 -> entre os 10% melhores (B=10 at the top)', () => {
-    expect(percentilePhrase(99, 'CRIT')).toBe('Você está entre os 10% melhores em CRIT.')
-  })
-
-  it('50 -> entre os 50% melhores (p >= 50 is the top half)', () => {
-    expect(percentilePhrase(50, 'CRIT')).toBe('Você está entre os 50% melhores em CRIT.')
-  })
-
-  it('49.5 -> entre os 50% piores (bottom half, ceil(4.95)=5)', () => {
-    expect(percentilePhrase(49.5, 'ATQ')).toBe('Você está entre os 50% piores em ATQ.')
-  })
-
-  it('30 -> entre os 30% piores (CMP-02 literal example)', () => {
-    expect(percentilePhrase(30, 'CRIT')).toBe('Você está entre os 30% piores em CRIT.')
-  })
-
-  it('10 -> entre os 10% piores (B=10 at the bottom)', () => {
-    expect(percentilePhrase(10, 'CRIT')).toBe('Você está entre os 10% piores em CRIT.')
-  })
-
-  it('0 -> entre os 10% piores (B=0 clamps up to 10 — never "0%")', () => {
-    expect(percentilePhrase(0, 'CRIT')).toBe('Você está entre os 10% piores em CRIT.')
   })
 })
 

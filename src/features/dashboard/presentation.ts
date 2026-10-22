@@ -24,16 +24,6 @@ export function tierForOvr(ovr: number | null): Tier | null {
   return 'platinum'
 }
 
-/** D-09/D-10/D-11: pt-BR percentile phrase, 10% steps, direct tone. */
-export function percentilePhrase(points: number, label: string): string {
-  const band = points >= 50
-    ? 10 * Math.ceil((100 - points) / 10)
-    : 10 * Math.ceil(points / 10)
-  const b = Math.min(90, Math.max(10, band))
-  const word = points >= 50 ? 'melhores' : 'piores'
-  return `Você está entre os ${b}% ${word} em ${label}.`
-}
-
 // 07.2 D-07: the three negative lower-is-better stats — a LOWER-than-average
 // value (more negative) is BETTER, not behind (owner-locked D-07 semantics).
 export const LOWER_IS_BETTER_STATS: ReadonlySet<string> = new Set([

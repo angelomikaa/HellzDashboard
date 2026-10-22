@@ -1,25 +1,22 @@
 #!/usr/bin/env node
 /**
- * NeoFoot live rank smoke matrix (plan 03-03 task 2).
+ * NeoFoot live rank smoke matrix (plan 09-03 task 2).
  *
  * Runs against the LIVE project: creates a throwaway class ZZRankSquad with 3
  * throwaway members (bcrypt PIN 1234), drives real submissions through the
  * deployed create_submission RPC, configures key stats through the REAL
- * set_key_stat RPC, then asserts the full rank contract with EXACT-VALUE
- * assertions against the 03-01 spec (src/lib/rankMath.test.ts):
+ * set_key_stat_v2 RPC (with p_function param), then asserts the full rank
+ * contract with EXACT-VALUE assertions against the value-proportional spec
+ * (src/lib/rankMath.test.ts):
  *
- *   percentile points: 74.25 (tie at top of 3), 49.5 (mid of 3 / all-tied), 99, 0
- *   OVR = 51 + mean(6 key-stat points) * 48/99:  a=61, b=77, c=87
- *   MIN_COHORT_SIZE = 3 (n=2 -> points null + data_sufficient false, values kept)
- *
- * FIXTURE DEVIATION (Rule 1, see 03-03-SUMMARY.md): the plan's sp row
- * {a:50, b:50, c:80} (tie at BOTTOM) contradicts its own expected values — a
- * bottom tie yields 24.75, while the plan's OVR cross-checks require the
- * locked tie-at-TOP value 74.25 (a's OVR-61 vector [0,74.25,0,49.5,0,0] and
- * b's OVR-77 mean 53.625 both need sp=74.25). The locked 03-01 spec is
- * authoritative, so sp is {a:80, b:80, c:50} (a/b tie at top, c below) and
- * c's OVR is 87 (mean 74.25 -> 51+36), not the plan's 95 — a/b/c joint
- * realizability of {74.25, 74.25, 99} on one stat is mathematically impossible.
+ *   value-proportional points: round(own/best*99,2) clamped [0,99]
+ *   higher-is-better: best = max; lower-is-better: best = min (most negative)
+ *   OVR = 51 + mean(6 key-stat points) * 48/99: recomputed per new formula
+ *   MIN_COHORT_SIZE = 3 (n=2 -> points null + data_sufficient false)
+ *   KEYU ordered set: 7th+ selection = relevant (no key_stat_limit); deselect
+ *   key promotes oldest relevant
+ *   last_validated_at present in my_report output
+ *   OVR parity: zero change where cohort unchanged, null where n<3 / no role
  *
  * Every fixture row is NEW and removed in cleanup (finally-style, WR-06
  * lesson: never permanently mutate live data; second run must also pass).
@@ -73,12 +70,20 @@ const CLASS = 'ZZRankSquad'
 const HANDLES = ['zz-rank-a', 'zz-rank-b', 'zz-rank-c']
 const KEY_STATS = ['hp', 'sp', 'patk', 'pdef', 'matk', 'mdef']
 
-// One submission per member via the real create_submission RPC (values are
-// the 03-01 worked-example fixtures; c has NO hit row -> n=2 insufficiency).
+// One submission per member via the real create_submission RPC. Values chosen
+// so value-proportional points come out clean (own/best*99):
+//   hp:  a=100/300→33, b=200/300→66, c=300/300→99
+//   sp:  a=40/80→49.5, b=80/80→99, c=80/80→99
+//   patk: a=10/30→33, b=20/30→66, c=30/30→99
+//   pdef: all 7→99 (tied at top)
+//   matk: a=100/300→33, b=200/300→66, c=300/300→99
+//   mdef: a=35/70→49.5, b=70/70→99, c=70/70→99
+// c has NO hit row → n=2 insufficiency.
+// OVRs: a=75 (mean 49.5), b=91 (mean 82.5), c=99 (mean 99)
 const FIXTURES = {
-  'zz-rank-a': { hp: 100, sp: 80, patk: 10, pdef: 7, matk: 100, mdef: 50, hit: 10 },
-  'zz-rank-b': { hp: 200, sp: 80, patk: 20, pdef: 7, matk: 200, mdef: 60, hit: 20 },
-  'zz-rank-c': { hp: 300, sp: 50, patk: 30, pdef: 7, matk: 300, mdef: 70 }, // hit absent (D-13/D-07)
+  'zz-rank-a': { hp: 100, sp: 40, patk: 10, pdef: 7, matk: 100, mdef: 35, hit: 10 },
+  'zz-rank-b': { hp: 200, sp: 80, patk: 20, pdef: 7, matk: 200, mdef: 70, hit: 20 },
+  'zz-rank-c': { hp: 300, sp: 80, patk: 30, pdef: 7, matk: 300, mdef: 70 }, // hit absent (n=2)
 }
 
 // ---------------------------------------------------------------------------
@@ -223,40 +228,54 @@ async function main() {
     console.log('[smoke-rank] 3 fixture submissions created via the real RPC')
 
     // Key-stat config through the RPC under test: counts must be 1..6 in order.
+    // Phase 9 KEYU: p_function param, no block at 7 (7th+ = relevant).
     let n = 0
     for (const k of KEY_STATS) {
       n += 1
-      const res = await rest('/rpc/set_key_stat', {
+      const res = await rest('/rpc/set_key_stat_v2', {
         method: 'POST',
         token: officer.access_token,
-        body: { p_class: CLASS, p_stat_key: k, p_enabled: true },
+        body: { p_class: CLASS, p_function: 'dps', p_stat_key: k, p_enabled: true },
       })
       check(
-        `officer set_key_stat(${k}) -> count ${n}`,
+        `officer set_key_stat_v2(${k}) -> count ${n}`,
         res.ok && numEq(res.json, n),
         `HTTP ${res.status} body=${res.text}`,
       )
     }
 
-    // ---- Assertions -------------------------------------------------------
-
-    // 1. Block-at-7 (D-02): enabling a 7th key stat is rejected server-side.
-    const block7 = await rest('/rpc/set_key_stat', {
+    // KEYU ordered-set test: 7th selection succeeds (no key_stat_limit),
+    // becomes a relevant at selection_order 7; key set stays at 6.
+    const seventh = await rest('/rpc/set_key_stat_v2', {
       method: 'POST',
       token: officer.access_token,
-      body: { p_class: CLASS, p_stat_key: 'hit', p_enabled: true },
+      body: { p_class: CLASS, p_function: 'dps', p_stat_key: 'hit', p_enabled: true },
     })
     check(
-      'set_key_stat block-at-7 rejected with key_stat_limit',
-      !block7.ok && block7.text.includes('key_stat_limit'),
-      `HTTP ${block7.status} ${block7.text.slice(0, 120)}`,
+      'KEYU: 7th selection succeeds as relevant (no key_stat_limit)',
+      seventh.ok && numEq(seventh.json, 6),
+      `HTTP ${seventh.status} body=${seventh.text}`,
     )
 
-    // 2. Member-denied write (D-03): members can never configure key stats.
-    const memberSet = await rest('/rpc/set_key_stat', {
+    // Deselect a key -> oldest relevant ('hit') promoted into the vacated slot.
+    const disable = await rest('/rpc/set_key_stat_v2', {
+      method: 'POST',
+      token: officer.access_token,
+      body: { p_class: CLASS, p_function: 'dps', p_stat_key: 'hp', p_enabled: false },
+    })
+    check(
+      'KEYU: deselect key hp -> count 6 (hp removed, hit promoted)',
+      disable.ok && numEq(disable.json, 6),
+      `HTTP ${disable.status} body=${disable.text}`,
+    )
+
+    // ---- Assertions -------------------------------------------------------
+
+    // 1. Member-denied write (D-03): members can never configure key stats.
+    const memberSet = await rest('/rpc/set_key_stat_v2', {
       method: 'POST',
       token: sessions['zz-rank-a'].access_token,
-      body: { p_class: CLASS, p_stat_key: 'hit', p_enabled: true },
+      body: { p_class: CLASS, p_function: 'dps', p_stat_key: 'hit', p_enabled: true },
     })
     check(
       'member set_key_stat -> forbidden',
@@ -307,10 +326,10 @@ async function main() {
     const top5rows = Array.isArray(top5.json) ? top5.json : []
     const top5ovrs = top5rows.map((r) => Number(r.ovr))
     check(
-      'officer class_top5 -> 3 rows [c 87, b 77, a 61] desc',
+      'officer class_top5 -> 3 rows [c 99, b 91, a 75] desc',
       top5.ok &&
         top5rows.length === 3 &&
-        JSON.stringify(top5ovrs) === JSON.stringify([87, 77, 61]) &&
+        JSON.stringify(top5ovrs) === JSON.stringify([99, 91, 75]) &&
         top5rows[0].display_name === 'ZZ Rank C' &&
         top5rows[1].display_name === 'ZZ Rank B' &&
         top5rows[2].display_name === 'ZZ Rank A',
@@ -342,29 +361,29 @@ async function main() {
     for (const s of statsB) byKeyB[s.stat_key] = s
 
     check(
-      'my_report(b) hp: own 200 avg 200 best 300 points 49.5 ds true (middle of 3)',
+      'my_report(b) hp: own 200 avg 200 best 300 points 66 ds true (66/100*99)',
       numEq(byKeyB.hp.own_value, 200) &&
         numEq(byKeyB.hp.class_average, 200) &&
         numEq(byKeyB.hp.best, 300) &&
-        numEq(byKeyB.hp.points, 49.5) &&
+        numEq(byKeyB.hp.points, 66) &&
         byKeyB.hp.data_sufficient === true,
       JSON.stringify(byKeyB.hp),
     )
     check(
-      'my_report(b) sp: own 80 avg 70 best 80 points 74.25 (tie at top: (1+0.5)/2x99)',
+      'my_report(b) sp: own 80 avg 66.67 best 80 points 99 ds true (tied at top)',
       numEq(byKeyB.sp.own_value, 80) &&
-        numEq(byKeyB.sp.class_average, 70) &&
+        numEq(byKeyB.sp.class_average, 200 / 3) &&
         numEq(byKeyB.sp.best, 80) &&
-        numEq(byKeyB.sp.points, 74.25) &&
+        numEq(byKeyB.sp.points, 99) &&
         byKeyB.sp.data_sufficient === true,
       JSON.stringify(byKeyB.sp),
     )
     check(
-      'my_report(b) pdef: own 7 avg 7 best 7 points 49.5 (all tied)',
+      'my_report(b) pdef: own 7 avg 7 best 7 points 99 ds true (all tied)',
       numEq(byKeyB.pdef.own_value, 7) &&
         numEq(byKeyB.pdef.class_average, 7) &&
         numEq(byKeyB.pdef.best, 7) &&
-        numEq(byKeyB.pdef.points, 49.5) &&
+        numEq(byKeyB.pdef.points, 99) &&
         byKeyB.pdef.data_sufficient === true,
       JSON.stringify(byKeyB.pdef),
     )
@@ -378,9 +397,9 @@ async function main() {
       JSON.stringify(byKeyB.hit),
     )
     check(
-      'my_report(b) ovr: value 77 data_sufficient true (mean 53.625 -> 51+26)',
+      'my_report(b) ovr: value 91 data_sufficient true (mean 82.5 -> 51+40)',
       reportB.json &&
-        numEq(reportB.json.ovr.value, 77) &&
+        numEq(reportB.json.ovr.value, 91) &&
         reportB.json.ovr.data_sufficient === true,
       JSON.stringify(reportB.json && reportB.json.ovr),
     )
@@ -401,13 +420,13 @@ async function main() {
       JSON.stringify(byKeyC.hp),
     )
     check(
-      'my_report(c) sp: points 0 (worst gets exactly 0)',
-      reportC.ok && numEq(byKeyC.sp.points, 0),
+      'my_report(c) sp: points 99 (tied at top gets 99)',
+      reportC.ok && numEq(byKeyC.sp.points, 99),
       JSON.stringify(byKeyC.sp),
     )
     check(
-      'my_report(c) ovr: value 87 (mean 74.25 -> 51+36)',
-      reportC.ok && numEq(reportC.json.ovr.value, 87) && reportC.json.ovr.data_sufficient === true,
+      'my_report(c) ovr: value 99 (mean 99 -> 51+48)',
+      reportC.ok && numEq(reportC.json.ovr.value, 99) && reportC.json.ovr.data_sufficient === true,
       JSON.stringify(reportC.json && reportC.json.ovr),
     )
 
@@ -422,13 +441,13 @@ async function main() {
       for (const s of reportA.json.stats) byKeyA[s.stat_key] = s
     }
     check(
-      'my_report(a) hp: points 0 (worst gets exactly 0)',
-      reportA.ok && numEq(byKeyA.hp.points, 0),
+      'my_report(a) hp: points 33 (100/300*99)',
+      reportA.ok && numEq(byKeyA.hp.points, 33),
       JSON.stringify(byKeyA.hp),
     )
     check(
-      'my_report(a) ovr: value 61 (mean 20.625 -> 51+10)',
-      reportA.ok && numEq(reportA.json.ovr.value, 61) && reportA.json.ovr.data_sufficient === true,
+      'my_report(a) ovr: value 75 (mean 49.5 -> 51+24)',
+      reportA.ok && numEq(reportA.json.ovr.value, 75) && reportA.json.ovr.data_sufficient === true,
       JSON.stringify(reportA.json && reportA.json.ovr),
     )
 
@@ -450,12 +469,14 @@ async function main() {
     check('RNK-02 leak-probe: per-stat objects carry exactly the documented fields', onlyDocFields)
 
     // 12. Incomplete-config OVR (D-02) + 13. compute-on-read proof.
-    const disable = await rest('/rpc/set_key_stat', {
+    // Current key set after KEYU tests: sp, patk, pdef, matk, mdef, hit (hp
+    // was deselected and hit promoted). Disable mdef → 5 keys → OVR null.
+    const disableMdef = await rest('/rpc/set_key_stat_v2', {
       method: 'POST',
       token: officer.access_token,
-      body: { p_class: CLASS, p_stat_key: 'mdef', p_enabled: false },
+      body: { p_class: CLASS, p_function: 'dps', p_stat_key: 'mdef', p_enabled: false },
     })
-    check('officer disables mdef -> count 5', disable.ok && numEq(disable.json, 5), `HTTP ${disable.status}`)
+    check('officer disables mdef -> count 5', disableMdef.ok && numEq(disableMdef.json, 5), `HTTP ${disableMdef.status}`)
 
     const reportA2 = await rest('/rpc/my_report', {
       method: 'POST',
@@ -473,14 +494,14 @@ async function main() {
     const spA2 = reportA2.json.stats.find((s) => s.stat_key === 'sp')
     check(
       'D-11: per-stat points still present while OVR insufficient',
-      reportA2.ok && numEq(hpA2.points, 0) && numEq(spA2.points, 74.25),
+      reportA2.ok && numEq(hpA2.points, 33) && numEq(spA2.points, 49.5),
       `hp=${JSON.stringify(hpA2)} sp=${JSON.stringify(spA2)}`,
     )
 
-    const reenable = await rest('/rpc/set_key_stat', {
+    const reenable = await rest('/rpc/set_key_stat_v2', {
       method: 'POST',
       token: officer.access_token,
-      body: { p_class: CLASS, p_stat_key: 'mdef', p_enabled: true },
+      body: { p_class: CLASS, p_function: 'dps', p_stat_key: 'mdef', p_enabled: true },
     })
     check('officer re-enables mdef -> count 6', reenable.ok && numEq(reenable.json, 6), `HTTP ${reenable.status}`)
 
@@ -490,9 +511,16 @@ async function main() {
       body: {},
     })
     check(
-      'compute-on-read: ovr 61 returns instantly after re-toggle (no backfill)',
-      reportA3.ok && numEq(reportA3.json.ovr.value, 61) && reportA3.json.ovr.data_sufficient === true,
+      'compute-on-read: ovr 75 returns instantly after re-toggle (no backfill)',
+      reportA3.ok && numEq(reportA3.json.ovr.value, 75) && reportA3.json.ovr.data_sufficient === true,
       JSON.stringify(reportA3.json && reportA3.json.ovr),
+    )
+
+    // 14. last_validated_at present in my_report output (HOME-03).
+    check(
+      'my_report(b) has last_validated_at field',
+      reportB.json && typeof reportB.json.last_validated_at === 'string',
+      `last_validated_at=${JSON.stringify(reportB.json && reportB.json.last_validated_at)}`,
     )
   } finally {
     // 14. Guaranteed cleanup — runs even when an assertion/setup threw mid-run.

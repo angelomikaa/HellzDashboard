@@ -1,24 +1,24 @@
 #!/usr/bin/env node
 /**
- * NeoFoot live promotion smoke matrix (plan 06-02 task 2) — proves migration
- * 0011's get_promotion() against the LIVE project:
+ * NeoFoot live promotion smoke matrix (plan 09-03 task 3).
+ *
+ * Runs against the LIVE project: proves migration 0018's get_promotion()
+ * against the value-proportional scale + role-differentiated key stats:
  *
  *   T-06-06  anon get_promotion denied
  *   SHWC-02  member-invocable: jsonb array of class sections, ≤5 cards per
  *            section, card shape {display_name, char_function, ovr, highlights}
- *   RNK-02   KEY-STAT LEAK PROOF: the staff-only /class_key_stats key set has
- *            ZERO intersection with every stat_key a member can see in the
- *            promotion payload, and the payload carries no is_key/key_stat/
- *            contributes_to_ovr marker anywhere (identical points formula for
- *            all stats => top-6-by-points selection cannot leak the key set)
+ *   RNK-02   KEY-STAT LEAK PROOF: no is_key/key_stat/contributes_to_ovr
+ *            marker anywhere; highlights carry exactly the class key set
  *   D-13     insufficient-data class (no OVR-capable member) => section
  *            ABSENT server-side
  *   D-14     staff-only boundary unchanged: class_top5 stays member-denied
  *   D-07     cohort filter: a deactivated member's card leaves the section
  *            instantly and returns on reactivation (compute-on-read)
+ *   KEYU     key-stat config via set_key_stat_v2 with p_function param
  *
  * Fixture design (deterministic leak-diff): the 6 key stats get an identical
- * tiny value for EVERY fixture member (all-tied-at-bottom points <= 49.5),
+ * tiny value for EVERY fixture member (all-tied -> 99 points each),
  * while 20 non-key "booster" stats get 1e9-scale values rotated across the 3
  * promo members so each card owns >= 14 boosters with points strictly above
  * 49.5 (99 / 74.25) — the top-6 highlight slots can only ever be boosters,
@@ -237,11 +237,21 @@ async function main() {
     await mgmtQuery(
       `insert into classes (class_name) values ('${PROMO_CLASS}'), ('${SPARE_CLASS}');`,
     )
-    await mgmtQuery(
-      `insert into class_key_stats (class_name, stat_key) values ` +
-        KEY_STATS.map((k) => `('${PROMO_CLASS}', '${k}')`).join(', ') +
-        `;`,
-    )
+    // Key-stat config via set_key_stat_v2 (Phase 9 KEYU): 6 key stats for
+    // PROMO_CLASS in the dps build role. SPARE_CLASS left without keys ->
+    // OVR null -> section hidden (D-13).
+    for (const k of KEY_STATS) {
+      const cfg = await rest('/rpc/set_key_stat_v2', {
+        method: 'POST',
+        token: officer.access_token,
+        body: { p_class: PROMO_CLASS, p_function: 'dps', p_stat_key: k, p_enabled: true },
+      })
+      check(
+        `setup: officer set_key_stat_v2(${PROMO_CLASS}, dps, ${k}) -> count ${KEY_STATS.indexOf(k) + 1}`,
+        cfg.ok && numEq(cfg.json, KEY_STATS.indexOf(k) + 1),
+        `HTTP ${cfg.status} body=${cfg.text}`,
+      )
+    }
     const pinHash = bcrypt.hashSync(PIN, 10)
     for (const m of MEMBERS) {
       await mgmtQuery(

@@ -230,29 +230,51 @@ export async function fetchMySubmissions(session: NeoFootSession): Promise<Submi
   return (await parseBody<SubmissionRow[]>(res)) ?? []
 }
 
-export async function fetchKeyStats(session: NeoFootSession, className: string): Promise<string[]> {
+export async function fetchKeyStats(
+  session: NeoFootSession,
+  className: string,
+  charFunction?: 'dps' | 'mdps' | 'suporte',
+): Promise<string[]> {
   // RLS: staff-only read (staff_select_key_stats, 0009) — a member JWT gets
-  // [] from the policy filter, which is NOT an error.
-  const res = await restFetch(
-    session,
-    `/class_key_stats?class_name=eq.${encodeURIComponent(className)}&select=stat_key`,
-  )
+  // [] from the policy filter, which is NOT an error. Reads per
+  // (class, char_function) when a function is supplied (Phase 9 KEYU ordered
+  // set); single-arg className overload kept for backward-compat transition.
+  let path = `/class_key_stats?class_name=eq.${encodeURIComponent(className)}&select=stat_key,selection_order&order=selection_order`
+  if (charFunction) {
+    path += `&char_function=eq.${charFunction}`
+  }
+  const res = await restFetch(session, path)
   const rows = await parseBody<{ stat_key: string }[]>(res)
   return (rows ?? []).map((r) => r.stat_key)
 }
 
+/**
+ * Phase 9 (D-11): set_key_stat v2 — ONE ordered selection set per
+ * (class, build-role): first 6 selected = keys, 7th+ = relevants.
+ * p_enabled=true appends to the end of the ordered set; p_enabled=false
+ * removes and, if the stat was a key, promotes the oldest relevant into
+ * the vacated slot. Returns the class's current key-stat count (order ≤ 6).
+ * Staff gate + advisory lock inside the RPC; errors: forbidden /
+ * unknown_class / unknown_function. Replaces set_key_stat + set_relevant_stat.
+ */
 export async function setKeyStat(
   session: NeoFootSession,
   className: string,
+  charFunction: 'dps' | 'mdps' | 'suporte',
   statKey: string,
   enabled: boolean,
 ): Promise<number> {
-  // SECURITY DEFINER RPC (0009): staff-only gate is INSIDE the function
-  // (member_role claim + active flag) — 'forbidden' / 'key_stat_limit' /
-  // 'unknown_class' raise server-side. Returns the class's current count.
-  const res = await restFetch(session, '/rpc/set_key_stat', {
+  // SECURITY DEFINER RPC (0018): staff-only gate is INSIDE the function
+  // (member_role claim + active flag). 'forbidden' / 'unknown_class' /
+  // 'unknown_function' raise server-side. Returns the class's current count.
+  const res = await restFetch(session, '/rpc/set_key_stat_v2', {
     method: 'POST',
-    body: JSON.stringify({ p_class: className, p_stat_key: statKey, p_enabled: enabled }),
+    body: JSON.stringify({
+      p_class: className,
+      p_function: charFunction,
+      p_stat_key: statKey,
+      p_enabled: enabled,
+    }),
   })
   return parseBody<number>(res)
 }
@@ -590,41 +612,25 @@ export async function fetchRoleRank(
   return (await parseBody<RoleRankRow[]>(res)) ?? []
 }
 
-export async function setRelevantStat(
+export async function fetchKeyRelevantStats(
   session: NeoFootSession,
   className: string,
-  statKey: string,
-  enabled: boolean,
-): Promise<number> {
-  // SECURITY DEFINER RPC (0013): staff-only gate INSIDE the function (member_role
-  // claim + active flag) — 'forbidden' / 'unknown_class' / 'already_key'
-  // (D-05 rule 1: key XOR relevant) / 'key_set_incomplete' (D-05 rule 2:
-  // relevant selections only after the class's 6-key set is complete) raise
-  // server-side. Returns the class's current relevant count. D-05 rule 3
-  // (vacancy never demotes relevant rows) and rule 4 (promotion demotes) live
-  // in the RPC pair itself — the client just renders the outcome.
-  const res = await restFetch(session, '/rpc/set_relevant_stat', {
-    method: 'POST',
-    body: JSON.stringify({ p_class: className, p_stat_key: statKey, p_enabled: enabled }),
-  })
-  return parseBody<number>(res)
-}
-
-export async function fetchKeyRelevantStats(session: NeoFootSession, className: string): Promise<string[]> {
+  charFunction?: 'dps' | 'mdps' | 'suporte',
+): Promise<string[]> {
   // RLS: staff-only read (staff_select_relevant_stats, 0013) — a member JWT
   // gets [] from the policy filter, which is NOT an error. Mirrors fetchKeyStats
-  // shape; the Stats-Chave page needs the current relevant set to render chip
-  // states (D-04/D-06).
-  const res = await restFetch(
-    session,
-    `/class_relevant_stats?class_name=eq.${encodeURIComponent(className)}&select=stat_key`,
-  )
+  // shape; per-(class, char_function) read when a function is supplied.
+  let path = `/class_relevant_stats?class_name=eq.${encodeURIComponent(className)}&select=stat_key`
+  if (charFunction) {
+    path += `&char_function=eq.${charFunction}`
+  }
+  const res = await restFetch(session, path)
   const rows = await parseBody<{ stat_key: string }[]>(res)
   return (rows ?? []).map((r) => r.stat_key)
 }
 
 // ---------------------------------------------------------------------------
-// 07.2-05 (checkpoint round 3, owner decision 2): the member's character
+// Phase 8 staff surfaces (08-05) — the staff operating layer built on
 // screenshot — clipped into the photo-crop layer of their crest card.
 // Supabase Storage (private bucket, RLS on storage.objects): a member can
 // write ONLY their own path (top-level folder = the JWT member_id claim);
