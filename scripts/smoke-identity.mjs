@@ -882,7 +882,7 @@ async function main() {
     check('6i. approved prospect can log in with the request PIN', prospectLogin.ok, `HTTP ${prospectLogin.status}`)
 
     // =====================================================================
-    // 7. Member-type approval (no stats, no submission)
+    // 7. Member-type approval (no stats, no submission) -- UAT test 7 contract
     // =====================================================================
     const memberReq = await rpc('create_membership_request', svc, {
       p_handle: H.memberreq,
@@ -894,29 +894,40 @@ async function main() {
       p_char_function: 'suporte',
       p_proof_path: `requests/${RUN_ID}/${H.memberreq}.jpg`,
     })
-    const memberReqId = memberReq.json?.request_id
-    check('7a. member-type request created without stats', memberReq.ok && !!memberReqId, `HTTP ${memberReq.status}`)
-    const memberApprove = await rpc('approve_request', officerToken, {
-      p_request: memberReqId,
+    check('7a. member-type request for a handle with NO members row -> not_member at intake',
+      !memberReq.ok && String(memberReq.text || '').includes('not_member'),
+      `HTTP ${memberReq.status}`)
+    const memberReqCount = await one(
+      `select count(*) as n from membership_requests where discord_handle = '${H.memberreq}';`,
+    )
+    check('7b. nothing committed for the unknown handle', Number(memberReqCount?.n) === 0, `n=${memberReqCount?.n}`)
+
+    // defense-in-depth: simulate a pre-guard slip-through via direct insert
+    const slipped = await mgmtQuery(
+      `insert into membership_requests (discord_handle, pin_hash, request_type, char_id, nickname, char_class, char_function, proof_path) values ('${H.memberreq}', '${pinHash}', 'member', '${CHAR_IDS.memberreq}', 'MemberReq Nick', '${CLASS}', 'suporte', 'requests/${RUN_ID}/slipped.jpg') returning id;`,
+    )
+    const slippedId = Array.isArray(slipped) ? slipped[0]?.id : slipped?.id
+    const slippedApprove = await rpc('approve_request', officerToken, {
+      p_request: slippedId,
       p_function: 'suporte',
     })
-    const memberReqMemberId = memberApprove.json
-    const memberReqSubs = await one(
-      `select count(*) as n from submissions where member_id = ${sqlStr(memberReqMemberId)};`,
+    const slippedMemberCount = await one(
+      `select count(*) as n from members where discord_handle = '${H.memberreq}';`,
     )
-    check(
-      '7b. member-type approval creates NO submission',
-      memberApprove.ok && Number(memberReqSubs?.n) === 0,
-      `subs=${memberReqSubs?.n}`,
+    const slippedStatus = await one(
+      `select status from membership_requests where id = '${slippedId}';`,
     )
-    const memberReqLogin = await loginProbe(H.memberreq)
-    check('7c. member-type approved handle logs in with the request PIN', memberReqLogin.ok, `HTTP ${memberReqLogin.status}`)
+    check('7c. defense-in-depth raises not_member and keeps the request pending',
+      !slippedApprove.ok && String(slippedApprove.text || '').includes('not_member')
+        && Number(slippedMemberCount?.n) === 0
+        && slippedStatus?.status === 'pending',
+      `HTTP ${slippedApprove.status} members=${slippedMemberCount?.n} status=${slippedStatus?.status}`)
+
     const memberReqStatus = await rpc('request_status', null, { p_handle: H.memberreq })
-    check(
-      '7d. request_status reports approved',
-      memberReqStatus.ok && memberReqStatus.json?.status === 'approved',
-      `status=${memberReqStatus.json?.status}`,
-    )
+    check('7d. request_status reports pending with four keys',
+      memberReqStatus.ok && memberReqStatus.json?.status === 'pending'
+        && Object.keys(memberReqStatus.json || {}).sort().join(',') === 'created_at,decided_at,request_type,status',
+      `status=${memberReqStatus.json?.status}`)
 
     // =====================================================================
     // 8. Inactive re-request (same member id, history preserved)
@@ -1124,8 +1135,8 @@ async function main() {
       `hist=${identHist?.source} char_id=${identRow?.char_id}`,
     )
     check(
-      '11c. D-20: validated char_function is NOT auto-applied (member stays dps, history records mdps)',
-      identRow?.char_function === 'dps' && identHist?.char_function === 'mdps',
+      '11c. D-20 REVISED: validated char_function IS auto-applied (member dps -> mdps; history records mdps)',
+      identRow?.char_function === 'mdps' && identHist?.char_function === 'mdps',
       `member=${identRow?.char_function} history=${identHist?.char_function}`,
     )
     const correct = await rpc('correct_identity', officerToken, {
@@ -1168,6 +1179,27 @@ async function main() {
       !memberApproveCall.ok && memberApproveCall.text.includes('forbidden'),
       `HTTP ${memberApproveCall.status}`,
     )
+
+    // =====================================================================
+    // 17. my_identity coalesced self-read (UAT test 4)
+    // =====================================================================
+    const myId = await rpc('my_identity', identToken, {})
+    check('17a. my_identity returns closed 4-key payload', myId.ok && Object.keys(myId.json || {}).sort().join(',') === 'char_class,char_function,char_id,display_name', `keys=${Object.keys(myId.json || {}).join(',')}`)
+    const newestHist = await one(
+      `select nickname, char_id, char_class, char_function from member_identity_history where member_id = ${sqlStr(identId)} order by created_at desc, id desc limit 1;`,
+    )
+    check('17a2. my_identity coalesces newest history (display/char_id/class)', myId.ok && myId.json?.display_name === newestHist?.nickname && myId.json?.char_id === newestHist?.char_id && myId.json?.char_class === newestHist?.char_class, `got=${JSON.stringify(myId.json)} hist=${JSON.stringify(newestHist)}`)
+
+    // 17b: history-less member -> registry row. Use H.a (no identity history? verify count)
+    const aHistCount = await one(`select count(*) as n from member_identity_history where member_id = (select id from members where discord_handle = '${H.a}');`)
+    const aReg = await one(`select display_name, char_id, char_class, char_function from members where discord_handle = '${H.a}';`)
+    const aToken = sessions[H.a].access_token
+    const aIdentityRead = await rpc('my_identity', aToken, {})
+    check('17b. history-less member gets the registry row', Number(aHistCount?.n) === 0 && aIdentityRead.ok && aIdentityRead.json?.display_name === aReg?.display_name && aIdentityRead.json?.char_class === aReg?.char_class && aIdentityRead.json?.char_function === aReg?.char_function, `hist=${aHistCount?.n}`)
+
+    // 17c: anon refused
+    const anonId = await rpc('my_identity', null, {})
+    check('17c. anon EXECUTE refused', !anonId.ok, `HTTP ${anonId.status}`)
 
     // =====================================================================
     // 12. Duplicate char_id across PENDING submissions + officer_queue identity
@@ -1264,6 +1296,26 @@ async function main() {
         promoCards.every((c) => typeof c.photo_path === 'string' && c.photo_path.startsWith('card-photos/')),
       `sample=${promoCards[0]?.photo_path}`,
     )
+
+    const pendingSub = await rpc('create_submission', identToken, {
+      p_stats: statArray(statKeys, 156),
+      p_identity: {
+        char_id: CHAR_IDS.identFirst,
+        nickname: 'Ident Nick 2',
+        char_class: CLASS,
+        char_function: 'suporte',
+      },
+    })
+    const pendingMemberBefore = await one(`select char_function from members where id = ${sqlStr(identId)};`)
+    check('11c2. pending submission does NOT promote char_function', pendingSub.ok && pendingMemberBefore?.char_function === 'mdps', `before=${pendingMemberBefore?.char_function}`)
+
+    const validatePending = await rpc('set_submission_status', officerToken, {
+      p_submission: pendingSub.json,
+      p_status: 'validated',
+    })
+    const pendingMemberAfter = await one(`select char_function from members where id = ${sqlStr(identId)};`)
+    check('11c3. next validated choice changes char_function', validatePending.ok && pendingMemberAfter?.char_function === 'suporte', `after=${pendingMemberAfter?.char_function}`)
+
 
     // =====================================================================
     // 14. Storage RLS (identity-proofs bucket)
@@ -1780,6 +1832,24 @@ async function main() {
       '16ai. request-access dummy- handle -> 400 dummy_handle',
       dummyRequest.status === 400 && dummyRequest.body?.error === 'dummy_handle',
       `HTTP ${dummyRequest.status} err=${dummyRequest.body?.error}`,
+    )
+    const unknownMemberRequest = await edge('request-access', {
+      ...memberReqBody,
+      discord_handle: H.memberreq,
+      char_id: CHAR_IDS.memberreq,
+    })
+    check(
+      '16aj. request-access unknown handle (member-type) -> 400 not_member',
+      unknownMemberRequest.status === 400 && unknownMemberRequest.body?.error === 'not_member',
+      `HTTP ${unknownMemberRequest.status} err=${unknownMemberRequest.body?.error}`,
+    )
+    const unknownMemberReqCount = await one(
+      `select count(*) as n from membership_requests where discord_handle = '${H.memberreq}';`,
+    )
+    check(
+      '16aj2. no request row committed for the unknown handle',
+      Number(unknownMemberReqCount?.n) === 0,
+      `n=${unknownMemberReqCount?.n}`,
     )
   } finally {
     try {
