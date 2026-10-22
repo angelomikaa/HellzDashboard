@@ -15,6 +15,17 @@ describe('profileFromRawText — Basic screenshot seam', () => {
     })
   })
 
+  it('parses the live pt-BR client text (Classe Criador) end to end', () => {
+    // 08.10 hotfix: the English fixture below is not what the live client emits.
+    expect(
+      profileFromRawText('SoldierHelIz\nClasse Criador\nID 17069\nLíder da Guilda Suprema'),
+    ).toEqual({
+      nickname: 'SoldierHelIz',
+      char_id: '17069',
+      char_class: 'Biochemist',
+    })
+  })
+
   it('keeps the three fields independent when only one is readable', () => {
     expect(profileFromRawText('Ahrya\nJob Gypsy')).toEqual({
       nickname: 'Ahrya',

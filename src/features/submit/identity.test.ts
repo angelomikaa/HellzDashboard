@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CHAR_FUNCTIONS,
+  CLASS_ALIASES,
   OFFICIAL_CLASSES,
   matchClassName,
   parseBasicProfileText,
@@ -64,6 +65,53 @@ describe('matchClassName — exact, containment, bounded fuzzy, never a default'
   })
 })
 
+// 08.10 hotfix: the live client is pt-BR and prints localized class names while
+// the catalog/seed stores the English transcendent names. WITHOUT these aliases
+// `char_class` was null for every pt-BR print and first access was blocked.
+describe('matchClassName — localized (pt-BR / es) class names', () => {
+  it('maps the observed live client name (Criador -> Biochemist)', () => {
+    expect(matchClassName('Criador')).toBe('Biochemist')
+    expect(matchClassName('criador')).toBe('Biochemist')
+    expect(matchClassName('Criador ID')).toBe('Biochemist')
+  })
+
+  it('maps localized transcendent and base names to the catalog entry', () => {
+    expect(matchClassName('Algoz')).toBe('Assassin Cross')
+    expect(matchClassName('Lorde')).toBe('Lord Knight')
+    expect(matchClassName('Arquimago')).toBe('High Wizard')
+    expect(matchClassName('Atirador de Elite')).toBe('Sniper')
+    expect(matchClassName('Sumo-Sacerdote')).toBe('High Priest')
+    expect(matchClassName('Mestre-Ferreiro')).toBe('Mastersmith')
+    expect(matchClassName('Templário')).toBe('Paladin')
+    expect(matchClassName('Desordeiro')).toBe('Stalker')
+    expect(matchClassName('Cigana')).toBe('Gypsy')
+    expect(matchClassName('Menestrel')).toBe('Bard')
+    // base classes follow the same rename rule as the English containment
+    expect(matchClassName('Cavaleiro')).toBe('Lord Knight')
+    expect(matchClassName('Alquimista')).toBe('Biochemist')
+  })
+
+  it('prefers the longest spelling so truncated Mastersmith is not Champion', () => {
+    expect(matchClassName('Mestre')).toBe('Champion')
+    expect(matchClassName('Mestre-Ferr')).toBe('Mastersmith')
+  })
+
+  it('folds accents and stays null for an unmapped localized name', () => {
+    expect(matchClassName('Sábio')).toBe('Professor')
+    expect(matchClassName('Sacerdote')).toBe('High Priest')
+    expect(matchClassName('Nv')).toBe(null)
+    expect(matchClassName('Ninja')).toBe(null)
+  })
+
+  it('every alias maps to an official catalog name (no silent typos)', () => {
+    for (const [alias, name] of Object.entries(CLASS_ALIASES)) {
+      expect(OFFICIAL_CLASSES, `alias "${alias}"`).toContain(name)
+      // the alias must actually resolve to its target
+      expect(matchClassName(alias), `alias "${alias}"`).toBe(name)
+    }
+  })
+})
+
 describe('parseBasicProfileText — the real Basic screenshot sample', () => {
   const SAMPLE = 'Ahrya\nJob Gypsy\nID 32980\nPower 288115'
 
@@ -78,6 +126,9 @@ describe('parseBasicProfileText — the real Basic screenshot sample', () => {
   it('normalizes OCR O -> 0 and accepts colon/period separators', () => {
     expect(parseBasicProfileText('Ahrya\nJob: Gypsy\nID: 32O8O').char_id).toBe('32080')
     expect(parseBasicProfileText('Ahrya\nJob Gypsy\nID. 12345').char_id).toBe('12345')
+    // the label itself is commonly misread (1D / lD) on the shipped fixture
+    expect(parseBasicProfileText('Ahrya\nJob Gypsy\n1D 32980 E').char_id).toBe('32980')
+    expect(parseBasicProfileText('Ahrya\nJob Gypsy\nlD 32980').char_id).toBe('32980')
   })
 
   it('leaves an unknown job as null but still reads ID and nickname', () => {
@@ -93,8 +144,12 @@ describe('parseBasicProfileText — the real Basic screenshot sample', () => {
     expect(parseBasicProfileText('Guild\nJob Gypsy\nID 32980').nickname).toBe(null)
   })
 
-  it('rejects digit-bearing candidate names', () => {
-    expect(parseBasicProfileText('Ahrya123\nJob Gypsy\nID 32980').nickname).toBe(null)
+  it('accepts digits only in the nickname band (adjacent to the class row)', () => {
+    // The line directly above the class band is where the client prints the
+    // nickname, so "Ahrya123" is a readable name there (08.10).
+    expect(parseBasicProfileText('Ahrya123\nJob Gypsy\nID 32980').nickname).toBe('Ahrya123')
+    // A detached line with digits is still rejected (it could be a stat row).
+    expect(parseBasicProfileText('Ahrya123\nHero\nJob Gypsy\nID 32980').nickname).toBe('Hero')
   })
 
   it('enforces the ID length bounds (3..12 digits, no truncation)', () => {
@@ -112,6 +167,81 @@ describe('parseBasicProfileText — the real Basic screenshot sample', () => {
   it('never infers the build role (D-03/D-19)', () => {
     const parsed = parseBasicProfileText(SAMPLE)
     expect('char_function' in parsed).toBe(false)
+  })
+})
+
+// 08.10 hotfix: the live client is pt-BR ("Classe Criador"). This is the exact
+// identity block of the reported screenshot; before the fix the class was null
+// for every localized print, which blocked first access with PROFILE_ERROR.
+describe('parseBasicProfileText — pt-BR client sample', () => {
+  const PT_BR = [
+    'SoldierHelIz',
+    'Classe Criador',
+    'ID 17069',
+    'Líder da Guilda Suprema',
+    'PV 12944/12944',
+    'PM 177/177',
+    'Base Nv99 MAX/MAX',
+    'Classe Nv40 0/5984',
+    'Poder 318038',
+  ].join('\n')
+
+  it('reads nickname + ID + class from the reported pt-BR print', () => {
+    expect(parseBasicProfileText(PT_BR)).toEqual({
+      nickname: 'SoldierHelIz',
+      char_id: '17069',
+      char_class: 'Biochemist',
+    })
+  })
+
+  it('survives a merged SPARSE_TEXT header band', () => {
+    expect(parseBasicProfileText('SoldierHelIz Classe Criador ID 17069\nPoder 318038')).toEqual({
+      nickname: 'SoldierHelIz',
+      char_id: '17069',
+      char_class: 'Biochemist',
+    })
+  })
+
+  it('never reads the job-level row ("Classe Nv40") as the class', () => {
+    expect(parseBasicProfileText('SoldierHelIz\nClasse Nv40 0/5984\nID 17069')).toMatchObject({
+      char_class: null,
+      char_id: '17069',
+      nickname: 'SoldierHelIz',
+    })
+  })
+
+  it('keeps the header class when the job-level row is emitted first', () => {
+    const text = 'Classe Nv40 0/5984\nSoldierHelIz\nClasse Criador\nID 17069'
+    expect(parseBasicProfileText(text).char_class).toBe('Biochemist')
+  })
+
+  it('accepts the Spanish label and class name', () => {
+    expect(parseBasicProfileText('SoldierHelIz\nClase Creador\nID 17069')).toEqual({
+      nickname: 'SoldierHelIz',
+      char_id: '17069',
+      char_class: 'Biochemist',
+    })
+  })
+
+  it('keeps a digit-bearing nickname from the band left of the label', () => {
+    expect(parseBasicProfileText('Helz2010 Classe Criador\nID 17069').nickname).toBe('Helz2010')
+  })
+
+  it('never mistakes the localized guild title for the nickname', () => {
+    expect(parseBasicProfileText('Líder da Guilda Suprema\nClasse Criador\nID 17069').nickname).toBe(
+      null,
+    )
+  })
+
+  it('ignores the screen tabs and OCR artifacts above the nickname band', () => {
+    // "Básico / Detalhes" are the screen tabs, "BE" an edge artifact — the
+    // nickname is the band adjacent to the class row, not the first line.
+    expect(
+      parseBasicProfileText('Básico\nDetalhes\nSoldierHelIz\nClasse Criador\nID 17069').nickname,
+    ).toBe('SoldierHelIz')
+    expect(parseBasicProfileText('BE\nSoldierHelIz\nClasse Criador\nID 17069').nickname).toBe(
+      'SoldierHelIz',
+    )
   })
 })
 

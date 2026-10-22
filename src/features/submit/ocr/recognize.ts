@@ -71,10 +71,14 @@ export interface BasicProfileRead extends BasicProfileFields {
 }
 
 // Letters + digits + the label separators the Basic header renders. Sparse
-// text finds the nickname band, "Job <class>" and "ID <digits>" as separate
-// boxes in ONE pass (no region map — D-19 recalibration model).
+// text finds the nickname band, the class band ("Job <class>" / "Classe
+// <classe>" / "Clase <clase>") and "ID <digits>" as separate boxes in ONE pass
+// (no region map — D-19 recalibration model). Accented Latin letters are
+// whitelisted too: the live client is pt-BR ("Líder", "Templário"), and
+// dropping them silently mangles localized nicknames/classes.
 const PROFILE_WHITELIST =
-  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 :./-'
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 :./-' +
+  'ÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝàáâãäåçèéêëìíîïñòóôõöùúûüýÿ'
 
 /** One region's read outcome: machine-generated pre-fill for the wizard. */
 export type OcrFieldOutcome =
@@ -385,6 +389,10 @@ export async function readBasicProfile(
   try {
     const { data } = await worker.recognize(canvas)
     const raw = data.text || ''
+    // 08.10: a rejected claim is otherwise undiagnosable (the UI can only say
+    // "não conseguimos ler"). Dev-only, this device's own text — never shipped
+    // to a log service and never part of a request body.
+    if (import.meta.env?.DEV) console.debug('[ocr] identity raw text:', JSON.stringify(raw))
     return { ...profileFromRawText(raw), raw_text: raw }
   } finally {
     // Restore the wizard's block segmentation; ocrRect sets its own whitelist

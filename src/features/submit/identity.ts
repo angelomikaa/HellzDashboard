@@ -55,6 +55,8 @@ export type SubmissionIdentityDraft = Omit<SubmissionIdentity, 'char_function'> 
 /** Lowercase a-z0-9 comparison space (accents/punctuation dropped). */
 function normalizeClassName(value: string | null | undefined): string {
   return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '')
 }
@@ -78,59 +80,165 @@ function levenshtein(a: string, b: string): number {
 }
 
 /**
+ * Localized class names -> official English catalog names (08.10 hotfix).
+ *
+ * The live game client is pt-BR: the Basic screen prints "Classe   Criador"
+ * while the catalog (supabase/seeds/classes.sql) stores "Biochemist" — without
+ * this table `matchClassName` returned null for every localized print and the
+ * first-access gate could never pass. Base-line names map to their catalog
+ * (transcendent) entry exactly like the English containment rule does
+ * ("Assassin" -> "Assassin Cross").
+ *
+ * Add entries here when a client locale or a new spelling shows up; keys are
+ * matched in the same normalized space (case/accent/punctuation-insensitive).
+ */
+export const CLASS_ALIASES: Readonly<Record<string, string>> = {
+  // pt-BR (bRO / RO Origin Americas)
+  algoz: 'Assassin Cross',
+  assassino: 'Assassin Cross',
+  lorde: 'Lord Knight',
+  cavaleiro: 'Lord Knight',
+  arquimago: 'High Wizard',
+  bruxo: 'High Wizard',
+  'atirador de elite': 'Sniper',
+  cacador: 'Sniper',
+  'sumo-sacerdote': 'High Priest',
+  'sumo sacerdote': 'High Priest',
+  sacerdote: 'High Priest',
+  'mestre-ferreiro': 'Mastersmith',
+  'mestre ferreiro': 'Mastersmith',
+  ferreiro: 'Mastersmith',
+  templario: 'Paladin',
+  cruzado: 'Paladin',
+  sabio: 'Professor',
+  desordeiro: 'Stalker',
+  arruaceiro: 'Stalker',
+  criador: 'Biochemist',
+  alquimista: 'Biochemist',
+  mestre: 'Champion',
+  monge: 'Champion',
+  menestrel: 'Bard',
+  bardo: 'Bard',
+  cigana: 'Gypsy',
+  odalisca: 'Gypsy',
+  invocador: 'Summoner',
+  rebelde: 'Rebellion',
+  // English client synonyms the catalog renames away from
+  creator: 'Biochemist',
+  clown: 'Bard',
+  dancer: 'Gypsy',
+  // es (Spanish client) — only the forms that differ from pt-BR
+  creador: 'Biochemist',
+  asesino: 'Assassin Cross',
+  caballero: 'Lord Knight',
+}
+
+interface ClassSurface {
+  surface: string
+  name: string
+}
+
+/** Every accepted spelling (official + localized) in normalized space. */
+const CLASS_SURFACES: readonly ClassSurface[] = [
+  ...OFFICIAL_CLASSES.map((name) => ({ surface: normalizeClassName(name), name })),
+  ...Object.entries(CLASS_ALIASES).map(([surface, name]) => ({
+    surface: normalizeClassName(surface),
+    name,
+  })),
+]
+
+function uniqueNames(surfaces: readonly ClassSurface[]): string[] {
+  return [...new Set(surfaces.map((entry) => entry.name))]
+}
+
+/**
  * Map an OCR'd job string to one of the 15 official class names.
- * Exact (normalized) first, then unique containment (handles "Assassin" for
- * "Assassin Cross" and noisy label/value runs), then bounded Levenshtein
- * ("Gypsv" -> "Gypsy"). Ambiguous or unknown input returns null — NEVER a
- * default class (a wrong class would silently corrupt cohorts).
+ * Exact (normalized) first, then containment (longest matching spelling wins,
+ * so "Mestre-Ferr" is Mastersmith and not Champion), then bounded
+ * Levenshtein ("Gypsv" -> "Gypsy", "Criador" -> Biochemist via the alias
+ * table). Ambiguous or unknown input returns null — NEVER a default class
+ * (a wrong class would silently corrupt cohorts).
  */
 export function matchClassName(observed: string | null | undefined): string | null {
   const o = normalizeClassName(observed)
   if (o.length < 2) return null
 
-  const exact = OFFICIAL_CLASSES.filter((name) => normalizeClassName(name) === o)
+  const exact = uniqueNames(CLASS_SURFACES.filter((entry) => entry.surface === o))
   if (exact.length === 1) return exact[0]
   if (exact.length > 1) return null
 
-  const contained = OFFICIAL_CLASSES.filter((name) => {
-    const n = normalizeClassName(name)
-    return n.includes(o) || o.includes(n)
-  })
-  if (contained.length === 1) return contained[0]
-  if (contained.length > 1) return null
-
-  const candidates: Array<{ name: string; distance: number }> = []
-  for (const name of OFFICIAL_CLASSES) {
-    const n = normalizeClassName(name)
-    const maxDistance = Math.max(1, Math.floor(0.25 * Math.min(o.length, n.length)))
-    const distance = levenshtein(o, n)
-    if (distance <= maxDistance) candidates.push({ name, distance })
+  // Containment needs at least 3 characters: two-letter fragments ("Nv" from
+  // the localized "Classe Nv40" job-level row) must never resolve a class.
+  if (o.length >= 3) {
+    const contained = CLASS_SURFACES.filter(
+      (entry) => entry.surface.includes(o) || o.includes(entry.surface),
+    )
+    if (contained.length > 0) {
+      const longest = Math.max(...contained.map((entry) => entry.surface.length))
+      const names = uniqueNames(contained.filter((entry) => entry.surface.length === longest))
+      return names.length === 1 ? names[0] : null
+    }
   }
+
+  const candidates = CLASS_SURFACES.map((entry) => {
+    const maxDistance = Math.max(1, Math.floor(0.25 * Math.min(o.length, entry.surface.length)))
+    return { name: entry.name, distance: levenshtein(o, entry.surface), maxDistance }
+  }).filter((candidate) => candidate.distance <= candidate.maxDistance)
   if (candidates.length === 0) return null
   candidates.sort((a, b) => a.distance - b.distance)
-  if (candidates.length > 1 && candidates[1].distance === candidates[0].distance) return null
-  return candidates[0].name
+  const best = candidates.filter((candidate) => candidate.distance === candidates[0].distance)
+  const names = [...new Set(best.map((candidate) => candidate.name))]
+  return names.length === 1 ? names[0] : null
 }
 
-// "ID 32980", "ID: 32O8O", "ID.32980" — O is the classic digit-zero OCR slip.
-// The negative lookahead keeps a 13+ digit run from being silently truncated.
-const ID_PATTERN = /\bID\b\s*[:.]?\s*([0-9O]{3,12})(?![0-9O])/i
-// "Job Gypsy" / "Job: Lord Knight" — the value must start with a letter so a
-// bare digits run never matches.
-const JOB_PATTERN = /\bJob\b\s*[:.]?\s*([A-Za-z][A-Za-z ]{1,30})/i
+// "ID 32980", "ID: 32O8O", "ID.32980" — O is the classic digit-zero OCR slip,
+// and the label itself is often read as "1D"/"lD" (measured on the shipped
+// English fixture). The negative lookahead keeps a 13+ digit run from being
+// silently truncated.
+const ID_PATTERN = /\b[Il1][D]\b\s*[:.]?\s*([0-9O]{3,12})(?![0-9O])/i
+// The class band label, whatever the client locale prints: "Job Gypsy"
+// (English), "Job: Lord Knight", "Classe   Criador" (pt-BR), "Clase Creador"
+// (es). The value must start with a letter so a bare digits run never matches,
+// and a digit terminates it so the localized "Classe Nv40" job-level row can
+// never be read as a class.
+const CLASS_LABEL_SOURCE = /\b(?:Job|Class|Classe|Clase)\b\s*[:.]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,30})/i
+// Label position inside one line (used to split nickname | class | ID bands).
+const CLASS_LABEL = /\b(?:Job|Class|Classe|Clase)\b/i
 
-// Lines that are labels/values around the nickname band, never the nickname.
+/** Every class-label occurrence's captured value, in reading order. */
+function classLabelValues(text: string): string[] {
+  const matches = text.matchAll(new RegExp(CLASS_LABEL_SOURCE.source, 'gi'))
+  return [...matches].map((match) => match[1].trim())
+}
+
+// Lines/tokens that are labels/values around the nickname band, never the
+// nickname (English + localized client vocabulary).
 const NICKNAME_KEYWORDS = [
   'job',
   'id',
   'power',
+  'poder',
   'guild',
+  'guilda',
+  'lider',
+  'líder',
   'level',
+  'nivel',
+  'nível',
+  'nv',
   'base',
+  'basico',
+  'básico',
+  'detalhes',
+  'details',
   'hp',
   'sp',
+  'pv',
+  'pm',
   'exp',
   'class',
+  'classe',
+  'clase',
   'atk',
   'def',
   'name',
@@ -140,13 +248,40 @@ const NICKNAME_KEYWORDS = [
 ]
 
 /**
+ * Turn one raw OCR fragment into a nickname, or null when it is not one.
+ * `allowDigits` is only true for the band LEFT of the class label (strong
+ * positional evidence: the game prints the nickname there, so "Helz2010" is
+ * a real nickname) — standalone lines stay digit-free so the ID/power rows
+ * are never mistaken for a name.
+ */
+function nicknameCandidate(value: string, allowDigits: boolean): string | null {
+  const candidate = value
+    .replace(/^[^A-Za-zÀ-ÿ0-9]+/, '')
+    .replace(/[|_]+$/g, '')
+    .trim()
+  if (candidate.length < 2 || candidate.length > 20) return null
+  if (!allowDigits && /[0-9]/.test(candidate)) return null
+  if (!/[A-Za-zÀ-ÿ]/.test(candidate)) return null
+  const lower = candidate.toLowerCase()
+  if (NICKNAME_KEYWORDS.some((word) => new RegExp(`\\b${word}\\b`, 'i').test(lower))) return null
+  if (matchClassName(candidate) !== null) return null
+  return candidate
+}
+
+/**
  * Parse the full-canvas OCR text of a Basic screenshot into identity fields.
- * The real sample reads:
+ * The English client sample reads:
  *
  *   Ahrya
  *   Job  Gypsy
  *   ID 32980
  *   Power  288115
+ *
+ * The pt-BR client (the live one, 08.10 hotfix) reads:
+ *
+ *   SoldierHelIz
+ *   Classe  Criador      ID 17069
+ *   Líder da Guilda Suprema
  *
  * Anything missing/ambiguous stays null — the first-access UI then refuses to
  * submit instead of guessing (D-03).
@@ -161,11 +296,16 @@ export function parseBasicProfileText(text: string): BasicProfileFields {
     if (/^\d{3,12}$/.test(digits)) char_id = digits
   }
 
+  // Try EVERY label occurrence and keep the first value that resolves: the
+  // header band ("Classe Criador") and the job-level row ("Classe Nv40") share
+  // a label, and OCR may emit either first.
   let char_class: string | null = null
-  const jobMatch = JOB_PATTERN.exec(raw)
-  if (jobMatch) {
-    // Trailing spaces are common (the next row starts on the same band).
-    char_class = matchClassName(jobMatch[1].trim())
+  for (const observed of classLabelValues(raw)) {
+    const match = matchClassName(observed)
+    if (match !== null) {
+      char_class = match
+      break
+    }
   }
 
   let nickname: string | null = null
@@ -173,17 +313,47 @@ export function parseBasicProfileText(text: string): BasicProfileFields {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
-    .slice(0, 5)
+
+  // 1. Preferred: the band left of the class label on the same line. SPARSE_TEXT
+  //    commonly merges the whole header row ("SoldierHelIz Classe Criador ID 17069").
   for (const line of lines) {
-    const candidate = line.replace(/[|_]+$/g, '').trim()
-    if (candidate.length < 2 || candidate.length > 20) continue
-    if (/[0-9]/.test(candidate)) continue
-    if (!/[A-Za-z]/.test(candidate)) continue
-    const lower = candidate.toLowerCase()
-    if (NICKNAME_KEYWORDS.some((word) => new RegExp(`\\b${word}\\b`, 'i').test(lower))) continue
-    if (matchClassName(candidate) !== null) continue
-    nickname = candidate
-    break
+    const labelAt = line.search(CLASS_LABEL)
+    if (labelAt <= 0) continue
+    const candidate = nicknameCandidate(line.slice(0, labelAt), true)
+    if (candidate !== null) {
+      nickname = candidate
+      break
+    }
+  }
+
+  // 2. The line immediately ABOVE the class band. The client prints the nickname
+  //    there, while the screen tabs ("Básico" / "Detalhes") sit above THAT — so
+  //    adjacency beats "first line that looks like a name", which would happily
+  //    claim a tab label or an OCR artifact.
+  if (nickname === null) {
+    const classLine = lines.findIndex((line) => CLASS_LABEL.test(line))
+    if (classLine > 0) {
+      for (let i = classLine - 1; i >= 0 && i >= classLine - 2; i--) {
+        const candidate = nicknameCandidate(lines[i], true)
+        if (candidate !== null) {
+          nickname = candidate
+          break
+        }
+      }
+    }
+  }
+
+  // 3. Fallback: the first standalone line that looks like a name (no class
+  //    band readable at all, or bands the OCR already separated).
+  if (nickname === null) {
+    for (const line of lines.slice(0, 5)) {
+      if (CLASS_LABEL.test(line)) continue
+      const candidate = nicknameCandidate(line, false)
+      if (candidate !== null) {
+        nickname = candidate
+        break
+      }
+    }
   }
 
   return { nickname, char_id, char_class }
