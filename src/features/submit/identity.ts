@@ -48,6 +48,10 @@ export interface SubmissionIdentity {
   char_function: CharFunction
 }
 
+export type SubmissionIdentityDraft = Omit<SubmissionIdentity, 'char_function'> & {
+  char_function: CharFunction | ''
+}
+
 /** Lowercase a-z0-9 comparison space (accents/punctuation dropped). */
 function normalizeClassName(value: string | null | undefined): string {
   return String(value ?? '')
@@ -190,7 +194,7 @@ const NICKNAME_ERROR = 'Informe o nick do personagem (até 80 caracteres).'
 const CLASS_ERROR = 'Selecione a classe do personagem.'
 const FUNCTION_ERROR = 'Selecione a função do personagem.'
 
-function identityProblems(value: Partial<SubmissionIdentity>): Array<{
+function identityProblems(value: Partial<SubmissionIdentityDraft>): Array<{
   field: 'char_id' | 'nickname' | 'char_class' | 'char_function'
   message: string
 }> {
@@ -213,7 +217,7 @@ function identityProblems(value: Partial<SubmissionIdentity>): Array<{
   }
 
   const charFunction = value.char_function
-  if (charFunction === undefined || !CHAR_FUNCTIONS.includes(charFunction)) {
+  if (charFunction === undefined || !CHAR_FUNCTIONS.includes(charFunction as CharFunction)) {
     problems.push({ field: 'char_function', message: FUNCTION_ERROR })
   }
 
@@ -245,6 +249,6 @@ export function validateIdentity(
  * Ordered problem list for the submit wizard ([] = valid). Order matches the
  * visual field order so the UI can focus the first offending input.
  */
-export function validateIdentityDraft(value: SubmissionIdentity): string[] {
+export function validateIdentityDraft(value: SubmissionIdentityDraft): string[] {
   return identityProblems(value).map((problem) => problem.message)
 }

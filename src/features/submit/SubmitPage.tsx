@@ -22,8 +22,8 @@ import {
   ApiError,
   createSubmission,
   fetchCatalog,
-  fetchMe,
-  type MemberRow,
+  fetchMyIdentity,
+  type MyIdentity,
   type StatCatalogEntry,
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
@@ -40,6 +40,7 @@ import {
   type BasicProfileFields,
   type CharFunction,
   type SubmissionIdentity,
+  type SubmissionIdentityDraft,
 } from './identity'
 import type { OcrFieldOutcome } from './ocr'
 import { applyOcrOutcomes } from './ocr/apply'
@@ -95,10 +96,10 @@ const IDENTITY_FIELD_IDS: Record<IdentityField, string> = {
  * the page can focus the offending input (the server re-validates anyway).
  */
 export function identitySubmitBlock(
-  identity: SubmissionIdentity,
+  identity: SubmissionIdentityDraft,
 ): { field: IdentityField; message: string } | null {
   if (validateIdentityDraft(identity).length === 0) return null
-  const first = validateIdentity(identity)
+  const first = validateIdentity(identity as SubmissionIdentity)
   return first.ok ? null : { field: first.field, message: first.message }
 }
 
@@ -172,7 +173,7 @@ interface SubmitPageProps {
 }
 
 export function SubmitPage({ session }: SubmitPageProps) {
-  const [data, setData] = useState<{ me: MemberRow; catalog: StatCatalogEntry[] } | null>(null)
+  const [data, setData] = useState<{ self: MyIdentity; catalog: StatCatalogEntry[] } | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [phase, setPhase] = useState<'wizard' | 'submitted'>('wizard')
@@ -183,11 +184,11 @@ export function SubmitPage({ session }: SubmitPageProps) {
   // Classe/Função prefill from the member row; ID/Nick start blank and are
   // typed or OCR-filled. char_function is NEVER inferred from the screenshot
   // (D-03/D-19) — the player's select is the only writer.
-  const [identity, setIdentity] = useState<SubmissionIdentity>({
+  const [identity, setIdentity] = useState<SubmissionIdentityDraft>({
     char_id: '',
     nickname: '',
     char_class: '',
-    char_function: 'dps',
+    char_function: '',
   })
   const [identityError, setIdentityError] = useState<{
     field: IdentityField
@@ -244,21 +245,21 @@ export function SubmitPage({ session }: SubmitPageProps) {
     let cancelled = false
     ;(async () => {
       try {
-        const [me, catalog] = await Promise.all([fetchMe(session), fetchCatalog(session)])
+        const [identity, catalog] = await Promise.all([fetchMyIdentity(session), fetchCatalog(session)])
         if (!cancelled) {
-          setData({ me, catalog })
+          setData({ self: identity, catalog })
           // Registry values are the starting point only: never overwrite a
           // field the player already edited while the load was in flight.
           setIdentity((current) => ({
             ...current,
             char_class:
               current.char_class === '' && identityTouchedRef.current.char_class !== true
-                ? (me.char_class ?? '')
+                ? (identity.char_class ?? '')
                 : current.char_class,
             char_function:
               identityTouchedRef.current.char_function === true
                 ? current.char_function
-                : me.char_function,
+                : identity.char_function,
           }))
         }
       } catch (err) {
@@ -299,7 +300,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
   }
 
   /** Build-role choice (never OCR-derived). */
-  function handleIdentityFunction(value: CharFunction) {
+  function handleIdentityFunction(value: CharFunction | '') {
     identityTouchedRef.current = { ...identityTouchedRef.current, char_function: true }
     setIdentity((current) => ({ ...current, char_function: value }))
     setIdentityError(null)
@@ -422,7 +423,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
     }
     setSubmitting(true)
     try {
-      await createSubmission(session, result.stats, identity)
+      await createSubmission(session, result.stats, identity as SubmissionIdentity)
       setPhase('submitted')
     } catch (err) {
       // The wizard state is KEPT — nothing the player typed is lost
@@ -461,7 +462,8 @@ export function SubmitPage({ session }: SubmitPageProps) {
     )
   }
 
-  const { me, catalog } = data
+  const { self, catalog } = data
+  const me = self
 
   // Blocked state: no registered character (no char_class) — UX gate only.
   if (me.char_class === null) {
@@ -692,6 +694,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                         : 'border-line'
                     }`}
                   >
+                    <option value="">Selecione a função</option>
                     {FUNCTION_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
