@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
-status: complete-pending-verification
-stopped_at: Completed 08-06-PLAN.md (legacy conversion + full battery green; phase pending verification)
-last_updated: "2026-10-21T07:59:00.000Z"
-last_activity: 2026-10-21
+status: completed
+stopped_at: Completed 08-04-PLAN.md (identity capture + session-less prospect wizard; 491 tests green, build green)
+last_updated: "2026-10-22T08:37:00.249Z"
+last_activity: "2026-10-21 -- 08-06 executed: legacy conversion applied (1 officer handle unclaimed; owner+dummies intact), smoke-identity 117/117 twice, full battery green (rls 39? lifecycle 11, officer, promotion, rank, card)"
 progress:
-  total_phases: 6
-  completed_phases: 3
-  total_plans: 18
-  completed_plans: 17
-  percent: 94
+  total_phases: 7
+  completed_phases: 4
+  total_plans: 21
+  completed_plans: 21
+  percent: 100
 ---
 
 # Project State
@@ -25,16 +25,17 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 ## Current Position
 
-Phase: 08 (whitelist-lifecycle-self-request-whitelisting-first-login-pi) — EXECUTING
-Plan: 6 of 6 (08-06 complete; phase pending /gsd-verify-work)
-Status: Phase 8 implementation complete (6/6 plans); legacy roster converted; all smoke suites green; ready for /gsd-verify-work
-Last activity: 2026-10-21 -- 08-06 executed: legacy conversion applied (1 officer handle unclaimed; owner+dummies intact), smoke-identity 117/117 twice, full battery green (rls 39? lifecycle 11, officer, promotion, rank, card)
+Phase: 08.1
+Plan: 0 of 9 (08-07/08/09 gap closure complete; pending owner UAT re-test of tests 3/4/7)
+Status: Phase 8 gap closure complete (08-07/08/09): not_member invariant enforced + satturne purged; my_identity coalesced self-read live; D-20 revised (member-originated validated choices promote char_function); full battery green; pending owner UAT re-test. Phase 08.1 context gathered (08.1-CONTEXT.md) — decisions locked for dummy purge, handle rotation, identification system, login fix (urgent ops); ready for /gsd-plan-phase 08.1.
+Last activity: 2026-10-22 -- 08.1 CONTEXT gathered (5 areas discussed: purge now/inside-08.1/no-reseed/OpenCode-executes; handle rotation out-of-band via apply-seed.mjs/replace whitelist.sql rows/accept git history/update smoke scripts; identification = step-up re-PIN for role changes only + owner universal hierarchy power + staff prefix stf-/off- + device fingerprint binding; login fix = urgent ops outside 08.1, OpenCode deploys+probes+verifies E2E). Next: /gsd-plan-phase 08.1 then execute.
 
 ## Accumulated Context
 
 ### Roadmap Evolution
 
 - Phase 07.1 inserted after Phase 7: Visual ID implementation (h-logo reference: sharp, modern, red neon, dark, city, futuristic, sci-fi look) (URGENT)
+- Phase 08.1 inserted after Phase 8: Security hardening for public deployment: purge dummies, upgrade generic handles, sophisticated identification system, fix login connection error (URGENT)
 
 ### Decisions
 
