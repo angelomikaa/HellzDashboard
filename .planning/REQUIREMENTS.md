@@ -60,6 +60,15 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 - [ ] **ROLE-11**: Officer-visible per-(class, role) key-stat config coverage indicator (staff-only, never member-visible)
 - [x] **ROLE-12**: Class catalog aligned with the official job tree (https://roocamer.gnjoy.game/home#job-intro): unreleased jobs excluded (Super Novice, Ninja), catalog additions needed by the seed roster (e.g., Summoner, Gunslinger), advanced-job naming reconciled (High Wizard/Professor, Biochemist/Smith, Dancer/Gypsy)
 
+### Hidden Raw Defenses
+
+- [ ] **DEF-01** (owner feedback 2026-10-22): `stat_catalog` gains `rpdef`/`rmdef` rows in `special` group, flat, `stat_direction='higher'`, `label_short` `RPDEF`/`RMDEF`; catalog count 57 → 59; member-facing surfaces (`my_report`, `my_card`, `get_promotion`, `role_rank`, dashboard, review, key-stat pages) surface them automatically with no RPC rewrite.
+- [ ] **DEF-02** (owner feedback 2026-10-22): Two tooltip OCR captures (`pdef_tooltip`/`mdef_tooltip`, transient `equip_pdef_raw`/`equip_mdef_raw`) inside the existing Especial step; per-capture failure/filled state so one tooltip read never blanks the other; tooltip grammar reads the "Equipment PDEF/MDEF" line then digit-reads the value; OCR field count 56 → 58.
+- [ ] **DEF-03** (owner feedback 2026-10-22): Raw defense calculated read-only as `floor(equipment / (1 + pct / 100))`; guards equipment ≥ 0 and denominator > 0; computed before `groupComplete`, `ReviewStep`, `buildStatsPayload`, and prospect gate; changing equipment or `equip_*_pct` unchecks Especial verification (one checkbox covers all 18 special values).
+- [ ] **DEF-04** (owner feedback 2026-10-22): Migration `0019_raw_defenses.sql` runs AFTER `0018` (untouched); inserts `rpdef`/`rmdef` with labels; remaps every `class_key_stats` row where `stat_key in ('pdef','mdef')` — keys and relevants — to `rpdef`/`rmdef` preserving `selection_order` and `selected_at`, then deletes old rows; OVR nulls for affected classes until a new validated submission supplies both raw values.
+- [ ] **DEF-05** (owner feedback 2026-10-22): Prospect/min-count gates updated: Edge function `58..59`; `requestFlow` minimum 58; DB floor `>=56` stays (Edge is the exact gate).
+- [ ] **DEF-06** (owner feedback 2026-10-22): Tests/seeds updated: `stat_catalog.sql` 59 rows; live `card-labels-4-6char.sql` gains `RPDEF`/`RMDEF`; structure tests stay at 56 screen fields + new tooltip grammar tests; wizard/prospect tests 58/59 payload expectations; smoke scripts 57 → 59, 56 → 58 where they assert full catalog.
+
 ### Dummy-Data Seed
 
 - [x] **SEED-01**: Reversible dummy seed following the owner-provided guild roster (see below), with validated submissions, realistic value shapes derived from live data or owner-supplied samples — incl. a clear leader, a ~98.5% runner-up, ties, and submitted_at spread — applied via the existing `apply-seed.mjs` tooling, files kept out of `seeds/` direct children. **Ships FIRST in v1.1** (owner decision: see how v1.0 wraps around data while v1.1 is developed)
@@ -189,8 +198,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HOME-01 | Phase 10 — Personalized Home Landing Tab | Pending |
 | HOME-02 | Phase 10 — Personalized Home Landing Tab | Pending |
 | SHWC-01 | Phase 10 — Personalized Home Landing Tab | Pending |
+| DEF-01 | Phase 9.1 — Hidden Raw Defenses | Pending |
+| DEF-02 | Phase 9.1 — Hidden Raw Defenses | Pending |
+| DEF-03 | Phase 9.1 — Hidden Raw Defenses | Pending |
+| DEF-04 | Phase 9.1 — Hidden Raw Defenses | Pending |
+| DEF-05 | Phase 9.1 — Hidden Raw Defenses | Pending |
+| DEF-06 | Phase 9.1 — Hidden Raw Defenses | Pending |
 
 **Coverage:**
-- v1.1 requirements: 37 total
-- Mapped to phases: 37 ✓
+- v1.1 requirements: 43 total
+- Mapped to phases: 43 ✓
 - Unmapped: 0 ✓

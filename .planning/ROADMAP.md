@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1–6 (shipped 2026-10-13) — full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
-- 🚧 **v1.1 Home, Whitelist & Fine Ranks** — Phases 7–10 (in progress)
+- 🚧 **v1.1 Home, Whitelist & Fine Ranks** — Phases 7–10.1 (in progress)
 
 ## Phases
 
@@ -26,6 +26,7 @@
 - [ ] Phase 8: Whitelist Lifecycle, Self-Request & Character Identity — handle-only registration, player-picked PIN on first login, owner PIN reset, reactivation, two self-request loops, per-submission identity (6 plans created)
 - [x] Phase 08.10: pt-BR OCR Identity — HOTFIX: the identity band reads the live pt-BR client ("Classe Criador"), localized class names map to the English catalog, and an unreadable field is named in the retry copy (1/1 plan) — completed 2026-10-22
 - [ ] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0017; renumbered: Phase 7 took 0012, Phase 07.2 takes 0013, Phase 8 takes 0014, Phase 8 gap closure consumed 0015, Phase 08.1 took 0016): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (4/4 plans)
+- [ ] Phase 9.1: Hidden Raw Defenses (RPDEF/RMDEF) — two tooltip OCR captures inside the Especial step; raw defense computed read-only from Equipment DEF / (1 + DEF%); transient equipment values; `rpdef`/`rmdef` remap all `pdef`/`mdef` key positions preserving order; migration 0019 after 0018 (2 plans)
 - [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (0/0 plans)
 
 </details>
@@ -154,6 +155,24 @@ Plans:
 Cross-cutting constraints: ONE migration, ONE tripod re-lock — both features rewrite the same three RPC bodies, so they land together (owner decision 8; ROLES.md §3.6: never rewrite the same three RPC bodies twice in one milestone); the backfill is the live-data continuity trick — without it every member's OVR nulls on migration day (P-ROLE-1, pre/post parity smoke is the detection); advisory-lock hash gains the role component and the old `set_key_stat` signature is dropped in the same migration (P-ROLE-6); the unified key/relevant selection (owner feedback 2026-10-20) ships INSIDE that same `set_key_stat` v2 rewrite — never as a separate migration; promotion top-5 stays class-wide across roles (OVR is the cross-role comparable currency); staff audit pass (ROLE-10) gates BEFORE per-role differentiation lands (P-ROLE-3: silent wrong-cohort scoring); migration + frontend deploy together to avoid stale-band skew (R17); formula edges (all-equal → one locked behavior, max=0, n≥3 gate retention) locked in spec + smoke; no new npm dependencies.
 **UI hint**: yes
 
+### Phase 9.1: Hidden Raw Defenses (RPDEF/RMDEF)
+**Goal**: Add hidden raw physical/magical defense stats (`RPDEF`/`RMDEF`) computed as `Equipment DEF / (1 + Equipment DEF%)` from two OCR tooltip captures inside the Especial step. Raw defenses register as independent catalog stats (`special` group, flat, higher-is-better, `label_short` `RPDEF`/`RMDEF`), take every `class_key_stats` position previously occupied by `PDEF`/`MDEF` preserving `selection_order`, and stay read-only with transient equipment inputs that are never stored or submitted. Visible to members like any other stat.
+**Depends on**: Phase 9 (migration 0018 applied live; `class_key_stats` re-keyed to `(class_name, char_function, stat_key)` with `selection_order`)
+**Requirements**: DEF-01, DEF-02, DEF-03, DEF-04, DEF-05, DEF-06
+**Success Criteria** (what must be TRUE):
+  1. `stat_catalog` gains `rpdef`/`rmdef` rows in `special` (flat, `stat_direction='higher'`, `label_short` `RPDEF`/`RMDEF`); catalog count 57 → 59; all member-facing surfaces (`my_report`, `my_card`, `get_promotion`, `role_rank`, dashboard, review, officer key-stat pages) surface them automatically with no RPC rewrite.
+  2. Two tooltip OCR captures (`pdef_tooltip`/`mdef_tooltip`, transient `equip_pdef_raw`/`equip_mdef_raw`) inside the Especial step; per-capture failure/filled state so one tooltip read never blanks the other; new tooltip grammar reads the "Equipment PDEF/MDEF" line and digit-reads the value; OCR field count 56 → 58.
+  3. Raw defense calculated read-only: `floor(equipment / (1 + pct / 100))`; guards equipment ≥ 0 and denominator > 0; computed before `groupComplete`, `ReviewStep`, `buildStatsPayload`, and prospect gate; changing equipment or `equip_*_pct` unchecks Especial verification (one checkbox covers all 18 special values).
+  4. `0019_raw_defenses.sql` runs AFTER `0018` (untouched); inserts `rpdef`/`rmdef` with labels; remaps every `class_key_stats` row where `stat_key in ('pdef','mdef')` — keys and relevants — to `rpdef`/`rmdef` preserving `selection_order` and `selected_at`, then deletes old rows; OVR nulls for affected classes until a new validated submission supplies both raw values.
+  5. Prospect/min-count gates: Edge function `58..59`; `requestFlow` minimum 58; DB floor `>=56` stays (Edge is exact gate).
+  6. Tests/seeds: `stat_catalog.sql` 59 rows; live `card-labels-4-6char.sql` gains `RPDEF`/`RMDEF`; structure tests unchanged at 56 screen fields + new tooltip grammar tests; wizard/prospect tests 58/59 payload expectations; smoke scripts 57 → 59, 56 → 58 where they assert full catalog.
+**Plans**: 2/2 plans
+Plans:
+- [ ] 09.1-01-PLAN.md — Catalog insert + migration 0019 + class_key_stats remap — Wave 1
+- [ ] 09.1-02-PLAN.md — OCR tooltip grammar/reader + Especial sub-section UI + effective-input gating + tests — Wave 2
+**Cross-cutting constraints**: `0018` must not be modified; `0019` follows `0018`; equipment values never enter `stat_catalog`/`buildStatsPayload`/`create_submission` payload; raw values merged into effective inputs only; the Special sub-section renders only when catalog contains both raw stats so old cached clients keep working; no new wizard step or catalog group.
+**UI hint**: yes
+
 ### Phase 10: Personalized Home Landing Tab
 **Goal**: Login lands players on a personalized home — their own OVR and best stats at a glance, with a clear nudge when their data is stale — while Destaques keeps the guild-wide EAFC celebration.
 **Depends on**: Phase 9 (`my_report` gains `last_validated_at` in migration 0014 — shipped there, consumed here)
@@ -171,7 +190,7 @@ Cross-cutting constraints: no router library — `'inicio'` joins the existing `
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 10 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 10 depends on 9's `last_validated_at`)
+Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|------------|
@@ -185,8 +204,9 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 (8 is independent and coul
 | 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 3/6 | In Progress|  |
 | 08.10. pt-BR OCR Identity (hotfix) | v1.1 | 1/1 | Complete | 2026-10-22 |
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 0/4 | Planned | - |
+| 9.1. Hidden Raw Defenses (RPDEF/RMDEF) | v1.1 | 0/2 | Planned | - |
 | 10. Personalized Home Landing Tab | v1.1 | 0/0 | Not started | - |
 
 ---
-*Roadmap created: 2026-10-07 · v1.0 archived 2026-10-13 · v1.1 roadmap created 2026-10-13 · revised 2026-10-13 (seed-first, role-differentiated key stats — 4 phases, 27 requirements)*
+*Roadmap created: 2026-10-07 · v1.0 archived 2026-10-13 · v1.1 roadmap created 2026-10-13 · revised 2026-10-22 (added Phase 9.1 Hidden Raw Defenses — 5 phases, DEF-01..DEF-06 requirements)*
 
