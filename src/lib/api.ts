@@ -7,6 +7,7 @@
 // claims from this JWT). Missing Authorization -> empty results (RLS sees no
 // claims); missing apikey -> 401.
 import { isValidSession, type NeoFootSession } from '../features/auth/session'
+import { computeDeviceFingerprintClient } from '../features/auth/session'
 import type { SubmissionIdentity } from '../features/submit/identity'
 
 export class ApiError extends Error {
@@ -52,6 +53,9 @@ async function restFetch(session: NeoFootSession, path: string, init?: RequestIn
   if (!supabaseUrl || !anonKey) {
     throw new ApiError(0, 'network', 'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
+  // D-17: compute device fingerprint once per page load and send it on every
+  // authenticated request so the server can enforce session-device binding.
+  const deviceFp = await computeDeviceFingerprintClient()
   let res: Response
   try {
     res = await fetch(`${supabaseUrl}/rest/v1${path}`, {
@@ -60,6 +64,7 @@ async function restFetch(session: NeoFootSession, path: string, init?: RequestIn
         apikey: anonKey,
         Authorization: `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
+        'X-Device-Fingerprint': deviceFp,
         ...init?.headers,
       },
     })
@@ -139,6 +144,13 @@ export async function fetchClasses(session: NeoFootSession): Promise<string[]> {
 // `active` was added in Phase 6 for the owner Remover/Reativar controls
 // (granted for SELECT in 0005; consumed by setMemberActive flows, AUTH-04).
 
+export interface MyIdentity {
+  display_name: string
+  char_id: string | null
+  char_class: string | null
+  char_function: 'dps' | 'mdps' | 'suporte'
+}
+
 export async function fetchMe(session: NeoFootSession): Promise<MemberRow> {
   // RLS: returns only the caller's own row (member_select_own).
   const res = await restFetch(
@@ -149,6 +161,18 @@ export async function fetchMe(session: NeoFootSession): Promise<MemberRow> {
   const row = rows?.[0]
   if (!row) throw new ApiError(401, 'unauthorized', 'no member row visible')
   return row
+}
+
+export async function fetchMyIdentity(session: NeoFootSession): Promise<MyIdentity> {
+  const res = await restFetch(session, '/rpc/my_identity', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  const identity = await parseBody<MyIdentity>(res)
+  if (!identity || typeof identity.display_name !== 'string' || !('char_function' in identity)) {
+    throw new ApiError(0, 'server', 'malformed my_identity response')
+  }
+  return identity
 }
 
 export async function fetchMembers(session: NeoFootSession): Promise<MemberRow[]> {
@@ -348,13 +372,15 @@ export async function setMemberRole(
   session: NeoFootSession,
   memberId: string,
   role: 'member' | 'officer',
+  stepUpToken?: string,
 ): Promise<void> {
-  // SECURITY DEFINER RPC (0011): POST /rpc/set_member_role body
+  // SECURITY DEFINER RPC (0011 + 0016 step-up enforcement): POST /rpc/set_member_role body
   // {p_member, p_role} — owner-only gate inside the RPC (AUTH-03); effective
   // at next login (D-10). No 'owner' value is ever sent — owner rows are
-  // immutable server-side. Raises 'invalid_role' / 'forbidden' (HTTP 500).
+  // immutable server-side. Raises 'invalid_role' / 'forbidden' / 'step_up_required' (HTTP 500).
   await restFetch(session, '/rpc/set_member_role', {
     method: 'POST',
+    headers: stepUpToken ? { 'X-Step-Up': stepUpToken } : undefined,
     body: JSON.stringify({ p_member: memberId, p_role: role }),
   })
 }

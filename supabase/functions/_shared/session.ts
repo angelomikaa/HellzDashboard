@@ -35,6 +35,23 @@ export function rowToState(
 
 export const SESSION_SECONDS = 7 * 24 * 60 * 60 // D-06: 7-day session
 
+// D-17: device fingerprint = SHA-256(user agent + IP). Bound to the JWT at
+// login; invalidated on mismatch (requires re-login).
+export async function computeDeviceFingerprint(
+  ua: string | null,
+  ip: string | null,
+): Promise<string> {
+  const input = ((ua ?? '') + '|' + (ip ?? '')).trim()
+  const buf = new TextEncoder().encode(input)
+  const hash = await crypto.subtle.digest('SHA-256', buf)
+  const hex = Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+  return hex
+}
+
+export const DEVICE_FP_CLAIM = 'device_fp'
+
 export interface EnvConfig {
   supabaseUrl: string
   serviceRoleKey: string
@@ -71,17 +88,21 @@ export async function mintSession(member: {
   id: string
   display_name: string
   role: string
-}): Promise<Session> {
+}, deviceFp?: string): Promise<Session> {
   const cfg = envConfig()
   if (!cfg) throw new Error('server_misconfigured')
   const nowSec = Math.floor(Date.now() / 1000)
   const secret = new TextEncoder().encode(cfg.jwtSecret)
   const kid = cfg.jwtKid
-  const token = await new SignJWT({
+  const claims: Record<string, unknown> = {
     role: 'authenticated',
     member_id: member.id,
     member_role: member.role,
-  })
+  }
+  if (deviceFp) {
+    claims[DEVICE_FP_CLAIM] = deviceFp
+  }
+  const token = await new SignJWT(claims)
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT', kid })
     .setSubject(member.id)
     .setIssuedAt(nowSec)
@@ -95,6 +116,47 @@ export async function mintSession(member: {
     display_name: member.display_name,
     member_role: member.role,
     expires_at: nowSec + SESSION_SECONDS,
+  }
+}
+
+// D-14/D-15: short-lived step-up JWT (10 minutes, distinct issuer) issued after
+// successful re-PIN via request_step_up. Distinguishable from session JWTs by
+// the `step_up:true` claim and `nefoot-step-up` issuer.
+export const STEP_UP_SECONDS = 10 * 60
+
+export async function stepUpSession(member: {
+  id: string
+  display_name: string
+  role: string
+}, deviceFp?: string): Promise<Session> {
+  const cfg = envConfig()
+  if (!cfg) throw new Error('server_misconfigured')
+  const nowSec = Math.floor(Date.now() / 1000)
+  const secret = new TextEncoder().encode(cfg.jwtSecret)
+  const kid = cfg.jwtKid
+  const claims: Record<string, unknown> = {
+    role: 'authenticated',
+    member_id: member.id,
+    member_role: member.role,
+    step_up: true,
+  }
+  if (deviceFp) {
+    claims[DEVICE_FP_CLAIM] = deviceFp
+  }
+  const token = await new SignJWT(claims)
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT', kid })
+    .setSubject(member.id)
+    .setIssuedAt(nowSec)
+    .setIssuer('nefoot-step-up')
+    .setExpirationTime(nowSec + STEP_UP_SECONDS)
+    .sign(secret)
+
+  return {
+    access_token: token,
+    member_id: member.id,
+    display_name: member.display_name,
+    member_role: member.role,
+    expires_at: nowSec + STEP_UP_SECONDS,
   }
 }
 

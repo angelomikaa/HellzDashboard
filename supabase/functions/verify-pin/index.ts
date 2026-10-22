@@ -6,9 +6,11 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
   DUMMY_HASH,
   corsHeaders,
+  DEVICE_FP_CLAIM,
   envConfig,
   json,
   mintSession,
+  computeDeviceFingerprint,
   rowToState,
 } from '../_shared/session.ts'
 import {
@@ -145,13 +147,22 @@ Deno.serve(async (req: Request) => {
 
   // Mint the 7-day custom-claim JWT (D-06) through the shared module — the exact
   // same block setup-pin uses, so both functions return an identical session.
+  // D-17: bind device fingerprint (user agent + IP) to the JWT so a stolen
+  // session is invalidated from a different device.
+  const ua = req.headers.get('user-agent') ?? null
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
+  const deviceFp = await computeDeviceFingerprint(ua, ip)
+
   let session
   try {
-    session = await mintSession({
-      id: member.id,
-      display_name: member.display_name,
-      role: member.role,
-    })
+    session = await mintSession(
+      {
+        id: member.id,
+        display_name: member.display_name,
+        role: member.role,
+      },
+      deviceFp,
+    )
   } catch {
     return json({ error: 'server_error' }, 500)
   }

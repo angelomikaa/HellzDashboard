@@ -7,6 +7,7 @@ export interface NeoFootSession {
   display_name: string
   member_role: 'member' | 'officer' | 'owner'
   expires_at: number // epoch seconds
+  deviceFp?: string // D-17: device fingerprint bound to the session JWT
 }
 
 const STORAGE_KEY = 'nefoot_session'
@@ -57,4 +58,25 @@ export function clearSession(): void {
 
 export function isExpired(s: NeoFootSession): boolean {
   return s.expires_at * 1000 <= Date.now()
+}
+
+// D-17: client-side device fingerprint (SHA-256 of navigator.userAgent).
+// Computed once per page load; sent as X-Device-Fingerprint on every API
+// request so the server can enforce session-device binding.
+export async function computeDeviceFingerprintClient(): Promise<string> {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  const buf = new TextEncoder().encode(ua)
+  const hash = await crypto.subtle.digest('SHA-256', buf)
+  const hex = Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+  return hex
+}
+
+// D-17: returns true when the session's device_fp matches the current
+// device fingerprint (or when deviceFp is absent — backward compatible with
+// pre-binding sessions). Used by api.ts to decide whether to re-auth.
+export function isDeviceBound(session: NeoFootSession, currentFp: string): boolean {
+  if (!session.deviceFp) return true // pre-binding session, no enforcement yet
+  return session.deviceFp === currentFp
 }
