@@ -189,6 +189,12 @@ describe('supersede flow (D-11)', () => {
       requestErrorCopy(new FunctionError(429, 'locked', 'x', { retryAfterSeconds: 120 })).message,
     ).toContain('2 minutos')
   })
+
+  it('maps not_member to Recrutamento copy without previous PIN', () => {
+    const copy = requestErrorCopy(new FunctionError(400, 'not_member', 'x'))
+    expect(copy.message).toContain('Recrutamento')
+    expect(copy.needsPreviousPin).toBe(false)
+  })
 })
 
 describe('prospect handoff — never submits directly', () => {

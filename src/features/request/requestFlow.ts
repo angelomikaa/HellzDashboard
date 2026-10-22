@@ -234,6 +234,13 @@ export function requestErrorCopy(error: FunctionError): RequestErrorCopy {
         clearPreviousPin: false,
         backToLogin: true,
       }
+    case 'not_member':
+      return {
+        message: 'Este handle n\u00e3o tem cadastro na guilda. Use "Recrutamento" para solicitar entrada.',
+        needsPreviousPin: false,
+        clearPreviousPin: false,
+        backToLogin: false,
+      }
     case 'proof_too_large':
       return {
         message: 'Comprovante muito grande (máx. 2 MB).',

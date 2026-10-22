@@ -350,6 +350,7 @@ export function requestApproveErrorFor(error: unknown): string {
   if (message.includes('already_member')) return 'Este handle já está ativo.'
   if (message.includes('not_pending')) return STALE_ROW_ERROR
   if (message.includes('invalid_function')) return 'Função inválida.'
+  if (message.includes('not_member')) return 'Handle sem cadastro de membro.'
   if (error instanceof ApiError && (error.kind === 'unauthorized' || message.includes('forbidden')))
     return SESSION_ERROR
   return SAVE_ERROR

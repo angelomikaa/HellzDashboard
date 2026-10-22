@@ -230,6 +230,7 @@ Deno.serve(async (req: Request) => {
     await removeUpload()
     if (msg.includes('request_pending')) return json({ error: 'request_pending' }, 409)
     if (msg.includes('duplicate_char_id')) return json({ error: 'duplicate_char_id' }, 400)
+    if (msg.includes('not_member')) return json({ error: 'not_member' }, 400)
     if (msg.includes('dummy_handle')) return json({ error: 'dummy_handle' }, 400)
     if (msg.includes('unknown_class')) return json({ error: 'unknown_class' }, 400)
     if (msg.includes('invalid_function')) return json({ error: 'invalid_function' }, 400)
