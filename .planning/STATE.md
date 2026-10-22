@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 ## Current Position
 
-Phase: 08.1
-Plan: 5 of 5 (all executed)
-Status: Phase 08.1 complete — dummy purge (08.1-01) live, zero-dummy verified; owner handle rotated to satturne + hash(0192) live (08.1-02); verify-pin deployed live with device_fp binding (08.1-03/04); migration 0016 step-up re-PIN applied live (08.1-05); login connection error resolved (verify-pin responding HTTP 200). Build green, 521 tests green. Ready for owner UAT re-test of Phase 8 gap closure tests 3/4/7, then Phase 9 planning.
-Last activity: 2026-10-22 -- Phase 08.1 fully executed: purge-dummies.sql applied (four zeros across members/submissions/stats/attempts); whitelist.sql rotated owner-handle→satturne; verify-pin deployed with device fingerprint binding (device_fp claim verified in JWT); migration 0016 applied (step_up_tokens table, request_step_up RPC, set_member_role step-up enforcement); all 5 SUMMARY files written; build green, 521 tests green.
+Phase: 08.10 (hotfix)
+Plan: 1 of 1 (executed)
+Status: Phase 08.10 complete — first access reads the LIVE pt-BR client: `Classe`/`Clase` labels scanned, localized class names mapped to the English catalog (`Criador` → `Biochemist`), nickname taken from the band adjacent to the class row, `1D`/`lD` ID-label misreads accepted, retry copy names the missing field. `PROFILE_ERROR` on a valid Básico print is fixed at the parser (reproduced with the report's exact text). Build green, 548 tests green. Pending: owner browser re-walk of first access; Phase 9 execution.
+Last activity: 2026-10-22 -- Phase 08.10 hotfix executed: identity.ts localized label scan + CLASS_ALIASES + band-adjacent nickname; recognize.ts accent whitelist + dev raw-text log; profileProblemMessage copy; summary/roadmap/state written; build + 548 tests green.
 
 ## Accumulated Context
 
@@ -36,6 +36,7 @@ Last activity: 2026-10-22 -- Phase 08.1 fully executed: purge-dummies.sql applie
 
 - Phase 07.1 inserted after Phase 7: Visual ID implementation (h-logo reference: sharp, modern, red neon, dark, city, futuristic, sci-fi look) (URGENT)
 - Phase 08.1 inserted after Phase 8: Security hardening for public deployment: purge dummies, upgrade generic handles, sophisticated identification system, fix login connection error (URGENT)
+- Phase 08.10 inserted after 08.1: pt-BR OCR identity HOTFIX (owner UAT 2026-10-22: every first-access claim blocked — the identity parser only knew the English client; `Classe Criador` prints never resolved a class)
 
 ### Decisions
 
@@ -94,6 +95,7 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 08]: 08-04: prospect flow rules live in `requestFlow.ts` with `requestAccess` injected (payload, gating, error copy, submit) — the page stays thin and the contract is unit-testable without network stubs; the wizard has no per-step attestations (ReviewStep gets `allStepsVerified`)
 - [Phase 08]: 08-04: the anonymous browser reads `stat_catalog` through the 0014 column-limited anon grant only (`fetchPublicCatalog`); key-stat config never crosses that boundary (T-08-29)
 - [Phase 08.1 hotfix 2026-10-22]: step-up repaired by migration 0017 + a new `step-up` Edge Function (deployed `--no-verify-jwt`; the function verifies the member JWT itself). 0016's `set_member_role` raised 22P02 on every call (`->>'member_id'::uuid` precedence) and never read `X-Step-Up`; its `request_step_up` could not verify bcryptjs `$2b$` hashes with pgcrypto, so the RPC is dropped and issuance is bcryptjs in the Edge layer (same lockout counter as login). 0016 also left `step_up_tokens` with RLS OFF + full anon/authenticated grants — 0017 enables RLS and revokes them. Client: re-PIN dialog in Personagens (PinBoxes) → `requestStepUp()` → token in `X-Step-Up`. Live proof: officer smoke 41/41 incl. step-up probes.
+- [Phase 08.10 hotfix 2026-10-22]: the LIVE client is pt-BR, so the identity OCR is label-agnostic (`Job|Class|Classe|Clase`, every occurrence tried, first resolvable wins) and `CLASS_ALIASES` maps localized names to the English catalog (`Criador` → `Biochemist`); an unmapped name still yields null (D-03, never a guessed class). Nickname is read from the band left of / directly above the class row (digits allowed there, so `Helz2010` works) — screen tabs and OCR artifacts above it are ignored. The `1D`/`lD` ID-label misread is accepted. Retry copy names the missing field instead of blaming all three. Acceptance: owner browser re-walk of first access.
 
 ### Blockers/Concerns (open — carry to next milestone)
 

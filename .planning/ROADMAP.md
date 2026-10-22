@@ -24,6 +24,7 @@
 
 - [x] Phase 7: Dummy-Data Seed & Catalog Alignment — owner-roster seed ships FIRST (owner decision 7: see how v1.0 wraps around data while v1.1 is developed), build-role vocabulary (ROLE-05) + official job-tree catalog (ROLE-12) aligned so dummies carry correct roles from day one (4/4 plans) — completed 2026-10-14
 - [ ] Phase 8: Whitelist Lifecycle, Self-Request & Character Identity — handle-only registration, player-picked PIN on first login, owner PIN reset, reactivation, two self-request loops, per-submission identity (6 plans created)
+- [x] Phase 08.10: pt-BR OCR Identity — HOTFIX: the identity band reads the live pt-BR client ("Classe Criador"), localized class names map to the English catalog, and an unreadable field is named in the retry copy (1/1 plan) — completed 2026-10-22
 - [ ] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0017; renumbered: Phase 7 took 0012, Phase 07.2 takes 0013, Phase 8 takes 0014, Phase 8 gap closure consumed 0015, Phase 08.1 took 0016): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (4/4 plans)
 - [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (0/0 plans)
 
@@ -122,6 +123,16 @@ Plans:
 - [ ] 08.1-03-PLAN.md — Device fingerprint binding: verify-pin binds device_fp (User-Agent + IP) to JWT; client sends X-Device-Fingerprint header; mismatch invalidates session — Wave 2
 - [ ] 08.1-04-PLAN.md — Step-up re-PIN: re-PIN required for role changes/hierarchy only; ordinary member flows not stepped up; only owner has hierarchy power; short-lived step-up token — Wave 3
 
+### Phase 08.10: pt-BR OCR Identity (HOTFIX, INSERTED)
+
+**Goal:** First access works on the LIVE pt-BR client: the identity band reads nickname + ID + class from "Classe Criador" prints (not just the English "Job Gypsy" fixture), the localized class maps to its official English catalog name, and a failed read names exactly what is missing.
+
+**Why:** Owner UAT 2026-10-22 — every first-access claim on the live client was blocked with "Não conseguimos ler o ID, o nick e a classe" because `JOB_PATTERN` only knew `Job`, `matchClassName` only knew English class names, and `setup-pin` validates against the English `classes` catalog.
+
+**Requirements**: IDEN-01, IDEN-02, WHIT-02 (repair, no new IDs)
+**Depends on:** Phase 8
+**Plans:** 1/1 — `08.10-01-PLAN.md` (see `.planning/phases/08.10-pt-br-ocr-identity/`)
+
 ### Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats
 **Goal**: Points differentiate the top end by real stat gaps within class+build-role cohorts — the leader holds 99 and everyone below scales by value distance — while key-stat configuration becomes per (class, build-role) with zero deploy-day OVR change, all landing in ONE migration and re-locked with ONE tripod pass.
 **Depends on**: Phase 7 (build-role vocabulary exists, catalog aligned, realistic seeded cohorts resident for band calibration)
@@ -172,6 +183,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 (8 is independent and coul
 | 6. Trust & Celebration — Officer Tools & Promotion Page | v1.0 | 7/7 | Complete | 2026-10-13 |
 | 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 4/4 | Complete    | 2026-10-15 |
 | 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 3/6 | In Progress|  |
+| 08.10. pt-BR OCR Identity (hotfix) | v1.1 | 1/1 | Complete | 2026-10-22 |
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 0/4 | Planned | - |
 | 10. Personalized Home Landing Tab | v1.1 | 0/0 | Not started | - |
 
