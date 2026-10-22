@@ -26,6 +26,7 @@ import {
   type StatPayloadItem,
   type WizardGroup,
 } from '../submit/wizard'
+import { RAW_DEFENSE_STAT_KEYS } from '../submit/rawDefense'
 
 export const REQUEST_HANDLE_ERROR = 'Informe seu usuário do Discord.'
 export const REQUEST_PIN_ERROR = 'Informe um PIN de 4 dígitos.'
@@ -405,14 +406,18 @@ export const PROSPECT_STEP_GROUP: Record<2 | 3 | 4, WizardGroup> = {
   4: 'special',
 }
 
-/** Same group→entries rule as SubmitPage: combat_power belongs to step 1. */
+/** Same group→entries rule as SubmitPage: combat_power belongs to step 1.
+ * Raw defenses (rpdef/rmdef) are NOT rendered in the special grid —
+ * DefenseStep owns them as read-only calculated fields. */
 export function prospectGroupEntries(
   catalog: StatCatalogEntry[],
   group: WizardGroup,
 ): StatCatalogEntry[] {
   return catalog.filter(
     (entry) =>
-      entry.group_name === group && !(group === 'general' && entry.stat_key === 'combat_power'),
+      entry.group_name === group &&
+      !(group === 'general' && entry.stat_key === 'combat_power') &&
+      !(group === 'special' && RAW_DEFENSE_STAT_KEYS.includes(entry.stat_key)),
   )
 }
 
@@ -510,8 +515,8 @@ export interface ProspectSubmitDeps {
 
 /**
  * Validate the (already confirmed) identity, build the stats payload with the
- * wizard rules, then POST request-access once. The >=56 guard mirrors the
- * live Edge validation; buildStatsPayload already guarantees the 56 required
+ * wizard rules, then POST request-access once. The >=58 guard mirrors the
+ * live Edge validation; buildStatsPayload already guarantees the 58 required
  * fields, so it is defense in depth, not a UX gate. Never touches
  * create_submission and never mints a session (T-08-28).
  */

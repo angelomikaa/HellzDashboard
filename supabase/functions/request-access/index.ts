@@ -25,9 +25,9 @@ const MAX_BODY_BYTES = 3_500_000
 const FUNCTIONS = new Set(['dps', 'mdps', 'suporte'])
 const REQUEST_TYPES = new Set(['member', 'prospect'])
 
-/** Prospect applications carry the full 56-key wizard payload (+optional combat_power). */
+/** Prospect applications carry the full 58-key wizard payload (+optional combat_power). */
 function validStats(stats: unknown): stats is Array<{ stat_key: string; value: number }> {
-  if (!Array.isArray(stats) || stats.length < 56 || stats.length > 57) return false
+  if (!Array.isArray(stats) || stats.length < 58 || stats.length > 59) return false
   const seen = new Set<string>()
   for (const raw of stats) {
     if (!raw || typeof raw !== 'object') return false

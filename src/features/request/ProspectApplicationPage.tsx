@@ -29,10 +29,12 @@ import {
 import { OcrCapture } from '../submit/OcrCapture'
 import { ReviewStep } from '../submit/ReviewStep'
 import { OCR_FIELD_FAILURE, StatGroupStep } from '../submit/StatGroupStep'
+import { DefenseStep } from '../submit/DefenseStep'
 import { INVALID_HINT, statFieldFeedback } from '../submit/fieldValidation'
 import { applyOcrOutcomes } from '../submit/ocr/apply'
 import type { OcrFieldOutcome } from '../submit/ocr'
 import { WIZARD_GROUPS, type GroupInputs } from '../submit/wizard'
+import { withDerivedDefenses, RAW_DEFENSE_STAT_KEYS } from '../submit/rawDefense'
 import { FUNCTION_LABELS } from '../../lib/groups'
 
 export const PROSPECT_LOAD_ERROR = 'Não foi possível carregar o formulário.'
@@ -68,6 +70,10 @@ export function ProspectApplicationPage({
 
   const [step, setStep] = useState<ProspectStep>(1)
   const [inputs, setInputs] = useState<GroupInputs>({})
+
+  // Effective inputs = manual inputs + computed read-only raw defenses
+  // (Phase 9.1 DEF-03).
+  const effectiveInputs = withDerivedDefenses(inputs)
   const [ocrRunningStep, setOcrRunningStep] = useState<1 | 2 | 3 | 4 | null>(null)
   const [failedFields, setFailedFields] = useState(emptyClaims)
   const [ocrFilledFields, setOcrFilledFields] = useState(emptyClaims)
@@ -154,7 +160,9 @@ export function ProspectApplicationPage({
       // The one write path: POST request-access with
       // { request_type: 'prospect', ...draft identity, stats } — never
       // create_submission, and never a session (T-08-28).
-      const outcome = await submitProspectApplication(draft, catalog, inputs, { requestAccess })
+      const outcome = await submitProspectApplication(draft, catalog, effectiveInputs, {
+        requestAccess,
+      })
       if (outcome.ok) {
         onSubmitted(outcome.requestId)
         return
@@ -354,7 +362,7 @@ export function ProspectApplicationPage({
             <StatGroupStep
               group={STEP_GROUP[step]}
               entries={prospectGroupEntries(catalog, STEP_GROUP[step])}
-              inputs={inputs}
+              inputs={effectiveInputs}
               onChange={handleChange}
               ocrRunning={ocrRunningStep === step}
               failedFields={failedFields[step]}
@@ -369,6 +377,17 @@ export function ProspectApplicationPage({
                 />
               }
             />
+            {step === 4 && catalog !== null && RAW_DEFENSE_STAT_KEYS.every((k) =>
+              catalog.some((e) => e.stat_key === k),
+            ) && (
+              <DefenseStep
+                inputs={inputs}
+                onEquipmentChange={(key, raw) => {
+                  setInputs((prev) => ({ ...prev, [key]: raw }))
+                }}
+                disabled={submitting || ocrRunningStep === 4}
+              />
+            )}
           </div>
         )}
 
@@ -402,7 +421,7 @@ export function ProspectApplicationPage({
             <button
               type="button"
               onClick={() => setStep((current) => (current + 1) as ProspectStep)}
-              disabled={!prospectCanContinue(catalog, step, inputs)}
+              disabled={!prospectCanContinue(catalog, step, effectiveInputs)}
               className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               Continuar

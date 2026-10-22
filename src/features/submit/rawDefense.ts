@@ -29,6 +29,20 @@ const PCT_TO_RAW: Record<string, string> = {
 }
 
 /**
+ * One tooltip card's static config (DefenseStep). The capture key, the
+ * transient equipment/pct input keys, and the derived catalog stat key.
+ */
+export interface RawDefenseCard {
+  capture: 'pdef_tooltip' | 'mdef_tooltip'
+  equipmentKey: 'equip_pdef_raw' | 'equip_mdef_raw'
+  pctKey: 'equip_pdef_pct' | 'equip_mdef_pct'
+  rawKey: 'rpdef' | 'rmdef'
+  label: string
+  title: string
+  example: string
+}
+
+/**
  * Compute one raw defense: floor(equipment / (1 + pct / 100)).
  *
  * Guards:

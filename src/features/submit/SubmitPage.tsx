@@ -33,6 +33,7 @@ import { HistoryList } from './HistoryList'
 import { OcrCapture } from './OcrCapture'
 import { ReviewStep } from './ReviewStep'
 import { OCR_FIELD_FAILURE, StatGroupStep } from './StatGroupStep'
+import { DefenseStep } from './DefenseStep'
 import { INVALID_HINT, statFieldFeedback } from './fieldValidation'
 import {
   validateIdentity,
@@ -51,6 +52,7 @@ import {
   type GroupInputs,
   type WizardGroup,
 } from './wizard'
+import { withDerivedDefenses, RAW_DEFENSE_STAT_KEYS } from './rawDefense'
 
 // Enumeration-safe copy (UI contract): never expose HTTP codes or internals.
 const NETWORK_ERROR =
@@ -179,6 +181,11 @@ export function SubmitPage({ session }: SubmitPageProps) {
   const [phase, setPhase] = useState<'wizard' | 'submitted'>('wizard')
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
   const [inputs, setInputs] = useState<GroupInputs>({})
+
+  // Effective inputs = manual inputs + computed read-only raw defenses
+  // (Phase 9.1 DEF-03). rpdef/rmdef are merged here so groupComplete,
+  // ReviewStep and buildStatsPayload always see consistent raw values.
+  const effectiveInputs = withDerivedDefenses(inputs)
 
   // Editable identity (08-04, IDEN-01/02): mandatory on every submission.
   // Classe/Função prefill from the member row; ID/Nick start blank and are
@@ -414,7 +421,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
       return
     }
 
-    const result = buildStatsPayload(data.catalog, inputs)
+    const result = buildStatsPayload(data.catalog, effectiveInputs)
     if (!result.ok) {
       // Defense in depth: the step gates should have prevented this — the
       // server re-validates regardless.
@@ -478,9 +485,14 @@ export function SubmitPage({ session }: SubmitPageProps) {
   }
 
   // combat_power is entered on the intro step, not on the Geral step.
+  // Raw defenses (rpdef/rmdef) are NOT rendered in the special grid —
+  // DefenseStep owns them as read-only calculated fields.
   const groupEntries = (group: WizardGroup): StatCatalogEntry[] =>
     catalog.filter(
-      (e) => e.group_name === group && !(group === 'general' && e.stat_key === 'combat_power'),
+      (e) =>
+        e.group_name === group &&
+        !(group === 'general' && e.stat_key === 'combat_power') &&
+        !(group === 'special' && RAW_DEFENSE_STAT_KEYS.includes(e.stat_key)),
     )
 
   /** D-15 replace-all-displayed: a read replaces EXACTLY this step's
@@ -763,7 +775,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
               <StatGroupStep
                 group={STEP_GROUP[step]}
                 entries={groupEntries(STEP_GROUP[step])}
-                inputs={inputs}
+                inputs={effectiveInputs}
                 onChange={handleChange}
                 ocrRunning={ocrRunningStep === step}
                 failedFields={failedFields[step]}
@@ -777,6 +789,18 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   />
                 }
               />
+              {step === 4 && data !== null && RAW_DEFENSE_STAT_KEYS.every((k) =>
+                data.catalog.some((e) => e.stat_key === k),
+              ) && (
+                <DefenseStep
+                  inputs={inputs}
+                  onEquipmentChange={(key, raw) => {
+                    setInputs((prev) => ({ ...prev, [key]: raw }))
+                    setStepVerified((v) => ({ ...v, 4: false }))
+                  }}
+                  disabled={submitting || ocrRunningStep === 4}
+                />
+              )}
               <div className="mt-4">
                 <StepVerifyCheckbox
                   stepNo={step}
@@ -791,7 +815,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
             <div className="mt-6">
               <ReviewStep
                 entries={catalog}
-                inputs={inputs}
+                inputs={effectiveInputs}
                 allStepsVerified={
                   stepVerified[1] && stepVerified[2] && stepVerified[3] && stepVerified[4]
                 }
@@ -833,7 +857,8 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   type="button"
                   onClick={() => setStep((s) => (s + 1) as 2 | 3 | 4 | 5)}
                   disabled={
-                    !groupComplete(catalog, STEP_GROUP[step], inputs) || !stepVerified[step]
+                    !groupComplete(catalog, STEP_GROUP[step], effectiveInputs) ||
+                    !stepVerified[step]
                   }
                   className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
