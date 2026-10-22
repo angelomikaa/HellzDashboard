@@ -57,7 +57,9 @@ if (!MGMT_TOKEN || !PROJECT_REF) {
 
 const MEMBER_HANDLE = 'member-handle'
 const OFFICER_HANDLE = 'officer-handle'
+const OWNER_HANDLE = 'satturne'
 const PIN = '1234'
+const OWNER_PIN = '0192'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -74,7 +76,7 @@ function check(name, cond, detail = '') {
 }
 
 /** Login via the deployed verify-pin function; both gateway headers required (01-02). */
-async function login(handle) {
+async function login(handle, pin = PIN) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-pin`, {
     method: 'POST',
     headers: {
@@ -82,7 +84,7 @@ async function login(handle) {
       Authorization: `Bearer ${ANON_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ discord_handle: handle, pin: PIN }),
+    body: JSON.stringify({ discord_handle: handle, pin }),
   })
   if (!res.ok) {
     throw new Error(`login failed for ${handle}: HTTP ${res.status} ${await res.text()}`)
@@ -221,7 +223,7 @@ async function main() {
     !officerClassInsert.ok,
     `HTTP ${officerClassInsert.status}`,
   )
-  const owner = await login('owner-handle')
+  const owner = await login(OWNER_HANDLE, OWNER_PIN)
   const ownerClassInsert = await rest('/classes', {
     method: 'POST',
     token: owner.access_token,
