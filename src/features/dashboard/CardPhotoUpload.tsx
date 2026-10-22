@@ -136,12 +136,14 @@ const iconProps = {
 
 export function CardPhotoUpload({
   session,
+  displayName,
   onDownload,
   downloading = false,
   downloadError = null,
   className = '',
 }: {
   session: NeoFootSession
+  displayName?: string | null
   // Owner round 6: the own-card download joined the on-card action row
   // (icon-only). DashboardPage owns the export contract and passes the
   // handler/state down.
@@ -235,7 +237,7 @@ export function CardPhotoUpload({
   const preview: CardExportData | null =
     card !== null && card.char_class !== null && card.ovr.value !== null
       ? {
-          name: session.display_name,
+          name: displayName ?? session.display_name,
           charClass: card.char_class,
           charFunction: card.char_function,
           ovr: Math.round(card.ovr.value),

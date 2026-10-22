@@ -64,10 +64,13 @@ const DOWNLOAD_ERROR = 'Não foi possível gerar o card. Tente novamente.'
 export function DashboardPage({
   session,
   onNavigate,
+  identityName,
 }: {
   session: NeoFootSession
   onNavigate: (tab: Tab) => void
+  identityName?: string | null
 }) {
+  const ownName = identityName ?? session.display_name
   // null report = still loading; error holds the mapped pt-BR copy.
   // null myCard = still loading OR the my_card fetch failed (degrade — the
   // grouped view renders regardless; only the strip hides itself).
@@ -151,7 +154,7 @@ export function DashboardPage({
   const exportData: CardExportData | null = useMemo(() => {
     if (myCard === null || myCard.char_class === null || myCard.ovr.value === null) return null
     return {
-      name: session.display_name,
+      name: ownName,
       charClass: myCard.char_class,
       charFunction: myCard.char_function,
       ovr: Math.round(myCard.ovr.value),
@@ -163,7 +166,7 @@ export function DashboardPage({
       photoSrc: photoUrl ?? crestSrcFor(myCard.char_class),
       monogramLetter: myCard.char_class.charAt(0).toUpperCase(),
     }
-  }, [myCard, photoUrl, session.display_name])
+  }, [myCard, photoUrl, ownName])
 
   // Same generating/failure affordances as the showcase download
   // (PromotionCard): disabled + 'Gerando…', inline enumeration-safe
@@ -178,7 +181,7 @@ export function DashboardPage({
     try {
       // Current export contract (07.2-05 round 7+): transparent PNG,
       // hellz-<nome>.png — via the shared cardFilename slugifier.
-      await downloadCard(exportData, cardFilename(session.display_name))
+      await downloadCard(exportData, cardFilename(ownName))
     } catch {
       setDownloadFailed(true)
     } finally {
@@ -240,6 +243,8 @@ export function DashboardPage({
                   (CardPhotoUpload owns the hover overlay and its data calls). */}
               <CardPhotoUpload
                 session={session}
+                // Same coalesced name as the export path above (08-08).
+                displayName={ownName}
                 className="mx-auto w-40 shrink-0 sm:w-48 lg:mx-0 lg:w-64 xl:w-72"
                 onDownload={
                   exportData === null
@@ -257,7 +262,7 @@ export function DashboardPage({
               <div className="flex min-w-0 flex-1 flex-col gap-4 lg:justify-center lg:py-1">
                 <OvrHero
                   ovr={report.ovr}
-                  displayName={session.display_name}
+                  displayName={ownName}
                   charClass={report.char_class}
                   charFunction={report.char_function}
                   layout="strip"
