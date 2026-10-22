@@ -119,46 +119,9 @@ export async function mintSession(member: {
   }
 }
 
-// D-14/D-15: short-lived step-up JWT (10 minutes, distinct issuer) issued after
-// successful re-PIN via request_step_up. Distinguishable from session JWTs by
-// the `step_up:true` claim and `nefoot-step-up` issuer.
-export const STEP_UP_SECONDS = 10 * 60
-
-export async function stepUpSession(member: {
-  id: string
-  display_name: string
-  role: string
-}, deviceFp?: string): Promise<Session> {
-  const cfg = envConfig()
-  if (!cfg) throw new Error('server_misconfigured')
-  const nowSec = Math.floor(Date.now() / 1000)
-  const secret = new TextEncoder().encode(cfg.jwtSecret)
-  const kid = cfg.jwtKid
-  const claims: Record<string, unknown> = {
-    role: 'authenticated',
-    member_id: member.id,
-    member_role: member.role,
-    step_up: true,
-  }
-  if (deviceFp) {
-    claims[DEVICE_FP_CLAIM] = deviceFp
-  }
-  const token = await new SignJWT(claims)
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT', kid })
-    .setSubject(member.id)
-    .setIssuedAt(nowSec)
-    .setIssuer('nefoot-step-up')
-    .setExpirationTime(nowSec + STEP_UP_SECONDS)
-    .sign(secret)
-
-  return {
-    access_token: token,
-    member_id: member.id,
-    display_name: member.display_name,
-    member_role: member.role,
-    expires_at: nowSec + STEP_UP_SECONDS,
-  }
-}
+// D-14/D-15 step-up lives in the step_up_tokens table + the `step-up` Edge
+// Function (migration 0017). The earlier short-lived-JWT design was never
+// wired to a caller and is removed so the two designs cannot be confused.
 
 export const MAX_PROOF_BYTES = 2_097_152 // CONTEXT: JPEG only, 2 MB
 
