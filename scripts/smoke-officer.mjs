@@ -291,8 +291,8 @@ async function main() {
       token: sessions[HANDLES.a].access_token,
     })
     const statKeys = Array.isArray(catalog.json) ? catalog.json.map((r) => r.stat_key) : []
-    if (statKeys.length !== 57) {
-      throw new Error(`live stat_catalog returned ${statKeys.length} rows, expected 57`)
+    if (statKeys.length !== 59) {
+      throw new Error(`live stat_catalog returned ${statKeys.length} rows, expected 59`)
     }
 
     // Pending submissions for member_a/b/c — full 57 values each, staggered
@@ -360,13 +360,13 @@ async function main() {
       `a=${!!rowA} b=${!!rowB} c=${!!rowC}`,
     )
     check(
-      "3c. member_a row: display_name/char_class/char_function + stats length 57",
+      "3c. member_a row: display_name/char_class/char_function + stats length 59",
       !!rowA &&
         rowA.display_name === DISPLAY[HANDLES.a] &&
         rowA.char_class === CLASS &&
         rowA.char_function === 'dps' &&
         Array.isArray(rowA.stats) &&
-        rowA.stats.length === 57,
+        rowA.stats.length === 59,
       rowA ? `stats=${rowA.stats ? rowA.stats.length : 'n/a'}` : 'row missing',
     )
     check(
@@ -376,8 +376,8 @@ async function main() {
     )
     const ourRows = [rowA, rowB, rowC].filter(Boolean)
     check(
-      '3e. every fixture row carries the full 57-stat payload',
-      ourRows.length === 3 && ourRows.every((r) => Array.isArray(r.stats) && r.stats.length === 57),
+      '3e. every fixture row carries the full 59-stat payload',
+      ourRows.length === 3 && ourRows.every((r) => Array.isArray(r.stats) && r.stats.length === 59),
       `rows=${ourRows.length}`,
     )
 
@@ -424,8 +424,8 @@ async function main() {
     })
     const statsA = reportA.json && Array.isArray(reportA.json.stats) ? reportA.json.stats : []
     check(
-      '6b. member_a my_report: all 57 stats data_sufficient with non-null points (n=3 cohort)',
-      reportA.ok && statsA.length === 57 && statsA.every((s) => s.data_sufficient === true && s.points !== null),
+      '6b. member_a my_report: all 59 stats data_sufficient with non-null points (n=3 cohort)',
+      reportA.ok && statsA.length === 59 && statsA.every((s) => s.data_sufficient === true && s.points !== null),
       `stats=${statsA.length}`,
     )
 
@@ -460,7 +460,7 @@ async function main() {
     const statsB = reportB.json && Array.isArray(reportB.json.stats) ? reportB.json.stats : []
     check(
       '8b. member_b my_report after reject: own values gone (own_value null) — rejected row left latest',
-      reportB.ok && statsB.length === 57 && statsB.every((s) => s.own_value === null),
+      reportB.ok && statsB.length === 59 && statsB.every((s) => s.own_value === null),
       `stats=${statsB.length}`,
     )
     const reportA2 = await rest('/rpc/my_report', {
@@ -471,7 +471,7 @@ async function main() {
     const statsA2 = reportA2.json && Array.isArray(reportA2.json.stats) ? reportA2.json.stats : []
     check(
       '8c. member_a my_report after reject: cohort n dropped to 2 -> every points null (D-05)',
-      reportA2.ok && statsA2.length === 57 && statsA2.every((s) => s.points === null),
+      reportA2.ok && statsA2.length === 59 && statsA2.every((s) => s.points === null),
       `stats=${statsA2.length}`,
     )
     const ownRowsB = await rest('/submissions?select=id,status&order=submitted_at.desc', {

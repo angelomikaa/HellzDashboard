@@ -55,9 +55,9 @@ describe('D-05-UAT-10 — the 6 flat damage stats are FLAT in the catalog (owner
     })
   }
 
-  it('the seed still ships exactly 57 catalog rows (REG-03 count, unchanged by the reclassification)', () => {
+  it('the seed ships 59 catalog rows (57 + RPDEF/RMDEF, Phase 9.1)', () => {
     const rows = SEED.match(/^\s*\('[^']+',/gm) ?? []
-    expect(rows).toHaveLength(57)
+    expect(rows).toHaveLength(59)
   })
 
   it('every row still carries a valid value_type', () => {

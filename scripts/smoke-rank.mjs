@@ -348,7 +348,7 @@ async function main() {
     })
     check('my_report(b) -> 2xx json', reportB.ok && reportB.json !== null, `HTTP ${reportB.status}`)
     const statsB = reportB.json && Array.isArray(reportB.json.stats) ? reportB.json.stats : []
-    check('my_report(b): stats array has 57 entries (full catalog)', statsB.length === 57, `len=${statsB.length}`)
+    check('my_report(b): stats array has 59 entries (full catalog)', statsB.length === 59, `len=${statsB.length}`)
 
     const groupRank = { general: 0, quasi: 1, special: 2 }
     let groupOrdered = statsB.length > 0

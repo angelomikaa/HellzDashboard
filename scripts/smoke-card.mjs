@@ -301,8 +301,8 @@ async function main() {
     // Full 57-stat catalog for submission payloads.
     const catalog = await rest('/stat_catalog?select=stat_key&order=stat_key.asc', { token: memberToken })
     const statKeys = Array.isArray(catalog.json) ? catalog.json.map((r) => r.stat_key) : []
-    if (statKeys.length !== 57) {
-      throw new Error(`live stat_catalog returned ${statKeys.length} rows, expected 57`)
+    if (statKeys.length !== 59) {
+      throw new Error(`live stat_catalog returned ${statKeys.length} rows, expected 59`)
     }
 
     // Validated submissions for a/b/c — full 57 values each (staggered).
@@ -326,9 +326,9 @@ async function main() {
         `count(distinct label_short) as distinct_short from stat_catalog;`,
     )
     const lc = Array.isArray(labelCensus) ? labelCensus[0] : null
-    check('0a. live catalog has 57 rows', !!lc && Number(lc.total) === 57, `total=${lc?.total}`)
-    check('0b. label_short populated for ALL 57 rows (no empty strings)', !!lc && Number(lc.empty) === 0, `empty=${lc?.empty}`)
-    check('0c. label_short values unique across all 57 (D-11 no collisions)', !!lc && Number(lc.distinct_short) === 57, `distinct=${lc?.distinct_short}`)
+    check('0a. live catalog has 59 rows', !!lc && Number(lc.total) === 59, `total=${lc?.total}`)
+    check('0b. label_short populated for ALL 59 rows (no empty strings)', !!lc && Number(lc.empty) === 0, `empty=${lc?.empty}`)
+    check('0c. label_short values unique across all 59 (D-11 no collisions)', !!lc && Number(lc.distinct_short) === 59, `distinct=${lc?.distinct_short}`)
 
     // ---- Probe 1 (CARD-01): my_card boundary ------------------------------
     const anonCard = await callRpc('my_card', null, {})
@@ -569,11 +569,11 @@ async function main() {
     const statsShapeOk = rankRows.every(
       (r) =>
         Array.isArray(r.stats) &&
-        r.stats.length === 57 &&
+        r.stats.length === 59 &&
         r.stats.every((s) => 'label_short' in s && 'class_average' in s && 'points' in s && 'value' in s),
     )
     check(
-      '6f. every row stats length 57 incl label_short + class_average (D-20 value+points+avg)',
+      '6f. every row stats length 59 incl label_short + class_average (D-20 value+points+avg)',
       statsShapeOk,
       rankRows[0] ? `stats0=${rankRows[0].stats.length}` : 'no rows',
     )

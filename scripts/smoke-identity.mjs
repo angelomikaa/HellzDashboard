@@ -524,7 +524,7 @@ async function main() {
 
     const catalogRes = await rest('/stat_catalog?select=stat_key&order=stat_key.asc', { token: memberToken })
     const statKeys = Array.isArray(catalogRes.json) ? catalogRes.json.map((r) => r.stat_key) : []
-    if (statKeys.length !== 57) throw new Error(`live stat_catalog returned ${statKeys.length} rows, expected 57`)
+    if (statKeys.length !== 59) throw new Error(`live stat_catalog returned ${statKeys.length} rows, expected 59`)
 
     // Validated cohort submissions (real RPC + officer validation).
     let base = 100
@@ -816,7 +816,7 @@ async function main() {
         boardRow.nickname === 'Prospect Nick' &&
         boardRow.proof_path === prospectProof &&
         Array.isArray(boardRow.stats) &&
-        boardRow.stats.length === 57,
+        boardRow.stats.length === 59,
       `stats=${boardRow?.stats?.length}`,
     )
 
@@ -851,8 +851,8 @@ async function main() {
         group by s.id;`,
     )
     check(
-      '6e. approved prospect stats became a VALIDATED 57-stat submission',
-      !!prospectSub && Number(prospectSub.n) === 57,
+      '6e. approved prospect stats became a VALIDATED 59-stat submission',
+      !!prospectSub && Number(prospectSub.n) === 59,
       `stats=${prospectSub?.n}`,
     )
     const prospectHist = await one(
@@ -1091,7 +1091,7 @@ async function main() {
     )
     check(
       '10e. superseded row retained with proof_path cleared and stats retained',
-      oldRow?.status === 'superseded' && oldRow?.proof_path === null && Number(oldRow?.stats) === 57,
+      oldRow?.status === 'superseded' && oldRow?.proof_path === null && Number(oldRow?.stats) === 59,
       `status=${oldRow?.status} stats=${oldRow?.stats}`,
     )
     check(
@@ -1358,8 +1358,8 @@ async function main() {
       { token: null },
     )
     check(
-      '15a. anon can read the five catalog label columns (>=56 rows)',
-      anonCatalog.ok && Array.isArray(anonCatalog.json) && anonCatalog.json.length >= 56,
+      '15a. anon can read the five catalog label columns (>=58 rows)',
+      anonCatalog.ok && Array.isArray(anonCatalog.json) && anonCatalog.json.length >= 58,
       `HTTP ${anonCatalog.status} rows=${Array.isArray(anonCatalog.json) ? anonCatalog.json.length : 'n/a'}`,
     )
     const anonKeyStats = await rest('/class_key_stats?select=class_name,stat_key&limit=5', {
@@ -1718,7 +1718,7 @@ async function main() {
     )
 
     // ---- 16ab-ac. request-access prospect (full application) --------------
-    const prospectStats = statArray(statKeys.slice(0, 56), 700)
+    const prospectStats = statArray(statKeys.slice(0, 58), 700)
     const prospectBody = {
       discord_handle: E.prospect,
       pin: EDGE_PIN,
@@ -1745,11 +1745,11 @@ async function main() {
       `select count(*) as n from members where discord_handle = ${sqlStr(E.prospect)};`,
     )
     check(
-      '16ab. request-access-prospect: 200 pending, 56 stats stored, ZERO member rows',
+      '16ab. request-access-prospect: 200 pending, 58 stats stored, ZERO member rows',
       edgeProspectReq.status === 200 &&
         edgeProspectRow?.status === 'pending' &&
         edgeProspectRow?.request_type === 'prospect' &&
-        Number(edgeProspectStats?.n) === 56 &&
+        Number(edgeProspectStats?.n) === 58 &&
         Number(edgeProspectMemberBefore?.n) === 0,
       `HTTP ${edgeProspectReq.status} stats=${edgeProspectStats?.n} members=${edgeProspectMemberBefore?.n}`,
     )

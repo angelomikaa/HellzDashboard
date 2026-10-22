@@ -241,6 +241,15 @@ const CANONICAL = [
   { capture: 'special', file: 'sampideal3.png' },
 ]
 
+// Tooltip captures prove the new tooltip grammar/reader against the two
+// owner-seeded screenshot samples. Kept separate from CANONICAL so the
+// rescale (G) and loose-margin (H) experiments stay pinned to the 4
+// canonical screenshots until tooltip margin invariance is calibrated.
+const TOOLTIP_CANONICAL = [
+  { capture: 'pdef_tooltip', file: 'samplepdef.png' },
+  { capture: 'mdef_tooltip', file: 'samplemdef.png' },
+]
+
 // Localized (pt-BR) Details captures — the LIVE client is pt-BR, so these are
 // the screens members actually photograph (owner-seeded 08.10). Kept separate
 // from CANONICAL so the English counts and the rescale (G) / loose-margin (H)
@@ -406,7 +415,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
   )
 
   it(
-    'B) [= spike F: native] readScreenshot reproduces the spike bar through the STRUCTURAL reader: exact values on the 56 shipped fields',
+    'B) [= spike F: native] readScreenshot reproduces the spike bar through the STRUCTURAL reader: exact values on the 56 shipped fields + 2 tooltip fields',
     { timeout: 30 * 60_000 },
     async () => {
       const expected = JSON.parse(readFileSync(EXPECTED_PATH, 'utf8'))
@@ -414,7 +423,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       let filled = 0
       let correct = 0
       const misses = []
-      for (const { capture, file } of CANONICAL) {
+      for (const { capture, file } of [...CANONICAL, ...TOOLTIP_CANONICAL]) {
         const canvas = await loadSampleCanvas(file)
         const outcomes = await readScreenshot(capture, canvas)
         const exp = expectedFor(expected, file)
@@ -431,7 +440,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       }
       console.log(`[harness B] fields=${total} filled=${filled} correct=${correct}`)
       if (misses.length > 0) console.log(`[harness B] misses:\n${misses.join('\n')}`)
-      expect(total).toBe(56)
+      expect(total).toBe(58)
       expect(correct).toBe(total)
     },
   )

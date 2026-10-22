@@ -272,8 +272,8 @@ async function main() {
       token: sessions[HANDLES.a].access_token,
     })
     const statKeys = Array.isArray(catalog.json) ? catalog.json.map((r) => r.stat_key) : []
-    if (statKeys.length !== 57) {
-      throw new Error(`live stat_catalog returned ${statKeys.length} rows, expected 57`)
+    if (statKeys.length !== 59) {
+      throw new Error(`live stat_catalog returned ${statKeys.length} rows, expected 59`)
     }
     const boosters = statKeys.filter((k) => !KEY_STATS.includes(k)).slice(0, 20)
 

@@ -24,7 +24,7 @@ const SEED = readFileSync(
   'utf8',
 )
 
-// The 57 live catalog stat_keys (0013:46-102's set — the mapping must cover
+// The 59 live catalog stat_keys (0013:46-102's set — the mapping must cover
 // every one of them).
 const STAT_KEYS = [
   'hp', 'sp', 'patk', 'pdef', 'matk', 'mdef',
@@ -41,6 +41,7 @@ const STAT_KEYS = [
   'dmg_vs_small', 'dmg_vs_medium', 'dmg_vs_large', 'dmg_vs_brute', 'dmg_vs_demi_human',
   'dmg_reduction_vs_small', 'dmg_reduction_vs_medium', 'dmg_reduction_vs_large',
   'dmg_reduction_vs_brute', 'dmg_reduction_vs_demi_human',
+  'rpdef', 'rmdef',
 ]
 
 // The owner-approved spot-check anchors (verbatim expectations from the
@@ -53,6 +54,8 @@ const APPROVED_ANCHORS: Record<string, string> = {
   hp: 'HP',
   hit: 'HIT', // the flagged 3-char exception
   combat_power: 'POWER',
+  rpdef: 'RPDEF',
+  rmdef: 'RMDEF',
 }
 
 function parseMapping(): Map<string, string> {

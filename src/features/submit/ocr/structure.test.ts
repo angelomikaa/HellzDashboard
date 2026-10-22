@@ -211,6 +211,34 @@ describe('screen grammar (the 56 shipped fields)', () => {
   })
 })
 
+describe('tooltip grammar (Phase 9.1 raw-defense captures)', () => {
+  it('pdef_tooltip reads Equipment PDEF into equip_pdef_raw', () => {
+    expect(SCREENS.pdef_tooltip.kind).toBe('tooltip')
+    expect(SCREENS.pdef_tooltip.label).toBe('Equipment PDEF')
+    expect(SCREENS.pdef_tooltip.fieldKey).toBe('equip_pdef_raw')
+    expect(fieldKeysFor('pdef_tooltip')).toEqual(['equip_pdef_raw'])
+  })
+
+  it('mdef_tooltip reads Equipment MDEF into equip_mdef_raw', () => {
+    expect(SCREENS.mdef_tooltip.kind).toBe('tooltip')
+    expect(SCREENS.mdef_tooltip.label).toBe('Equipment MDEF')
+    expect(SCREENS.mdef_tooltip.fieldKey).toBe('equip_mdef_raw')
+    expect(fieldKeysFor('mdef_tooltip')).toEqual(['equip_mdef_raw'])
+  })
+
+  it('the 56 screen fields are unchanged by the tooltip captures', () => {
+    const all = [
+      ...fieldKeysFor('basic'),
+      ...fieldKeysFor('general'),
+      ...fieldKeysFor('quasi'),
+      ...fieldKeysFor('special'),
+    ]
+    expect(all).toHaveLength(56)
+    expect(new Set(all).size).toBe(56)
+    expect(fieldKeysFor('special')).toHaveLength(15)
+  })
+})
+
 describe('label matching (fuzzy, spike semantics)', () => {
   it('normalizes to lowercase a-z only', () => {
     expect(normalizeLabel('Refine PATK')).toBe('refinepatk')

@@ -27,8 +27,8 @@ describe('sanity constants (D-20 + 05-01 gate calibration)', () => {
     expect(PERCENTUAL_DEFAULT).toEqual({ min: -1_000, max: 5_000 })
   })
 
-  it('ships exactly 12 per-stat sanity overrides', () => {
-    expect(Object.keys(SANITY_OVERRIDES)).toHaveLength(12)
+  it('ships exactly 14 per-stat sanity overrides (12 + equip_pdef_raw/equip_mdef_raw)', () => {
+    expect(Object.keys(SANITY_OVERRIDES)).toHaveLength(14)
   })
 })
 

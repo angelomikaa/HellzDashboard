@@ -291,7 +291,7 @@ async function main() {
   // 12. live catalog has exactly 57 stats.
   const catalog = await rest('/stat_catalog?select=stat_key', { token: member.access_token })
   const catalogCount = Array.isArray(catalog.json) ? catalog.json.length : -1
-  check('live stat_catalog has 57 rows', catalog.status === 200 && catalogCount === 57, `count ${catalogCount}`)
+  check('live stat_catalog has 59 rows', catalog.status === 200 && catalogCount === 59, `count ${catalogCount}`)
 
   // 13. Deactivated staff lose staff access immediately (0007 / CR-01):
   //     deactivate the smoke officer via the Management API, assert staff

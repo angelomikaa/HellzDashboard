@@ -73,6 +73,8 @@ update stat_catalog set label_short = 'RD.M'    where stat_key = 'dmg_reduction_
 update stat_catalog set label_short = 'RD.L'    where stat_key = 'dmg_reduction_vs_large';
 update stat_catalog set label_short = 'RD.BR'   where stat_key = 'dmg_reduction_vs_brute';
 update stat_catalog set label_short = 'RD.D'    where stat_key = 'dmg_reduction_vs_demi_human';
+update stat_catalog set label_short = 'RPDEF'   where stat_key = 'rpdef';
+update stat_catalog set label_short = 'RMDEF'   where stat_key = 'rmdef';
 
 -- Post-apply invariants (run after the UPDATEs in the same query batch):
 -- every label 1..7 chars, all distinct (0013's UNIQUE constraint re-check).

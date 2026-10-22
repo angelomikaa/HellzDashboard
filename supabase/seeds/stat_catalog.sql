@@ -1,4 +1,4 @@
--- 57-stat catalog seed (REG-03): re-runnable upsert.
+-- 59-stat catalog seed (REG-03): re-runnable upsert.
 -- Keys are the owner-eye-validated OCR region keys (Phase 1 spike, D-09/D-10).
 -- value_type: 'percentual' iff the key ends in _pct OR it is a % damage
 -- modifier (dmg_vs_*, dmg_reduction_vs_*); everything else is 'flat'.
@@ -64,6 +64,8 @@ insert into stat_catalog (stat_key, label, group_name, value_type) values
   ('dmg_reduction_vs_medium','Redução vs Médio','special','percentual'),
   ('dmg_reduction_vs_large','Redução vs Grande','special','percentual'),
   ('dmg_reduction_vs_brute','Redução vs Bruto','special','percentual'),
-  ('dmg_reduction_vs_demi_human','Redução vs Humanoide','special','percentual')
+  ('dmg_reduction_vs_demi_human','Redução vs Humanoide','special','percentual'),
+  ('rpdef','RPDEF','special','flat'),
+  ('rmdef','RMDEF','special','flat')
 on conflict (stat_key) do update
   set label = excluded.label, group_name = excluded.group_name, value_type = excluded.value_type;
