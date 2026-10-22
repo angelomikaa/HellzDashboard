@@ -14,6 +14,29 @@ export const PROOF_ERROR = 'Envie o print do personagem.'
 export const PROFILE_ERROR = 'Não conseguimos ler o ID, o nick e a classe. Envie outro print.'
 export const NETWORK_ERROR = 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 
+/** pt-BR natural list: ['o ID', 'a classe'] -> "o ID e a classe". */
+function joinPt(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? ''
+  return `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`
+}
+
+/**
+ * Retry copy for an incomplete OCR profile that names exactly what is missing
+ * (08.10): the generic PROFILE_ERROR claimed the ID, nick AND class all failed
+ * even when only the class was unreadable — which is what a pt-BR client
+ * produced before the localized labels were supported. Kept pure so the page
+ * stays a thin renderer.
+ */
+export function profileProblemMessage(profile: BasicProfileFields | null): string {
+  if (profile === null) return PROFILE_ERROR
+  const missing: string[] = []
+  if (!profile.char_id) missing.push('o ID')
+  if (!profile.nickname) missing.push('o nick')
+  if (!profile.char_class) missing.push('a classe')
+  if (missing.length === 0 || missing.length === 3) return PROFILE_ERROR
+  return `Não conseguimos ler ${joinPt(missing)} no print. Envie outro print.`
+}
+
 export interface FirstAccessDraft {
   handle: string
   pin: string

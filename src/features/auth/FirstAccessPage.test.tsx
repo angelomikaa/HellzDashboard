@@ -7,6 +7,7 @@ import {
   firstAccessProblem,
   firstAccessProblemMessage,
   profileComplete,
+  profileProblemMessage,
   profileSummary,
   setupErrorCopy,
   submitFirstAccess,
@@ -206,5 +207,32 @@ describe('submitFirstAccess — mocked setupPin', () => {
     expect(outcome.ok).toBe(false)
     expect(outcome.ok === false && outcome.message).toContain('conexão')
     expect(outcome.ok === false && outcome.message).not.toContain('ECONNREFUSED')
+  })
+})
+
+// 08.10 hotfix: the old copy claimed the ID, nick AND class failed when only the
+// class was unreadable (the pt-BR client case), sending players to re-shoot a
+// perfectly good print.
+describe('profileProblemMessage — field-specific retry copy', () => {
+  it('names exactly the missing field(s)', () => {
+    expect(profileProblemMessage({ ...READ_PROFILE, char_class: null })).toBe(
+      'Não conseguimos ler a classe no print. Envie outro print.',
+    )
+    expect(profileProblemMessage({ ...READ_PROFILE, nickname: null })).toBe(
+      'Não conseguimos ler o nick no print. Envie outro print.',
+    )
+    expect(profileProblemMessage({ ...READ_PROFILE, char_id: null })).toBe(
+      'Não conseguimos ler o ID no print. Envie outro print.',
+    )
+    expect(profileProblemMessage({ ...READ_PROFILE, nickname: null, char_class: null })).toBe(
+      'Não conseguimos ler o nick e a classe no print. Envie outro print.',
+    )
+  })
+
+  it('falls back to the canonical copy when nothing was read', () => {
+    expect(profileProblemMessage(null)).toBe(PROFILE_ERROR)
+    expect(profileProblemMessage({ nickname: null, char_id: null, char_class: null })).toBe(
+      PROFILE_ERROR,
+    )
   })
 })

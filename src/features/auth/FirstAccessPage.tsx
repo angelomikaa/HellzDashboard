@@ -14,7 +14,7 @@ import { setupPin } from '../../lib/api'
 import type { BasicProfileFields } from '../submit/identity'
 import { ProofField } from '../identity/ProofField'
 import { PinBoxes } from './PinBoxes'
-import { PROFILE_ERROR, profileComplete, profileSummary, submitFirstAccess } from './firstAccess'
+import { profileComplete, profileProblemMessage, profileSummary, submitFirstAccess } from './firstAccess'
 import { saveSession, type NeoFootSession } from './session'
 
 export interface FirstAccessPageProps {
@@ -163,7 +163,7 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
             )}
             {!reading && incomplete && (
               <p role="alert" className="mt-1 text-sm font-semibold text-destructive">
-                {PROFILE_ERROR}
+                {profileProblemMessage(profile)}
               </p>
             )}
             {!reading && summary === null && ocrError === null && !incomplete && (
