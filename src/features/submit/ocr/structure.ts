@@ -237,7 +237,18 @@ export interface RowGrammar {
   right: string[]
 }
 
-export type ScreenGrammar = { kind: 'pills' } | ({ kind: 'rows' } & RowGrammar)
+/** Tooltip capture: one line carries both label and value (e.g.
+ * "Equipment PDEF:4913"), read by the tooltip reader in recognize.ts. */
+export interface TooltipGrammar {
+  kind: 'tooltip'
+  label: string   // label to confirm on the line, e.g. 'Equipment PDEF'
+  fieldKey: string // transient field key, e.g. 'equip_pdef_raw'
+}
+
+export type ScreenGrammar =
+  | { kind: 'pills' }
+  | ({ kind: 'rows' } & RowGrammar)
+  | TooltipGrammar
 
 // `satisfies` keeps the literal per-key types (SCREENS.general.left narrows
 // without a cast) while still validating the Record shape.
@@ -272,6 +283,8 @@ export const SCREENS = {
     ],
     right: [],
   },
+  pdef_tooltip: { kind: 'tooltip', label: 'Equipment PDEF', fieldKey: 'equip_pdef_raw' },
+  mdef_tooltip: { kind: 'tooltip', label: 'Equipment MDEF', fieldKey: 'equip_mdef_raw' },
 } satisfies Record<CaptureKey, ScreenGrammar>
 
 /** The shipped fields of one capture (the read replaces exactly its own
@@ -280,6 +293,7 @@ export function fieldKeysFor(capture: CaptureKey): string[] {
   const grammar = SCREENS[capture]
   if (!grammar) return []
   if (grammar.kind === 'pills') return ['combat_power']
+  if (grammar.kind === 'tooltip') return [grammar.fieldKey]
   return [...grammar.left, ...grammar.right]
 }
 

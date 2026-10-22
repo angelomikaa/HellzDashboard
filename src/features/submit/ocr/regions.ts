@@ -13,7 +13,13 @@
 //
 // The game UI layout version these aspects were calibrated against (D-21 —
 // single active version).
-export type CaptureKey = 'basic' | 'general' | 'quasi' | 'special'
+export type CaptureKey =
+  | 'basic'
+  | 'general'
+  | 'quasi'
+  | 'special'
+  | 'pdef_tooltip'
+  | 'mdef_tooltip'
 
 export const GAME_UI_VERSION = 'ro-origin-ui-2026-10'
 
@@ -33,5 +39,11 @@ export const CAPTURES: Record<CaptureKey, CaptureMap> = {
   },
   special: {
     aspect: 0.8299, // 649/782 (sampideal3)
+  },
+  pdef_tooltip: {
+    aspect: 1.3384, // 613/458 (samplepdef)
+  },
+  mdef_tooltip: {
+    aspect: 1.3599, // 665/489 (samplemdef)
   },
 }

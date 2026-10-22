@@ -49,6 +49,10 @@ export const SANITY_OVERRIDES: Record<string, SanityRange> = {
   variable_ct_pct: { min: -100, max: 0 },
   fixed_ct_pct: { min: -100, max: 0 },
   global_cd_pct: { min: -100, max: 0 },
+  // Equipment raw values read from tooltip screenshots: flat, non-negative,
+  // generous ceiling for large defense values.
+  equip_pdef_raw: { min: 0, max: 100_000_000 },
+  equip_mdef_raw: { min: 0, max: 100_000_000 },
 }
 
 /**

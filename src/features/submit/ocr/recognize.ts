@@ -47,22 +47,29 @@ import {
 } from './preprocess'
 import { computePanelRect } from './locate'
 import {
+  DARK_LUMA_MAX,
   DIGITS_WHITELIST,
   LABELS_WHITELIST,
   PILL_DIGITS_WHITELIST,
   PILL_THRESHOLD,
   SCREENS,
+  TooltipGrammar,
   assignByOrder,
   detectPillRects,
   detectRowCells,
   fieldKeysFor,
+  findTextBands,
   matchLabel,
+  normalizeLabel,
   resolveConflicts,
+  rowProfile,
+  scoreLabelPair,
   upscaleForHeight,
   type Rect,
   type RowGrammar,
 } from './structure'
 import { sanityAccepts } from './sanity'
+import { parseTooltipValue } from './tooltip'
 import { parseBasicProfileText, type BasicProfileFields } from '../identity'
 
 /** One full Basic-screen profile read (08-03 D-03): OCR text + parsed identity. */
@@ -328,6 +335,12 @@ export async function readScreenshot(
   if (grammar.kind === 'pills') {
     const pillValues = await readBasicScreen(worker, canvas, data)
     for (const [k, v] of pillValues) values.set(k, v)
+  } else if (grammar.kind === 'tooltip') {
+    // Tooltip screen: one line carries label + value (e.g. "Equipment PDEF:4913").
+    // Panel-localize like rows screens, then confirm the label band and
+    // digit-read the value from that same band.
+    const raw = await readTooltipScreen(worker, canvas, data, grammar)
+    if (raw !== null) values.set(grammar.fieldKey, raw)
   } else {
     // Rows screens profile dark pixels: a gray/dark surrounding margin IS
     // dark and collapses detection — locate and crop to the panel first
@@ -358,6 +371,60 @@ export async function readScreenshot(
     }
   }
   return outcomes
+}
+
+/**
+ * Read one tooltip capture: locate the band whose label matches grammar.label
+ * (e.g. "Equipment PDEF"), then digit-read the value from that same band.
+ * Returns the raw value string or null when the label line isn't found.
+ */
+async function readTooltipScreen(
+  worker: Worker,
+  source: HTMLCanvasElement,
+  data: ImageDataLike,
+  grammar: TooltipGrammar,
+): Promise<string | null> {
+  // Panel-localize (tooltip is a light panel on a dark background); fall back
+  // to the full image when no panel is detected.
+  const panelRect = computePanelRect(data)
+  let sourceCanvas = source
+  let work: ImageDataLike = data
+  if (panelRect) {
+    sourceCanvas = toCanvas(cropCanvas(source, panelRect))
+    const raw = ctx2d(sourceCanvas, true).getImageData(0, 0, sourceCanvas.width, sourceCanvas.height)
+    work = { data: raw.data, width: raw.width, height: raw.height }
+  }
+
+  const gray = toGrayscale(work)
+  const counts = rowProfile(gray, DARK_LUMA_MAX)
+  const bands = findTextBands(counts, 3)
+
+  for (const band of bands) {
+    const bandRect: Rect = {
+      left: 0,
+      top: band.top,
+      width: work.width,
+      height: band.bottom - band.top,
+    }
+
+    // Label pass: letters only, confirm the Equipment PDEF/MDEF line.
+    const labelText = await ocrRect(worker, sourceCanvas, bandRect, {
+      whitelist: LABELS_WHITELIST,
+    })
+    const observed = normalizeLabel(labelText)
+    // Require 'equipment' so we never match 'Base PDEF' / 'PDEF gained...'
+    if (!observed.includes('equipment')) continue
+    if (scoreLabelPair(labelText, grammar.label) <= 0) continue
+
+    // Value pass: digits only, same band.
+    const valueText = await ocrRect(worker, sourceCanvas, bandRect, {
+      whitelist: DIGITS_WHITELIST,
+    })
+    const value = parseTooltipValue(valueText)
+    if (value !== null) return value
+  }
+
+  return null
 }
 
 /** Parse-only seam for unit tests (the worker path is browser-only). */
