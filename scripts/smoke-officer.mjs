@@ -183,6 +183,25 @@ async function rest(path, { method = 'GET', token = null, body = null, extraHead
   return { status: res.status, ok: res.ok, json, text }
 }
 
+/** Step-up re-PIN (0017): exchange the member session + PIN for a single-use
+ *  token that set_member_role requires in the X-Step-Up header. */
+async function stepUp(session, pin = PIN) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/step-up`, {
+    method: 'POST',
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ pin }),
+  })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`step-up failed: HTTP ${res.status} ${text}`)
+  const json = JSON.parse(text)
+  if (!json?.token) throw new Error('step-up returned no token')
+  return json.token
+}
+
 /** Service-level Management API Run Query (legacy /v1 endpoint, 01-01 proven). */
 async function mgmtQuery(sql) {
   const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`, {
@@ -490,15 +509,39 @@ async function main() {
       !officerGrant.ok && officerGrant.text.includes('forbidden'),
       `HTTP ${officerGrant.status}`,
     )
-    const ownerGrant = await rest('/rpc/set_member_role', {
+    const ownerNoToken = await rest('/rpc/set_member_role', {
       method: 'POST',
       token: sessions[HANDLES.owner].access_token,
       body: { p_member: memberIds[HANDLES.a], p_role: 'officer' },
     })
     check(
-      "10b. owner grants 'officer' on member_a -> 2xx",
+      '10h. owner set_member_role WITHOUT X-Step-Up -> non-2xx step_up_required (D-14/D-15)',
+      !ownerNoToken.ok && ownerNoToken.text.includes('step_up_required'),
+      `HTTP ${ownerNoToken.status}`,
+    )
+    const ownerStepUp1 = await stepUp(sessions[HANDLES.owner])
+    const ownerGrant = await rest('/rpc/set_member_role', {
+      method: 'POST',
+      token: sessions[HANDLES.owner].access_token,
+      extraHeaders: { 'X-Step-Up': ownerStepUp1 },
+      body: { p_member: memberIds[HANDLES.a], p_role: 'officer' },
+    })
+    check(
+      "10b. owner grants 'officer' on member_a with a step-up token -> 2xx",
       ownerGrant.ok,
       `HTTP ${ownerGrant.status}`,
+    )
+    // Single-use: replaying the same token must be refused.
+    const ownerReplay = await rest('/rpc/set_member_role', {
+      method: 'POST',
+      token: sessions[HANDLES.owner].access_token,
+      extraHeaders: { 'X-Step-Up': ownerStepUp1 },
+      body: { p_member: memberIds[HANDLES.b], p_role: 'officer' },
+    })
+    check(
+      '10i. replayed step-up token -> non-2xx step_up_required (single-use)',
+      !ownerReplay.ok && ownerReplay.text.includes('step_up_required'),
+      `HTTP ${ownerReplay.status}`,
     )
     const reloginA1 = await login(HANDLES.a)
     check(
@@ -506,13 +549,15 @@ async function main() {
       reloginA1.member_role === 'officer' && jwtClaim(reloginA1.access_token, 'member_role') === 'officer',
       `session=${reloginA1.member_role}, jwt=${jwtClaim(reloginA1.access_token, 'member_role')}`,
     )
+    const ownerStepUp2 = await stepUp(sessions[HANDLES.owner])
     const ownerRevoke = await rest('/rpc/set_member_role', {
       method: 'POST',
       token: sessions[HANDLES.owner].access_token,
+      extraHeaders: { 'X-Step-Up': ownerStepUp2 },
       body: { p_member: memberIds[HANDLES.a], p_role: 'member' },
     })
     check(
-      "10d. owner revokes member_a back to 'member' -> 2xx",
+      "10d. owner revokes member_a back to 'member' with a fresh step-up token -> 2xx",
       ownerRevoke.ok,
       `HTTP ${ownerRevoke.status}`,
     )
@@ -522,9 +567,11 @@ async function main() {
       reloginA2.member_role === 'member' && jwtClaim(reloginA2.access_token, 'member_role') === 'member',
       `session=${reloginA2.member_role}, jwt=${jwtClaim(reloginA2.access_token, 'member_role')}`,
     )
+    const ownerStepUp3 = await stepUp(sessions[HANDLES.owner])
     const ownerTarget = await rest('/rpc/set_member_role', {
       method: 'POST',
       token: sessions[HANDLES.owner].access_token,
+      extraHeaders: { 'X-Step-Up': ownerStepUp3 },
       body: { p_member: memberIds[HANDLES.owner], p_role: 'member' },
     })
     check(
@@ -532,13 +579,16 @@ async function main() {
       !ownerTarget.ok && ownerTarget.text.includes('forbidden'),
       `HTTP ${ownerTarget.status}`,
     )
+    // The token stays unspent: target validation runs BEFORE consumption, so
+    // the rejected call must not burn the owner's re-PIN.
     const grantOwnerRole = await rest('/rpc/set_member_role', {
       method: 'POST',
       token: sessions[HANDLES.owner].access_token,
+      extraHeaders: { 'X-Step-Up': ownerStepUp3 },
       body: { p_member: memberIds[HANDLES.b], p_role: 'owner' },
     })
     check(
-      "10g. no path grants 'owner' (p_role='owner') -> non-2xx invalid_role (whitelist rejects before any write)",
+      "10g. no path grants 'owner' (p_role='owner') -> non-2xx invalid_role; rejected call keeps the step-up token usable",
       !grantOwnerRole.ok && grantOwnerRole.text.includes('invalid_role'),
       `HTTP ${grantOwnerRole.status}`,
     )
