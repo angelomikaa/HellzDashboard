@@ -8,9 +8,9 @@ last_updated: "2026-10-22T08:37:00.249Z"
 last_activity: "2026-10-21 -- 08-06 executed: legacy conversion applied (1 officer handle unclaimed; owner+dummies intact), smoke-identity 117/117 twice, full battery green (rls 39? lifecycle 11, officer, promotion, rank, card)"
 progress:
   total_phases: 7
-  completed_phases: 4
-  total_plans: 21
-  completed_plans: 21
+  completed_phases: 5
+  total_plans: 26
+  completed_plans: 26
   percent: 100
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 08.1
-Plan: 0 of 9 (08-07/08/09 gap closure complete; pending owner UAT re-test of tests 3/4/7)
-Status: Phase 8 gap closure complete (08-07/08/09): not_member invariant enforced + satturne purged; my_identity coalesced self-read live; D-20 revised (member-originated validated choices promote char_function); full battery green; pending owner UAT re-test. Phase 08.1 context gathered (08.1-CONTEXT.md) — decisions locked for dummy purge, handle rotation, identification system, login fix (urgent ops); ready for /gsd-plan-phase 08.1.
-Last activity: 2026-10-22 -- 08.1 CONTEXT gathered (5 areas discussed: purge now/inside-08.1/no-reseed/OpenCode-executes; handle rotation out-of-band via apply-seed.mjs/replace whitelist.sql rows/accept git history/update smoke scripts; identification = step-up re-PIN for role changes only + owner universal hierarchy power + staff prefix stf-/off- + device fingerprint binding; login fix = urgent ops outside 08.1, OpenCode deploys+probes+verifies E2E). Next: /gsd-plan-phase 08.1 then execute.
+Plan: 5 of 5 (all executed)
+Status: Phase 08.1 complete — dummy purge (08.1-01) live, zero-dummy verified; owner handle rotated to satturne + hash(0192) live (08.1-02); verify-pin deployed live with device_fp binding (08.1-03/04); migration 0016 step-up re-PIN applied live (08.1-05); login connection error resolved (verify-pin responding HTTP 200). Build green, 521 tests green. Ready for owner UAT re-test of Phase 8 gap closure tests 3/4/7, then Phase 9 planning.
+Last activity: 2026-10-22 -- Phase 08.1 fully executed: purge-dummies.sql applied (four zeros across members/submissions/stats/attempts); whitelist.sql rotated owner-handle→satturne; verify-pin deployed with device fingerprint binding (device_fp claim verified in JWT); migration 0016 applied (step_up_tokens table, request_step_up RPC, set_member_role step-up enforcement); all 5 SUMMARY files written; build green, 521 tests green.
 
 ## Accumulated Context
 
@@ -136,6 +136,11 @@ Resume file: .planning/phases/08-whitelist-lifecycle-self-request-whitelisting-f
 | 08 | 08-02 | ~35 min | 4 | 5 | 2026-10-21 |
 | 08 | 08-03 | ~30 min | 4 | 22 | 2026-10-21 |
 | 08 | 08-04 | ~49 min | 2 | 10 | 2026-10-21 |
+| 08.1 | 08.1-01 | ~15 min | 2 | 1 | 2026-10-22 |
+| 08.1 | 08.1-02 | ~10 min | 3 | 2 | 2026-10-22 |
+| 08.1 | 08.1-03 | ~25 min | 5 | 5 | 2026-10-22 |
+| 08.1 | 08.1-04 | ~5 min | 2 | 2 | 2026-10-22 |
+| 08.1 | 08.1-05 | ~20 min | 3 | 4 | 2026-10-22 |
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*
