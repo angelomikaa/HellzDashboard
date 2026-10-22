@@ -63,8 +63,12 @@ export const PILL_TEXT_PAD_FRAC = 0.12
 export const PILL_DIGITS_WHITELIST = '0123456789.,%-/'
 /** Numeric whitelist — the 05-01 spike tuning, verbatim. */
 export const DIGITS_WHITELIST = '0123456789.,%-'
-/** Letters whitelist for label reads (game labels are English words). */
-export const LABELS_WHITELIST = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ '
+/** Letters whitelist for label reads. Accented letters are whitelisted too:
+ * the live client is pt-BR ("PRECISÃO", "CRÍT", "Bônus de Dano") and dropping
+ * them silently mangles every localized label. */
+export const LABELS_WHITELIST =
+  'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ' +
+  'ÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝàáâãäåçèéêëìíîïñòóôõöùúûüýÿ'
 
 // ---------------------------------------------------------------------------
 // 1D run/profile primitives
@@ -359,13 +363,89 @@ export const GAME_LABELS: Record<string, string> = {
   dmg_reduction_vs_demi_human: 'DMG Reduction vs Demi-Human',
 }
 
+/** The SAME stat keys as the pt-BR client labels them (measured on the
+ * owner-seeded localized samples, 08.10). Matching tries both vocabularies:
+ * the locale is not detectable from pixels, and label mode is the normal path
+ * (English fixtures already carry the next section's rows, so order mode
+ * rarely holds).
+ *
+ * NOT listed, for lack of a trustworthy transcription:
+ *  - `pve_dmg_reduction` / `pve_dmg_bonus` / `pvp_dmg_reduction` /
+ *    `pvp_dmg_bonus`: the pt rows clip to "…ção de Dano J…" where the icon
+ *    glyph lands, so the exact wording is unknown. Those four ride on order
+ *    mode (the 13+13 quasi capture), which is locale-blind.
+ *  - `global_cd_pct`: the pt-BR Especial screen does not show the row at all
+ *    (it shows PV Máx% + PM Máx% where English shows Max SP + Global CD%),
+ *    so it cannot be label-matched — the value stays manual on this screen. */
+export const GAME_LABELS_PT: Record<string, string> = {
+  // Atributos Comuns (general)
+  hp: 'PV',
+  sp: 'PM',
+  patk: 'ATQF',
+  pdef: 'DEFF',
+  matk: 'ATQM',
+  mdef: 'DEFM',
+  refine_patk: 'ATQF (Refino)',
+  refine_pdef: 'DEFF (Refino)',
+  refine_matk: 'ATQM (Refino)',
+  refine_mdef: 'DEFM (Refino)',
+  hp_recover: 'Recuperar PV',
+  sp_recover: 'Recuperar PM',
+  hit: 'PRECISÃO',
+  flee: 'ESQUIVA',
+  // Atributos Avançados (quasi) — order mode is primary here, these are the
+  // fallback when a capture carries extra rows.
+  aspd: 'VATQ%',
+  mspd: 'VMOV%',
+  variable_ct: 'TC Variável',
+  variable_ct_pct: 'TC Variável %',
+  fixed_ct: 'TC Fixo',
+  fixed_ct_pct: 'TC Fixo %',
+  healing_done: 'Efeito de Cura',
+  healing_taken: 'Cura Recebida%',
+  crit: 'CRÍT',
+  crit_res: 'RES CRÍT',
+  crit_dmg: 'Dano CRÍT%',
+  crit_dmg_res: 'RES a Dano Crítico',
+  pdmg: 'Bônus de Dano F%',
+  pdmg_r: 'Redução de Dano F%',
+  mdmg: 'Bônus Dano M%',
+  mdmg_r: 'Redução de Dano M%',
+  ignore_pdef: 'Ignorar DEFF',
+  ignore_pdef_pct: 'Ignorar DEFF%',
+  ignore_mdef: 'Ignorar DEFM',
+  ignore_mdef_pct: 'Ignorar DEFM%',
+  pdmg_bonus: 'Bônus de Dano',
+  mdmg_bonus: 'Dano M Bônus',
+  // Especial (special) — label mode is the ONLY path for the single-column
+  // capture, so these entries are what makes that screen readable on pt-BR.
+  max_sp_pct: 'PM Máx%',
+  equip_patk_pct: 'ATQF de Equipamento%',
+  equip_matk_pct: 'ATQM de Equipamento%',
+  equip_pdef_pct: 'DEFF de Equipamento%',
+  equip_mdef_pct: 'DEFM de Equipamento%',
+  dmg_vs_small: 'Dano x Inimigos Pequenos',
+  dmg_reduction_vs_small: 'Redução de Dano x Inimigos Pequenos',
+  dmg_vs_medium: 'Dano x Inimigo Médio',
+  dmg_reduction_vs_medium: 'Redução de Dano x Inimigos Médios',
+  dmg_vs_large: 'Dano x Inimigo Grande',
+  dmg_reduction_vs_large: 'Redução de Dano x Inimigos Grandes',
+  dmg_vs_brute: 'Dano x Bruto',
+  dmg_reduction_vs_brute: 'Redução de Dano x Bruto',
+  dmg_reduction_vs_demi_human: 'Redução de Dano x Humanoide%',
+}
+
 // ---------------------------------------------------------------------------
 // Fuzzy label matching
 // ---------------------------------------------------------------------------
 
-/** Lowercase a-z only — the comparison space for labels. */
+/** Lowercase a-z only — the comparison space for labels. Accents are folded
+ * (NFD + combining-mark strip) so "PRECISÃO" → "precisao" matches its expected
+ * label whether or not the OCR engine emitted the diacritic. */
 export function normalizeLabel(s: string | null | undefined): string {
   return String(s ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z]/g, '')
 }
@@ -400,10 +480,25 @@ export function scoreLabelPair(observed: string, expected: string): number {
   if (o === '') return -Infinity
   if (o === e) return 100
   if (e.includes(o)) return 90 - Math.abs(e.length - o.length)
-  if (o.includes(e)) return 85 - Math.abs(e.length - o.length)
+  // expected ⊂ observed only counts for a SMALL surplus: the game never pads a
+  // label, so extra characters are OCR surplus, not part of the name. Unbounded
+  // this let a short label outscore a near-exact long one (measured on pt-BR:
+  // "ATQM Refinc" scored matk 79 via its "ATQM" prefix and beat refine_matk's
+  // 75, so the Refino row was lost).
+  const surplus = o.length - e.length
+  if (o.includes(e) && surplus <= Math.max(2, Math.floor(0.25 * e.length))) return 85 - surplus
   const maxDist = Math.max(2, Math.floor(0.25 * Math.min(o.length, e.length)))
   const dist = levenshtein(o, e)
   if (dist <= maxDist) return 80 - dist * 5
+  // Shape fallback for occlusion: an icon drawn over the text rewrites several
+  // characters mid-label (measured on pt-BR: a check glyph over "Humanoide%"
+  // reads "HumMwmaitieY"). Length-normalized similarity separates that case
+  // cleanly (0.73 vs ≤0.58 for every other label), and the score stays far
+  // below the exact/containment paths so a clean row always wins a conflict.
+  if (o.length >= 10 && e.length >= 10) {
+    const similarity = 1 - dist / Math.max(o.length, e.length)
+    if (similarity >= 0.65) return 40 * similarity
+  }
   return -Infinity
 }
 
@@ -412,15 +507,28 @@ export interface LabelMatch {
   score: number
 }
 
-/** Best vocabulary key for one observed label, or null below the bar. */
+/** Every label we accept for one stat key (English client + pt-BR client). */
+export function labelsFor(key: string): string[] {
+  const out: string[] = []
+  const en = GAME_LABELS[key]
+  const pt = GAME_LABELS_PT[key]
+  if (en) out.push(en)
+  if (pt) out.push(pt)
+  return out
+}
+
+/** Best vocabulary key for one observed label, or null below the bar. Tries
+ * every accepted label per key and keeps the best-scoring pair. */
 export function matchLabel(observed: string, vocabKeys: string[]): LabelMatch | null {
   let bestKey: string | null = null
   let bestScore = 0 // acceptance floor: containment(≥77) / distance(≥60) qualify, noise doesn't
   for (const key of vocabKeys) {
-    const score = scoreLabelPair(observed, GAME_LABELS[key] ?? '')
-    if (score > bestScore) {
-      bestScore = score
-      bestKey = key
+    for (const label of labelsFor(key)) {
+      const score = scoreLabelPair(observed, label)
+      if (score > bestScore) {
+        bestScore = score
+        bestKey = key
+      }
     }
   }
   return bestKey === null ? null : { key: bestKey, score: bestScore }

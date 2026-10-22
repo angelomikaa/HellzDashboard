@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DARK_LUMA_MAX,
   GAME_LABELS,
+  GAME_LABELS_PT,
   PILL_CHROMA_MIN,
   SCREENS,
   VALUE_CHROMA_MAX,
@@ -234,6 +235,73 @@ describe('label matching (fuzzy, spike semantics)', () => {
     const match = matchLabel('CRIT DMG RE', ['crit_dmg_res', 'crit_dmg', 'crit_res'])
     expect(match?.key).toBe('crit_dmg_res')
     expect(matchLabel('zzzzzzz', ['crit_dmg_res', 'crit_dmg'])).toBeNull()
+  })
+
+  it('folds accents so localized labels compare in a-z space', () => {
+    expect(normalizeLabel('PRECISÃO')).toBe('precisao')
+    expect(normalizeLabel('CRÍT')).toBe('crit')
+    expect(normalizeLabel('Bônus de Dano')).toBe('bonusdedano')
+    expect(scoreLabelPair('PRECISAO', 'PRECISÃO')).toBe(100)
+  })
+
+  it('a near-exact long label beats a short label merely contained in the read', () => {
+    // Measured pt-BR case: the clipped "ATQM (Refino" reads "ATQM Refinc".
+    // "ATQM" is contained in it, but the Refino row must keep refine_matk.
+    expect(scoreLabelPair('ATQM Refinc', 'ATQM (Refino)')).toBeGreaterThan(
+      scoreLabelPair('ATQM Refinc', 'ATQM'),
+    )
+    expect(matchLabel('ATQM Refinc', ['matk', 'refine_matk'])?.key).toBe('refine_matk')
+  })
+
+  it('recovers a label whose middle is occluded by an icon (shape fallback)', () => {
+    // Measured pt-BR case: a check glyph over "Humanoide%" reads
+    // "HumMwmaitieY"; every other special label scores far lower.
+    const vocab = [
+      'dmg_reduction_vs_small',
+      'dmg_reduction_vs_brute',
+      'dmg_reduction_vs_demi_human',
+    ]
+    expect(matchLabel('Reducao de Dano x HumMwmaitieY', vocab)?.key).toBe(
+      'dmg_reduction_vs_demi_human',
+    )
+  })
+})
+
+describe('pt-BR client labels (localized Details screens)', () => {
+  it('covers the Atributos Comuns and Especial rows — the label-mode captures', () => {
+    for (const key of fieldKeysFor('general')) {
+      expect(GAME_LABELS_PT[key], `pt label for ${key}`).toBeTruthy()
+    }
+    for (const key of fieldKeysFor('special')) {
+      // The pt-BR Especial screen has no Global CD row (it shows PV Máx% +
+      // PM Máx% where the English client shows Max SP + Global CD%), so that
+      // value stays manual on this screen — asserting the gap keeps it honest.
+      if (key === 'global_cd_pct') continue
+      expect(GAME_LABELS_PT[key], `pt label for ${key}`).toBeTruthy()
+    }
+  })
+
+  it('leaves the four clipped PvE/PvP quasi rows to order mode', () => {
+    // Their pt rows clip to "…ção de Dano J…" where an icon glyph lands, so no
+    // transcription is trustworthy; the 13+13 quasi capture assigns by order.
+    for (const key of ['pve_dmg_reduction', 'pve_dmg_bonus', 'pvp_dmg_reduction', 'pvp_dmg_bonus']) {
+      expect(GAME_LABELS_PT[key]).toBeUndefined()
+    }
+  })
+
+  it('every localized label matches its own key inside its side vocabulary', () => {
+    for (const capture of ['general', 'quasi', 'special'] as const) {
+      const grammar = SCREENS[capture]
+      if (grammar.kind !== 'rows') throw new Error(`${capture} is not a rows grammar`)
+      const vocabs = grammar.columns === 2 ? [grammar.left, grammar.right] : [grammar.left]
+      for (const vocab of vocabs) {
+        for (const key of vocab) {
+          const label = GAME_LABELS_PT[key]
+          if (!label) continue
+          expect(matchLabel(label, vocab)?.key, `${capture}: "${label}" should be ${key}`).toBe(key)
+        }
+      }
+    }
   })
 })
 
