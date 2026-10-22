@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { NeoFootSession } from '../auth/session'
+import { ApiError, FunctionError } from '../../lib/api'
 import {
   addMemberErrorFor,
   canResetPin,
   filterMembersByPin,
   identityErrorFor,
   pinBadgeLabel,
+  roleChangeErrorCopy,
   sortIdentityHistory,
 } from './CharactersPage'
 
@@ -60,5 +62,41 @@ describe('CharactersPage helpers', () => {
 
   it('maps identity duplicate', () => {
     expect(identityErrorFor({ message: 'duplicate_char_id' } as any)).toContain('duplicate_char_id')
+  })
+
+  it('maps step-up failures for role changes', () => {
+    // Wrong PIN carries the server's remaining-attempts counter.
+    const wrongPin = new FunctionError(401, 'invalid_pin', 'invalid_pin', {
+      attemptsRemaining: 3,
+    })
+    expect(roleChangeErrorCopy(wrongPin)).toContain('PIN incorreto')
+    expect(roleChangeErrorCopy(wrongPin)).toContain('3 tentativas')
+    expect(
+      roleChangeErrorCopy(new FunctionError(401, 'invalid_pin', 'invalid_pin')),
+    ).toBe('PIN incorreto.')
+
+    // Lockout renders minutes, never raw seconds.
+    const locked = new FunctionError(429, 'locked', 'locked', { retryAfterSeconds: 600 })
+    expect(roleChangeErrorCopy(locked)).toContain('10 minutos')
+
+    // Expired/absent server token keeps the action in the dialog.
+    const stale = new ApiError(
+      400,
+      'server',
+      'HTTP 400: {"code":"P0001","message":"step_up_required"}',
+    )
+    expect(roleChangeErrorCopy(stale)).toContain('Confirmação expirada')
+
+    // Session and permission failures share the session line.
+    expect(roleChangeErrorCopy(new FunctionError(401, 'unauthorized'))).toContain('sessão')
+    expect(roleChangeErrorCopy(new ApiError(401, 'unauthorized', 'nope'))).toContain('sessão')
+    expect(
+      roleChangeErrorCopy(new ApiError(400, 'server', 'HTTP 400: {"message":"forbidden"}')),
+    ).toContain('sessão')
+
+    // Anything else stays the enumeration-safe generic copy.
+    expect(roleChangeErrorCopy(new Error('boom'))).toBe(
+      'Falha ao salvar — tente novamente.',
+    )
   })
 })

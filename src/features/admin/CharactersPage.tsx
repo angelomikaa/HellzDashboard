@@ -20,9 +20,11 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import {
   ApiError,
+  FunctionError,
   fetchClasses,
   fetchStaffMembers,
   addMember,
+  requestStepUp,
   resetMemberPin,
   fetchIdentityHistory,
   correctIdentity,
@@ -38,6 +40,7 @@ import { FUNCTION_LABELS } from '../../lib/groups'
 import { validateIdentityDraft, OFFICIAL_CLASSES } from '../submit/identity'
 import type { CharFunction } from '../submit/identity'
 import { ClassCrest } from '../assets/ClassCrest'
+import { PinBoxes } from '../auth/PinBoxes'
 import { ConfirmDialog } from './ConfirmDialog'
 
 // Enumeration-safe pt-BR copy (UI contract): never expose HTTP codes, gateway
@@ -54,6 +57,12 @@ const MEMBER_REACTIVATED_MESSAGE = 'Membro reativado.'
 const RESET_PIN_SUCCESS = 'PIN redefinido. O membro definirá um novo PIN no próximo acesso.'
 const ADD_MEMBER_SUCCESS = 'Membro adicionado. O PIN será criado no primeiro acesso.'
 const NO_FILTER_MATCH = 'Nenhum membro com esses filtros.'
+
+// Step-up re-PIN copy (D-14/D-15, repaired in 0017): hierarchy changes are
+// handling actions, so the owner re-authenticates before the RPC runs.
+const PIN_REQUIRED = 'Digite seu PIN de 4 dígitos para continuar.'
+const PIN_WRONG = 'PIN incorreto.'
+const STEP_UP_EXPIRED = 'Confirmação expirada. Digite seu PIN novamente.'
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   member: 'Membro',
@@ -143,6 +152,48 @@ function confirmConfig(action: PendingAction): ConfirmConfig {
   }
 }
 
+/**
+ * Enumeration-safe copy for a failed staff action. Role changes add the
+ * step-up failures (wrong PIN, lockout, stale token) on top of the shared
+ * unauthorized/forbidden mapping; everything else stays the generic save line
+ * (T-06-03: never expose which server check failed). Exported for the node
+ * test suite.
+ */
+export function roleChangeErrorCopy(error: unknown): string {
+  if (error instanceof FunctionError) {
+    switch (error.code) {
+      case 'invalid_pin': {
+        const remaining = error.attemptsRemaining
+        if (typeof remaining === 'number' && remaining > 0) {
+          return `${PIN_WRONG} ${
+            remaining === 1 ? '1 tentativa restante.' : `${remaining} tentativas restantes.`
+          }`
+        }
+        return PIN_WRONG
+      }
+      case 'locked': {
+        const minutes = Math.max(1, Math.ceil((error.retryAfterSeconds ?? 0) / 60))
+        return `Muitas tentativas incorretas. Tente novamente em ${minutes} ${
+          minutes === 1 ? 'minuto' : 'minutos'
+        }.`
+      }
+      case 'pin_setup_required':
+        return 'Seu PIN ainda não foi criado. Saia e entre novamente para definir um PIN.'
+      case 'unauthorized':
+      case 'invalid_session':
+      case 'forbidden':
+        return SESSION_ERROR
+      default:
+        return SAVE_ERROR
+    }
+  }
+  if (error instanceof ApiError) {
+    if (error.kind === 'unauthorized' || error.message.includes('forbidden')) return SESSION_ERROR
+    if (error.message.includes('step_up_required')) return STEP_UP_EXPIRED
+  }
+  return SAVE_ERROR
+}
+
 export function CharactersPage({
   session,
   onOpenIdentityReview,
@@ -166,6 +217,12 @@ export function CharactersPage({
 
   // Staff action awaiting confirm-modal confirmation.
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
+
+  // Step-up re-PIN for hierarchy changes (promote/demote, D-14/D-15). The PIN
+  // lives only in this transient state — never stored or logged — and both
+  // fields reset whenever the dialog opens or closes.
+  const [stepUpPin, setStepUpPin] = useState('')
+  const [dialogError, setDialogError] = useState<string | null>(null)
 
   // Owner feedback (07.2-06 checkpoint): quick class/function token filters —
   // pure view aid over the already-fetched roster (no server round trip).
@@ -248,6 +305,11 @@ export function CharactersPage({
 
   // Confirm-modal copy for the pending staff action (null → dialog closed).
   const confirm = pendingAction === null ? null : confirmConfig(pendingAction)
+  // Role changes are handling actions: they require the re-PIN step before the
+  // RPC (the server rejects the call without a step-up token anyway).
+  const needsStepUp =
+    pendingAction !== null &&
+    (pendingAction.kind === 'promote' || pendingAction.kind === 'demote')
 
   function startEdit(member: MemberRow) {
     setSavedRow(null)
@@ -293,38 +355,61 @@ export function CharactersPage({
   function openConfirm(action: PendingAction) {
     setSavedRow(null)
     setSaveError(null)
+    setStepUpPin('')
+    setDialogError(null)
     setPendingAction(action)
   }
 
+  function closeConfirm() {
+    setPendingAction(null)
+    setStepUpPin('')
+    setDialogError(null)
+  }
+
   // Staff confirm flow (AUTH-03/AUTH-04): one shared handler — the action
-  // kind decides the RPC and the success copy. Errors are enumeration-safe
-  // per-row copy; the unauthorized kind maps to the session line. Never
-  // expose which RPC check failed.
+  // kind decides the RPC and the success copy. Role changes first exchange the
+  // owner's PIN for a single-use step-up token (0017), then present it to
+  // set_member_role. Errors are enumeration-safe copy; a failed step-up keeps
+  // the dialog open so the PIN can be retried in place. Never expose which
+  // server check failed.
   async function handleConfirm() {
     if (pendingAction === null || busy) return
-    const memberId = pendingAction.member.id
+    const action = pendingAction
+    const memberId = action.member.id
+    const roleChange = action.kind === 'promote' || action.kind === 'demote'
+
+    if (roleChange && stepUpPin.length !== 4) {
+      setDialogError(PIN_REQUIRED)
+      return
+    }
+
     setSavingRowId(memberId)
+    setDialogError(null)
     try {
-      if (pendingAction.kind === 'promote') {
-        await setMemberRole(session, memberId, 'officer')
-      } else if (pendingAction.kind === 'demote') {
-        await setMemberRole(session, memberId, 'member')
-      } else if (pendingAction.kind === 'deactivate') {
+      if (action.kind === 'promote' || action.kind === 'demote') {
+        const token = await requestStepUp(session, stepUpPin)
+        await setMemberRole(
+          session,
+          memberId,
+          action.kind === 'promote' ? 'officer' : 'member',
+          token,
+        )
+      } else if (action.kind === 'deactivate') {
         await setMemberActive(session, memberId, false)
-      } else if (pendingAction.kind === 'activate') {
+      } else if (action.kind === 'activate') {
         await setMemberActive(session, memberId, true)
       } else {
         await resetMemberPin(session, memberId)
       }
       const message =
-        pendingAction.kind === 'promote' || pendingAction.kind === 'demote'
+        roleChange
           ? ROLE_UPDATED_MESSAGE
-          : pendingAction.kind === 'deactivate'
+          : action.kind === 'deactivate'
             ? MEMBER_REMOVED_MESSAGE
-            : pendingAction.kind === 'activate'
+            : action.kind === 'activate'
               ? MEMBER_REACTIVATED_MESSAGE
               : RESET_PIN_SUCCESS
-      setPendingAction(null)
+      closeConfirm()
       setSavedRow({ id: memberId, text: message })
       // Refresh so the role/active change persists on screen. A refresh
       // failure keeps the stale rows — the action itself succeeded.
@@ -334,15 +419,16 @@ export function CharactersPage({
         /* stale list; success copy still shown */
       }
     } catch (err) {
-      setPendingAction(null)
-      setSaveError({
-        id: memberId,
-        text:
-          err instanceof ApiError &&
-          (err.kind === 'unauthorized' || err.message.includes('forbidden'))
-            ? SESSION_ERROR
-            : SAVE_ERROR,
-      })
+      if (roleChange) {
+        // Wrong PIN / lockout / stale token: keep the confirmation open, clear
+        // the PIN and show the copy inline (the token is single-use, so a
+        // retry needs a fresh re-PIN either way).
+        setDialogError(roleChangeErrorCopy(err))
+        setStepUpPin('')
+      } else {
+        closeConfirm()
+        setSaveError({ id: memberId, text: roleChangeErrorCopy(err) })
+      }
     } finally {
       setSavingRowId(null)
     }
@@ -1039,7 +1125,7 @@ export function CharactersPage({
           )}
         </>
       )}
-      {confirm !== null && (
+      {confirm !== null && pendingAction !== null && (
         <ConfirmDialog
           open
           title={confirm.title}
@@ -1047,9 +1133,29 @@ export function CharactersPage({
           confirmLabel={confirm.confirmLabel}
           destructive={confirm.destructive}
           onConfirm={() => void handleConfirm()}
-          onCancel={() => setPendingAction(null)}
+          onCancel={closeConfirm}
           busy={savingRowId !== null}
-        />
+          confirmDisabled={needsStepUp && stepUpPin.length !== 4}
+          error={dialogError}
+        >
+          {needsStepUp && (
+            <div className="mt-4">
+              <PinBoxes
+                value={stepUpPin}
+                onChange={(value) => {
+                  setStepUpPin(value)
+                  setDialogError(null)
+                }}
+                disabled={savingRowId !== null}
+                label="Confirme seu PIN"
+              />
+              <p className="mt-2 text-xs text-muted">
+                Alterações de papel exigem re-autenticação. O PIN vale por 10 minutos e uma
+                alteração.
+              </p>
+            </div>
+          )}
+        </ConfirmDialog>
       )}
     </section>
   )

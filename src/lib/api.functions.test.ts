@@ -4,6 +4,7 @@ import {
   FunctionError,
   fetchRequestStatus,
   requestAccess,
+  requestStepUp,
   setupPin,
   type RequestAccessInput,
 } from './api'
@@ -292,6 +293,62 @@ describe('fetchRequestStatus — anon RPC, four keys only', () => {
       )
     await expect(fetchRequestStatus('ahrya')).rejects.toMatchObject({
       code: 'invalid_response',
+    })
+  })
+})
+
+// 0017 repair: the step-up token is the ONLY way a role change can pass the
+// RPC's step-up gate, so the wrapper's request shape and error mapping are
+// pinned here.
+describe('step-up re-PIN', () => {
+  it('posts the PIN with the member session bearer and returns the token id', async () => {
+    nextResponse = () => res(200, JSON.stringify({ token: 'tok-1' }))
+    await expect(requestStepUp(SESSION, '1234')).resolves.toBe('tok-1')
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].url).toBe('https://test-project.supabase.co/functions/v1/step-up')
+    expect(calls[0].init.method).toBe('POST')
+    expect(headers(calls[0]).apikey).toBe('test-anon-key')
+    // Unlike the anon surface, step-up presents the member's own session.
+    expect(headers(calls[0]).Authorization).toBe(`Bearer ${SESSION.access_token}`)
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ pin: '1234' })
+  })
+
+  it('maps a wrong PIN to invalid_pin with remaining attempts', async () => {
+    nextResponse = () =>
+      res(401, JSON.stringify({ error: 'invalid_pin', attempts_remaining: 4 }))
+    await expect(requestStepUp(SESSION, '0000')).rejects.toMatchObject({
+      name: 'FunctionError',
+      code: 'invalid_pin',
+      status: 401,
+      attemptsRemaining: 4,
+    })
+  })
+
+  it('maps a lockout to locked with retry_after_seconds', async () => {
+    nextResponse = () =>
+      res(429, JSON.stringify({ error: 'locked', retry_after_seconds: 120 }))
+    await expect(requestStepUp(SESSION, '1234')).rejects.toMatchObject({
+      code: 'locked',
+      status: 429,
+      retryAfterSeconds: 120,
+    })
+  })
+
+  it('rejects a 2xx without a token as invalid_response', async () => {
+    nextResponse = () => res(200, JSON.stringify({ token: 42 }))
+    await expect(requestStepUp(SESSION, '1234')).rejects.toMatchObject({
+      code: 'invalid_response',
+    })
+  })
+
+  it('maps a fetch rejection to network', async () => {
+    vi.stubGlobal('fetch', async () => {
+      throw new Error('offline')
+    })
+    await expect(requestStepUp(SESSION, '1234')).rejects.toMatchObject({
+      code: 'network',
+      status: 0,
     })
   })
 })

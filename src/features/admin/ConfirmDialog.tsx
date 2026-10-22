@@ -4,10 +4,17 @@
 // Personagens (Remover/Reativar/role changes).
 //
 // Accessibility contract: role="dialog" + aria-modal + aria-labelledby,
-// Escape cancels, overlay backdrop click cancels, focus moves to the confirm
-// button on open and returns to the previously focused element on close.
+// Escape cancels, overlay backdrop click cancels, focus moves to the first
+// enabled field on open (the step-up PIN box when present, else the confirm
+// button), Tab cycles through every focusable inside the dialog, and focus
+// returns to the previously focused element on close.
 // Flat-border language only — no icons, no shadows, no new color tokens.
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from 'react'
 
 export interface ConfirmDialogProps {
   open: boolean
@@ -18,6 +25,9 @@ export interface ConfirmDialogProps {
   onConfirm: () => void
   onCancel: () => void
   busy?: boolean // disables both buttons while the RPC is in flight
+  confirmDisabled?: boolean // extra gate (e.g. step-up PIN not complete)
+  error?: string | null // inline failure copy; the dialog stays open
+  children?: ReactNode // extra fields between the body and the buttons
 }
 
 export function ConfirmDialog({
@@ -29,10 +39,14 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   busy = false,
+  confirmDisabled = false,
+  error = null,
+  children,
 }: ConfirmDialogProps) {
   const titleId = 'confirm-dialog-title'
+  const errorId = 'confirm-dialog-error'
+  const dialogRef = useRef<HTMLDivElement | null>(null)
   const confirmRef = useRef<HTMLButtonElement | null>(null)
-  const cancelRef = useRef<HTMLButtonElement | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -40,7 +54,10 @@ export function ConfirmDialog({
     // Remember the trigger so focus can return when the dialog closes.
     returnFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
-    confirmRef.current?.focus()
+    // Step-up dialogs open with a PIN field: focus it so the owner can type
+    // immediately. Everything else keeps the confirm-button focus.
+    const field = dialogRef.current?.querySelector<HTMLElement>('input:not([disabled])')
+    ;(field ?? confirmRef.current)?.focus()
     return () => {
       returnFocusRef.current?.focus()
       returnFocusRef.current = null
@@ -60,20 +77,30 @@ export function ConfirmDialog({
 
   if (!open) return null
 
-  // The dialog contains exactly two buttons — Tab cycles between them, so a
-  // two-element wrap keeps focus trapped inside while open.
+  // Every focusable inside the dialog participates in the trap (the two
+  // buttons plus any step-up PIN inputs), so Tab can never leave the modal.
   function handleTab(e: ReactKeyboardEvent<HTMLDivElement>) {
     if (e.key !== 'Tab') return
+    const root = dialogRef.current
+    if (root === null) return
+    const items = Array.from(
+      root.querySelectorAll<HTMLElement>(
+        'input:not([disabled]), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((el) => el.getClientRects().length > 0)
+    if (items.length === 0) return
+    const first = items[0]
+    const last = items[items.length - 1]
     const active = document.activeElement
-    if (e.shiftKey && (active === cancelRef.current || active === confirmRef.current)) {
+    const inside = active instanceof HTMLElement && root.contains(active)
+    if (e.shiftKey) {
+      if (!inside || active === first) {
+        e.preventDefault()
+        last.focus()
+      }
+    } else if (!inside || active === last) {
       e.preventDefault()
-      confirmRef.current?.focus()
-    } else if (!e.shiftKey && active === cancelRef.current) {
-      e.preventDefault()
-      confirmRef.current?.focus()
-    } else if (!e.shiftKey && active === confirmRef.current) {
-      e.preventDefault()
-      cancelRef.current?.focus()
+      first.focus()
     }
   }
 
@@ -90,19 +117,26 @@ export function ConfirmDialog({
       onKeyDown={handleTab}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={error !== null ? errorId : undefined}
         className="w-full max-w-sm rounded-lg border border-line bg-surface p-6"
       >
         <h2 id={titleId} className="text-base font-semibold text-content">
           {title}
         </h2>
         <p className="mt-2 text-sm text-muted">{body}</p>
+        {children}
+        {error !== null && (
+          <p id={errorId} role="alert" className="mt-3 text-sm font-semibold text-destructive">
+            {error}
+          </p>
+        )}
         <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
-            ref={cancelRef}
             onClick={onCancel}
             disabled={busy}
             aria-busy={busy}
@@ -114,7 +148,7 @@ export function ConfirmDialog({
             type="button"
             ref={confirmRef}
             onClick={onConfirm}
-            disabled={busy}
+            disabled={busy || confirmDisabled}
             aria-busy={busy}
             className={confirmClasses}
           >

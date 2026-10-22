@@ -374,15 +374,65 @@ export async function setMemberRole(
   role: 'member' | 'officer',
   stepUpToken?: string,
 ): Promise<void> {
-  // SECURITY DEFINER RPC (0011 + 0016 step-up enforcement): POST /rpc/set_member_role body
-  // {p_member, p_role} — owner-only gate inside the RPC (AUTH-03); effective
-  // at next login (D-10). No 'owner' value is ever sent — owner rows are
-  // immutable server-side. Raises 'invalid_role' / 'forbidden' / 'step_up_required' (HTTP 500).
+  // SECURITY DEFINER RPC (0011, step-up enforcement repaired in 0017):
+  // POST /rpc/set_member_role body {p_member, p_role} — owner-only gate inside
+  // the RPC (AUTH-03); effective at next login (D-10). No 'owner' value is
+  // ever sent — owner rows are immutable server-side. The RPC now requires the
+  // single-use token from requestStepUp() in the X-Step-Up header and consumes
+  // it (missing/stale/foreign token -> 'step_up_required'). Also raises
+  // 'invalid_role' / 'invalid_member' / 'forbidden'.
   await restFetch(session, '/rpc/set_member_role', {
     method: 'POST',
     headers: stepUpToken ? { 'X-Step-Up': stepUpToken } : undefined,
     body: JSON.stringify({ p_member: memberId, p_role: role }),
   })
+}
+
+/**
+ * Step-up re-PIN (D-14/D-15, repaired in 0017): re-authenticates the CALLER's
+ * PIN and returns a short-lived, single-use, device-bound token for
+ * setMemberRole(). The PIN is checked server-side with bcryptjs (the same
+ * library verify-pin uses — the DB cannot read bcryptjs '$2b$' hashes); the
+ * token row is written with the service role by the `step-up` Edge Function.
+ * The PIN lives only in this request body: never stored, logged or put in a
+ * URL (T-08-18).
+ */
+export async function requestStepUp(
+  session: NeoFootSession,
+  pin: string,
+): Promise<string> {
+  const { supabaseUrl, anonKey } = anonEnv()
+  let res: Response
+  try {
+    res = await fetch(`${supabaseUrl}/functions/v1/step-up`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pin }),
+    })
+  } catch (err) {
+    throw new FunctionError(0, 'network', err instanceof Error ? err.message : 'network error')
+  }
+
+  const text = await res.text().catch(() => '')
+  const parsed = parseJsonObject(text)
+  if (!res.ok) {
+    const code = typeof parsed?.error === 'string' ? parsed.error : 'server_error'
+    const message = typeof parsed?.message === 'string' ? parsed.message : code
+    throw new FunctionError(res.status, code, message, {
+      attemptsRemaining: optionalNumber(parsed?.attempts_remaining),
+      retryAfterSeconds: optionalNumber(parsed?.retry_after_seconds),
+    })
+  }
+  const token = typeof parsed?.token === 'string' ? parsed.token : ''
+  // A 2xx without a token is a contract breach, not a usable step-up.
+  if (token === '') {
+    throw new FunctionError(res.status, 'invalid_response', 'malformed step-up token')
+  }
+  return token
 }
 
 export async function setMemberActive(
