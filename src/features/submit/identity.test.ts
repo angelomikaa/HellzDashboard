@@ -223,6 +223,21 @@ describe('parseBasicProfileText — pt-BR client sample', () => {
     })
   })
 
+  it('ignores the copy-icon artifact between the name and the class band', () => {
+    // Measured SPARSE_TEXT output of the real Samplebasicptbr.png (2026-10-22):
+    // the copy/edit icon next to the name lands as its own "SN" line.
+    const observed = [
+      'Ahrya', '', 'SN', '', 'Classe Sumo Sacerdote', '', '1D 32980 E', '',
+      'WHR Vibe sem Luka', '', 'rd', '', 'PV', '', '123101/123101', '', 'PM',
+      '', 'Base/Nv99', '', 'mMaxmax Ig', '', 'Classe/Nv40', '', 'Poder',
+    ].join('\n')
+    expect(parseBasicProfileText(observed)).toEqual({
+      nickname: 'Ahrya',
+      char_id: '32980',
+      char_class: 'High Priest',
+    })
+  })
+
   it('keeps a digit-bearing nickname from the band left of the label', () => {
     expect(parseBasicProfileText('Helz2010 Classe Criador\nID 17069').nickname).toBe('Helz2010')
   })

@@ -326,20 +326,31 @@ export function parseBasicProfileText(text: string): BasicProfileFields {
     }
   }
 
-  // 2. The line immediately ABOVE the class band. The client prints the nickname
-  //    there, while the screen tabs ("Básico" / "Detalhes") sit above THAT — so
-  //    adjacency beats "first line that looks like a name", which would happily
-  //    claim a tab label or an OCR artifact.
+  // 2. The lines immediately ABOVE the class band. The client prints the
+  //    nickname there, while the screen tabs ("Básico" / "Detalhes") sit above
+  //    THAT. Measured on the real pt-BR sample: SPARSE_TEXT emits the name and
+  //    then the copy-icon artifact as its own 2-glyph line ("Ahrya", "SN",
+  //    "Classe Sumo Sacerdote") — so score the window instead of "nearest wins".
+  //    Digits are allowed only directly above the class band (the nickname
+  //    band); a line further up with digits is a stat row, not a name.
   if (nickname === null) {
     const classLine = lines.findIndex((line) => CLASS_LABEL.test(line))
     if (classLine > 0) {
-      for (let i = classLine - 1; i >= 0 && i >= classLine - 2; i--) {
-        const candidate = nicknameCandidate(lines[i], true)
-        if (candidate !== null) {
-          nickname = candidate
-          break
-        }
+      let best: { value: string; score: number; length: number } | null = null
+      for (let i = classLine - 1; i >= 0 && i >= classLine - 3; i--) {
+        const distance = classLine - i
+        const candidate = nicknameCandidate(lines[i], distance === 1)
+        if (candidate === null) continue
+        let score = Math.max(0, 4 - distance) // proximity: 3 / 2 / 1
+        if (/[a-zà-ÿ]/.test(candidate)) score += 2
+        if (candidate.length >= 3) score += 2
+        if (candidate.length >= 5) score += 1
+        if (candidate === candidate.toUpperCase()) score -= 2
+        const better =
+          best === null || score > best.score || (score === best.score && candidate.length > best.length)
+        if (better) best = { value: candidate, score, length: candidate.length }
       }
+      nickname = best?.value ?? null
     }
   }
 
