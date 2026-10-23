@@ -25,9 +25,17 @@ const MAX_BODY_BYTES = 3_500_000
 const FUNCTIONS = new Set(['dps', 'mdps', 'suporte'])
 const REQUEST_TYPES = new Set(['member', 'prospect'])
 
-/** Prospect applications carry the full 58-key wizard payload (+optional combat_power). */
+/**
+ * Prospect applications carry the wizard's full stat set. The Edge only owns
+ * the SHAPE (unique, finite, sane count): the exact number depends on the
+ * catalog version the applicant's client fetched, so a hard 58/59 window
+ * breaks every application whenever the catalog gains or loses a stat — the
+ * pre-9.1 client sends 56/57 rows, the post-9.1 client (RPDEF/RMDEF) sends
+ * 58/59, and combat_power adds one. The RPC's own "known unique numeric keys"
+ * check (>= 56, every key present in stat_catalog) stays the semantic gate.
+ */
 function validStats(stats: unknown): stats is Array<{ stat_key: string; value: number }> {
-  if (!Array.isArray(stats) || stats.length < 58 || stats.length > 59) return false
+  if (!Array.isArray(stats) || stats.length < 56 || stats.length > 61) return false
   const seen = new Set<string>()
   for (const raw of stats) {
     if (!raw || typeof raw !== 'object') return false
