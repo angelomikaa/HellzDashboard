@@ -481,6 +481,88 @@ export function nicknameFromLayout(words: readonly OcrWord[], imageWidth: number
   return { anchored: true, nickname: nicknameCandidate(text, true) }
 }
 
+// ---------------------------------------------------------------------------
+// Structural ID read (word boxes)
+// ---------------------------------------------------------------------------
+//
+// Owner report (2026-10-23): SoldierHellz (ID 17069) never got its ID
+// prefilled. SPARSE_TEXT read the printed "ID 17069" as ONE word, "1017069E":
+// the label's I became "1", the D became "0", both glued to the number, plus
+// the copy badge as "E". No text rule can split that safely — a power value
+// starting "10…" would match the same shape — but the card's LAYOUT can: the
+// ID is printed on the class band, right of the class value. Gated by that
+// geometry, a token that is EXACTLY label-glyphs + number (+ badge) is the ID
+// row, and the leading pair is the label, never part of the number.
+
+const ID_LABEL_WORD = /^[Il1][D][:.]?$/i
+const ID_LABEL_GLUED = /^[Il1][D0O]([0-9O]{3,12})[A-Za-z]?$/i
+const ID_NUMBER_WORD = /^([0-9O]{3,12})[A-Za-z]?$/i
+
+/**
+ * The ID inside one ID-band token, or null. The glued-label form is tried
+ * FIRST: on that band a leading label pair is the label ("1017069E" ->
+ * "17069"), so the bare reading of the same token would corrupt the number
+ * with the label's glyphs.
+ */
+function idFromToken(token: string): string | null {
+  const glued = ID_LABEL_GLUED.exec(token) ?? ID_NUMBER_WORD.exec(token)
+  if (glued === null) return null
+  const digits = glued[1].replace(/O/gi, '0')
+  return /^\d{3,12}$/.test(digits) ? digits : null
+}
+
+/**
+ * The character ID from the word boxes — a RESCUE the caller consults only
+ * when the text parse found nothing (the text read wins when both see a
+ * number). The ID prints on the class band, right of the class value, so a
+ * digits-shaped token there is the ID; anything off that band (a stat value
+ * further down, a nickname above) is never considered. Missing, unread or
+ * ambiguous -> null: the player types the ID (D-03: never guess an identity).
+ */
+export function idFromLayout(words: readonly OcrWord[]): string | null {
+  const usable = words.filter(
+    (word) =>
+      typeof word.text === 'string' &&
+      word.text.trim() !== '' &&
+      Number.isFinite(word.x0) &&
+      Number.isFinite(word.y0) &&
+      Number.isFinite(word.x1) &&
+      Number.isFinite(word.y1),
+  )
+  const label = usable
+    .filter((word) => CLASS_LABEL_WORD.test(word.text.trim()))
+    .sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0)[0]
+  if (label === undefined) return null
+
+  // The class band: words whose vertical midpoint sits on the label's line.
+  // The ID may print TALLER than the label (measured 42px vs 23px on the
+  // owner capture), so the midpoint — not full overlap — decides membership.
+  const labelHeight = Math.max(1, label.y1 - label.y0)
+  const slack = 0.35 * labelHeight
+  const band = usable
+    .filter((word) => {
+      if (word === label) return false
+      const mid = (word.y0 + word.y1) / 2
+      return mid >= label.y0 - slack && mid <= label.y1 + slack && word.x0 > label.x1 + 2
+    })
+    .sort((a, b) => a.x0 - b.x0)
+
+  for (let i = 0; i < band.length; i++) {
+    const token = band[i].text.trim()
+    // A standalone label word ("ID"/"1D") points at the number printed after
+    // it; anything else on the band must carry the number itself.
+    if (ID_LABEL_WORD.test(token)) {
+      if (band[i + 1] === undefined) continue
+      const digits = idFromToken(band[i + 1].text.trim())
+      if (digits !== null) return digits
+      continue
+    }
+    const digits = idFromToken(token)
+    if (digits !== null) return digits
+  }
+  return null
+}
+
 const ID_ERROR = 'Informe o ID do personagem (somente números, até 12 dígitos).'
 const NICKNAME_ERROR = 'Informe o nick do personagem (até 80 caracteres).'
 const CLASS_ERROR = 'Selecione a classe do personagem.'

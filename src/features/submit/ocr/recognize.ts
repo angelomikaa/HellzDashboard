@@ -72,7 +72,13 @@ import {
 } from './structure'
 import { sanityAccepts } from './sanity'
 import { parseTooltipValue } from './tooltip'
-import { nicknameFromLayout, parseBasicProfileText, type BasicProfileFields, type OcrWord } from '../identity'
+import {
+  idFromLayout,
+  nicknameFromLayout,
+  parseBasicProfileText,
+  type BasicProfileFields,
+  type OcrWord,
+} from '../identity'
 
 /** One full Basic-screen profile read (08-03 D-03): OCR text + parsed identity. */
 export interface BasicProfileRead extends BasicProfileFields {
@@ -513,9 +519,11 @@ function wordsFromBlocks(data: unknown): OcrWord[] {
 
 /**
  * Read the character identity (nickname / ID / job) from a Basic screenshot in
- * ONE full-canvas OCR pass: the text is parsed with the pure identity module and
+ * ONE full-canvas OCR pass: the text is parsed with the pure identity module,
  * the nickname is decided from the word boxes (it is printed left-aligned with
- * the class label — text alone cannot tell a name from a crop-cut fragment).
+ * the class label — text alone cannot tell a name from a crop-cut fragment)
+ * and the ID falls back to the same boxes when the text row is unreadable
+ * ("ID 17069" can glue into "1017069E" — geometry, not text, splits it).
  *
  * Used by first access (D-03) and the member request form. The existing worker
  * is shared; PSM is switched to SPARSE_TEXT for this read and restored to the
@@ -544,11 +552,16 @@ export async function readBasicProfile(
     // to a log service and never part of a request body.
     if (import.meta.env?.DEV) console.debug('[ocr] identity raw text:', JSON.stringify(raw))
     const parsed = profileFromRawText(raw)
-    const layout = nicknameFromLayout(wordsFromBlocks(data), canvas.width)
+    const words = wordsFromBlocks(data)
+    const layout = nicknameFromLayout(words, canvas.width)
     // A located class band means the card header is in this capture: the
     // layout decides the nickname (null = "not readable", never a guess).
     const nickname = layout.anchored ? layout.nickname : parsed.nickname
-    return { nickname, char_id: parsed.char_id, char_class: parsed.char_class, raw_text: raw }
+    // The text read wins; the word boxes rescue the one row the text cannot
+    // see — "ID 17069" printed with the label glyphs glued to the number
+    // reads as the single word "1017069E" (owner capture 2026-10-23).
+    const char_id = parsed.char_id ?? idFromLayout(words)
+    return { nickname, char_id, char_class: parsed.char_class, raw_text: raw }
   } finally {
     // Restore the wizard's block segmentation; ocrRect sets its own whitelist
     // before every read, but PSM is worker-global.

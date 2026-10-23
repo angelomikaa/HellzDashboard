@@ -3,6 +3,7 @@ import {
   CHAR_FUNCTIONS,
   CLASS_ALIASES,
   OFFICIAL_CLASSES,
+  idFromLayout,
   matchClassName,
   nicknameFromLayout,
   parseBasicProfileText,
@@ -360,6 +361,94 @@ describe('nicknameFromLayout — the name is the band left-aligned above the cla
 
     const noise = [at('y Arvah /', 20, 20, 120, 50), at('Classe', 20, 66, 90, 88)]
     expect(nicknameFromLayout(noise, 300)).toEqual({ anchored: true, nickname: null })
+  })
+})
+
+describe('idFromLayout — the ID is the number printed right of the class value', () => {
+  const at = (text: string, x0: number, y0: number, x1: number, y1: number): OcrWord => ({
+    text,
+    x0,
+    y0,
+    x1,
+    y1,
+  })
+
+  // The owner-reported capture (2026-10-23, sold.jpg 739x447): SPARSE_TEXT
+  // read "ID 17069" as the single word "1017069E" (label I->"1", D->"0", copy
+  // badge -> "E", box 42px tall vs the label's 23px). The text parse cannot
+  // split it — that is WHY this layout rescue exists.
+  it('rescues the merged-label row the text parse cannot see', () => {
+    expect(parseBasicProfileText('Classe Criador\n1017069E').char_id).toBe(null)
+    const words = [
+      at('A', 119, 103, 139, 149),
+      at('SoldierHellz', 181, 118, 353, 144),
+      at('Z', 369, 115, 395, 155),
+      at('Classe', 180, 166, 260, 189),
+      at('Criador', 294, 166, 385, 189),
+      at('1017069E', 505, 156, 650, 198),
+      at('ETT', 167, 187, 221, 245),
+      at('RAPP', 230, 187, 361, 245),
+      at('Poder', 43, 391, 112, 411),
+    ]
+    expect(idFromLayout(words)).toBe('17069')
+  })
+
+  // sampidentityaryah.jpg (725x341): the label survived as its own word
+  // ("1D", the documented I/l/1 slip) and the badge printed as "Z".
+  it('reads the separate label word and strips the copy badge', () => {
+    const words = [
+      at('Aryah', 169, 25, 245, 56),
+      at('Classe', 170, 71, 245, 93),
+      at('Sumo', 277, 73, 332, 90),
+      at('Sacerdote', 338, 72, 432, 90),
+      at('1D', 476, 73, 498, 91),
+      at('39943Z', 505, 66, 607, 93),
+    ]
+    expect(idFromLayout(words)).toBe('39943')
+  })
+
+  it('accepts a bare number and the O->0 digit slip', () => {
+    const words = [
+      at('Classe', 170, 71, 245, 93),
+      at('Sacerdote', 338, 72, 432, 90),
+      at('39943E', 505, 66, 607, 93),
+    ]
+    expect(idFromLayout(words)).toBe('39943')
+
+    const slipped = [
+      at('Classe', 170, 71, 245, 93),
+      at('1O39943E', 505, 66, 607, 93),
+    ]
+    expect(idFromLayout(slipped)).toBe('39943')
+  })
+
+  it('never scavenges numbers outside the class band', () => {
+    // A power value starting "10…" on a stat row FAR BELOW the band, and a
+    // digit-bearing nickname ABOVE it, are positional non-IDs: the geometry
+    // gate is what makes the label-pair strip safe.
+    const words = [
+      at('10777Hellz', 181, 118, 353, 144),
+      at('Classe', 180, 166, 260, 189),
+      at('Criador', 294, 166, 385, 189),
+      at('Poder', 43, 391, 112, 411),
+      at('10398392', 150, 391, 300, 411),
+    ]
+    expect(idFromLayout(words)).toBe(null)
+  })
+
+  it('refuses the unread and the overlong (D-03: never guess)', () => {
+    // No class band to anchor on.
+    expect(idFromLayout([at('1017069E', 505, 156, 650, 198)])).toBe(null)
+    // A label word with no number after it.
+    expect(
+      idFromLayout([at('Classe', 180, 166, 260, 189), at('Criador', 294, 166, 385, 189), at('1D', 505, 166, 527, 189)]),
+    ).toBe(null)
+    // 13+ digits is not an ID printed by the client (the text pattern's cap).
+    expect(
+      idFromLayout([at('Classe', 180, 166, 260, 189), at('101234567890123', 505, 166, 650, 189)]),
+    ).toBe(null)
+    // Two glyphs of junk with no number.
+    expect(idFromLayout([at('Classe', 180, 166, 260, 189), at('10', 505, 166, 541, 189)])).toBe(null)
   })
 })
 
