@@ -35,6 +35,20 @@ export const REQUEST_PROOF_ERROR = 'Envie o print do personagem.'
 export const REQUEST_NETWORK_ERROR =
   'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 
+// Server-side rejections that used to fall into the dead-end "tente novamente"
+// fallback (owner report 2026-10-23: a submit failed with no way to tell what
+// was wrong). Each code now names the actual problem so the applicant can act.
+export const REQUEST_PROOF_REJECTED =
+  'O servidor não aceitou o comprovante. Envie de novo o print em JPEG da tela Básico.'
+export const REQUEST_STATS_REJECTED =
+  'Os status enviados não conferem com a lista oficial. Recarregue a página e refaça a captura.'
+export const REQUEST_FIELDS_REJECTED =
+  'Algum dado do formulário foi recusado (ID, nick ou classe). Revise e envie de novo.'
+export const REQUEST_FUNCTION_REJECTED = 'Função inválida: escolha DPS, MDPS ou Suporte.'
+export const REQUEST_CLASS_REJECTED = 'Classe não reconhecida pelo servidor. Escolha a classe na lista.'
+export const REQUEST_SERVER_ERROR =
+  'O servidor não conseguiu registrar a solicitação agora. Tente novamente em instantes.'
+
 /** Prospect handoff payload: the 08-04 wizard adds stats and submits. */
 export interface ProspectDraft {
   handle: string
@@ -249,6 +263,50 @@ export function requestErrorCopy(error: FunctionError): RequestErrorCopy {
         clearPreviousPin: false,
         backToLogin: false,
       }
+    case 'invalid_proof':
+      return {
+        message: REQUEST_PROOF_REJECTED,
+        needsPreviousPin: false,
+        clearPreviousPin: false,
+        backToLogin: false,
+      }
+    case 'invalid_stats':
+      return {
+        message: REQUEST_STATS_REJECTED,
+        needsPreviousPin: false,
+        clearPreviousPin: false,
+        backToLogin: false,
+      }
+    case 'invalid_request':
+      return {
+        message: REQUEST_FIELDS_REJECTED,
+        needsPreviousPin: false,
+        clearPreviousPin: false,
+        backToLogin: false,
+      }
+    case 'invalid_function':
+      return {
+        message: REQUEST_FUNCTION_REJECTED,
+        needsPreviousPin: false,
+        clearPreviousPin: false,
+        backToLogin: false,
+      }
+    case 'unknown_class':
+      return {
+        message: REQUEST_CLASS_REJECTED,
+        needsPreviousPin: false,
+        clearPreviousPin: false,
+        backToLogin: false,
+      }
+    case 'server_error':
+    case 'server_misconfigured':
+    case 'invalid_response':
+      return {
+        message: REQUEST_SERVER_ERROR,
+        needsPreviousPin: false,
+        clearPreviousPin: false,
+        backToLogin: false,
+      }
     case 'network':
       return {
         message: REQUEST_NETWORK_ERROR,
@@ -396,6 +454,12 @@ export const PROSPECT_NETWORK_COPY =
   'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 export const PROSPECT_GENERIC_COPY = 'Não foi possível enviar a solicitação. Tente novamente.'
 export const PROSPECT_MEMBER_COPY = 'Este handle já pertence a um membro ativo. Entre com seu PIN.'
+export const PROSPECT_STATS_COPY =
+  'Os status enviados não conferem com a lista oficial. Recarregue a página e refaça as capturas.'
+export const PROSPECT_PROOF_COPY =
+  'O servidor não aceitou o comprovante. Envie de novo o print em JPEG da tela Básico.'
+export const PROSPECT_FIELDS_COPY =
+  'Algum dado do formulário foi recusado (ID, nick ou classe). Volte e revise a identificação.'
 
 export type ProspectStep = 1 | 2 | 3 | 4 | 5
 
@@ -482,6 +546,17 @@ export function prospectErrorCopy(error: FunctionError): ProspectErrorCopy {
       return { message: PROSPECT_CLASS_COPY, field: 'char_class' }
     case 'already_member':
       return { message: PROSPECT_MEMBER_COPY }
+    case 'invalid_stats':
+      return { message: PROSPECT_STATS_COPY }
+    case 'invalid_proof':
+      return { message: PROSPECT_PROOF_COPY }
+    case 'invalid_request':
+    case 'invalid_function':
+      return { message: PROSPECT_FIELDS_COPY }
+    case 'server_error':
+    case 'server_misconfigured':
+    case 'invalid_response':
+      return { message: REQUEST_SERVER_ERROR }
     case 'network':
       return { message: PROSPECT_NETWORK_COPY }
     default:

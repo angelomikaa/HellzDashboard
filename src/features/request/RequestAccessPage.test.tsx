@@ -8,6 +8,7 @@ import {
   formatRequestDate,
   prefillIdentity,
   prospectDraftFrom,
+  prospectErrorCopy,
   requestErrorCopy,
   requestFormProblem,
   requestProblemMessage,
@@ -194,6 +195,56 @@ describe('supersede flow (D-11)', () => {
     const copy = requestErrorCopy(new FunctionError(400, 'not_member', 'x'))
     expect(copy.message).toContain('Recrutamento')
     expect(copy.needsPreviousPin).toBe(false)
+  })
+
+  // Owner report 2026-10-23: a submit failed with the dead-end "Não foi
+  // possível enviar a solicitação. Tente novamente." — the server's real code
+  // was swallowed by the fallback. Every code the Edge can return now names
+  // the problem, and none of them may be the generic copy.
+  it('names each server rejection instead of the generic retry copy', () => {
+    const codes = [
+      'invalid_proof',
+      'invalid_stats',
+      'invalid_request',
+      'invalid_function',
+      'unknown_class',
+      'server_error',
+      'server_misconfigured',
+      'invalid_response',
+    ]
+    const generic = requestErrorCopy(new FunctionError(400, 'mystery_code', 'x')).message
+    for (const code of codes) {
+      const copy = requestErrorCopy(new FunctionError(400, code, 'x'))
+      expect(copy.message).not.toBe(generic)
+      expect(copy.message.length).toBeGreaterThan(10)
+      expect(copy.needsPreviousPin).toBe(false)
+    }
+    expect(requestErrorCopy(new FunctionError(400, 'invalid_proof', 'x')).message).toContain(
+      'comprovante',
+    )
+    expect(requestErrorCopy(new FunctionError(400, 'invalid_stats', 'x')).message).toContain(
+      'status',
+    )
+  })
+})
+
+describe('prospect submission errors — same diagnosis, wizard copy', () => {
+  it('names stats/proof/field/server failures and keeps the generic as a last resort', () => {
+    const generic = prospectErrorCopy(new FunctionError(400, 'mystery_code', 'x')).message
+    for (const code of [
+      'invalid_stats',
+      'invalid_proof',
+      'invalid_request',
+      'invalid_function',
+      'server_error',
+      'invalid_response',
+    ]) {
+      expect(prospectErrorCopy(new FunctionError(400, code, 'x')).message).not.toBe(generic)
+    }
+    expect(prospectErrorCopy(new FunctionError(400, 'invalid_stats', 'x')).message).toContain(
+      'status',
+    )
+    expect(prospectErrorCopy(new FunctionError(400, 'unknown_class', 'x')).field).toBe('char_class')
   })
 })
 
