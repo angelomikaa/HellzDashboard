@@ -27,8 +27,10 @@ import type { NeoFootSession } from '../auth/session'
 
 // Renders one ordered-set chip for a catalog entry within a (class, build-role)
 // combo. Phase 9 KEYU: no block-at-7 — chips stay clickable past 6; the 7th+
-// selection becomes a relevant automatically server-side. Shows selection_order
-// as a suffix: keys get `(n)` (1-6), relevants get `Rn` (7th+).
+// selection becomes a relevant automatically server-side. Keys keep the red
+// accent fill + the `(n)` order suffix (1-6); relevants are marked by the
+// PURPLE fill instead of the retired R1/R2 suffix (owner decision 2026-10-23 —
+// same toggle behavior, visual feedback only).
 function renderStatChip({
   entry,
   selected,
@@ -55,11 +57,12 @@ function renderStatChip({
         selected
           ? isKey
             ? 'border-accent bg-accent text-accent-foreground hover-primary'
-            : 'border-accent bg-accent text-accent-foreground hover-primary opacity-80'
+            : 'border-relevant bg-relevant text-accent-foreground hover-relevant'
           : 'border-line bg-surface text-content hover-control'
       }`}
     >
-      {entry.label}{isKey ? ` (${order})` : order > 6 ? ` R${order - 6}` : ''}
+      {entry.label}
+      {isKey ? ` (${order})` : ''}
     </button>
   )
 }
@@ -75,7 +78,7 @@ const INSUFFICIENT_OVR = '— dados insuficientes'
 // Phase 9: block-at-7 and key/relevant gating copy eliminated (KEYU-01).
 // Remaining: SESSION_ERROR / NETWORK_ERROR / SAVE_ERROR only.
 const TIER_LEGEND =
-  'Vermelho = chave (define o OVR) · a partir da 7ª seleção = relevante (guia o foco de melhoria)'
+  'Vermelho = chave (define o OVR) · Roxo = relevante (guia o foco de melhoria)'
 
 export type BuildRole = 'dps' | 'mdps' | 'suporte'
 

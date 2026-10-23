@@ -68,13 +68,14 @@
   --color-tier-gold: #E9B44C;         /* gold's ONLY surviving role (D-01) */
   --color-tier-platinum: #D7E3F0;
 
-  /* 07.2 D-06: relevant-tier signal — a DELIBERATE exception to the 07.1
-     D-01 single-accent rule (owner direction: relevant stats are marked
-     YELLOW on the Stats-Chave governance surface, against the red key
-     marking). Dedicated token family — it must NOT resurrect the retired
-     UI accent hex (D-06), and tier gold #E9B44C keeps its own tier role. */
-  --color-relevant: #D9A521;          /* relevant-tier border/fill signal */
-  --color-relevant-bright: #E8BC4D;   /* small yellow text on dark (≥4.5:1 on #1E1E1E) */
+  /* 07.2 D-06 (SUPERSEDED 2026-10-23, owner): the relevant-tier signal is a
+     PURPLE FILL on the Stats-Chave chips — replaces both the retired yellow
+     marking and the R1/R2 order suffix. Purely visual feedback: the toggle
+     behavior behind the chip is unchanged. Dedicated token family — it must
+     NOT collide with the accent red (keys) or tier gold. */
+  --color-relevant: #7C3AED;          /* relevant-tier fill signal (white text 5.7:1) */
+  --color-relevant-bright: #A78BFA;   /* small purple text on dark (6.1:1 on #1E1E1E) */
+  --color-relevant-hover: #8347EB;     /* relevant fill hover — one step brighter (5.2:1 white) */
 
   /* display font — hero elements only (D-07): wordmark/lockup, h1s, OVR/points numbers */
   --font-display: "Orbitron", "Segoe UI", system-ui, sans-serif;
@@ -169,6 +170,17 @@
   &:hover:not(:disabled) {
     background-color: var(--color-accent-hover);
     box-shadow: 0 0 18px 1px rgb(220 53 56 / 0.4), 0 0 2px 1px rgb(220 53 56 / 0.6);
+  }
+}
+
+/* Filled relevant chips (Stats-Chave): the purple fill brightens one step +
+   a faint purple glow appears — same one-step ramp language as hover-primary,
+   in the relevant token family. */
+@utility hover-relevant {
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+  &:hover:not(:disabled) {
+    background-color: var(--color-relevant-hover);
+    box-shadow: 0 0 18px 1px rgb(124 58 237 / 0.4), 0 0 2px 1px rgb(124 58 237 / 0.6);
   }
 }
 
