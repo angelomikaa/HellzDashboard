@@ -314,6 +314,21 @@ describe('pt-BR client labels (localized Details screens)', () => {
     }
   })
 
+  it('carries the pt-BR tooltip wording for the raw-defense captures', () => {
+    const expected = [
+      ['pdef_tooltip', 'DEFF de Equipamento', 'equip_pdef_raw'],
+      ['mdef_tooltip', 'DEFM de Equipamento', 'equip_mdef_raw'],
+    ] as const
+    for (const [capture, labelPt, fieldKey] of expected) {
+      const grammar = SCREENS[capture]
+      if (grammar.kind !== 'tooltip') throw new Error(`${capture} is not a tooltip grammar`)
+      expect(grammar.labelPt).toBe(labelPt)
+      expect(grammar.fieldKey).toBe(fieldKey)
+      // the line also prints the value ("DEFF de Equipamento: 5149")
+      expect(scoreLabelPair(`${labelPt}: 5149`, labelPt)).toBe(100)
+    }
+  })
+
   it('every localized label matches its own key inside its side vocabulary', () => {
     for (const capture of ['general', 'quasi', 'special'] as const) {
       const grammar = SCREENS[capture]

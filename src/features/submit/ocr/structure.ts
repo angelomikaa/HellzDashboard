@@ -252,6 +252,7 @@ export interface RowGrammar {
 export interface TooltipGrammar {
   kind: 'tooltip'
   label: string   // label to confirm on the line, e.g. 'Equipment PDEF'
+  labelPt?: string // pt-BR client wording, e.g. 'DEFF de Equipamento'
   fieldKey: string // transient field key, e.g. 'equip_pdef_raw'
 }
 
@@ -296,8 +297,18 @@ export const SCREENS = {
     // (e.g. TdR Global% 0 → no row; Dano x Bruto 0 → no row).
     omitsZeroRows: true,
   },
-  pdef_tooltip: { kind: 'tooltip', label: 'Equipment PDEF', fieldKey: 'equip_pdef_raw' },
-  mdef_tooltip: { kind: 'tooltip', label: 'Equipment MDEF', fieldKey: 'equip_mdef_raw' },
+  pdef_tooltip: {
+    kind: 'tooltip',
+    label: 'Equipment PDEF',
+    labelPt: 'DEFF de Equipamento',
+    fieldKey: 'equip_pdef_raw',
+  },
+  mdef_tooltip: {
+    kind: 'tooltip',
+    label: 'Equipment MDEF',
+    labelPt: 'DEFM de Equipamento',
+    fieldKey: 'equip_mdef_raw',
+  },
 } satisfies Record<CaptureKey, ScreenGrammar>
 
 /** The shipped fields of one capture (the read replaces exactly its own

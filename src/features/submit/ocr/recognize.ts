@@ -455,9 +455,13 @@ async function readTooltipScreen(
       whitelist: LABELS_WHITELIST,
     })
     const observed = normalizeLabel(labelText)
-    // Require 'equipment' so we never match 'Base PDEF' / 'PDEF gained...'
-    if (!observed.includes('equipment')) continue
-    if (scoreLabelPair(labelText, grammar.label) <= 0) continue
+    // Require the "equipment" wording (en) / "equipamento" (pt-BR) so we never
+    // match 'Base PDEF' / 'PDEF gained from base stats...'.
+    if (!observed.includes('equipment') && !observed.includes('equipamento')) continue
+    const labels = [grammar.label, grammar.labelPt].filter(
+      (label): label is string => typeof label === 'string' && label.length > 0,
+    )
+    if (!labels.some((label) => scoreLabelPair(labelText, label) > 0)) continue
 
     // Value pass: digits only, same band.
     const valueText = await ocrRect(worker, sourceCanvas, bandRect, {
