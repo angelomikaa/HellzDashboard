@@ -263,12 +263,22 @@ const LOCALIZED_CANONICAL = [
   { capture: 'quasi', file: 'sampidealptavancados.png' },
   { capture: 'special', file: 'sampidealptidealespecial.png' },
   { capture: 'special', file: 'sampespecialtdr.png' },
-  // Tooltip captures: the pt-BR wording is "DEF F/DEFM de Equipamento: N"
-  // (the reader used to require the literal English "equipment").
+]
+const hasLocalizedSamples = LOCALIZED_CANONICAL.every(({ file }) => existsSync(samplePath(file)))
+
+// Phase 9.1's raw-defense captures live on their OWN screenshot basis
+// (.secrets samples samplepdef/samplemdef, plus their pt-BR counterparts) —
+// a tooltip read is NOT part of the first-input Details flow. Kept in its own
+// list so the localized first-input experiment stays exactly that.
+// pt-BR wording: "DEFF de Equipamento: 5149" / "DEFM de Equipamento: 1525"
+// (the reader used to require the literal English word "equipment").
+const LOCALIZED_TOOLTIP_CANONICAL = [
   { capture: 'pdef_tooltip', file: 'samplepdefpt.png' },
   { capture: 'mdef_tooltip', file: 'samplemdefpt.png' },
 ]
-const hasLocalizedSamples = LOCALIZED_CANONICAL.every(({ file }) => existsSync(samplePath(file)))
+const hasLocalizedTooltipSamples = LOCALIZED_TOOLTIP_CANONICAL.every(({ file }) =>
+  existsSync(samplePath(file)),
+)
 
 async function loadSampleCanvas(file) {
   const { data, info } = await sharp(samplePath(file))
@@ -479,11 +489,41 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       }
       console.log(`[harness I] pt-BR fields=${total} correct=${correct}`)
       if (misses.length > 0) console.log(`[harness I] misses:\n${misses.join('\n')}`)
-      // 14 (Comuns) + 26 (Avançados) + 15 + 15 (both Especial shots)
-      // + 2 tooltip captures = 72. Every key has a printed row or is a
-      // documented zero-omission.
-      expect(total).toBe(72)
-      expect(correct).toBe(72)
+      // 14 (Comuns) + 26 (Avançados) + 15 + 15 (both Especial shots) = 70.
+      // Every key has a printed row or is a documented zero-omission.
+      expect(total).toBe(70)
+      expect(correct).toBe(70)
+    },
+  )
+
+  it.skipIf(!hasLocalizedTooltipSamples)(
+    'J) pt-BR raw-defense tooltips (Phase 9.1 flow, separate screenshot basis) read exactly',
+    { timeout: 30 * 60_000 },
+    async () => {
+      const expected = JSON.parse(readFileSync(EXPECTED_PATH, 'utf8'))
+      const misses = []
+      let correct = 0
+      for (const { capture, file } of LOCALIZED_TOOLTIP_CANONICAL) {
+        const canvas = await loadSampleCanvas(file)
+        const outcomes = await readScreenshot(capture, canvas)
+        const exp = expectedFor(expected, file)
+        for (const o of outcomes) {
+          const expectedRaw = exp[o.stat_key]
+          if (expectedRaw === undefined) {
+            misses.push(`${file}:${o.stat_key} has no ground-truth entry`)
+          } else if (o.status === 'filled' && matchesExpected(o.raw, expectedRaw, o.stat_key)) {
+            correct += 1
+          } else {
+            misses.push(
+              `${file}:${o.stat_key} got=${o.status === 'filled' ? JSON.stringify(o.raw) : '<failed>'} expected="${expectedRaw}"`,
+            )
+          }
+        }
+      }
+      console.log(`[harness J] pt-BR tooltips correct=${correct}`)
+      if (misses.length > 0) console.log(`[harness J] misses:\n${misses.join('\n')}`)
+      expect(misses).toEqual([])
+      expect(correct).toBe(LOCALIZED_TOOLTIP_CANONICAL.length)
     },
   )
 
