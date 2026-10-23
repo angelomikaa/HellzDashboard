@@ -55,6 +55,14 @@
 //      open prefills NOTHING (the nickname fragment "ryah"/"dh" is never taken
 //      as a name). The nickname is anchored on the class label's left edge —
 //      the game prints the two left-aligned.
+//   L) identity read is scale-invariant (owner report 2026-10-23 round 2: the
+//      tester's ORIGINAL higher-resolution Snipping-Tool capture failed with
+//      "Não conseguimos ler o nick" while the owner's compressed 739px copy
+//      read fine): the SAME canonical captures resampled to the Snipping-Tool
+//      widths (1000-2800px) must never dead-end with a null field, and the
+//      REPORTED card must read nickname/ID/class EXACTLY — readBasicProfile
+//      resamples to the calibrated operating width (identityReadDimensions)
+//      instead of trusting the source resolution.
 //   [D RETIRED (round 3): "the default centered-80% crop misaligns every
 //   region" was a mechanism claim about the region-fraction reader; the
 //   structural reader is not region-fraction-based, so the premise is gone.
@@ -320,6 +328,26 @@ async function rescaledSample(file, factor) {
   const src = await sharp(samplePath(file)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const w = Math.max(1, Math.round(src.info.width * factor))
   const h = Math.max(1, Math.round(src.info.height * factor))
+  const { data, info } = await sharp(src.data, { raw: { width: src.info.width, height: src.info.height, channels: 4 } })
+    .resize(w, h, { kernel: 'cubic' })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  const canvas = new FakeCanvas(info.width, info.height)
+  canvas._buf = new Uint8ClampedArray(data)
+  return canvas
+}
+
+/** Rescale a sample to an EXACT width — experiment L's Snipping-Tool-width
+ *  fixture (the tester's original captures are larger than the corpus). */
+async function rescaledSampleWidth(file, targetWidth) {
+  const src = await sharp(samplePath(file)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  return resampleRawToWidth(src, targetWidth)
+}
+
+async function resampleRawToWidth(src, targetWidth) {
+  const w = Math.max(1, Math.round(targetWidth))
+  const h = Math.max(1, Math.round((src.info.height * w) / src.info.width))
   const { data, info } = await sharp(src.data, { raw: { width: src.info.width, height: src.info.height, channels: 4 } })
     .resize(w, h, { kernel: 'cubic' })
     .ensureAlpha()
@@ -614,6 +642,63 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       )
       if (misses.length > 0) console.log(`[harness K] misses:\n${misses.join('\n')}`)
       expect(misses).toEqual([])
+    },
+  )
+
+  it.skipIf(!hasIdentitySamples)(
+    'L) identity read is scale-invariant: Snipping-Tool widths never dead-end, and the reported card reads exactly',
+    { timeout: 30 * 60_000 },
+    async () => {
+      // The 2026-10-23 round-2 owner report: the tester's ORIGINAL
+      // higher-resolution capture failed ("Não conseguimos ler o nick") while
+      // the owner's compressed 739px copy of the SAME card read fine. Measured
+      // before the resample fix, on this very card: 1200px lost the nickname,
+      // 1000px glued the copy badge into the ID as a digit ("399432"),
+      // 2800px produced "0170696"/"Aryahrd". readBasicProfile must resample
+      // every capture to the calibrated operating width (715px) instead of
+      // trusting the source resolution.
+      //
+      // Two acceptance tiers. (1) NO sample may dead-end with a null field at
+      // any width — the tester's failure mode is a missing-field error that
+      // forces full manual typing. (2) The REPORTED card must read exact at
+      // every width. The other samples' exact values are NOT pinned here: the
+      // fixture resamples synthetic upscales (native -> sharp cubic -> the
+      // read's own resample), a double-resample chain that perturbs pixels
+      // beyond what a production capture's single browser resample does; under
+      // that stress the copy/pencil badge can glue into a value ("Ahryard",
+      // "Ahrya Z", "399435") — a pre-existing OCR sensitivity the mandatory
+      // manual fix-up absorbs (D-03 review), not a regression of this fix.
+      const widths = [1000, 1200, 1478, 1800, 2200, 2800]
+      const deadEnds = []
+      const exactMisses = []
+      let reads = 0
+      for (const sample of IDENTITY_CANONICAL) {
+        for (const width of widths) {
+          const canvas = await rescaledSampleWidth(sample.file, width)
+          const read = await readBasicProfile(canvas)
+          reads += 1
+          for (const field of ['nickname', 'char_id', 'char_class']) {
+            // A dead-end is LOSING a field the native capture reads
+            // (sampbasicideal's canonical char_id IS null — the English card
+            // prints no readable ID — so null there is the pinned behavior).
+            if (sample[field] !== null && read[field] === null) {
+              deadEnds.push(`${sample.file}@${canvas.width}x${canvas.height} ${field} is null`)
+            }
+            if (sample.file === 'sampidentitysoldierhellz.jpg' && read[field] !== sample[field]) {
+              exactMisses.push(
+                `${sample.file}@${canvas.width}x${canvas.height} ${field} got=${JSON.stringify(read[field])} expected=${JSON.stringify(sample[field])}`,
+              )
+            }
+          }
+        }
+      }
+      console.log(
+        `[harness L] identity rescale reads=${reads} dead-ends=${deadEnds.length} exact-misses=${exactMisses.length}`,
+      )
+      if (deadEnds.length > 0) console.log(`[harness L] dead-ends:\n${deadEnds.join('\n')}`)
+      if (exactMisses.length > 0) console.log(`[harness L] exact misses:\n${exactMisses.join('\n')}`)
+      expect(deadEnds).toEqual([])
+      expect(exactMisses).toEqual([])
     },
   )
 
