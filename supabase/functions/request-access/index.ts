@@ -1,12 +1,14 @@
 // NeoFoot request-access Edge Function (Phase 8, plan 08-02; WHIT-08/09/10)
-// POST { discord_handle, pin, confirm_pin, request_type:'member'|'prospect',
+// POST { discord_handle, pin?, confirm_pin?, request_type:'member'|'prospect',
 //        char_id, nickname, char_class, char_function, proof_data_url,
 //        stats?: Array<{stat_key,value}>, previous_pin?: string }
 //   -> 200 { request_id, status:'pending' }
-// Anon intake for both self-request loops. Never writes members, never mints a
-// session, never echoes the PIN/hash. Proof images are uploaded with the service
-// role to the private staff-only `identity-proofs` bucket; a superseded request
-// is only replaced after its own PIN verifies (bcrypt + the shared lockout).
+// Anon intake for both self-request loops. The PIN pair is REQUIRED for a
+// 'member' re-link and ABSENT for a 'prospect' (0022: the applicant chooses the
+// PIN at first access, after staff approval). Never writes members, never mints
+// a session, never echoes the PIN/hash. Proof images are uploaded with the
+// service role to the private staff-only `identity-proofs` bucket; a superseded
+// request is only replaced after its own PIN verifies (bcrypt + shared lockout).
 import bcrypt from 'npm:bcryptjs@3'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
