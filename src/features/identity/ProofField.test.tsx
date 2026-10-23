@@ -25,6 +25,19 @@ describe('ProofField — structure', () => {
     expect(html).not.toContain('<form')
   })
 
+  // Capture parity (2026-10-22): the proof field shows the SAME optimal
+  // example the stats wizard and the prospect application use, so members
+  // photograph the same screen everywhere (the identity read needs it).
+  it('shows the optimal Basic example and the capture hint', () => {
+    const html = renderToStaticMarkup(
+      <ProofField value={null} onChange={() => {}} onImage={() => {}} />,
+    )
+    expect(html).toContain('href="/examples/basic.png"')
+    expect(html).toContain('src="/examples/basic.png"')
+    expect(html).toContain('Exemplo da tela básica do personagem')
+    expect(html).toContain('mesma captura do envio de status')
+  })
+
   it('previews the selected proof and offers Remover', () => {
     const dataUrl = 'data:image/jpeg;base64,AAAA'
     const html = renderToStaticMarkup(<ProofField value={dataUrl} onChange={() => {}} />)
