@@ -586,6 +586,22 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       if (cutRead.nickname !== null) {
         misses.push(`clipped crop: nickname got=${JSON.stringify(cutRead.nickname)} expected=null`)
       }
+      // Proof-path regression (2026-10-22): the request-access "Comprovante"
+      // read the WHOLE phone screenshot (dark game backdrop, no crop) and the
+      // nickname came out as a fragment. A whole-frame upload must prefill
+      // NOTHING — the crop overlay, now shared with the stats flow, is what
+      // isolates the card and makes the three fields readable.
+      const framed = await paddedSample(
+        'sampidentityaryah.jpg',
+        { top: 1.4, bottom: 3.4, left: 0.25, right: 0.25 },
+        { r: 18, g: 20, b: 26, alpha: 1 },
+      )
+      const framedRead = await readBasicProfile(framed)
+      if (framedRead.nickname !== null) {
+        misses.push(
+          `whole-frame proof (${framed.width}x${framed.height}): nickname got=${JSON.stringify(framedRead.nickname)} expected=null (no fragment from an uncropped screenshot)`,
+        )
+      }
       console.log(
         `[harness K] identity samples=${IDENTITY_CANONICAL.length} misses=${misses.length}`,
       )
