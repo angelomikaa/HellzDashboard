@@ -97,6 +97,22 @@ Deno.serve(async (req: Request) => {
 
   const key = nickname.toLowerCase()
 
+  async function memberByHandle(): Promise<MemberRow | null> {
+    if (handle.length === 0) return null
+    const { data, error } = await admin
+      .from('members')
+      .select('id, pin_hash, active, char_id')
+      .eq('active', true)
+      .ilike('discord_handle', escapeLike(handle))
+      .limit(2)
+    if (error) throw new Error('handle lookup failed')
+    const rows = (data ?? []) as MemberRow[]
+    // discord_handle is UNIQUE; two hits mean a broken registry, which must
+    // never be guessed.
+    if (rows.length > 1) throw new Error('ambiguous handle')
+    return rows[0] ?? null
+  }
+
   async function lookupStatus(): Promise<LookupStatus> {
     const { data, error } = await admin
       .from('members')
@@ -106,30 +122,32 @@ Deno.serve(async (req: Request) => {
     if (error) throw new Error('member lookup failed')
     const rows = (data ?? []) as MemberRow[]
     if (rows.length > 1) return 'ambiguous_identity'
-    const row = rows[0]
-    if (row) {
-      if (row.char_id !== null && row.char_id !== charId) return 'identity_mismatch'
-      return row.pin_hash === null ? 'ready' : 'pin_set'
+    const byNick = rows[0]
+    let byHandle: MemberRow | null
+    try {
+      byHandle = await memberByHandle()
+    } catch {
+      return 'ambiguous_identity'
     }
 
-    // Owner rule (2026-10-23): a Discord handle that already belongs to an
-    // ACTIVE account refuses the PIN system entirely. A claimed handle can never
-    // queue a new registration; an unclaimed one is an account waiting for its
-    // nickname to match, which an officer resolves.
-    if (handle.length > 0) {
-      const { data: byHandle, error: handleErr } = await admin
-        .from('members')
-        .select('id, pin_hash')
-        .eq('active', true)
-        .ilike('discord_handle', escapeLike(handle))
-        .limit(2)
-      if (handleErr) throw new Error('handle lookup failed')
-      const handleRows = (byHandle ?? []) as { id: string; pin_hash: string | null }[]
-      if (handleRows.length > 1) return 'ambiguous_identity'
-      if (handleRows.length === 1) {
-        return handleRows[0].pin_hash === null ? 'handle_registered' : 'handle_claimed'
-      }
+    // Owner rule (2026-10-23): a Discord handle that already belongs to a
+    // CLAIMED account refuses the PIN system entirely — no PIN setter, no
+    // registration request, ever. This is checked before the nickname answer so
+    // the handle cannot be used to reach another row.
+    if (byHandle && byHandle.pin_hash !== null && byNick?.id !== byHandle.id) {
+      return 'handle_claimed'
     }
+    // The handle belongs to an ACTIVE account without a PIN, but the print
+    // points at a different row: never queue a second registration for it.
+    if (byHandle && byNick && byNick.id !== byHandle.id) return 'handle_registered'
+
+    if (byNick) {
+      if (byNick.char_id !== null && byNick.char_id !== charId) return 'identity_mismatch'
+      return byNick.pin_hash === null ? 'ready' : 'pin_set'
+    }
+    // The handle is known without a PIN and the print nickname matches nothing:
+    // the account exists, so an officer fixes the nickname (never a new row).
+    if (byHandle) return 'handle_registered'
 
     if (handle.length > 0) {
       const { data: pending, error: pendingErr } = await admin
