@@ -21,6 +21,7 @@ import {
   mergeRuns,
   normalizeLabel,
   levenshtein,
+  isTooltipLabelLine,
   matchLabel,
   omittedZeroKeys,
   resolveConflicts,
@@ -330,8 +331,7 @@ describe('pt-BR client labels (localized Details screens)', () => {
   })
 
   it('every localized label matches its own key inside its side vocabulary', () => {
-    for (const capture of ['general', 'quasi', 'special'] as const) {
-      const grammar = SCREENS[capture]
+    for (const capture of ['general', 'quasi', 'special'] as const) {      const grammar = SCREENS[capture]
       if (grammar.kind !== 'rows') throw new Error(`${capture} is not a rows grammar`)
       const vocabs = grammar.columns === 2 ? [grammar.left, grammar.right] : [grammar.left]
       for (const vocab of vocabs) {
@@ -517,5 +517,49 @@ describe('rect types', () => {
   it('Rect uses left/top/width/height (spike crop semantics)', () => {
     const rect: Rect = { left: 1, top: 2, width: 3, height: 4 }
     expect(rect.left).toBe(1)
+  })
+})
+
+// Owner-clarified semantics (2026-10-22): the raw-defense tooltip prints TWO
+// numbers, and the values vary per character — what matters is the game's
+// relation `base DEF + equipment DEF = the PDEF/MDEF shown on the Details
+// screen`, and Phase 9.1 needs the EQUIPMENT term for
+// `floor(equipment / (1 + pct))`. So the reader must lock onto the equipment
+// line by its wording alone, never by comparing numbers.
+describe('isTooltipLabelLine (equipment line only — never the base line)', () => {
+  const pdefLabels = ['Equipment PDEF', 'DEFF de Equipamento']
+  const mdefLabels = ['Equipment MDEF', 'DEFM de Equipamento']
+
+  it('accepts the equipment line exactly as the samples print it', () => {
+    expect(isTooltipLabelLine('Equipment PDEF: 4760', pdefLabels)).toBe(true)
+    expect(isTooltipLabelLine('Equipment MDEF: 1523', mdefLabels)).toBe(true)
+    expect(isTooltipLabelLine('DEFF de Equipamento: 5149', pdefLabels)).toBe(true)
+    expect(isTooltipLabelLine('DEFM de Equipamento: 1525', mdefLabels)).toBe(true)
+  })
+
+  it('accepts the measured OCR deformations of that line', () => {
+    // The real crops read as "Equipment PDEFO" / "Base PDEFé" on the English
+    // 9.1 samples (trailing glyph bleeds into the band).
+    expect(isTooltipLabelLine('Equipment PDEFO', pdefLabels)).toBe(true)
+  })
+
+  it('rejects the base line — the number we must NOT feed the equation', () => {
+    expect(isTooltipLabelLine('Base PDEF: 136', pdefLabels)).toBe(false)
+    expect(isTooltipLabelLine('Base MDEF: 228', mdefLabels)).toBe(false)
+    expect(isTooltipLabelLine('Base PDEF: 117', pdefLabels)).toBe(false)
+    expect(isTooltipLabelLine('Base PDEFé', pdefLabels)).toBe(false)
+  })
+
+  it('rejects the itemized description and the tooltip header lines', () => {
+    expect(isTooltipLabelLine('DEFF obtido de equipamentos e outras fontes.', pdefLabels)).toBe(false)
+    expect(isTooltipLabelLine('Reduces your PDMG taken', pdefLabels)).toBe(false)
+    expect(isTooltipLabelLine('Currently contains', pdefLabels)).toBe(false)
+  })
+
+  it('does not depend on the value (only the wording selects the line)', () => {
+    for (const value of ['0', '7', '136', '5149', '99999']) {
+      expect(isTooltipLabelLine(`DEFF de Equipamento: ${value}`, pdefLabels)).toBe(true)
+      expect(isTooltipLabelLine(`Base PDEF: ${value}`, pdefLabels)).toBe(false)
+    }
   })
 })

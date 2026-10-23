@@ -557,6 +557,29 @@ export function matchLabel(observed: string, vocabKeys: string[]): LabelMatch | 
   return bestKey === null ? null : { key: bestKey, score: bestScore }
 }
 
+/**
+ * True when a tooltip text band is the raw-defense line we want — i.e. the
+ * EQUIPMENT line (`Equipment PDEF: 4760` / `DEFF de Equipamento: 5149`).
+ *
+ * The tooltip prints two numbers, and only one of them is usable: the base line
+ * (`Base PDEF: 136` / `Base PDEF: 117`) is NOT read, because the game's
+ * relationship is
+ *
+ *     base DEF + equipment DEF = the PDEF/MDEF shown on the Details screen
+ *
+ * and Phase 9.1 needs the equipment term for `floor(equipment / (1 + pct))`.
+ * So the wording gate rejects anything that isn't the equipment line, including
+ * the itemized description (`DEFF obtido de equipamentos e outras fontes.`).
+ *
+ * Values differ per character — this predicate deliberately only looks at the
+ * label text, never at the number.
+ */
+export function isTooltipLabelLine(labelText: string, labels: readonly string[]): boolean {
+  const observed = normalizeLabel(labelText)
+  if (!observed.includes('equipment') && !observed.includes('equipamento')) return false
+  return labels.some((label) => label.length > 0 && scoreLabelPair(labelText, label) > 0)
+}
+
 // ---------------------------------------------------------------------------
 // Adaptive upscale
 // ---------------------------------------------------------------------------

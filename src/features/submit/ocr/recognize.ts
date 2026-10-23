@@ -61,12 +61,11 @@ import {
   detectRowCells,
   fieldKeysFor,
   findTextBands,
+  isTooltipLabelLine,
   matchLabel,
-  normalizeLabel,
   omittedZeroKeys,
   resolveConflicts,
   rowProfile,
-  scoreLabelPair,
   upscaleForHeight,
   type Rect,
   type RowGrammar,
@@ -454,14 +453,14 @@ async function readTooltipScreen(
     const labelText = await ocrRect(worker, sourceCanvas, bandRect, {
       whitelist: LABELS_WHITELIST,
     })
-    const observed = normalizeLabel(labelText)
-    // Require the "equipment" wording (en) / "equipamento" (pt-BR) so we never
-    // match 'Base PDEF' / 'PDEF gained from base stats...'.
-    if (!observed.includes('equipment') && !observed.includes('equipamento')) continue
+    // The tooltip carries TWO numbers (Base PDEF and Equipment PDEF); only the
+    // equipment line is the term Phase 9.1 needs (base + equipment = the PDEF
+    // shown on the Details screen). The predicate rejects the base line and the
+    // itemized description, and accepts the pt-BR wording too.
     const labels = [grammar.label, grammar.labelPt].filter(
       (label): label is string => typeof label === 'string' && label.length > 0,
     )
-    if (!labels.some((label) => scoreLabelPair(labelText, label) > 0)) continue
+    if (!isTooltipLabelLine(labelText, labels)) continue
 
     // Value pass: digits only, same band.
     const valueText = await ocrRect(worker, sourceCanvas, bandRect, {
