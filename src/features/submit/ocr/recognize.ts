@@ -517,6 +517,71 @@ function wordsFromBlocks(data: unknown): OcrWord[] {
   return words
 }
 
+// ---------------------------------------------------------------------------
+// Identity read operating scale
+// ---------------------------------------------------------------------------
+//
+// Owner report (2026-10-23, round 2): the owner's compressed 739px copy read
+// all three fields, but the tester's ORIGINAL Snipping-Tool capture (higher
+// resolution) failed with "Não conseguimos ler o nick". ProofField hands this
+// read the image at FULL source resolution, and the whole identity corpus is
+// calibrated on 691-739px captures — outside that band Tesseract's word
+// segmentation and glyph confusions shift (measured on the same card):
+//
+//   1200px  the name's box no longer starts on the label's left edge -> null
+//   1000px  the copy badge after the ID reads as digit "2" -> ID "399432"
+//   2800px  the label's D reads as a glued "0" -> ID "0170696"; the badge
+//           fragments glue into the name -> "Aryahrd"
+//
+// A wrong prefill is worse than none (D-03), so the read does not chase those
+// per-scale misreads with heuristics: it resamples every capture to ONE
+// canonical operating width — the one the corpus was calibrated against.
+
+export const IDENTITY_READ_WIDTH = 715
+const IDENTITY_READ_BAND = 0.05
+
+/**
+ * The dimensions the identity read runs at. Inside the ±5% band around the
+ * canonical width the capture is used as-is (the calibrated corpus —
+ * 691/707/725/739px — never gets resampled); anything else — a 1200px
+ * Snipping-Tool original, a 2800px snip, a tight 300px crop — is resampled to
+ * the canonical width so the reader sees one operating point, not a per-device
+ * lottery. Invalid dimensions pass through untouched (the decode path owns
+ * that failure).
+ */
+export function identityReadDimensions(
+  width: number,
+  height: number,
+): { width: number; height: number } {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return { width, height }
+  }
+  const scale = IDENTITY_READ_WIDTH / width
+  if (scale >= 1 - IDENTITY_READ_BAND && scale <= 1 + IDENTITY_READ_BAND) {
+    return { width, height }
+  }
+  return {
+    width: IDENTITY_READ_WIDTH,
+    height: Math.max(1, Math.round((height * IDENTITY_READ_WIDTH) / width)),
+  }
+}
+
+/** High-quality resample of a canvas (the identity read's scale normalizer). */
+function resampleCanvas(source: HTMLCanvasElement, width: number, height: number): HTMLCanvasElement {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = ctx2d(canvas, true)
+  ctx.imageSmoothingEnabled = true
+  // Downscaling a 2800px snip with 'low' quality aliases the glyphs away —
+  // demand the best filter the browser has for the canonical resample.
+  ctx.imageSmoothingQuality = 'high'
+  // explicit 5-arg form (the 3-arg convenience overload is outside the
+  // drawImage contract the offline harness pins)
+  ctx.drawImage(source, 0, 0, width, height)
+  return canvas
+}
+
 /**
  * Read the character identity (nickname / ID / job) from a Basic screenshot in
  * ONE full-canvas OCR pass: the text is parsed with the pure identity module,
@@ -524,6 +589,10 @@ function wordsFromBlocks(data: unknown): OcrWord[] {
  * the class label — text alone cannot tell a name from a crop-cut fragment)
  * and the ID falls back to the same boxes when the text row is unreadable
  * ("ID 17069" can glue into "1017069E" — geometry, not text, splits it).
+ * The canvas is first resampled to the canonical operating width
+ * (identityReadDimensions) — the calibrated corpus is 691-739px and the
+ * tester's higher-resolution originals must read identically to the
+ * compressed copies, not per-scale differently.
  *
  * Used by first access (D-03) and the member request form. The existing worker
  * is shared; PSM is switched to SPARSE_TEXT for this read and restored to the
@@ -535,8 +604,13 @@ export async function readBasicProfile(
   image: ImageBitmap | HTMLCanvasElement,
 ): Promise<BasicProfileRead> {
   const worker = await getWorker()
-  const canvas =
+  const source =
     image instanceof HTMLCanvasElement ? image : imageToData(image).canvas
+  // Resample BEFORE the single pass: the text and the word boxes must share
+  // the same (canonical) space the layout thresholds were calibrated on.
+  const dims = identityReadDimensions(source.width, source.height)
+  const canvas =
+    dims.width === source.width ? source : resampleCanvas(source, dims.width, dims.height)
 
   await worker.setParameters({
     tessedit_pageseg_mode: PSM.SPARSE_TEXT,
