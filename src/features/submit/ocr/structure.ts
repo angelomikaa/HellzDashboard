@@ -239,6 +239,12 @@ export interface RowGrammar {
   columns: 1 | 2
   left: string[]
   right: string[]
+  /** The game OMITS a row whose value is zero instead of printing 0.00%
+   * (measured on the Especial column: a 0% stat has no line at all, while the
+   * Atributos Comuns/Avançados columns do print their zeros). When set, a key
+   * between two read rows and without a row of its own is a ZERO, not a failed
+   * read — see `omittedZeroKeys`. */
+  omitsZeroRows?: boolean
 }
 
 /** Tooltip capture: one line carries both label and value (e.g.
@@ -286,6 +292,9 @@ export const SCREENS = {
       'dmg_reduction_vs_brute', 'dmg_reduction_vs_demi_human',
     ],
     right: [],
+    // Owner-measured: the Especial list hides zero-valued lines entirely
+    // (e.g. TdR Global% 0 → no row; Dano x Bruto 0 → no row).
+    omitsZeroRows: true,
   },
   pdef_tooltip: { kind: 'tooltip', label: 'Equipment PDEF', fieldKey: 'equip_pdef_raw' },
   mdef_tooltip: { kind: 'tooltip', label: 'Equipment MDEF', fieldKey: 'equip_mdef_raw' },
@@ -374,9 +383,10 @@ export const GAME_LABELS: Record<string, string> = {
  *    `pvp_dmg_bonus`: the pt rows clip to "…ção de Dano J…" where the icon
  *    glyph lands, so the exact wording is unknown. Those four ride on order
  *    mode (the 13+13 quasi capture), which is locale-blind.
- *  - `global_cd_pct`: the pt-BR Especial screen does not show the row at all
- *    (it shows PV Máx% + PM Máx% where English shows Max SP + Global CD%),
- *    so it cannot be label-matched — the value stays manual on this screen. */
+ *
+ * `max_hp_pct` is listed even though no capture reads it: the pt-BR Especial
+ * panel starts with a "PV Máx%" row, and knowing that row keeps it from being
+ * counted as an unreadable row when the zero-omission rule infers values. */
 export const GAME_LABELS_PT: Record<string, string> = {
   // Atributos Comuns (general)
   hp: 'PV',
@@ -419,11 +429,13 @@ export const GAME_LABELS_PT: Record<string, string> = {
   mdmg_bonus: 'Dano M Bônus',
   // Especial (special) — label mode is the ONLY path for the single-column
   // capture, so these entries are what makes that screen readable on pt-BR.
+  max_hp_pct: 'PV Máx%',
   max_sp_pct: 'PM Máx%',
   equip_patk_pct: 'ATQF de Equipamento%',
   equip_matk_pct: 'ATQM de Equipamento%',
   equip_pdef_pct: 'DEFF de Equipamento%',
   equip_mdef_pct: 'DEFM de Equipamento%',
+  global_cd_pct: 'TdR Global%',
   dmg_vs_small: 'Dano x Inimigos Pequenos',
   dmg_reduction_vs_small: 'Redução de Dano x Inimigos Pequenos',
   dmg_vs_medium: 'Dano x Inimigo Médio',
@@ -681,6 +693,37 @@ export function resolveConflicts(assignments: KeyAssignment[]): Map<string, KeyA
     }
   }
   return byKey
+}
+
+/** Raw text for a row the panel omits because its value is zero. */
+export const OMITTED_ZERO_RAW = '0'
+
+/**
+ * Keys the panel omitted because their value is zero. The game hides a
+ * zero-valued line instead of printing 0.00% (owner-measured on the Especial
+ * column). Only keys BETWEEN the first and last row we actually read are
+ * inferred: a cropped/scrolled screenshot that starts or ends mid-section must
+ * stay 'failed' at its edges — blank must never become 0 there.
+ *
+ * `unexplainedRows` is the number of rendered rows we could not place at all;
+ * any such row could be the "missing" one, so nothing is inferred.
+ */
+export function omittedZeroKeys(
+  grammar: RowGrammar,
+  matchedKeys: Iterable<string>,
+  unexplainedRows = 0,
+): string[] {
+  if (grammar.omitsZeroRows !== true || unexplainedRows > 0) return []
+  const keys = [...grammar.left, ...grammar.right]
+  const matched = new Set(matchedKeys)
+  const indices: number[] = []
+  keys.forEach((key, i) => {
+    if (matched.has(key)) indices.push(i)
+  })
+  if (indices.length < 2) return []
+  const first = Math.min(...indices)
+  const last = Math.max(...indices)
+  return keys.slice(first + 1, last).filter((key) => !matched.has(key))
 }
 
 // ---------------------------------------------------------------------------

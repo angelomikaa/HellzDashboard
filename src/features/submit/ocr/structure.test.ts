@@ -22,6 +22,7 @@ import {
   normalizeLabel,
   levenshtein,
   matchLabel,
+  omittedZeroKeys,
   resolveConflicts,
   rowProfile,
   columnProfileInRange,
@@ -301,10 +302,6 @@ describe('pt-BR client labels (localized Details screens)', () => {
       expect(GAME_LABELS_PT[key], `pt label for ${key}`).toBeTruthy()
     }
     for (const key of fieldKeysFor('special')) {
-      // The pt-BR Especial screen has no Global CD row (it shows PV Máx% +
-      // PM Máx% where the English client shows Max SP + Global CD%), so that
-      // value stays manual on this screen — asserting the gap keeps it honest.
-      if (key === 'global_cd_pct') continue
       expect(GAME_LABELS_PT[key], `pt label for ${key}`).toBeTruthy()
     }
   })
@@ -330,6 +327,48 @@ describe('pt-BR client labels (localized Details screens)', () => {
         }
       }
     }
+  })
+})
+
+describe('omittedZeroKeys (the Especial panel hides zero-valued rows)', () => {
+  const specialGrammar = () => {
+    const grammar = SCREENS.special
+    if (grammar.kind !== 'rows') throw new Error('special is not a rows grammar')
+    return grammar
+  }
+
+  it('infers an interior missing row as zero (TdR Global% 0 → no line)', () => {
+    const grammar = specialGrammar()
+    const matched = grammar.left.filter((key) => key !== 'global_cd_pct')
+    expect(omittedZeroKeys(grammar, matched)).toEqual(['global_cd_pct'])
+  })
+
+  it('infers both interior brute rows when a shot skips them', () => {
+    const grammar = specialGrammar()
+    const matched = grammar.left.filter(
+      (key) => key !== 'dmg_vs_brute' && key !== 'dmg_reduction_vs_brute',
+    )
+    expect(omittedZeroKeys(grammar, matched)).toEqual(['dmg_vs_brute', 'dmg_reduction_vs_brute'])
+  })
+
+  it('never infers at the edges: a cropped/scrolled shot keeps those failed', () => {
+    const grammar = specialGrammar()
+    // samppt1-style: the Especial list is cut off after Dano x Inimigo Grande.
+    const matched = grammar.left.slice(0, grammar.left.indexOf('dmg_vs_large') + 1)
+    expect(omittedZeroKeys(grammar, matched)).toEqual([])
+  })
+
+  it('infers nothing when a rendered row could not be placed', () => {
+    const grammar = specialGrammar()
+    const matched = grammar.left.filter((key) => key !== 'global_cd_pct')
+    expect(omittedZeroKeys(grammar, matched, 1)).toEqual([])
+  })
+
+  it('leaves the columns that DO print their zeros alone', () => {
+    const general = SCREENS.general
+    if (general.kind !== 'rows') throw new Error('general is not a rows grammar')
+    expect(general.omitsZeroRows).toBeUndefined()
+    expect(omittedZeroKeys(general, ['hp'])).toEqual([])
   })
 })
 

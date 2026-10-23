@@ -49,7 +49,9 @@ import { computePanelRect } from './locate'
 import {
   DARK_LUMA_MAX,
   DIGITS_WHITELIST,
+  GAME_LABELS,
   LABELS_WHITELIST,
+  OMITTED_ZERO_RAW,
   PILL_DIGITS_WHITELIST,
   PILL_THRESHOLD,
   SCREENS,
@@ -61,6 +63,7 @@ import {
   findTextBands,
   matchLabel,
   normalizeLabel,
+  omittedZeroKeys,
   resolveConflicts,
   rowProfile,
   scoreLabelPair,
@@ -241,6 +244,11 @@ function vocabFor(grammar: RowGrammar, side: 'L' | 'R'): string[] {
   return grammar.columns === 2 ? (side === 'L' ? grammar.left : grammar.right) : grammar.left
 }
 
+/** Every stat key we can name, across all screens. A row that names one of
+ * these but is not part of the capture being read belongs to another section
+ * scrolled into frame — understood, not unreadable. */
+const ALL_LABEL_KEYS = Object.keys(GAME_LABELS)
+
 /**
  * Read a Details screen (rows grammar): detect cells, assign keys (fixed row
  * order when band counts match exactly — skips label OCR; label OCR +
@@ -259,6 +267,7 @@ async function readRowsScreen(
 
   const ordered = assignByOrder(cells, grammar)
   let assignments
+  let unexplainedRows = 0
   if (ordered) {
     assignments = ordered
   } else {
@@ -266,17 +275,51 @@ async function readRowsScreen(
     // capture's vocabulary (scroll mixtures, extra sections and truncated
     // labels handled there).
     assignments = []
+    const seenKeys = new Set<string>()
+    let duplicateKey = false
     for (const cell of cells) {
-      if (!cell.labelRect) continue
+      if (!cell.labelRect) {
+        unexplainedRows += 1
+        continue
+      }
       const observed = await ocrRect(worker, source, cell.labelRect, {
         whitelist: LABELS_WHITELIST,
       })
-      const match = matchLabel(observed, vocabFor(grammar, cell.side))
-      if (match) assignments.push({ key: match.key, cell, labelScore: match.score })
+      const vocab = vocabFor(grammar, cell.side)
+      const match = matchLabel(observed, vocab)
+      // Prefer a stat that lives on ANOTHER screen when it is a better read
+      // than anything in this capture's vocabulary: on pt-BR the Especial
+      // panel starts with "PV Máx%" (max_hp_pct, read elsewhere) which loses
+      // the vocabulary match to "PM Máx%" (max_sp_pct) by one glyph.
+      const elsewhere = matchLabel(observed, ALL_LABEL_KEYS)
+      if (
+        elsewhere &&
+        !vocab.includes(elsewhere.key) &&
+        elsewhere.score >= 85 &&
+        elsewhere.score > (match?.score ?? 0)
+      ) {
+        continue // known row of another section — it explains itself
+      }
+      if (!match) {
+        if (elsewhere && elsewhere.score >= 85) continue
+        unexplainedRows += 1
+        continue
+      }
+      if (seenKeys.has(match.key)) duplicateKey = true
+      seenKeys.add(match.key)
+      assignments.push({ key: match.key, cell, labelScore: match.score })
     }
+    // Two rows claiming one key means at least one row is misread: do not
+    // infer any zero from that screen (see omittedZeroKeys).
+    if (duplicateKey) unexplainedRows += 1
   }
 
   const byKey = resolveConflicts(assignments)
+  // A zero-valued row is never drawn on the Especial panel: infer it instead
+  // of reporting a read failure (owner-measured rule).
+  for (const key of omittedZeroKeys(grammar, byKey.keys(), unexplainedRows)) {
+    values.set(key, OMITTED_ZERO_RAW)
+  }
   for (const [key, a] of byKey) {
     const raw = await ocrRect(worker, source, a.cell.valueRect, { whitelist: DIGITS_WHITELIST })
     values.set(key, raw)
