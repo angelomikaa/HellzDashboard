@@ -254,13 +254,15 @@ const TOOLTIP_CANONICAL = [
 // the screens members actually photograph (owner-seeded 08.10). Kept separate
 // from CANONICAL so the English counts and the rescale (G) / loose-margin (H)
 // experiments stay pinned to the 4 English fixtures.
-// Note: the pt-BR Especial screen has NO Global CD row (it shows PV Máx% +
-// PM Máx% where the English client shows Max SP + Global CD%), so
-// global_cd_pct has no expectation here — the value stays manual on pt-BR.
+// The Especial panel OMITS zero-valued rows (owner-measured: a 0% stat has no
+// line), so the two samples together cover both paths — one where TdR Global%
+// has no row (⇒ 0) and one where it prints -10.00% while Dano x Bruto /
+// Redução de Dano x Bruto have no rows (⇒ 0).
 const LOCALIZED_CANONICAL = [
   { capture: 'general', file: 'sampidealptcomuns.png' },
   { capture: 'quasi', file: 'sampidealptavancados.png' },
   { capture: 'special', file: 'sampidealptidealespecial.png' },
+  { capture: 'special', file: 'sampespecialtdr.png' },
 ]
 const hasLocalizedSamples = LOCALIZED_CANONICAL.every(({ file }) => existsSync(samplePath(file)))
 
@@ -461,10 +463,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
           total += 1
           const expectedRaw = exp[o.stat_key]
           if (expectedRaw === undefined) {
-            // Documented structural gap (see LOCALIZED_CANONICAL): the pt-BR
-            // screen has no row for this stat, so a FILLED outcome would be a
-            // guess, not a read.
-            if (o.status === 'filled') misses.push(`${file}:${o.stat_key} filled without a pt-BR row`)
+            misses.push(`${file}:${o.stat_key} has no ground-truth entry`)
             continue
           }
           if (o.status === 'filled' && matchesExpected(o.raw, expectedRaw, o.stat_key)) correct += 1
@@ -476,10 +475,10 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       }
       console.log(`[harness I] pt-BR fields=${total} correct=${correct}`)
       if (misses.length > 0) console.log(`[harness I] misses:\n${misses.join('\n')}`)
-      // 14 (Comuns) + 26 (Avançados) + 15 (Especial) = 55 outcomes;
-      // 54 have a printed row to match — global_cd_pct has no pt-BR row.
-      expect(total).toBe(55)
-      expect(correct).toBe(54)
+      // 14 (Comuns) + 26 (Avançados) + 15 + 15 (both Especial shots) = 70.
+      // Every key has a printed row or is a documented zero-omission.
+      expect(total).toBe(70)
+      expect(correct).toBe(70)
     },
   )
 
