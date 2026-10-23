@@ -92,7 +92,7 @@ describe('requestFormProblem — shared identity form', () => {
       null,
     )
     // every other rule still applies
-    expect(requestFormProblem({ ...VALID, pin: '' }, { requirePin: false })).toBe('proof')
+    expect(requestFormProblem({ ...VALID, proofDataUrl: null }, { requirePin: false })).toBe('proof')
   })
 })
 
