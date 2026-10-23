@@ -615,15 +615,14 @@ export async function fetchRoleRank(
 export async function fetchKeyRelevantStats(
   session: NeoFootSession,
   className: string,
-  charFunction?: 'dps' | 'mdps' | 'suporte',
 ): Promise<string[]> {
   // RLS: staff-only read (staff_select_relevant_stats, 0013) — a member JWT
-  // gets [] from the policy filter, which is NOT an error. Mirrors fetchKeyStats
-  // shape; per-(class, char_function) read when a function is supplied.
-  let path = `/class_relevant_stats?class_name=eq.${encodeURIComponent(className)}&select=stat_key`
-  if (charFunction) {
-    path += `&char_function=eq.${charFunction}`
-  }
+  // gets [] from the policy filter, which is NOT an error. LEGACY surface:
+  // class_relevant_stats was never re-keyed per build role (0018 kept it
+  // class-level for rollback safety), so there is NO char_function column —
+  // never add a `char_function=eq.` filter here (PostgREST 400s). Phase 9
+  // KEYU reads relevants from class_key_stats positions 7+ instead.
+  const path = `/class_relevant_stats?class_name=eq.${encodeURIComponent(className)}&select=stat_key`
   const res = await restFetch(session, path)
   const rows = await parseBody<{ stat_key: string }[]>(res)
   return (rows ?? []).map((r) => r.stat_key)

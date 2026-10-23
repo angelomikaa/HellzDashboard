@@ -17,7 +17,6 @@ import {
   fetchCatalog,
   fetchClasses,
   fetchClassTop5,
-  fetchKeyRelevantStats,
   fetchKeyStats,
   setKeyStat,
   type ClassTop5Row,
@@ -89,10 +88,11 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
   const [selectedFunction, setSelectedFunction] = useState<BuildRole | ''>('')
 
   // Per-(class, function) server views: keyStats = current ordered set
-  // (first 6 = keys, 7th+ = relevants), top5 = preview. relevantStats kept
-  // for the coverage count (KEYU: unified set, no separate relevant tier).
+  // (first 6 = keys, 7th+ = relevants), top5 = preview. KEYU: relevants are
+  // derived from the ordered set (positions 7+) — the legacy
+  // class_relevant_stats table is no longer read (0018 never re-keyed it,
+  // so a char_function filter there 400s).
   const [keyStats, setKeyStats] = useState<string[] | null>(null)
-  const [relevantStats, setRelevantStats] = useState<string[] | null>(null)
   const [top5, setTop5] = useState<ClassTop5Row[] | null>(null)
   const [classError, setClassError] = useState<string | null>(null)
 
@@ -123,14 +123,12 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
   // class or function change.
   const loadClassData = useCallback(
     async (className: string, charFunction: BuildRole | '', isStale?: () => boolean) => {
-      const [keys, relevants, preview] = await Promise.all([
+      const [keys, preview] = await Promise.all([
         fetchKeyStats(session, className, charFunction || undefined),
-        fetchKeyRelevantStats(session, className, charFunction || undefined),
         fetchClassTop5(session, className),
       ])
       if (isStale?.()) return
       setKeyStats(keys)
-      setRelevantStats(relevants)
       setTop5(preview)
     },
     [session],
@@ -140,7 +138,6 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
     if (selectedClass === '' || selectedFunction === '') return
     let cancelled = false
     setKeyStats(null)
-    setRelevantStats(null)
     setTop5(null)
     setClassError(null)
     setToggleError(null)
@@ -267,7 +264,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
             <p className="mt-6 text-center text-base text-muted">
               Selecione a função de build para ver os stats-chave.
             </p>
-          ) : keyStats === null || relevantStats === null || top5 === null ? (
+          ) : keyStats === null || top5 === null ? (
             <p className="mt-6 text-base text-muted">Carregando…</p>
           ) : (
             <>
