@@ -49,6 +49,12 @@
 //   region-map read path (rectToPixels + prepareCandidates); the structural
 //   reader has no per-region replica to mirror. Gate decomposition evidence
 //   lives in the debug session records.]
+//   K) identity header (08.10 hotfix, owner-reported garbage prefill 2026-10-22):
+//      readBasicProfile reads nickname/ID/class exactly on the two canonical
+//      Basic samples AND on the owner's capture, and a crop that cuts the name
+//      open prefills NOTHING (the nickname fragment "ryah"/"dh" is never taken
+//      as a name). The nickname is anchored on the class label's left edge —
+//      the game prints the two left-aligned.
 //   [D RETIRED (round 3): "the default centered-80% crop misaligns every
 //   region" was a mechanism claim about the region-fraction reader; the
 //   structural reader is not region-fraction-based, so the premise is gone.
@@ -124,7 +130,7 @@ vi.mock('tesseract.js', async () => {
 })
 
 // --- production pipeline (verbatim) -------------------------------------------------
-import { readScreenshot } from '../src/features/submit/ocr/recognize'
+import { readBasicProfile, readScreenshot } from '../src/features/submit/ocr/recognize'
 import { CAPTURES } from '../src/features/submit/ocr/regions'
 import { needsCrop } from '../src/features/submit/OcrCapture'
 import { parseStatValue } from '../src/lib/parseStatValue'
@@ -280,6 +286,17 @@ const hasLocalizedTooltipSamples = LOCALIZED_TOOLTIP_CANONICAL.every(({ file }) 
   existsSync(samplePath(file)),
 )
 
+// Identity header fixtures (experiment K). The two Basic screenshots are the
+// canonical English/pt-BR samples; the third is the owner's real capture that
+// prefilled "dh" — expected "Aryah" (the card literally prints A-r-y-a-h at
+// 10x zoom), ID 39943, High Priest.
+const IDENTITY_CANONICAL = [
+  { file: 'sampbasicideal.png', nickname: 'Ahrya', char_id: null, char_class: 'Gypsy' },
+  { file: 'Samplebasicptbr.png', nickname: 'Ahrya', char_id: '32980', char_class: 'High Priest' },
+  { file: 'sampidentityaryah.jpg', nickname: 'Aryah', char_id: '39943', char_class: 'High Priest' },
+]
+const hasIdentitySamples = IDENTITY_CANONICAL.every(({ file }) => existsSync(samplePath(file)))
+
 async function loadSampleCanvas(file) {
   const { data, info } = await sharp(samplePath(file))
     .ensureAlpha()
@@ -299,6 +316,18 @@ async function rescaledSample(file, factor) {
   const { data, info } = await sharp(src.data, { raw: { width: src.info.width, height: src.info.height, channels: 4 } })
     .resize(w, h, { kernel: 'cubic' })
     .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  const canvas = new FakeCanvas(info.width, info.height)
+  canvas._buf = new Uint8ClampedArray(data)
+  return canvas
+}
+
+/** Crop a sample to a pixel rect (the crop-overlay fixture). */
+async function croppedSample(file, rect) {
+  const { data, info } = await sharp(samplePath(file))
+    .ensureAlpha()
+    .extract(rect)
     .raw()
     .toBuffer({ resolveWithObject: true })
   const canvas = new FakeCanvas(info.width, info.height)
@@ -387,6 +416,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       },
     }
     global.ImageData = FakeImageData
+    global.HTMLCanvasElement = FakeCanvas // readBasicProfile's canvas fast-path
     hoisted.setEncoder(async (canvas) =>
       sharp(Buffer.from(canvas._buffer()), {
         raw: { width: canvas.width, height: canvas.height, channels: 4 },
@@ -524,6 +554,43 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       if (misses.length > 0) console.log(`[harness J] misses:\n${misses.join('\n')}`)
       expect(misses).toEqual([])
       expect(correct).toBe(LOCALIZED_TOOLTIP_CANONICAL.length)
+    },
+  )
+
+  it.skipIf(!hasIdentitySamples)(
+    'K) identity header reads nickname/ID/class exactly; a crop that cuts the name prefills nothing',
+    { timeout: 30 * 60_000 },
+    async () => {
+      const misses = []
+      for (const sample of IDENTITY_CANONICAL) {
+        const canvas = await loadSampleCanvas(sample.file)
+        const read = await readBasicProfile(canvas)
+        for (const field of ['nickname', 'char_id', 'char_class']) {
+          if (read[field] !== sample[field]) {
+            misses.push(
+              `${sample.file}:${field} got=${JSON.stringify(read[field])} expected=${JSON.stringify(sample[field])}`,
+            )
+          }
+        }
+      }
+      // The owner-reported failure (2026-10-22): a crop starting inside the
+      // name leaves only "ryah" (the site showed "dh"). The read must stay
+      // EMPTY — never prefill a fragment of a name it could not see whole.
+      const clipped = await croppedSample('sampidentityaryah.jpg', {
+        left: 190,
+        top: 0,
+        width: 140,
+        height: 60,
+      })
+      const cutRead = await readBasicProfile(clipped)
+      if (cutRead.nickname !== null) {
+        misses.push(`clipped crop: nickname got=${JSON.stringify(cutRead.nickname)} expected=null`)
+      }
+      console.log(
+        `[harness K] identity samples=${IDENTITY_CANONICAL.length} misses=${misses.length}`,
+      )
+      if (misses.length > 0) console.log(`[harness K] misses:\n${misses.join('\n')}`)
+      expect(misses).toEqual([])
     },
   )
 
