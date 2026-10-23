@@ -29,6 +29,14 @@ const PCT_TO_RAW: Record<string, string> = {
 }
 
 /**
+ * Is this catalog stat key one of the derived raw defenses? Callers filter the
+ * special grid with it (the value has no input field — DefenseStep shows it).
+ */
+export function isRawDefenseStat(statKey: string): boolean {
+  return (RAW_DEFENSE_STAT_KEYS as readonly string[]).includes(statKey)
+}
+
+/**
  * One tooltip card's static config (DefenseStep). The capture key, the
  * transient equipment/pct input keys, and the derived catalog stat key.
  */
@@ -59,17 +67,19 @@ export function computeRawDefense(
   pctRaw: string | undefined,
 ): number | null {
   const equip = parseStatValue(equipmentRaw ?? '')
-  if (!equip.ok || equip.isPercentual || !Number.isFinite(equip.value) || equip.value < 0) {
-    return null
-  }
+  if (!equip.ok || equip.isPercentual) return null
+  const equipValue = equip.value
+  if (equipValue === null || !Number.isFinite(equipValue) || equipValue < 0) return null
 
   const pct = parseStatValue(pctRaw ?? '')
-  if (!pct.ok || !Number.isFinite(pct.value)) return null
+  if (!pct.ok) return null
+  const pctValue = pct.value
+  if (pctValue === null || !Number.isFinite(pctValue)) return null
 
-  const denominator = 1 + pct.value / 100
+  const denominator = 1 + pctValue / 100
   if (!Number.isFinite(denominator) || denominator <= 0) return null
 
-  const raw = Math.floor(equip.value / denominator)
+  const raw = Math.floor(equipValue / denominator)
   return Number.isFinite(raw) ? raw : null
 }
 

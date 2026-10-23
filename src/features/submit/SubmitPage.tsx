@@ -52,7 +52,7 @@ import {
   type GroupInputs,
   type WizardGroup,
 } from './wizard'
-import { withDerivedDefenses, RAW_DEFENSE_STAT_KEYS } from './rawDefense'
+import { withDerivedDefenses, isRawDefenseStat, RAW_DEFENSE_STAT_KEYS } from './rawDefense'
 
 // Enumeration-safe copy (UI contract): never expose HTTP codes or internals.
 const NETWORK_ERROR =
@@ -492,7 +492,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
       (e) =>
         e.group_name === group &&
         !(group === 'general' && e.stat_key === 'combat_power') &&
-        !(group === 'special' && RAW_DEFENSE_STAT_KEYS.includes(e.stat_key)),
+        !(group === 'special' && isRawDefenseStat(e.stat_key)),
     )
 
   /** D-15 replace-all-displayed: a read replaces EXACTLY this step's

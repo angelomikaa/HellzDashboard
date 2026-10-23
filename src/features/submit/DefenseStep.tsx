@@ -17,11 +17,10 @@ import type { GroupInputs } from './wizard'
 import { OcrCapture } from './OcrCapture'
 import type { OcrFieldOutcome } from './ocr/recognize'
 import { OCR_FIELD_FAILURE } from './StatGroupStep'
-import { statFieldFeedback } from './fieldValidation'
+import { INVALID_HINT, statFieldFeedback } from './fieldValidation'
 import {
   withDerivedDefenses,
   EQUIPMENT_RAW_KEYS,
-  RAW_DEFENSE_STAT_KEYS,
   type RawDefenseCard,
 } from './rawDefense'
 import { formatStatValue } from '../../lib/parseStatValue'
@@ -102,7 +101,6 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
 
   const cardIsRunning = (card: RawDefenseCard) => running.has(card.capture)
   const cardIsFailed = (card: RawDefenseCard) => failed.has(card.equipmentKey) && !filled.has(card.equipmentKey)
-  const cardIsFilled = (card: RawDefenseCard) => filled.has(card.equipmentKey)
   const equipmentEngaged = (key: (typeof EQUIPMENT_RAW_KEYS)[number]) =>
     blurred.has(key) || filled.has(key)
 
@@ -190,6 +188,10 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
                     {OCR_FIELD_FAILURE}
                   </p>
                 )}
+                <div className="flex items-end justify-between gap-2 text-xs text-muted">
+                  <span>Equip. {card.label} % (da captura)</span>
+                  <span className="font-mono">{pctRaw.trim() === '' ? '—' : pctRaw}</span>
+                </div>
                 <div className="flex items-end justify-between gap-2 pt-2 border-t border-line/50">
                   <span className="text-sm text-muted">Bruto calculado</span>
                   <span className="text-sm font-mono font-semibold text-content">

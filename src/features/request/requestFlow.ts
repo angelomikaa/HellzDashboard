@@ -26,7 +26,7 @@ import {
   type StatPayloadItem,
   type WizardGroup,
 } from '../submit/wizard'
-import { RAW_DEFENSE_STAT_KEYS } from '../submit/rawDefense'
+import { isRawDefenseStat } from '../submit/rawDefense'
 
 export const REQUEST_HANDLE_ERROR = 'Informe seu usuário do Discord.'
 export const REQUEST_PIN_ERROR = 'Informe um PIN de 4 dígitos.'
@@ -417,7 +417,7 @@ export function prospectGroupEntries(
     (entry) =>
       entry.group_name === group &&
       !(group === 'general' && entry.stat_key === 'combat_power') &&
-      !(group === 'special' && RAW_DEFENSE_STAT_KEYS.includes(entry.stat_key)),
+      !(group === 'special' && isRawDefenseStat(entry.stat_key)),
   )
 }
 
