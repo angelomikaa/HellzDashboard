@@ -119,9 +119,12 @@ vi.mock('tesseract.js', async () => {
     const real = await actual.createWorker(langs, oem, { cachePath })
     return {
       setParameters: (params) => real.setParameters(params),
-      recognize: async (canvas) => {
+      // Pass the output options through: readBasicProfile reads with
+      // { blocks: true } — a mock that drops the 3rd arg silently degrades
+      // the harness to the text-only path (it hid the word-box defects).
+      recognize: async (canvas, options, output) => {
         const png = await hoisted.encodeCanvas(canvas)
-        return real.recognize(png)
+        return real.recognize(png, options, output)
       },
       terminate: () => real.terminate(),
     }
@@ -289,11 +292,15 @@ const hasLocalizedTooltipSamples = LOCALIZED_TOOLTIP_CANONICAL.every(({ file }) 
 // Identity header fixtures (experiment K). The two Basic screenshots are the
 // canonical English/pt-BR samples; the third is the owner's real capture that
 // prefilled "dh" — expected "Aryah" (the card literally prints A-r-y-a-h at
-// 10x zoom), ID 39943, High Priest.
+// 10x zoom), ID 39943, High Priest. The fourth (2026-10-23 owner report:
+// "the reader errors on this print") is the merged-label capture — "ID 17069"
+// reads as the single word "1017069E", so the ID only comes out through the
+// word-box rescue (idFromLayout); nickname/class come from the same boxes.
 const IDENTITY_CANONICAL = [
   { file: 'sampbasicideal.png', nickname: 'Ahrya', char_id: null, char_class: 'Gypsy' },
   { file: 'Samplebasicptbr.png', nickname: 'Ahrya', char_id: '32980', char_class: 'High Priest' },
   { file: 'sampidentityaryah.jpg', nickname: 'Aryah', char_id: '39943', char_class: 'High Priest' },
+  { file: 'sampidentitysoldierhellz.jpg', nickname: 'SoldierHellz', char_id: '17069', char_class: 'Biochemist' },
 ]
 const hasIdentitySamples = IDENTITY_CANONICAL.every(({ file }) => existsSync(samplePath(file)))
 
