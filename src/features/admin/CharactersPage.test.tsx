@@ -30,10 +30,18 @@ describe('CharactersPage helpers', () => {
     expect(addMemberErrorFor({ message: 'dummy_handle' } as any)).toContain('teste')
   })
 
-  it('owner sees reset, officer does not', () => {
+  it('owner resets members and officers, officer resets members only', () => {
     const member = { id: 'm', role: 'member' } as any
+    const officer = { id: 'o', role: 'officer' } as any
+    const owner = { id: 'w', role: 'owner' } as any
+
     expect(canResetPin(ownerSession, member)).toBe(true)
-    expect(canResetPin(officerSession, member)).toBe(false)
+    expect(canResetPin(ownerSession, officer)).toBe(true)
+    expect(canResetPin(ownerSession, owner)).toBe(false)
+
+    expect(canResetPin(officerSession, member)).toBe(true)
+    expect(canResetPin(officerSession, officer)).toBe(false)
+    expect(canResetPin(officerSession, owner)).toBe(false)
   })
 
   it('badges', () => {

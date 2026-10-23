@@ -966,7 +966,7 @@ export function CharactersPage({
                               Reativar
                             </button>
                           )}
-                          {isOwner && (
+                          {canResetPin(session, member) && (
                             <button
                               type="button"
                               onClick={() => openConfirm({ kind: 'resetPin', member })}
@@ -1227,7 +1227,11 @@ export function pinBadgeTone(pin_set: boolean): 'amber' | 'muted' {
 }
 
 export function canResetPin(session: NeoFootSession, member: MemberRow): boolean {
-  return session.member_role === 'owner' && member.role !== 'owner'
+  // 0021: the owner resets members and officers; an officer resets members only.
+  // The owner account is never resettable (D-08).
+  if (member.role === 'owner') return false
+  if (session.member_role === 'owner') return true
+  return session.member_role === 'officer' && member.role === 'member'
 }
 
 export function filterMembersByPin(members: StaffMember[], filter: PinFilter): StaffMember[] {

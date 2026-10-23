@@ -123,9 +123,11 @@ export function RequestAccessPage({
         })
         return
       }
-      // A known character without a PIN claims it by PRINT (Phase 10): the
-      // handle only prefills the first-access screen.
-      if (status === 'unclaimed') {
+      // A known character without a PIN claims it by PRINT (Phase 10), and so
+      // does an unknown handle (owner decision 2026-10-23): the registry request
+      // only becomes a member row after an officer approves the print. The PIN
+      // setter opens on the next attempt, never before the approval.
+      if (status === 'unclaimed' || status === 'none') {
         onFirstAccess?.(h)
         if (!onFirstAccess) {
           setIdentifyStatus({
@@ -136,12 +138,13 @@ export function RequestAccessPage({
         }
         return
       }
-      // Handle unknown to the registry: the member re-link form (staff approval).
-      setHandle(h)
-      setRequestType('member')
-      setStep('form')
-      setStatus({ kind: 'idle' })
-      setRequestId(null)
+      // Unreachable today (the three statuses are exhaustive); never open a PIN
+      // form as a fallback.
+      setIdentifyStatus({
+        kind: 'error',
+        message: 'Não foi possível verificar o handle agora. Tente de novo.',
+        backToLogin: false,
+      })
     } catch {
       setIdentifyStatus({
         kind: 'error',

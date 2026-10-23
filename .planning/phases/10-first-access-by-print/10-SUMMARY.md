@@ -32,8 +32,9 @@ The request-access **Identificação** step no longer probes `verify-pin` with a
 fake PIN (which answered 401 for both claimed and unknown handles and opened the
 old relink form with PIN boxes). It calls `first-access { action: 'identify' }`
 and answers `claimed` (→ "Essa conta já tem PIN. Entre com o nick e o PIN.", no
-form), `unclaimed` (→ print-first claim) or `none` (→ staff-approved relink
-form).
+form) or `unclaimed`/`none` (→ print-first claim). An unknown handle therefore
+asks only for the print and queues a registration request; the PIN setter only
+opens after the officer approval, when the registry row exists without a PIN.
 
 Approval (`approve_request` v3) creates/reactivates the member **unclaimed**
 (`pin_hash NULL`, `claimed_at NULL`). The next attempt answers `ready` and the
@@ -52,7 +53,9 @@ player sets the PIN.
   then delegates to `claim_pin` (single conditional UPDATE).
 - `approve_request` v3 — registration branch + `duplicate_nickname` guard
   (nicknames are the login key).
-- `reset_member_pin` / `review_identity` v2 — also clear the member-id lockout key.
+- `reset_member_pin` v2 — also clears the member-id lockout key. **0021** raises
+  the caller gate: officers may reset **members** only; an officer is reset by the
+  owner; the owner account is never resettable (D-08).
 
 ## Lockout
 
@@ -66,7 +69,7 @@ counted (uniform 401, timing-equalized with the dummy hash).
 - `verify-pin` — `{ nickname, pin }`; legacy `{ discord_handle }` still accepted.
 - `setup-pin` — `{ nickname, pin, confirm_pin, char_id, char_class, proof_data_url }`;
   legacy handle payloads resolve to the same row.
-- `first-access` (new) — `{ action: 'lookup' | 'request', ... }`; the lookup
+- `first-access` (new) — `{ action: 'lookup' | 'request' | 'identify', ... }`; the lookup
   mints/stores nothing.
 
 ## Client
