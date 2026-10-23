@@ -87,11 +87,16 @@ Deno.serve(async (req: Request) => {
   const stats = body.stats
 
   if (handle.length === 0 || handle.length > 64) return json({ error: 'invalid_request' }, 400)
-  if (
-    typeof pin !== 'string' || !/^\d{4}$/.test(pin) ||
-    typeof confirmPin !== 'string' || confirmPin !== pin
-  ) {
-    return json({ error: 'invalid_request' }, 400)
+  // Owner decision 2026-10-23: the recruitment flow has no PIN — a prospect is
+  // not a member yet and sets the PIN at first access after staff approval
+  // (0022 stores pin_hash NULL). The member re-link path still requires it.
+  if (requestType !== 'prospect') {
+    if (
+      typeof pin !== 'string' || !/^\d{4}$/.test(pin) ||
+      typeof confirmPin !== 'string' || confirmPin !== pin
+    ) {
+      return json({ error: 'invalid_request' }, 400)
+    }
   }
   if (!REQUEST_TYPES.has(requestType)) return json({ error: 'invalid_request' }, 400)
   if (!/^\d{1,12}$/.test(charId)) return json({ error: 'invalid_request' }, 400)
@@ -219,7 +224,9 @@ Deno.serve(async (req: Request) => {
   if (uploadErr) return json({ error: 'server_error' }, 500)
   uploaded = true
 
-  const pinHash = bcrypt.hashSync(pin, 10)
+  // 0022: a prospect application carries no PIN (stored NULL); the PIN is set
+  // at first access after approval.
+  const pinHash = requestType === 'prospect' ? null : bcrypt.hashSync(pin as string, 10)
   const { data: rpcResult, error: rpcError } = await admin.rpc('create_membership_request', {
     p_handle: handle,
     p_pin_hash: pinHash,

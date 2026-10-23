@@ -195,7 +195,7 @@ export function RequestAccessPage({
     event.preventDefault()
     if (submitting || reading) return
 
-    const problem = requestFormProblem(draft())
+    const problem = requestFormProblem(draft(), { requirePin: requestType !== 'prospect' })
     if (problem !== null) {
       setStatus({ kind: 'error', message: requestProblemMessage(problem), backToLogin: false })
       return
@@ -241,7 +241,7 @@ export function RequestAccessPage({
   if (requestId !== null) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
-        <div className="w-full max-w-md rounded-lg border border-line bg-surface p-6">
+        <div className="neon-ring w-full max-w-md rounded-lg border border-line bg-surface p-6">
           <h1 className="text-center text-2xl font-bold leading-[1.2] text-content">
             Solicitação enviada
           </h1>
@@ -258,7 +258,7 @@ export function RequestAccessPage({
             <button
               type="button"
               onClick={onBack}
-              className="text-sm font-semibold text-muted hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="h-11 w-full rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               Voltar para o login
             </button>
@@ -271,7 +271,7 @@ export function RequestAccessPage({
   if (step === 'chooser') {
     return (
       <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
-        <div className="w-full max-w-md rounded-lg border border-line bg-surface p-6">
+        <div className="neon-ring w-full max-w-md rounded-lg border border-line bg-surface p-6">
           <h1 className="text-center text-2xl font-bold leading-[1.2] text-content">
             Solicitar acesso
           </h1>
@@ -319,9 +319,9 @@ export function RequestAccessPage({
             <button
               type="button"
               onClick={onBack}
-              className="text-sm font-semibold text-muted hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="h-11 w-full rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              Voltar
+              Voltar para o login
             </button>
           </div>
         </div>
@@ -332,59 +332,72 @@ export function RequestAccessPage({
   const prospect = requestType === 'prospect'
 
   if (step === 'identify') {
+    // Refusal state (owner decision 2026-10-23): an account that already has a
+    // PIN gets ONE message and ONE way out — no form, no second action, no
+    // stacked back links.
+    const refused = identifyStatus.kind === 'error' && identifyStatus.backToLogin
+
     return (
       <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
-        <div className="w-full max-w-md rounded-lg border border-line bg-surface p-6">
-          <h1 className="text-center text-2xl font-bold leading-[1.2] text-content">
-            Identificação
-          </h1>
-          <p className="mt-1 text-center text-sm font-medium text-muted">
-            Informe seu handle para verificar se já possui cadastro.
-          </p>
-          <form onSubmit={submitIdentify} className="mt-4 flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <label htmlFor="identify-handle" className="text-sm font-semibold text-content">
-                Usuário do Discord
-              </label>
-              <input
-                id="identify-handle"
-                type="text"
-                autoComplete="off"
-                value={identifyHandle}
-                onChange={(e) => setIdentifyHandle(e.target.value)}
-                disabled={identifyStatus.kind === 'submitting'}
-                className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              />
-            </div>
-            {identifyStatus.kind === 'error' && (
-              <p role="alert" className="text-sm font-semibold text-destructive">
+        <div className="neon-ring w-full max-w-md rounded-lg border border-line bg-surface p-6">
+          {refused ? (
+            <div className="flex flex-col gap-6">
+              <p role="alert" className="text-center text-base font-semibold text-error">
                 {identifyStatus.message}
               </p>
-            )}
-            {identifyStatus.kind === 'error' && identifyStatus.backToLogin && (
               <button
                 type="button"
                 onClick={onBack}
-                className="text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="h-11 w-full rounded-md border border-line px-4 text-base font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
-                Voltar para o login
+                Voltar ao login
               </button>
-            )}
-            <button
-              type="submit"
-              disabled={identifyStatus.kind === 'submitting' || identifyHandle.trim().length === 0}
-              className="h-11 w-full rounded-md bg-accent text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {identifyStatus.kind === 'submitting' ? 'Verificando...' : 'Continuar'}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setStep('chooser'); setIdentifyStatus({ kind: 'idle' }) }}
-              className="text-sm font-semibold text-muted hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Voltar
-            </button>
-          </form>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-center text-2xl font-bold leading-[1.2] text-content">
+                Identificação
+              </h1>
+              <p className="mt-1 text-center text-sm font-medium text-muted">
+                Informe seu handle para verificar se já possui cadastro.
+              </p>
+              <form onSubmit={submitIdentify} className="mt-4 flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="identify-handle" className="text-sm font-semibold text-content">
+                    Usuário do Discord
+                  </label>
+                  <input
+                    id="identify-handle"
+                    type="text"
+                    autoComplete="off"
+                    value={identifyHandle}
+                    onChange={(e) => setIdentifyHandle(e.target.value)}
+                    disabled={identifyStatus.kind === 'submitting'}
+                    className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  />
+                </div>
+                {identifyStatus.kind === 'error' && (
+                  <p role="alert" className="text-sm font-semibold text-error">
+                    {identifyStatus.message}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={identifyStatus.kind === 'submitting' || identifyHandle.trim().length === 0}
+                  className="h-11 w-full rounded-md bg-accent text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {identifyStatus.kind === 'submitting' ? 'Verificando...' : 'Continuar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setStep('chooser'); setIdentifyStatus({ kind: 'idle' }) }}
+                  className="h-11 w-full rounded-md border border-line px-4 text-base font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  Voltar
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </main>
     )
@@ -392,7 +405,7 @@ export function RequestAccessPage({
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
-      <div className="w-full max-w-lg rounded-lg border border-line bg-surface p-6">
+      <div className="neon-ring w-full max-w-lg rounded-lg border border-line bg-surface p-6">
         <h1 className="text-center text-2xl font-bold leading-[1.2] text-content">
           {prospect ? 'Recrutamento' : 'Identificação'}
         </h1>
@@ -420,14 +433,21 @@ export function RequestAccessPage({
             />
           </div>
 
-          <PinBoxes value={pin} onChange={setPin} disabled={submitting} />
-          <PinBoxes
-            value={confirmPin}
-            onChange={setConfirmPin}
-            disabled={submitting}
-            label="Confirme o PIN"
-          />
-
+          {/* Owner decision 2026-10-23: the recruitment flow never asks for a
+              PIN. The prospect becomes a member only after staff approval and
+              sets the PIN on the first login (print-first claim). The legacy
+              member re-link form keeps the PIN pair it has always had. */}
+          {!prospect && (
+            <>
+              <PinBoxes value={pin} onChange={setPin} disabled={submitting} />
+              <PinBoxes
+                value={confirmPin}
+                onChange={setConfirmPin}
+                disabled={submitting}
+                label="Confirme o PIN"
+              />
+            </>
+          )}
           <ProofField
             key={proofKey}
             value={proof}
@@ -442,7 +462,7 @@ export function RequestAccessPage({
           />
           {reading && <p className="text-sm text-muted">Lendo o print…</p>}
           {ocrError !== null && (
-            <p role="alert" className="text-sm font-semibold text-destructive">
+            <p role="alert" className="text-sm font-semibold text-error">
               {ocrError}
             </p>
           )}
@@ -541,7 +561,7 @@ export function RequestAccessPage({
             </select>
           </div>
 
-          {needsPreviousPin && (
+          {needsPreviousPin && !prospect && (
             <div className="rounded-md border border-line bg-dominant px-3 py-3">
               <PinBoxes
                 value={previousPin}
@@ -560,7 +580,7 @@ export function RequestAccessPage({
           )}
 
           {status.kind === 'error' && (
-            <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+            <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
               {status.message}
             </p>
           )}
@@ -578,19 +598,10 @@ export function RequestAccessPage({
                 : 'Enviar solicitação'}
           </button>
 
-          {status.kind === 'error' && status.backToLogin && (
-            <button
-              type="button"
-              onClick={onBack}
-              className="text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Voltar para o login
-            </button>
-          )}
           <button
             type="button"
             onClick={() => setStep('chooser')}
-            className="text-sm font-semibold text-muted hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="h-11 w-full rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             Voltar
           </button>

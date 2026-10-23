@@ -824,8 +824,10 @@ export interface FirstAccessRequestInput {
 
 export interface RequestAccessInput {
   discord_handle: string
-  pin: string
-  confirm_pin: string
+  /** Required for `member`; omitted for `prospect` (PIN is chosen at first
+   *  access after approval — owner decision 2026-10-23). */
+  pin?: string
+  confirm_pin?: string
   request_type: RequestType
   char_id: string
   nickname: string

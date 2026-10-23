@@ -36,7 +36,6 @@ vi.mock('../../lib/api', async (importOriginal) => {
 
 const DRAFT: ProspectDraft = {
   handle: 'ahrya',
-  pin: '1234',
   char_id: '32980',
   nickname: 'Ahrya',
   char_class: 'Gypsy',
@@ -146,12 +145,10 @@ describe('prospectGroupEntries — combat_power belongs to step 1', () => {
 })
 
 describe('buildProspectPayload — the live request-access contract', () => {
-  it('sends the draft identity, both PINs and the stats', () => {
+  it('sends the draft identity and the stats, never a PIN', () => {
     const payload = buildProspectPayload(DRAFT, [{ stat_key: 'patk', value: 10 }])
     expect(payload).toMatchObject({
       discord_handle: 'ahrya',
-      pin: '1234',
-      confirm_pin: '1234',
       request_type: 'prospect',
       char_id: '32980',
       nickname: 'Ahrya',
@@ -159,6 +156,8 @@ describe('buildProspectPayload — the live request-access contract', () => {
       char_function: 'dps',
       proof_data_url: 'data:image/jpeg;base64,AAAA',
     })
+    expect('pin' in payload).toBe(false)
+    expect('confirm_pin' in payload).toBe(false)
     expect(payload.stats).toEqual([{ stat_key: 'patk', value: 10 }])
   })
 })
@@ -171,7 +170,7 @@ describe('submitProspectApplication — request-access only, never create_submis
     expect(d.requestAccess).toHaveBeenCalledTimes(1)
     const sent = d.requestAccess.mock.calls[0][0] as RequestAccessInput
     expect(sent.request_type).toBe('prospect')
-    expect(sent.pin).toBe(sent.confirm_pin)
+    expect('pin' in sent).toBe(false)
     expect(sent.stats).toHaveLength(56)
     expect(createSubmission).not.toHaveBeenCalled()
   })

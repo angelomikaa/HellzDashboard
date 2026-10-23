@@ -49,10 +49,12 @@ export const REQUEST_CLASS_REJECTED = 'Classe não reconhecida pelo servidor. Es
 export const REQUEST_SERVER_ERROR =
   'O servidor não conseguiu registrar a solicitação agora. Tente novamente em instantes.'
 
-/** Prospect handoff payload: the 08-04 wizard adds stats and submits. */
+/** Prospect handoff payload: the 08-04 wizard adds stats and submits.
+ *  Owner decision 2026-10-23: no PIN here — a prospect is not a member yet, so
+ *  there is no credential to choose. Staff approval creates the row unclaimed
+ *  and the PIN is defined on the first login (print-first claim). */
 export interface ProspectDraft {
   handle: string
-  pin: string
   char_id: string
   nickname: string
   char_class: string
@@ -82,11 +84,19 @@ export type RequestProblem =
   | 'char_class'
   | 'char_function'
 
-/** First blocking problem in form order, or null when submittable. */
-export function requestFormProblem(draft: RequestFormDraft): RequestProblem | null {
+/** First blocking problem in form order, or null when submittable.
+ *  `requirePin` is false for the recruitment flow only (owner decision
+ *  2026-10-23: prospects choose their PIN at first access, not at application). */
+export function requestFormProblem(
+  draft: RequestFormDraft,
+  options: { requirePin?: boolean } = {},
+): RequestProblem | null {
+  const requirePin = options.requirePin !== false
   if (draft.handle.trim() === '' || draft.handle.trim().length > 64) return 'handle'
-  if (!/^\d{4}$/.test(draft.pin)) return 'pin'
-  if (draft.confirmPin !== draft.pin) return 'mismatch'
+  if (requirePin) {
+    if (!/^\d{4}$/.test(draft.pin)) return 'pin'
+    if (draft.confirmPin !== draft.pin) return 'mismatch'
+  }
   if (draft.proofDataUrl === null) return 'proof'
   if (draft.charFunction === '') return 'char_function'
   const identity = validateIdentity({
@@ -177,11 +187,11 @@ export function buildMemberRequest(
   return payload
 }
 
-/** Build the prospect handoff (no stats yet — the 08-04 wizard owns them). */
+/** Build the prospect handoff (no stats, no PIN yet — the 08-04 wizard owns the
+ *  stats and the member sets the PIN on the first login after approval). */
 export function prospectDraftFrom(draft: RequestFormDraft): ProspectDraft {
   return {
     handle: draft.handle.trim(),
-    pin: draft.pin,
     char_id: draft.char_id.trim(),
     nickname: draft.nickname.trim(),
     char_class: draft.char_class,
@@ -514,16 +524,15 @@ export function prospectIdentity(draft: ProspectDraft): SubmissionIdentity {
   }
 }
 
-/** The LIVE request-access prospect contract (08-02): pin and confirm_pin are
- *  both the same 4 digits; stats ride along with the identity. */
+/** The request-access prospect contract: stats ride along with the identity.
+ *  Owner decision 2026-10-23: no PIN is sent — the member defines it on the
+ *  first login after staff approval. */
 export function buildProspectPayload(
   draft: ProspectDraft,
   stats: StatPayloadItem[],
 ): RequestAccessInput {
   return {
     discord_handle: draft.handle,
-    pin: draft.pin,
-    confirm_pin: draft.pin,
     request_type: 'prospect',
     char_id: draft.char_id,
     nickname: draft.nickname,

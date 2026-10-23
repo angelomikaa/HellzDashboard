@@ -85,6 +85,15 @@ describe('requestFormProblem — shared identity form', () => {
     expect(requestProblemMessage('proof')).toContain('print')
     expect(requestProblemMessage('char_function')).toContain('função')
   })
+
+  // Owner decision 2026-10-23: the recruitment flow never asks for a PIN.
+  it('does not require a PIN when requirePin is false (prospect)', () => {
+    expect(requestFormProblem({ ...VALID, pin: '', confirmPin: '' }, { requirePin: false })).toBe(
+      null,
+    )
+    // every other rule still applies
+    expect(requestFormProblem({ ...VALID, pin: '' }, { requirePin: false })).toBe('proof')
+  })
 })
 
 describe('OCR prefill never overwrites an edited field', () => {
@@ -249,17 +258,17 @@ describe('prospect submission errors — same diagnosis, wizard copy', () => {
 })
 
 describe('prospect handoff — never submits directly', () => {
-  it('builds the full draft with no stats and the chosen function', () => {
+  it('builds the full draft with no stats, no PIN and the chosen function', () => {
     const draft = prospectDraftFrom({ ...VALID, charFunction: 'suporte' })
     expect(draft).toEqual({
       handle: 'ahrya',
-      pin: '1234',
       char_id: '32980',
       nickname: 'Ahrya',
       char_class: 'Gypsy',
       char_function: 'suporte',
       proof_data_url: 'data:image/jpeg;base64,AAAA',
     })
+    expect('pin' in draft).toBe(false)
     expect('stats' in draft).toBe(false)
     expect('request_type' in draft).toBe(false)
   })
