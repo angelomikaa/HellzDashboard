@@ -55,7 +55,7 @@ import {
   PILL_DIGITS_WHITELIST,
   PILL_THRESHOLD,
   SCREENS,
-  TooltipGrammar,
+  type TooltipGrammar,
   assignByOrder,
   detectPillRects,
   detectRowCells,

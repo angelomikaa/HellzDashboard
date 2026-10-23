@@ -382,7 +382,7 @@ describe('omittedZeroKeys (the Especial panel hides zero-valued rows)', () => {
   it('leaves the columns that DO print their zeros alone', () => {
     const general = SCREENS.general
     if (general.kind !== 'rows') throw new Error('general is not a rows grammar')
-    expect(general.omitsZeroRows).toBeUndefined()
+    expect('omitsZeroRows' in general).toBe(false)
     expect(omittedZeroKeys(general, ['hp'])).toEqual([])
   })
 })
