@@ -160,7 +160,7 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
           const failed = failedProofs.has(row.request_id)
           const url = identityProofUrl(session, row.proof_path)
           const insufficient = !row.data_sufficient || row.ovr === null
-          const typeBadge = row.request_type === 'member' ? 'Já é membro' : 'Novo no clã'
+          const typeBadge = requestTypeBadge(row.request_type)
           return (
             <div key={row.request_id} className="rounded-md border border-line bg-surface p-4">
               <div className="flex items-start gap-3">
@@ -217,17 +217,25 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
                       className="max-h-64 w-full object-contain"
                     />
                   )}
-                  {row.stats && row.stats.length > 0 && (
-                    <div className="mt-3 grid grid-cols-1 gap-1 sm:grid-cols-2">
-                      {row.stats.map((s) => (
-                        <div key={s.stat_key} className="flex justify-between text-sm">
-                          <span className="text-content">{s.label}</span>
-                          <span className="text-muted">
-                            {s.value === null ? '—' : s.value}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                  {row.request_type === 'registration' ? (
+                    <p className="mt-3 text-sm text-muted">
+                      Primeiro acesso: a aprovação cria o cadastro do personagem. O PIN é definido
+                      pelo jogador no próximo acesso.
+                    </p>
+                  ) : (
+                    row.stats &&
+                    row.stats.length > 0 && (
+                      <div className="mt-3 grid grid-cols-1 gap-1 sm:grid-cols-2">
+                        {row.stats.map((s) => (
+                          <div key={s.stat_key} className="flex justify-between text-sm">
+                            <span className="text-content">{s.label}</span>
+                            <span className="text-muted">
+                              {s.value === null ? '—' : s.value}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )
                   )}
                 </div>
               )}
@@ -310,7 +318,10 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
 
 // ---- helpers ----
 export function requestTypeBadge(requestType: StaffRequestRow['request_type']): string {
-  return requestType === 'member' ? 'Já é membro' : 'Novo no clã'
+  if (requestType === 'member') return 'Já é membro'
+  // 0020: first access with no registry match -> officer-approved registration.
+  if (requestType === 'registration') return 'Cadastro'
+  return 'Novo no clã'
 }
 
 export function requestTypeLabel(requestType: StaffRequestRow['request_type']): string {
@@ -351,6 +362,7 @@ export function requestApproveErrorFor(error: unknown): string {
   if (message.includes('not_pending')) return STALE_ROW_ERROR
   if (message.includes('invalid_function')) return 'Função inválida.'
   if (message.includes('not_member')) return 'Handle sem cadastro de membro.'
+  if (message.includes('duplicate_nickname')) return 'Este nick já pertence a outro cadastro ativo.'
   if (error instanceof ApiError && (error.kind === 'unauthorized' || message.includes('forbidden')))
     return SESSION_ERROR
   return SAVE_ERROR

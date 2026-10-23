@@ -392,7 +392,12 @@ export function statusView(result: RequestStatus | null): StatusView {
       tone: 'none',
     }
   }
-  const typeLabel = result.request_type === 'member' ? 'Vínculo de personagem' : 'Nova entrada'
+  const typeLabel =
+    result.request_type === 'member'
+      ? 'Vínculo de personagem'
+      : result.request_type === 'registration'
+        ? 'Cadastro de personagem'
+        : 'Nova entrada'
   const created = formatRequestDate(result.created_at)
   switch (result.status) {
     case 'pending':
