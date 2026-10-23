@@ -13,19 +13,22 @@ type LoginStatus =
 
 export interface LoginPageProps {
   onLogin: (session: NeoFootSession) => void
-  /** 409 pin_setup_required -> first-access claim, carrying the typed handle. */
-  onFirstAccess: (handle: string) => void
+  /** 409 pin_setup_required -> first-access claim (identity comes from the print). */
+  onFirstAccess: () => void
   onRequestAccess: () => void
 }
 
 const NETWORK_ERROR = 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 
-// Plan 01-03 / D-01: Discord handle + 4-digit PIN. No OAuth, no Discord API, no email.
+// Plan 01-03 / D-01; Phase 10 (2026-10-23): login is by character NICKNAME +
+// 4-digit PIN. No OAuth, no Discord API, no email. The nickname is the registry
+// key (members.login_key, migration 0020); the Discord handle is a staff-facing
+// contact field and plays no part here.
 // Phase 8 (08-03, D-02): the PIN is entered in the shared 2FA-style PinBoxes —
 // four masked boxes, no auto-submit. The PIN lives only in the transient form
 // state + the HTTPS request body (T-08-18): never stored, logged or in a URL.
 export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPageProps) {
-  const [discordHandle, setDiscordHandle] = useState('')
+  const [nickname, setNickname] = useState('')
   const [pin, setPin] = useState('')
   const [status, setStatus] = useState<LoginStatus>({ kind: 'idle' })
 
@@ -36,7 +39,7 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPage
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (disabled) return
-    if (discordHandle.trim().length === 0 || !/^\d{4}$/.test(pin)) return
+    if (nickname.trim().length === 0 || !/^\d{4}$/.test(pin)) return
     setStatus({ kind: 'submitting' })
     try {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-pin`, {
@@ -49,7 +52,7 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPage
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ discord_handle: discordHandle.trim(), pin }),
+        body: JSON.stringify({ nickname: nickname.trim(), pin }),
       })
 
       if (res.ok) {
@@ -75,29 +78,37 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPage
 
       if (res.status === 401) {
         // Enumeration-safe copy (T-01-03 / UI-SPEC): never reveals whether the
-        // handle or the PIN was wrong. WR-07: attempts_remaining comes from the
+        // nickname or the PIN was wrong. WR-07: attempts_remaining comes from the
         // function (D-07), but the gateway can 401 before the function runs —
         // never render "undefined tentativas restantes".
         const remaining = body.attempts_remaining
         if (typeof remaining !== 'number' || remaining <= 0) {
-          setStatus({ kind: 'error', message: 'Discord ou PIN incorreto.' })
+          setStatus({ kind: 'error', message: 'Nick ou PIN incorreto.' })
         } else {
           setStatus({
             kind: 'error',
             message:
               remaining === 1
-                ? 'Discord ou PIN incorreto — 1 tentativa restante.'
-                : `Discord ou PIN incorreto — ${remaining} tentativas restantes.`,
+                ? 'Nick ou PIN incorreto — 1 tentativa restante.'
+                : `Nick ou PIN incorreto — ${remaining} tentativas restantes.`,
           })
         }
         setPin('')
         return
       }
 
+      if (res.status === 409 && body.error === 'ambiguous_identity') {
+        setStatus({
+          kind: 'error',
+          message: 'Mais de um cadastro usa este nick. Fale com um oficial.',
+        })
+        setPin('')
+        return
+      }
+
       if (res.status === 409 && body.error === 'pin_setup_required') {
-        // Unclaimed handle (WHIT-01/02): route into first access instead of a
-        // dead-end wrong-PIN message. The handle travels in component state
-        // only — no token, no URL.
+        // Unclaimed character (WHIT-01/02): route into first access instead of a
+        // dead-end wrong-PIN message.
         setStatus({ kind: 'needs-setup' })
         return
       }
@@ -134,15 +145,15 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPage
         <div aria-hidden="true" className="mx-auto mb-6 mt-4 h-px w-16 bg-line" />
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <label htmlFor="discord-handle" className="text-sm font-semibold text-content">
-              Usuário do Discord
+            <label htmlFor="login-nickname" className="text-sm font-semibold text-content">
+              Nick do personagem
             </label>
             <input
-              id="discord-handle"
+              id="login-nickname"
               type="text"
               autoComplete="off"
-              value={discordHandle}
-              onChange={(e) => setDiscordHandle(e.target.value)}
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
               disabled={locked}
               className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
@@ -155,7 +166,7 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPage
               </p>
               <button
                 type="button"
-                onClick={() => onFirstAccess(discordHandle.trim())}
+                onClick={onFirstAccess}
                 className="mt-2 h-10 w-full rounded-md bg-accent text-sm font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Criar meu PIN

@@ -4,13 +4,20 @@ import { FunctionError } from '../../lib/api'
 import type { NeoFootSession } from './session'
 import {
   PROFILE_ERROR,
+  REQUEST_ALREADY_PENDING,
+  canRequestRegistration,
+  canSetPin,
   firstAccessProblem,
   firstAccessProblemMessage,
   profileComplete,
   profileProblemMessage,
   profileSummary,
+  registrationErrorCopy,
+  registrationProblem,
   setupErrorCopy,
+  statusMessage,
   submitFirstAccess,
+  submitRegistration,
   type FirstAccessDeps,
   type FirstAccessDraft,
 } from './firstAccess'
@@ -32,6 +39,7 @@ const VALID: FirstAccessDraft = {
   confirmPin: '1234',
   profile: READ_PROFILE,
   proofDataUrl: 'data:image/jpeg;base64,AAAA',
+  status: 'ready',
 }
 
 function deps(overrides?: Partial<FirstAccessDeps>): FirstAccessDeps {
@@ -42,21 +50,20 @@ function deps(overrides?: Partial<FirstAccessDeps>): FirstAccessDeps {
   }
 }
 
-// Plan 08-03 task 3 (D-03): identity comes ONLY from the screenshot, and the
-// claim is blocked — not guessed — when OCR is incomplete. Node-env tests
-// cover the pure submit orchestration; static markup proves there is no typed
-// identity field.
-describe('FirstAccessPage — structure (D-03)', () => {
-  it('collects only handle + PIN + confirmation + proof (no typed identity)', () => {
+// Phase 10 (owner decision 2026-10-23): the print is the identity. The first
+// paint collects handle + print only; the PIN boxes appear once the registry
+// answers `ready` for the read nickname.
+describe('FirstAccessPage — structure (Phase 10)', () => {
+  it('starts with handle + print only (no typed identity, no PIN yet)', () => {
     const html = renderToStaticMarkup(
       <FirstAccessPage initialHandle="ahrya" onDone={() => {}} onBack={() => {}} />,
     )
     expect(html).toContain('Primeiro acesso')
     expect(html).toContain('first-access-handle')
-    expect(html).toContain('PIN (4 dígitos)')
-    expect(html).toContain('Confirme o PIN')
     expect(html).toContain('Comprovante (print do personagem, JPEG)')
-    expect(html).toContain('Criar meu PIN')
+    // The PIN setter is gated by the registry lookup, never shown upfront.
+    expect(html).not.toContain('PIN (4 dígitos)')
+    expect(html).not.toContain('Criar meu PIN')
     // No typed char_id/nickname/class inputs anywhere on the claim screen.
     expect(html).not.toContain('id="char_id"')
     expect(html).not.toContain('id="nickname"')
@@ -64,7 +71,7 @@ describe('FirstAccessPage — structure (D-03)', () => {
     expect(html).not.toContain('<select')
   })
 
-  it('prefills the handle from the login screen', () => {
+  it('prefills the handle from the request-access probe', () => {
     const html = renderToStaticMarkup(
       <FirstAccessPage initialHandle="Ahrya#1234" onDone={() => {}} onBack={() => {}} />,
     )
@@ -80,20 +87,34 @@ describe('FirstAccessPage — structure (D-03)', () => {
   })
 })
 
+describe('registry status gates the flow', () => {
+  it('only a claimable row opens the PIN setter', () => {
+    expect(canSetPin('ready')).toBe(true)
+    for (const status of ['pin_set', 'pending', 'unknown', 'identity_mismatch', 'ambiguous_identity'] as const) {
+      expect(canSetPin(status)).toBe(false)
+    }
+    expect(canSetPin(null)).toBe(false)
+  })
+
+  it('only an unknown nickname can become a registration request', () => {
+    expect(canRequestRegistration('unknown')).toBe(true)
+    expect(canRequestRegistration('ready')).toBe(false)
+    expect(canRequestRegistration('pending')).toBe(false)
+    expect(canRequestRegistration(null)).toBe(false)
+  })
+
+  it('explains every non-ready status without asking for a PIN', () => {
+    expect(statusMessage('pin_set')).toContain('já tem PIN')
+    expect(statusMessage('pending')).toContain('aprovação')
+    expect(statusMessage('unknown')).toContain('lista da guilda')
+    expect(statusMessage('identity_mismatch')).toContain('não confere')
+    expect(statusMessage('ambiguous_identity')).toContain('Mais de um cadastro')
+  })
+})
+
 describe('firstAccessProblem — submit blocking order', () => {
-  it('accepts a complete draft', () => {
+  it('accepts a complete claim draft', () => {
     expect(firstAccessProblem(VALID)).toBe(null)
-  })
-
-  it('blocks an empty or over-long handle', () => {
-    expect(firstAccessProblem({ ...VALID, handle: '   ' })).toBe('handle')
-    expect(firstAccessProblem({ ...VALID, handle: 'x'.repeat(65) })).toBe('handle')
-  })
-
-  it('blocks a non-4-digit PIN and a mismatch', () => {
-    expect(firstAccessProblem({ ...VALID, pin: '123' })).toBe('pin')
-    expect(firstAccessProblem({ ...VALID, pin: '12a4' })).toBe('pin')
-    expect(firstAccessProblem({ ...VALID, confirmPin: '4321' })).toBe('mismatch')
   })
 
   it('blocks a missing proof and an incomplete OCR profile', () => {
@@ -102,6 +123,34 @@ describe('firstAccessProblem — submit blocking order', () => {
     expect(
       firstAccessProblem({ ...VALID, profile: { ...READ_PROFILE, char_class: null } }),
     ).toBe('profile')
+  })
+
+  it('blocks a non-4-digit PIN and a mismatch when the row is claimable', () => {
+    expect(firstAccessProblem({ ...VALID, pin: '123' })).toBe('pin')
+    expect(firstAccessProblem({ ...VALID, pin: '12a4' })).toBe('pin')
+    expect(firstAccessProblem({ ...VALID, confirmPin: '4321' })).toBe('mismatch')
+  })
+
+  it('never asks the claim path for a Discord handle', () => {
+    expect(firstAccessProblem({ ...VALID, handle: '   ' })).toBe(null)
+  })
+
+  it('keeps the PIN setter closed for a non-claimable registry answer', () => {
+    for (const status of ['unknown', 'pin_set', 'pending', 'identity_mismatch', 'ambiguous_identity', null] as const) {
+      expect(firstAccessProblem({ ...VALID, status })).toBe('status')
+    }
+    expect(firstAccessProblemMessage('status')).toContain('Verifique o personagem')
+  })
+
+  it('requires the handle only for the registration request', () => {
+    const unknown = { ...VALID, status: 'unknown' as const }
+    expect(registrationProblem({ ...unknown, handle: '   ' })).toBe('handle')
+    expect(registrationProblem({ ...unknown, handle: 'x'.repeat(65) })).toBe('handle')
+    expect(registrationProblem(unknown)).toBe(null)
+    expect(registrationProblem({ ...unknown, proofDataUrl: null })).toBe('proof')
+    expect(registrationProblem({ ...unknown, profile: null })).toBe('profile')
+    // A registration request never validates PIN digits.
+    expect(registrationProblem({ ...unknown, handle: 'ahrya' })).toBe(null)
   })
 
   it('uses the retry copy for an unreadable profile', () => {
@@ -132,18 +181,17 @@ describe('submitFirstAccess — mocked setupPin', () => {
     expect(d.setupPin).not.toHaveBeenCalled()
   })
 
-  it('sends the OCR-derived identity (never typed values) and saves once', async () => {
+  it('sends the OCR-derived identity keyed by nickname (never typed values) and saves once', async () => {
     const d = deps()
     const outcome = await submitFirstAccess(VALID, d)
 
     expect(outcome).toEqual({ ok: true, session: SESSION })
     expect(d.setupPin).toHaveBeenCalledTimes(1)
     expect(d.setupPin).toHaveBeenCalledWith({
-      discord_handle: 'ahrya',
+      nickname: 'Ahrya',
       pin: '1234',
       confirm_pin: '1234',
       char_id: '32980',
-      nickname: 'Ahrya',
       char_class: 'Gypsy',
       proof_data_url: 'data:image/jpeg;base64,AAAA',
     })
@@ -207,6 +255,77 @@ describe('submitFirstAccess — mocked setupPin', () => {
     expect(outcome.ok).toBe(false)
     expect(outcome.ok === false && outcome.message).toContain('conexão')
     expect(outcome.ok === false && outcome.message).not.toContain('ECONNREFUSED')
+  })
+})
+
+// Phase 10: a print with no registry match becomes an officer-approved
+// registration request. It must never mint a session or ask for a PIN.
+describe('submitRegistration — officer approval path', () => {
+  const UNKNOWN: FirstAccessDraft = { ...VALID, status: 'unknown' }
+
+  function registrationDeps(result?: { request_id: string; status: 'pending'; duplicate: boolean }) {
+    return {
+      requestFirstAccess: vi.fn(async () => result ?? {
+        request_id: '22222222-2222-2222-2222-222222222222',
+        status: 'pending' as const,
+        duplicate: false,
+      }),
+    }
+  }
+
+  it('sends handle + print identity and never a PIN', async () => {
+    const d = registrationDeps()
+    const outcome = await submitRegistration(UNKNOWN, d)
+
+    expect(outcome).toMatchObject({ ok: true, duplicate: false })
+    expect(d.requestFirstAccess).toHaveBeenCalledWith({
+      discord_handle: 'ahrya',
+      char_id: '32980',
+      nickname: 'Ahrya',
+      char_class: 'Gypsy',
+      proof_data_url: 'data:image/jpeg;base64,AAAA',
+    })
+  })
+
+  it('blocks without a handle before reaching the server', async () => {
+    const d = registrationDeps()
+    const outcome = await submitRegistration({ ...UNKNOWN, handle: '  ' }, d)
+    expect(outcome.ok).toBe(false)
+    expect(d.requestFirstAccess).not.toHaveBeenCalled()
+  })
+
+  it('reports a duplicate pending request without failing', async () => {
+    const d = registrationDeps({
+      request_id: '22222222-2222-2222-2222-222222222222',
+      status: 'pending',
+      duplicate: true,
+    })
+    const outcome = await submitRegistration(UNKNOWN, d)
+    expect(outcome).toMatchObject({ ok: true, duplicate: true })
+    expect(REQUEST_ALREADY_PENDING).toContain('aguardando aprovação')
+  })
+
+  it('maps server refusals to pt-BR copy', async () => {
+    expect(registrationErrorCopy(new FunctionError(409, 'already_registered', 'x'))).toContain(
+      'já foi cadastrado',
+    )
+    expect(registrationErrorCopy(new FunctionError(400, 'unknown_class', 'x'))).toContain(
+      'classe lida',
+    )
+    expect(registrationErrorCopy(new FunctionError(409, 'request_pending', 'x'))).toBe(
+      REQUEST_ALREADY_PENDING,
+    )
+    expect(registrationErrorCopy(new FunctionError(0, 'network', 'x'))).toContain('conexão')
+  })
+
+  it('a failed request never advances the guard', async () => {
+    const outcome = await submitRegistration(UNKNOWN, {
+      requestFirstAccess: vi.fn(async () => {
+        throw new FunctionError(500, 'server_error', 'x')
+      }),
+    })
+    expect(outcome.ok).toBe(false)
+    expect(outcome.ok === false && outcome.message).not.toContain('server_error')
   })
 })
 

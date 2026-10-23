@@ -758,7 +758,9 @@ export async function fetchCardPhotoByPath(
 // request stays staff-gated (T-08-20).
 // ---------------------------------------------------------------------------
 
-export type RequestType = 'member' | 'prospect'
+/** 'registration' (0020): a first-access print with no registry match, approved
+ *  by an officer without a PIN so the player can set it on the next attempt. */
+export type RequestType = 'member' | 'prospect' | 'registration'
 export type RequestState = 'pending' | 'approved' | 'rejected' | 'superseded'
 
 export interface FunctionErrorExtras {
@@ -783,9 +785,33 @@ export class FunctionError extends Error {
 }
 
 export interface SetupPinInput {
-  discord_handle: string
+  /** Character nickname read from the print — the login key since 0020. */
+  nickname: string
   pin: string
   confirm_pin: string
+  char_id: string
+  char_class: string
+  proof_data_url: string
+}
+
+/** first-access lookup answer (0020). The page renders one state per status. */
+export type FirstAccessStatus =
+  | 'ready'
+  | 'pin_set'
+  | 'pending'
+  | 'unknown'
+  | 'identity_mismatch'
+  | 'ambiguous_identity'
+
+export interface FirstAccessLookupInput {
+  nickname: string
+  char_id: string
+  /** Discord handle — only used to find a pending registration for this person. */
+  discord_handle?: string
+}
+
+export interface FirstAccessRequestInput {
+  discord_handle: string
   char_id: string
   nickname: string
   char_class: string
@@ -814,7 +840,7 @@ export interface RequestStatus {
 }
 
 const REQUEST_STATES: readonly RequestState[] = ['pending', 'approved', 'rejected', 'superseded']
-const REQUEST_TYPES: readonly RequestType[] = ['member', 'prospect']
+const REQUEST_TYPES: readonly RequestType[] = ['member', 'prospect', 'registration']
 
 /** Env for the anon surface: same project URL/anon key as REST. */
 function anonEnv(): { supabaseUrl: string; anonKey: string } {
@@ -853,7 +879,7 @@ function optionalNumber(value: unknown): number | undefined {
  * render path).
  */
 async function edgeFetch<T>(
-  fn: 'setup-pin' | 'request-access' | 'verify-pin',
+  fn: 'setup-pin' | 'request-access' | 'verify-pin' | 'first-access',
   body: unknown,
 ): Promise<T> {
   const { supabaseUrl, anonKey } = anonEnv()
@@ -889,8 +915,8 @@ async function edgeFetch<T>(
 }
 
 /**
- * First-access claim: validates handle/PIN/proof server-side and returns the
- * standard session. The caller persists it with saveSession (pages do it).
+ * First-access claim: validates the print identity + PIN server-side and
+ * returns the standard session. The caller persists it with saveSession.
  */
 export async function setupPin(input: SetupPinInput): Promise<NeoFootSession> {
   const body = await edgeFetch<{ session?: unknown }>('setup-pin', input)
@@ -899,6 +925,62 @@ export async function setupPin(input: SetupPinInput): Promise<NeoFootSession> {
     throw new FunctionError(200, 'invalid_response', 'malformed session')
   }
   return body.session
+}
+
+const FIRST_ACCESS_STATUSES: readonly FirstAccessStatus[] = [
+  'ready',
+  'pin_set',
+  'pending',
+  'unknown',
+  'identity_mismatch',
+  'ambiguous_identity',
+]
+
+/**
+ * Ask the registry what the print's nickname resolves to (0020). God-mode:
+ * this call mints nothing and stores nothing — it only decides whether the
+ * page opens the PIN setter, the login hint or the approval request.
+ */
+export async function firstAccessLookup(
+  input: FirstAccessLookupInput,
+): Promise<FirstAccessStatus> {
+  const body = await edgeFetch<{ status?: unknown }>('first-access', {
+    action: 'lookup',
+    ...input,
+  })
+  if (
+    typeof body.status !== 'string' ||
+    !FIRST_ACCESS_STATUSES.includes(body.status as FirstAccessStatus)
+  ) {
+    throw new FunctionError(200, 'invalid_response', 'malformed first-access status')
+  }
+  return body.status as FirstAccessStatus
+}
+
+/**
+ * Queue a 'registration' request (handle + print identity + proof). The officer
+ * approval registers the character WITHOUT a PIN, so the player retries the
+ * first-access flow and sets it there.
+ */
+export async function requestFirstAccess(
+  input: FirstAccessRequestInput,
+): Promise<{ request_id: string; status: 'pending'; duplicate: boolean }> {
+  const body = await edgeFetch<{
+    request_id?: unknown
+    status?: unknown
+    duplicate?: unknown
+  }>('first-access', { action: 'request', ...input })
+  if (typeof body.request_id !== 'string' || body.request_id.length === 0) {
+    throw new FunctionError(200, 'invalid_response', 'malformed request_id')
+  }
+  if (body.status !== 'pending') {
+    throw new FunctionError(200, 'invalid_response', 'unexpected request status')
+  }
+  return {
+    request_id: body.request_id,
+    status: 'pending',
+    duplicate: body.duplicate === true,
+  }
 }
 
 /**
@@ -1065,7 +1147,7 @@ export interface StaffRequestStat {
 export interface StaffRequestRow {
   request_id: string
   discord_handle: string
-  request_type: 'member' | 'prospect'
+  request_type: 'member' | 'prospect' | 'registration'
   char_id: string
   nickname: string
   char_class: string

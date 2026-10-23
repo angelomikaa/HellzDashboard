@@ -3,10 +3,13 @@ import type { NeoFootSession } from '../features/auth/session'
 import {
   FunctionError,
   fetchRequestStatus,
+  firstAccessLookup,
   requestAccess,
+  requestFirstAccess,
   requestStepUp,
   setupPin,
   type RequestAccessInput,
+  type SetupPinInput,
 } from './api'
 
 // Plan 08-03 task 2: the unauthenticated surface. Every call carries the anon
@@ -20,12 +23,13 @@ const SESSION: NeoFootSession = {
   expires_at: Math.floor(Date.now() / 1000) + 3600,
 }
 
-const SETUP_INPUT = {
-  discord_handle: 'ahrya',
+// 0020: the claim is keyed by the character nickname read from the print — the
+// Discord handle is no longer part of the setup-pin payload.
+const SETUP_INPUT: SetupPinInput = {
+  nickname: 'Ahrya',
   pin: '1234',
   confirm_pin: '1234',
   char_id: '32980',
-  nickname: 'Ahrya',
   char_class: 'Gypsy',
   proof_data_url: 'data:image/jpeg;base64,AAAA',
 }
@@ -166,6 +170,89 @@ describe('setupPin — session contract', () => {
       status: 500,
       code: 'server_error',
     })
+  })
+})
+
+describe('first-access — lookup + registration (0020)', () => {
+  it('posts action lookup with the print identity and no session', async () => {
+    nextResponse = () => res(200, JSON.stringify({ status: 'ready' }))
+    await expect(
+      firstAccessLookup({ nickname: 'Ahrya', char_id: '32980', discord_handle: 'ahrya' }),
+    ).resolves.toBe('ready')
+
+    expect(calls[0].url).toBe('https://test-project.supabase.co/functions/v1/first-access')
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+      action: 'lookup',
+      nickname: 'Ahrya',
+      char_id: '32980',
+      discord_handle: 'ahrya',
+    })
+    expect(headers(calls[0]).Authorization).toBe('Bearer test-anon-key')
+  })
+
+  it('rejects an unknown lookup status as invalid_response', async () => {
+    nextResponse = () => res(200, JSON.stringify({ status: 'maybe' }))
+    await expect(
+      firstAccessLookup({ nickname: 'Ahrya', char_id: '32980' }),
+    ).rejects.toMatchObject({ code: 'invalid_response' })
+
+    nextResponse = () => res(200, JSON.stringify({}))
+    await expect(
+      firstAccessLookup({ nickname: 'Ahrya', char_id: '32980' }),
+    ).rejects.toMatchObject({ code: 'invalid_response' })
+  })
+
+  it('posts action request with handle + identity + proof', async () => {
+    nextResponse = () =>
+      res(200, JSON.stringify({ request_id: 'req-9', status: 'pending', duplicate: false }))
+    await expect(
+      requestFirstAccess({
+        discord_handle: 'ahrya',
+        char_id: '32980',
+        nickname: 'Ahrya',
+        char_class: 'Gypsy',
+        proof_data_url: 'data:image/jpeg;base64,AAAA',
+      }),
+    ).resolves.toEqual({ request_id: 'req-9', status: 'pending', duplicate: false })
+
+    expect(calls[0].url).toBe('https://test-project.supabase.co/functions/v1/first-access')
+    expect(JSON.parse(String(calls[0].init.body))).toMatchObject({ action: 'request' })
+  })
+
+  it('keeps the duplicate flag and maps server refusals', async () => {
+    nextResponse = () =>
+      res(200, JSON.stringify({ request_id: 'req-9', status: 'pending', duplicate: true }))
+    await expect(
+      requestFirstAccess({
+        discord_handle: 'ahrya',
+        char_id: '32980',
+        nickname: 'Ahrya',
+        char_class: 'Gypsy',
+        proof_data_url: 'data:image/jpeg;base64,AAAA',
+      }),
+    ).resolves.toMatchObject({ duplicate: true })
+
+    nextResponse = () => res(409, JSON.stringify({ error: 'already_registered' }))
+    await expect(
+      requestFirstAccess({
+        discord_handle: 'ahrya',
+        char_id: '32980',
+        nickname: 'Ahrya',
+        char_class: 'Gypsy',
+        proof_data_url: 'data:image/jpeg;base64,AAAA',
+      }),
+    ).rejects.toMatchObject({ status: 409, code: 'already_registered' })
+
+    nextResponse = () => res(200, JSON.stringify({ status: 'pending' }))
+    await expect(
+      requestFirstAccess({
+        discord_handle: 'ahrya',
+        char_id: '32980',
+        nickname: 'Ahrya',
+        char_class: 'Gypsy',
+        proof_data_url: 'data:image/jpeg;base64,AAAA',
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_response' })
   })
 })
 
