@@ -168,10 +168,10 @@ Cross-cutting constraints: ONE migration, ONE tripod re-lock — both features r
   4. `0019_raw_defenses.sql` runs AFTER `0018` (untouched); inserts `rpdef`/`rmdef` with labels; remaps every `class_key_stats` row where `stat_key in ('pdef','mdef')` — keys and relevants — to `rpdef`/`rmdef` preserving `selection_order` and `selected_at`, then deletes old rows; OVR nulls for affected classes until a new validated submission supplies both raw values.
   5. Prospect/min-count gates: Edge function `58..59`; `requestFlow` minimum 58; DB floor `>=56` stays (Edge is exact gate).
   6. Tests/seeds: `stat_catalog.sql` 59 rows; live `card-labels-4-6char.sql` gains `RPDEF`/`RMDEF`; structure tests unchanged at 56 screen fields + new tooltip grammar tests; wizard/prospect tests 58/59 payload expectations; smoke scripts 57 → 59, 56 → 58 where they assert full catalog.
-**Plans**: 2/2 plans
+**Plans**: 1/2 plans complete (09.1-01 done: migration 0019 + seeds committed in 4e818ce; DEF-01/DEF-04 complete)
 Plans:
-- [ ] 09.1-01-PLAN.md — Catalog insert + migration 0019 + class_key_stats remap — Wave 1
-- [ ] 09.1-02-PLAN.md — OCR tooltip grammar/reader + Especial sub-section UI + effective-input gating + tests — Wave 2
+- [x] 09.1-01-PLAN.md — Catalog insert + migration 0019 + class_key_stats remap — Wave 1 — committed (4e818ce): DEF-01/DEF-04 complete
+- [~] 09.1-02-PLAN.md — OCR tooltip grammar/reader + Especial sub-section UI + effective-input gating + tests — Wave 2 — in progress (uncommitted changes to structure.ts, recognize.ts, etc.)
 **Cross-cutting constraints**: `0018` must not be modified; `0019` follows `0018`; equipment values never enter `stat_catalog`/`buildStatsPayload`/`create_submission` payload; raw values merged into effective inputs only; the Special sub-section renders only when catalog contains both raw stats so old cached clients keep working; no new wizard step or catalog group.
 **UI hint**: yes
 
@@ -206,7 +206,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 (8 is independent 
 | 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 3/6 | In Progress|  |
 | 08.10. pt-BR OCR Identity (hotfix) | v1.1 | 1/1 | Complete | 2026-10-22 |
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 5/5 | Complete | 2026-10-22 |
-| 9.1. Hidden Raw Defenses (RPDEF/RMDEF) | v1.1 | 0/2 | Planned | - |
+| 9.1. Hidden Raw Defenses (RPDEF/RMDEF) | v1.1 | 1/2 | In Progress | - |
 | 10. Personalized Home Landing Tab | v1.1 | 0/0 | Not started | - |
 
 ---
