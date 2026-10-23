@@ -566,8 +566,8 @@ export function identityReadDimensions(
   }
 }
 
-/** High-quality resample of a canvas (the identity read's scale normalizer). */
-function resampleCanvas(source: HTMLCanvasElement, width: number, height: number): HTMLCanvasElement {
+/** One high-quality drawImage pass (the resample ladder's step). */
+function drawResampled(source: HTMLCanvasElement, width: number, height: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -580,6 +580,30 @@ function resampleCanvas(source: HTMLCanvasElement, width: number, height: number
   // drawImage contract the offline harness pins)
   ctx.drawImage(source, 0, 0, width, height)
   return canvas
+}
+
+/**
+ * High-quality resample of a canvas (the identity read's scale normalizer).
+ * Large downscales go down a LADDER of <=2x passes: one drawImage call from a
+ * 3600px 4K-monitor snip to 715px undersamples small glyphs past what the
+ * filter can follow (measured 2026-10-23: in a single 5x pass the English
+ * sample's class band vanished entirely), while halving keeps every pass
+ * inside the faithful range — the classic multi-step canvas downscale.
+ * Upscales take one pass.
+ */
+function resampleCanvas(source: HTMLCanvasElement, width: number, height: number): HTMLCanvasElement {
+  let current = source
+  let w = source.width
+  let h = source.height
+  while (width * 2 <= w) {
+    const step = Math.max(width, Math.round(w / 2))
+    const stepHeight = Math.max(1, Math.round((h * step) / w))
+    current = drawResampled(current, step, stepHeight)
+    w = step
+    h = stepHeight
+  }
+  if (w === width && h === height) return current
+  return drawResampled(current, width, height)
 }
 
 /**

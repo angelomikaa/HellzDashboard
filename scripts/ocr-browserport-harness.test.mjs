@@ -56,13 +56,15 @@
 //      as a name). The nickname is anchored on the class label's left edge —
 //      the game prints the two left-aligned.
 //   L) identity read is scale-invariant (owner report 2026-10-23 round 2: the
-//      tester's ORIGINAL higher-resolution Snipping-Tool capture failed with
+//      tester's ORIGINAL higher-resolution capture failed with
 //      "Não conseguimos ler o nick" while the owner's compressed 739px copy
-//      read fine): the SAME canonical captures resampled to the Snipping-Tool
-//      widths (1000-2800px) must never dead-end with a null field, and the
-//      REPORTED card must read nickname/ID/class EXACTLY — readBasicProfile
-//      resamples to the calibrated operating width (identityReadDimensions)
-//      instead of trusting the source resolution.
+//      read fine — the calibrated samples are all Full HD-monitor snips, so a
+//      Quad HD/4K monitor snips the same card much larger): the SAME canonical
+//      captures resampled to the monitor-width range (1000-3600px) must never
+//      dead-end with a null field, and the REPORTED card must read
+//      nickname/ID/class EXACTLY — readBasicProfile resamples to the
+//      calibrated operating width (identityReadDimensions) instead of
+//      trusting the source resolution.
 //   [D RETIRED (round 3): "the default centered-80% crop misaligns every
 //   region" was a mechanism claim about the region-fraction reader; the
 //   structural reader is not region-fraction-based, so the premise is gone.
@@ -651,12 +653,16 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
     async () => {
       // The 2026-10-23 round-2 owner report: the tester's ORIGINAL
       // higher-resolution capture failed ("Não conseguimos ler o nick") while
-      // the owner's compressed 739px copy of the SAME card read fine. Measured
-      // before the resample fix, on this very card: 1200px lost the nickname,
-      // 1000px glued the copy badge into the ID as a digit ("399432"),
-      // 2800px produced "0170696"/"Aryahrd". readBasicProfile must resample
-      // every capture to the calibrated operating width (715px) instead of
-      // trusting the source resolution.
+      // the owner's compressed 739px copy of the SAME card read fine. Root
+      // cause confirmed with the owner: the calibrated samples all come from a
+      // Full HD monitor, so the same card region snipped on a Quad HD or 4K
+      // monitor (or at Windows DPI scaling) lands as a much larger image —
+      // 1000-3600px wide measured here. Measured before the resample fix, on
+      // this very card: 1200px lost the nickname, 1000px glued the copy badge
+      // into the ID as a digit ("399432"), 2800px produced "0170696"/
+      // "Aryahrd". readBasicProfile must resample every capture to the
+      // calibrated operating width (715px) instead of trusting the source
+      // resolution.
       //
       // Two acceptance tiers. (1) NO sample may dead-end with a null field at
       // any width — the tester's failure mode is a missing-field error that
@@ -668,7 +674,7 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       // that stress the copy/pencil badge can glue into a value ("Ahryard",
       // "Ahrya Z", "399435") — a pre-existing OCR sensitivity the mandatory
       // manual fix-up absorbs (D-03 review), not a regression of this fix.
-      const widths = [1000, 1200, 1478, 1800, 2200, 2800]
+      const widths = [1000, 1200, 1478, 1800, 2200, 2800, 3600]
       const deadEnds = []
       const exactMisses = []
       let reads = 0
