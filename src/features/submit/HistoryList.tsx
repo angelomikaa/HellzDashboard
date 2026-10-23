@@ -21,7 +21,7 @@ const STATUS_LABELS: Record<SubmissionRow['status'], string> = {
 const STATUS_CLASSES: Record<SubmissionRow['status'], string> = {
   pending: 'text-muted',
   validated: 'text-success',
-  rejected: 'text-destructive',
+  rejected: 'text-error',
   // Same visual weight as Aguarda validação — the player's own replaced
   // pending (0010 one-pending rule), not an officer judgment (per UI-SPEC).
   discarded: 'text-muted',
@@ -64,7 +64,7 @@ export function HistoryList({ session, onNewSubmission }: HistoryListProps) {
       </h2>
 
       {error !== null ? (
-        <p role="alert" aria-live="polite" className="mt-4 text-sm font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="mt-4 text-sm font-semibold text-error">
           {error}
         </p>
       ) : rows === null ? (

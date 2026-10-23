@@ -80,12 +80,12 @@ export function ReviewStep({
       ))}
 
       {missingRequired !== null && missingRequired.length > 0 && (
-        <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
           {`Faltam valores obrigatórios: ${missingRequired.join(', ')}.`}
         </p>
       )}
       {submitError !== null && (
-        <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
           {submitError}
         </p>
       )}

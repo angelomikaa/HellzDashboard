@@ -138,7 +138,7 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPage
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
-      <div className="w-full max-w-96 rounded-lg border border-line bg-surface p-6">
+      <div className="neon-ring w-full max-w-96 rounded-lg border border-line bg-surface p-6">
         <img src={hellzMark} alt="Hellz" className="mx-auto mb-3 mt-2 h-20 w-20 glow-accent" />
         <h1 className="text-center text-3xl font-bold leading-[1.2] text-content">Hellz</h1>
         <p className="mt-1 text-center text-sm font-medium text-muted">Painel Geral</p>
@@ -180,7 +180,7 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPage
             <p
               role="alert"
               aria-live="polite"
-              className="text-sm font-semibold text-destructive"
+              className="text-sm font-semibold text-error"
             >
               {status.message}
             </p>
@@ -198,7 +198,7 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPage
           <button
             type="button"
             onClick={onRequestAccess}
-            className="text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="h-11 w-full rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             Solicitar acesso
           </button>

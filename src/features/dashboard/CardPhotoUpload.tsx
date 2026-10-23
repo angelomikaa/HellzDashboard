@@ -337,7 +337,7 @@ export function CardPhotoUpload({
         </div>
       )}
       {(error !== null || downloadError !== null) && (
-        <p role="alert" aria-live="polite" className="mt-2 text-center text-xs font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="mt-2 text-center text-xs font-semibold text-error">
           {error ?? downloadError}
         </p>
       )}

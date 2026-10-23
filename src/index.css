@@ -55,6 +55,13 @@
   --color-destructive: #F85149;
   --color-success: #3FB950;
 
+  /* error feedback is ORANGE (owner decision 2026-10-23): every CTA and the
+     whole surface language are red, so red error text read as decoration.
+     Destructive ACTIONS keep --color-destructive; this token is for the
+     message/validation layer (alerts, invalid borders). 6.7:1 on #1E1E1E. */
+  --color-error: #F0883E;
+  --color-error-hover: #FFA95C;
+
   /* tier tokens (D-02: semantic identity preserved; bronze nudged for AA on #1E1E1E) */
   --color-tier-bronze: #C97F3F;
   --color-tier-silver: #B8C0CC;
@@ -96,6 +103,57 @@
     radial-gradient(ellipse 80% 50% at 50% -10%, rgb(220 53 56 / 0.08), transparent),
     repeating-linear-gradient(0deg, rgb(220 53 56 / 0.03) 0 1px, transparent 1px 48px),
     repeating-linear-gradient(90deg, rgb(220 53 56 / 0.03) 0 1px, transparent 1px 48px);
+}
+
+/* Neon ring — the rotating red contour on the access panels and the dashboard
+   hero (owner decision 2026-10-23). The ring is a pseudo-element OUTSIDE the
+   box, so the container keeps its own border (tier color included) and the
+   gradient only paints the 2px frame. @property makes the conic angle
+   animatable; reduced-motion freezes it on the same frame instead of hiding
+   it. Nothing else in the app animates. */
+@property --neon-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes neon-spin {
+  to {
+    --neon-angle: 360deg;
+  }
+}
+
+@utility neon-ring {
+  position: relative;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    padding: 2px;
+    background: conic-gradient(
+      from var(--neon-angle),
+      rgb(220 53 56 / 0) 0deg,
+      rgb(220 53 56 / 0.15) 35deg,
+      rgb(220 53 56 / 0.9) 72deg,
+      #f26d6f 92deg,
+      rgb(220 53 56 / 0.9) 112deg,
+      rgb(220 53 56 / 0.15) 150deg,
+      rgb(220 53 56 / 0) 185deg,
+      rgb(220 53 56 / 0) 360deg
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: neon-spin 5s linear infinite;
+    filter: drop-shadow(0 0 6px rgb(220 53 56 / 0.45));
+    pointer-events: none;
+  }
 }
 
 /* Hover feedback (owner gate round 5) — ONE shared pattern per element
@@ -255,9 +313,11 @@
 
 /* D-05: nothing auto-animates. Hover/focus transitions exist (owner gate
    round 5) but only on non-transform properties and only on user
-   interaction; reduce users get instant state changes. */
+   interaction; reduce users get instant state changes. The neon ring keeps
+   its static frame (the animation is removed, the gradient stays). */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     transition: none !important;
+    animation: none !important;
   }
 }

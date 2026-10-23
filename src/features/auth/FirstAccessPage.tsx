@@ -34,7 +34,6 @@ import {
   profileComplete,
   profileProblemMessage,
   profileSummary,
-  statusBackToLogin,
   statusMessage,
   submitFirstAccess,
   submitRegistration,
@@ -187,7 +186,7 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
-      <div className="w-full max-w-md rounded-lg border border-line bg-surface p-6">
+      <div className="neon-ring w-full max-w-md rounded-lg border border-line bg-surface p-6">
         <img src={hellzMark} alt="Hellz" className="mx-auto mb-3 mt-2 h-16 w-16 glow-accent" />
         <h1 className="text-center text-2xl font-bold leading-[1.2] text-content">Primeiro acesso</h1>
         <p className="mt-1 text-center text-sm font-medium text-muted">
@@ -241,12 +240,12 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
             {reading && <p className="mt-1 text-sm text-muted">Lendo o print…</p>}
             {!reading && summary !== null && <p className="mt-1 text-sm text-content">{summary}</p>}
             {!reading && ocrError !== null && (
-              <p role="alert" className="mt-1 text-sm font-semibold text-destructive">
+              <p role="alert" className="mt-1 text-sm font-semibold text-error">
                 {ocrError}
               </p>
             )}
             {!reading && incomplete && (
-              <p role="alert" className="mt-1 text-sm font-semibold text-destructive">
+              <p role="alert" className="mt-1 text-sm font-semibold text-error">
                 {profileProblemMessage(profile)}
               </p>
             )}
@@ -255,7 +254,7 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
             )}
             {!reading && summary !== null && !checking && lookupError !== null && (
               <div className="mt-1 flex flex-col gap-2">
-                <p role="alert" className="text-sm font-semibold text-destructive">
+                <p role="alert" className="text-sm font-semibold text-error">
                   {lookupError}
                 </p>
                 <button
@@ -271,7 +270,7 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
             {!reading && summary !== null && !checking && lookup !== null && (
               <p
                 className={`mt-1 text-sm ${
-                  lookup === 'ready' ? 'text-content' : 'font-semibold text-destructive'
+                  lookup === 'ready' ? 'text-content' : 'font-semibold text-error'
                 }`}
               >
                 {statusMessage(lookup)}
@@ -304,13 +303,13 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
                 label="Confirme o PIN"
               />
               {mismatch && (
-                <p className="text-sm font-semibold text-destructive">Os PINs não conferem.</p>
+                <p className="text-sm font-semibold text-error">Os PINs não conferem.</p>
               )}
             </>
           )}
 
           {status.kind === 'error' && (
-            <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+            <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
               {status.message}
             </p>
           )}
@@ -341,34 +340,15 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
               Enviar print para aprovação
             </button>
           )}
-          {status.kind === 'error' && status.backToLogin && (
-            <button
-              type="button"
-              onClick={onBack}
-              className="text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Voltar para o login
-            </button>
-          )}
-          {lookup !== null && statusBackToLogin(lookup) && status.kind !== 'error' && (
-            <button
-              type="button"
-              onClick={onBack}
-              className="text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Voltar para o login
-            </button>
-          )}
-          {!(status.kind === 'error' && status.backToLogin) &&
-            !(lookup !== null && statusBackToLogin(lookup) && status.kind !== 'error') && (
-              <button
-                type="button"
-                onClick={onBack}
-                className="text-sm font-semibold text-muted hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                Voltar
-              </button>
-            )}
+          {/* Owner decision 2026-10-23: one way out, styled like every other
+              secondary action (outline), never a stack of back links. */}
+          <button
+            type="button"
+            onClick={onBack}
+            className="h-11 w-full rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Voltar para o login
+          </button>
         </form>
       </div>
     </main>

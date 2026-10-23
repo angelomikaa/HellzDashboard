@@ -205,7 +205,7 @@ export function DashboardPage({
   return (
     <section aria-busy={loading}>
       {error !== null ? (
-        <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
           {error}
         </p>
       ) : report === null ? (
@@ -232,7 +232,7 @@ export function DashboardPage({
               just under the strip. */}
           <section
             aria-label="Resumo do personagem"
-            className={`mt-4 rounded-lg border-2 bg-dominant p-3 ${
+            className={`neon-ring mt-4 rounded-lg border-2 bg-dominant p-3 ${
               ovrTier !== null ? TIER_BORDER_DISPLAY[ovrTier] : 'border-line'
             }`}
           >

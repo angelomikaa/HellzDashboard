@@ -130,7 +130,7 @@ export function ConfirmDialog({
         <p className="mt-2 text-sm text-muted">{body}</p>
         {children}
         {error !== null && (
-          <p id={errorId} role="alert" className="mt-3 text-sm font-semibold text-destructive">
+          <p id={errorId} role="alert" className="mt-3 text-sm font-semibold text-error">
             {error}
           </p>
         )}

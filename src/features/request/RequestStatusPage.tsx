@@ -84,7 +84,7 @@ export function RequestStatusPage({ initialHandle = '', onBack }: RequestStatusP
         </form>
 
         {lookup.kind === 'error' && (
-          <p role="alert" className="mt-4 text-sm font-semibold text-destructive">
+          <p role="alert" className="mt-4 text-sm font-semibold text-error">
             {lookup.message}
           </p>
         )}
@@ -102,7 +102,7 @@ export function RequestStatusPage({ initialHandle = '', onBack }: RequestStatusP
         <button
           type="button"
           onClick={onBack}
-          className="mt-4 text-sm font-semibold text-muted hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="mt-4 h-11 w-full rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           Voltar
         </button>

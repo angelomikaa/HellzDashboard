@@ -173,7 +173,7 @@ export function RankPage({ session }: { session: NeoFootSession }) {
       </div>
 
       {error !== null ? (
-        <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-error">
           {error}
         </p>
       ) : displayRows === null ? (

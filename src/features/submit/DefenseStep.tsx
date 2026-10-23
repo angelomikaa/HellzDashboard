@@ -178,13 +178,13 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
                     placeholder="4913"
                   />
                   {feedback.invalid && (
-                    <p role="alert" aria-live="polite" className="text-xs font-semibold text-destructive">
+                    <p role="alert" aria-live="polite" className="text-xs font-semibold text-error">
                       {INVALID_HINT}
                     </p>
                   )}
                 </label>
                 {isFailed && !feedback.invalid && (
-                  <p role="alert" aria-live="polite" className="text-xs font-semibold text-destructive">
+                  <p role="alert" aria-live="polite" className="text-xs font-semibold text-error">
                     {OCR_FIELD_FAILURE}
                   </p>
                 )}

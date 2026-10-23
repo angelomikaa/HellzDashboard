@@ -184,7 +184,7 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
 
       <div className={tab === 'envios' ? 'mt-6' : 'mt-6 hidden'} role="tabpanel">
       {error !== null ? (
-        <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-error">
           {error}
         </p>
       ) : rows === null ? (
@@ -326,7 +326,7 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                           <p
                             role="alert"
                             aria-live="polite"
-                            className="mt-2 text-sm font-semibold text-destructive"
+                            className="mt-2 text-sm font-semibold text-error"
                           >
                             {saveErrorMessage}
                           </p>

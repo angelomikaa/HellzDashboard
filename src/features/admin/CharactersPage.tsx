@@ -526,7 +526,7 @@ export function CharactersPage({
       <p className="mt-1 text-sm text-muted">Registre nome, classe e função de cada membro.</p>
 
       {error !== null ? (
-        <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-error">
           {error}
         </p>
       ) : data === null ? (
@@ -583,7 +583,7 @@ export function CharactersPage({
             <p className="mt-2 text-sm font-semibold text-success">{addMemberStatus.message}</p>
           )}
           {addMemberStatus.kind === 'error' && (
-            <p role="alert" aria-live="polite" className="mt-2 text-sm font-semibold text-destructive">
+            <p role="alert" aria-live="polite" className="mt-2 text-sm font-semibold text-error">
               {addMemberStatus.message}
             </p>
           )}
@@ -990,7 +990,7 @@ export function CharactersPage({
                         <span
                           role="alert"
                           aria-live="polite"
-                          className="text-sm font-semibold text-destructive"
+                          className="text-sm font-semibold text-error"
                         >
                           {saveError.text}
                         </span>
@@ -1069,7 +1069,7 @@ export function CharactersPage({
                               </div>
                             </div>
                             {identityError && (
-                              <p role="alert" className="mt-2 text-sm font-semibold text-destructive">
+                              <p role="alert" className="mt-2 text-sm font-semibold text-error">
                                 {identityError}
                               </p>
                             )}

@@ -64,7 +64,7 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
   if (error !== null) {
     return (
       <section className="rounded-lg border border-line bg-surface p-6">
-        <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
           {error}
         </p>
       </section>

@@ -203,7 +203,7 @@ export function ProofField({ value, onChange, onImage, disabled = false }: Proof
         </p>
       )}
       {error !== null && (
-        <p role="alert" className="text-sm font-semibold text-destructive">
+        <p role="alert" className="text-sm font-semibold text-error">
           {error}
         </p>
       )}

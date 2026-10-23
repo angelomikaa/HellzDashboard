@@ -116,7 +116,7 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
                   className={`h-11 w-full rounded-md border bg-surface text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                     // `!` keeps the hover border-brighten from masking the
                     // validation border while an invalid value is hovered.
-                    feedback.invalid ? 'border-destructive!' : 'border-line'
+                    feedback.invalid ? 'border-error!' : 'border-line'
                   } ${percentual ? 'pr-8' : 'px-3'} ${ocrRunning ? 'animate-pulse' : ''}`}
                 />
                 {percentual && (
@@ -134,12 +134,12 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
                 </p>
               )}
               {feedback.invalid && (
-                <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+                <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
                   {INVALID_HINT}
                 </p>
               )}
               {!feedback.invalid && failedFields.has(entry.stat_key) && (
-                <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+                <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
                   {OCR_FIELD_FAILURE}
                 </p>
               )}

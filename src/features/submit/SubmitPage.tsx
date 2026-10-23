@@ -454,7 +454,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
       // scannable centered column on desktop — never stretched into the
       // wide shell.
       <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6">
-        <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
           {loadError}
         </p>
       </section>
@@ -639,7 +639,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     aria-invalid={identityError?.field === 'char_id' || undefined}
                     disabled={ocrRunningStep === 1}
                     className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
-                      identityError?.field === 'char_id' ? 'border-destructive!' : 'border-line'
+                      identityError?.field === 'char_id' ? 'border-error!' : 'border-line'
                     }`}
                   />
                   {identityOcrFilled.has('char_id') && (
@@ -649,7 +649,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     <p
                       role="alert"
                       aria-live="polite"
-                      className="text-sm font-semibold text-destructive"
+                      className="text-sm font-semibold text-error"
                     >
                       {identityError.message}
                     </p>
@@ -670,7 +670,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     aria-invalid={identityError?.field === 'nickname' || undefined}
                     disabled={ocrRunningStep === 1}
                     className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
-                      identityError?.field === 'nickname' ? 'border-destructive!' : 'border-line'
+                      identityError?.field === 'nickname' ? 'border-error!' : 'border-line'
                     }`}
                   />
                   {identityOcrFilled.has('nickname') && (
@@ -680,7 +680,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     <p
                       role="alert"
                       aria-live="polite"
-                      className="text-sm font-semibold text-destructive"
+                      className="text-sm font-semibold text-error"
                     >
                       {identityError.message}
                     </p>
@@ -702,7 +702,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     disabled={ocrRunningStep === 1}
                     className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
                       identityError?.field === 'char_function'
-                        ? 'border-destructive!'
+                        ? 'border-error!'
                         : 'border-line'
                     }`}
                   >
@@ -717,7 +717,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     <p
                       role="alert"
                       aria-live="polite"
-                      className="text-sm font-semibold text-destructive"
+                      className="text-sm font-semibold text-error"
                     >
                       {identityError.message}
                     </p>
@@ -742,7 +742,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                       // `!` keeps the hover border-brighten from masking the
                       // validation border while an invalid value is hovered.
-                      combatPowerFeedback.invalid ? 'border-destructive!' : 'border-line'
+                      combatPowerFeedback.invalid ? 'border-error!' : 'border-line'
                     } ${ocrRunningStep === 1 ? 'animate-pulse' : ''}`}
                   />
                   {combatPowerFeedback.ok && (
@@ -751,12 +751,12 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     </p>
                   )}
                   {combatPowerFeedback.invalid && (
-                    <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+                    <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
                       {INVALID_HINT}
                     </p>
                   )}
                   {!combatPowerFeedback.invalid && failedFields[1].has('combat_power') && (
-                    <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+                    <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
                       {OCR_FIELD_FAILURE}
                     </p>
                   )}

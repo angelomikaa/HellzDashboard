@@ -201,7 +201,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
       <p className="mt-1 text-sm text-muted">{TIER_LEGEND}</p>
 
       {loadError !== null ? (
-        <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-error">
           {loadError}
         </p>
       ) : classes === null || catalog === null ? (
@@ -259,7 +259,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
             <p
               role="alert"
               aria-live="polite"
-              className="mt-6 text-sm font-semibold text-destructive"
+              className="mt-6 text-sm font-semibold text-error"
             >
               {classError}
             </p>
@@ -275,7 +275,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                 <p
                   role="alert"
                   aria-live="polite"
-                  className="mt-4 text-sm font-semibold text-destructive"
+                  className="mt-4 text-sm font-semibold text-error"
                 >
                   {toggleError}
                 </p>

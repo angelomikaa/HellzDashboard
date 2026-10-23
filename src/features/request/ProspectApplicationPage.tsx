@@ -191,7 +191,7 @@ export function ProspectApplicationPage({
             <p className="text-base text-muted">Carregando…</p>
           ) : (
             <div className="flex flex-col gap-4">
-              <p role="alert" className="text-sm font-semibold text-destructive">
+              <p role="alert" className="text-sm font-semibold text-error">
                 {loadError}
               </p>
               <button
@@ -204,7 +204,7 @@ export function ProspectApplicationPage({
               <button
                 type="button"
                 onClick={onBack}
-                className="text-sm font-semibold text-muted hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="h-11 w-full rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Voltar
               </button>
@@ -234,7 +234,7 @@ export function ProspectApplicationPage({
           </p>
           {identityError !== null && (
             <div className="mt-2 flex flex-col gap-2">
-              <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+              <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
                 {identityError}
               </p>
               <button
@@ -326,7 +326,7 @@ export function ProspectApplicationPage({
                   disabled={ocrRunningStep === 1}
                   placeholder={ocrRunningStep === 1 ? OCR_READING_PLACEHOLDER : undefined}
                   className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                    combatPowerFeedback.invalid ? 'border-destructive!' : 'border-line'
+                    combatPowerFeedback.invalid ? 'border-error!' : 'border-line'
                   } ${ocrRunningStep === 1 ? 'animate-pulse' : ''}`}
                 />
                 {combatPowerFeedback.ok && (
@@ -338,7 +338,7 @@ export function ProspectApplicationPage({
                   <p
                     role="alert"
                     aria-live="polite"
-                    className="text-sm font-semibold text-destructive"
+                    className="text-sm font-semibold text-error"
                   >
                     {INVALID_HINT}
                   </p>
@@ -347,7 +347,7 @@ export function ProspectApplicationPage({
                   <p
                     role="alert"
                     aria-live="polite"
-                    className="text-sm font-semibold text-destructive"
+                    className="text-sm font-semibold text-error"
                   >
                     {OCR_FIELD_FAILURE}
                   </p>

@@ -134,7 +134,7 @@ export function PromotionCard({
         <CardSvg data={exportData} className="h-auto w-full" />
       </article>
       {failed && (
-        <p role="alert" aria-live="polite" className="text-xs font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="text-xs font-semibold text-error">
           {DOWNLOAD_ERROR}
         </p>
       )}

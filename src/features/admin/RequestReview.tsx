@@ -141,7 +141,7 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
   return (
     <div className="flex flex-col gap-3">
       {error !== null && (
-        <p role="alert" aria-live="polite" className="text-sm font-semibold text-destructive">
+        <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
           {error}
         </p>
       )}
