@@ -263,6 +263,10 @@ const LOCALIZED_CANONICAL = [
   { capture: 'quasi', file: 'sampidealptavancados.png' },
   { capture: 'special', file: 'sampidealptidealespecial.png' },
   { capture: 'special', file: 'sampespecialtdr.png' },
+  // Tooltip captures: the pt-BR wording is "DEF F/DEFM de Equipamento: N"
+  // (the reader used to require the literal English "equipment").
+  { capture: 'pdef_tooltip', file: 'samplepdefpt.png' },
+  { capture: 'mdef_tooltip', file: 'samplemdefpt.png' },
 ]
 const hasLocalizedSamples = LOCALIZED_CANONICAL.every(({ file }) => existsSync(samplePath(file)))
 
@@ -475,10 +479,11 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
       }
       console.log(`[harness I] pt-BR fields=${total} correct=${correct}`)
       if (misses.length > 0) console.log(`[harness I] misses:\n${misses.join('\n')}`)
-      // 14 (Comuns) + 26 (Avançados) + 15 + 15 (both Especial shots) = 70.
-      // Every key has a printed row or is a documented zero-omission.
-      expect(total).toBe(70)
-      expect(correct).toBe(70)
+      // 14 (Comuns) + 26 (Avançados) + 15 + 15 (both Especial shots)
+      // + 2 tooltip captures = 72. Every key has a printed row or is a
+      // documented zero-omission.
+      expect(total).toBe(72)
+      expect(correct).toBe(72)
     },
   )
 
