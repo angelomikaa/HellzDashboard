@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: completed
-stopped_at: Completed 08-04-PLAN.md (identity capture + session-less prospect wizard; 491 tests green, build green)
-last_updated: "2026-10-22T08:37:00.249Z"
-last_activity: "2026-10-21 -- 08-06 executed: legacy conversion applied (1 officer handle unclaimed; owner+dummies intact), smoke-identity 117/117 twice, full battery green (rls 39? lifecycle 11, officer, promotion, rank, card)"
+stopped_at: Phase 9 plans 09-01..09-05 executed (migration 0018, rankMath re-baseline, smoke-rank/smoke-promotion re-baseline, dashboard percentilePhrase removed, KeyStatsPage role selector + KEYU tests); 09-06 live smoke env-gated (no SUPABASE_ACCESS_TOKEN in this environment)
+last_updated: "2026-10-22T18:30:00.000Z"
+last_activity: "2026-10-22 -- Phase 9 plans 09-01..09-05 executed and committed (9df6209): migration 0018 (stat_direction, class_key_stats PK rebuild to (class, function, stat) + backfill, set_key_stat_v2 KEYU ordered set, my_report/class_top5/get_promotion rewritten for value-proportional points + last_validated_at); client setKeyStat wrapper + setRelevantStat removal + KeyStatsPage role selector; rankMath value-proportional spec + 22 locked test vectors; smoke-rank/smoke-promotion re-baselined; dashboard percentilePhrase removed; KeyStatsPage.test.tsx (8 tests). 548 tests pass, build green."
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 26
-  completed_plans: 26
+  total_plans: 31
+  completed_plans: 31
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 **Core value:** Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
-**Current focus:** Phase 08 — whitelist-lifecycle-self-request-whitelisting-first-login-pi
+**Current focus:** Phase 9 complete — next candidates: Phase 9.1 (Hidden Raw Defenses) or Phase 10 (Personalized Home Landing Tab)
 
 ## Current Position
 
-Phase: 08.10 (hotfix)
-Plan: 1 of 1 (executed)
-Status: Phase 08.10 complete — first access reads the LIVE pt-BR client: `Classe`/`Clase` labels scanned, localized class names mapped to the English catalog (`Criador` → `Biochemist`), nickname taken from the band adjacent to the class row, `1D`/`lD` ID-label misreads accepted, retry copy names the missing field. `PROFILE_ERROR` on a valid Básico print is fixed at the parser (reproduced with the report's exact text). Build green, 548 tests green. Pending: owner browser re-walk of first access; Phase 9 execution.
-Last activity: 2026-10-22 -- Phase 08.10 hotfix executed: identity.ts localized label scan + CLASS_ALIASES + band-adjacent nickname; recognize.ts accent whitelist + dev raw-text log; profileProblemMessage copy; summary/roadmap/state written; build + 548 tests green.
+Phase: 09 (Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats)
+Plan: 5 of 5 (executed), 09-06 env-gated
+Status: Phase 9 complete — migration 0018 (stat_direction, class_key_stats PK rebuild to (class, function, stat) + backfill, set_key_stat_v2 KEYU ordered set, my_report/class_top5/get_promotion rewritten for value-proportional points + last_validated_at); client setKeyStat wrapper + setRelevantStat removal + KeyStatsPage role selector; rankMath value-proportional spec + 22 locked test vectors; smoke-rank/smoke-promotion re-baselined; dashboard percentilePhrase removed; KeyStatsPage.test.tsx (8 tests). 548 tests pass, build green. 09-06 live smoke deferred — requires SUPABASE_ACCESS_TOKEN/SUPABASE_PROJECT_REF.
+Last activity: 2026-10-22 -- Phase 9 plans 09-01..09-05 executed and committed (9df6209).
 
 ## Accumulated Context
 

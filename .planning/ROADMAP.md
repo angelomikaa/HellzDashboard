@@ -25,7 +25,7 @@
 - [x] Phase 7: Dummy-Data Seed & Catalog Alignment — owner-roster seed ships FIRST (owner decision 7: see how v1.0 wraps around data while v1.1 is developed), build-role vocabulary (ROLE-05) + official job-tree catalog (ROLE-12) aligned so dummies carry correct roles from day one (4/4 plans) — completed 2026-10-14
 - [ ] Phase 8: Whitelist Lifecycle, Self-Request & Character Identity — handle-only registration, player-picked PIN on first login, owner PIN reset, reactivation, two self-request loops, per-submission identity (6 plans created)
 - [x] Phase 08.10: pt-BR OCR Identity — HOTFIX: the identity band reads the live pt-BR client ("Classe Criador"), localized class names map to the English catalog, and an unreadable field is named in the retry copy (1/1 plan) — completed 2026-10-22
-- [ ] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0017; renumbered: Phase 7 took 0012, Phase 07.2 takes 0013, Phase 8 takes 0014, Phase 8 gap closure consumed 0015, Phase 08.1 took 0016): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (4/4 plans)
+- [x] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0018; renumbered: Phase 7 took 0012, Phase 07.2 takes 0013, Phase 8 takes 0014, Phase 8 gap closure consumed 0015, Phase 08.1 took 0016, Phase 08.1 step-up consumed 0017): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (5/5 plans, 09-06 env-gated) — completed 2026-10-22
 - [ ] Phase 9.1: Hidden Raw Defenses (RPDEF/RMDEF) — two tooltip OCR captures inside the Especial step; raw defense computed read-only from Equipment DEF / (1 + DEF%); transient equipment values; `rpdef`/`rmdef` remap all `pdef`/`mdef` key positions preserving order; migration 0019 after 0018 (2 plans)
 - [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (0/0 plans)
 
@@ -145,12 +145,14 @@ Plans:
   4. Every re-locked baseline is green in the same phase: `rankMath.ts` locked test values, `smoke-rank.mjs` exact-value matrix, and `smoke-promotion.mjs` ordering (fixtures carry build roles and per-combo 6-row key-stat inserts); tier bands (D-01/D-02) are recalibrated by the owner against the resident seeded cohorts before being locked, and the improvement-screen percentile phrase is gone — stat cards no longer claim percentile position
   5. The admin surface works and the governance holds: Stats-Chave gains the role selector (class → role → stat chips, per-combo count display, KEYU ordered-set copy), build-role assignment stays staff-only (Personagens path), the staff audit pass re-assigns existing members' build roles before any per-role differentiation applies, officers see the per-(class, role) config coverage indicator (staff-only) — and RNK-02 closed-payload discipline holds (leak probes stay green, no member-visible sign that role configs differ)
   6. (Owner feedback 2026-10-20) Key and relevant are ONE ordered selection set per (class, build-role): first 6 = keys, 7th+ = relevants; deselecting a key promotes the oldest remaining relevant so the key set stays at 6 whenever ≥6 are selected — implemented inside `set_key_stat` v2 (single RPC, persisted order, advisory-lock safe), replacing the key-XOR-relevant gating
-**Plans**: 4/4 plans (see `.planning/phases/09-fine-ranks-value-proportional-scale-role-key-stats/`)
+**Plans**: 5/5 plans complete (see `.planning/phases/09-fine-ranks-value-proportional-scale-role-key-stats/`)
 Plans:
-- [ ] 09-01-PLAN.md — Migration 0017: stat_direction, class_key_stats re-key + backfill, set_key_stat v2, my_report/class_top5/get_promotion rewrites, last_validated_at — Wave 1
-- [ ] 09-02-PLAN.md — Client API + Stats-Chave: set_key_stat_v2 wrapper, setRelevantStat removed, role selector + KEYU ordered set + coverage indicator — Wave 2
-- [ ] 09-03-PLAN.md — Tripod re-lock: rankMath.ts value-proportional spec + tests, smoke-rank.mjs + smoke-promotion.mjs re-baselined — Wave 3
-- [ ] 09-04-PLAN.md — Dashboard UI: percentilePhrase dropped, stat cards show raw points + tier badge — Wave 4
+- [x] 09-01-PLAN.md — Migration 0018: stat_direction, class_key_stats re-key + backfill, set_key_stat v2, my_report/class_top5/get_promotion rewrites, last_validated_at — Wave 1 — committed (9df6209)
+- [x] 09-02-PLAN.md — Client API + Stats-Chave: set_key_stat_v2 wrapper, setRelevantStat removed, role selector + KEYU ordered set + coverage indicator — Wave 2 — committed (9df6209)
+- [x] 09-03-PLAN.md — Tripod re-lock: rankMath.ts value-proportional spec + tests, smoke-rank.mjs + smoke-promotion.mjs re-baselined — Wave 3 — committed (9df6209)
+- [x] 09-04-PLAN.md — Dashboard UI: percentilePhrase dropped, stat cards show raw points + tier badge — Wave 4 — committed (9df6209)
+- [x] 09-05-PLAN.md — KeyStatsPage tests — Wave 5 — committed (9df6209)
+- [~] 09-06-PLAN.md — Live smoke verification against deployed Supabase — env-gated (requires SUPABASE_ACCESS_TOKEN/PROJECT_REF) — deferred
 
 Cross-cutting constraints: ONE migration, ONE tripod re-lock — both features rewrite the same three RPC bodies, so they land together (owner decision 8; ROLES.md §3.6: never rewrite the same three RPC bodies twice in one milestone); the backfill is the live-data continuity trick — without it every member's OVR nulls on migration day (P-ROLE-1, pre/post parity smoke is the detection); advisory-lock hash gains the role component and the old `set_key_stat` signature is dropped in the same migration (P-ROLE-6); the unified key/relevant selection (owner feedback 2026-10-20) ships INSIDE that same `set_key_stat` v2 rewrite — never as a separate migration; promotion top-5 stays class-wide across roles (OVR is the cross-role comparable currency); staff audit pass (ROLE-10) gates BEFORE per-role differentiation lands (P-ROLE-3: silent wrong-cohort scoring); migration + frontend deploy together to avoid stale-band skew (R17); formula edges (all-equal → one locked behavior, max=0, n≥3 gate retention) locked in spec + smoke; no new npm dependencies.
 **UI hint**: yes
@@ -203,7 +205,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 (8 is independent 
 | 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 4/4 | Complete    | 2026-10-15 |
 | 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 3/6 | In Progress|  |
 | 08.10. pt-BR OCR Identity (hotfix) | v1.1 | 1/1 | Complete | 2026-10-22 |
-| 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 0/4 | Planned | - |
+| 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 5/5 | Complete | 2026-10-22 |
 | 9.1. Hidden Raw Defenses (RPDEF/RMDEF) | v1.1 | 0/2 | Planned | - |
 | 10. Personalized Home Landing Tab | v1.1 | 0/0 | Not started | - |
 
