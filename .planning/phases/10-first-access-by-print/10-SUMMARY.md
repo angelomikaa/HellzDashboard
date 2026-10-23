@@ -28,6 +28,13 @@ PIN/registration system (owner rule 2026-10-23): no PIN setter, no registration
 request, no queue spam. Login also accepts the handle as a fallback for the
 nickname field, and a claimed account can only be reached through its PIN.
 
+The request-access **Identificação** step no longer probes `verify-pin` with a
+fake PIN (which answered 401 for both claimed and unknown handles and opened the
+old relink form with PIN boxes). It calls `first-access { action: 'identify' }`
+and answers `claimed` (→ "Essa conta já tem PIN. Entre com o nick e o PIN.", no
+form), `unclaimed` (→ print-first claim) or `none` (→ staff-approved relink
+form).
+
 Approval (`approve_request` v3) creates/reactivates the member **unclaimed**
 (`pin_hash NULL`, `claimed_at NULL`). The next attempt answers `ready` and the
 player sets the PIN.

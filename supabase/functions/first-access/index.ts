@@ -15,6 +15,13 @@
 //        'identity_mismatch' registry row holds a DIFFERENT char_id
 //        'ambiguous_identity' more than one registry row uses the nickname
 //
+//   POST { action: 'identify', discord_handle }
+//     -> 200 { status: 'claimed' | 'unclaimed' | 'none' }
+//        Handle-only probe for the request-access identification step.
+//        'claimed' (account with a PIN) refuses the PIN system entirely: no
+//        relink form, no PIN boxes — log in instead or ask staff for a reset.
+//        'unclaimed' has a registry row without a PIN -> first-access claim.
+//
 //   POST { action: 'request', discord_handle, char_id, nickname, char_class,
 //          proof_data_url }
 //     -> 200 { request_id, status: 'pending', duplicate }
@@ -36,7 +43,7 @@ import {
 } from '../_shared/session.ts'
 
 const MAX_BODY_BYTES = 3_500_000
-const ACTIONS = new Set(['lookup', 'request'])
+const ACTIONS = new Set(['lookup', 'request', 'identify'])
 
 type LookupStatus =
   | 'ready'
@@ -87,8 +94,6 @@ Deno.serve(async (req: Request) => {
   const charId = typeof body.char_id === 'string' ? body.char_id.trim() : ''
   const handle = typeof body.discord_handle === 'string' ? body.discord_handle.trim() : ''
 
-  if (nickname.length === 0 || nickname.length > 80) return json({ error: 'invalid_request' }, 400)
-  if (!/^\d{1,12}$/.test(charId)) return json({ error: 'invalid_request' }, 400)
   if (handle.length > 64) return json({ error: 'invalid_request' }, 400)
 
   const cfg = envConfig()
@@ -112,6 +117,25 @@ Deno.serve(async (req: Request) => {
     if (rows.length > 1) throw new Error('ambiguous handle')
     return rows[0] ?? null
   }
+
+  // Handle-only probe used by the request-access "Identificação" step. Owner
+  // rule (2026-10-23): an account that already has a PIN must refuse the PIN
+  // system entirely, so the probe never opens a PIN form for it.
+  if (action === 'identify') {
+    if (handle.length === 0) return json({ error: 'invalid_request' }, 400)
+    try {
+      const member = await memberByHandle()
+      if (member === null) return json({ status: 'none' })
+      return json({ status: member.pin_hash === null ? 'unclaimed' : 'claimed' })
+    } catch {
+      return json({ error: 'server_error' }, 500)
+    }
+  }
+
+  if (nickname.length === 0 || nickname.length > 80) {
+    return json({ error: 'invalid_request' }, 400)
+  }
+  if (!/^\d{1,12}$/.test(charId)) return json({ error: 'invalid_request' }, 400)
 
   async function lookupStatus(): Promise<LookupStatus> {
     const { data, error } = await admin

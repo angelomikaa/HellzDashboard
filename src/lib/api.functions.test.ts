@@ -3,6 +3,7 @@ import type { NeoFootSession } from '../features/auth/session'
 import {
   FunctionError,
   fetchRequestStatus,
+  firstAccessIdentify,
   firstAccessLookup,
   requestAccess,
   requestFirstAccess,
@@ -218,6 +219,25 @@ describe('first-access — lookup + registration (0020)', () => {
     await expect(
       firstAccessLookup({ nickname: 'Ahrya', char_id: '32980' }),
     ).rejects.toMatchObject({ code: 'invalid_response' })
+  })
+
+  it('posts action identify with only the handle and maps the three answers', async () => {
+    for (const status of ['claimed', 'unclaimed', 'none'] as const) {
+      nextResponse = () => res(200, JSON.stringify({ status }))
+      await expect(firstAccessIdentify('satturne')).resolves.toBe(status)
+    }
+    expect(calls[calls.length - 1].url).toBe(
+      'https://test-project.supabase.co/functions/v1/first-access',
+    )
+    expect(JSON.parse(String(calls[calls.length - 1].init.body))).toEqual({
+      action: 'identify',
+      discord_handle: 'satturne',
+    })
+
+    nextResponse = () => res(200, JSON.stringify({ status: 'ready' }))
+    await expect(firstAccessIdentify('satturne')).rejects.toMatchObject({
+      code: 'invalid_response',
+    })
   })
 
   it('posts action request with handle + identity + proof', async () => {

@@ -11,7 +11,7 @@
 // approval stays staff-gated (T-08-20). The PIN is transient state only
 // (T-08-18).
 import { useRef, useState, type FormEvent } from 'react'
-import { requestAccess, type RequestType } from '../../lib/api'
+import { firstAccessIdentify, requestAccess, type RequestType } from '../../lib/api'
 import { ProofField } from '../identity/ProofField'
 import type { BasicProfileFields, CharFunction } from '../submit/identity'
 import { PinBoxes } from '../auth/PinBoxes'
@@ -38,8 +38,9 @@ export interface RequestAccessPageProps {
   initialRequestId?: string
   onBack: () => void
   onStartApplication: (draft: ProspectDraft) => void
-  /** Identification path: when the handle is unclaimed (verify-pin 409), hand
-   *  off to the first-access claim flow instead of the re-link form. */
+  /** Identification path: when the handle is known without a PIN, hand off to
+   *  the first-access claim flow instead of any PIN form. A handle whose account
+   *  already has a PIN never opens a form at all (owner rule 2026-10-23). */
   onFirstAccess?: (handle: string) => void
 }
 
@@ -90,9 +91,10 @@ export function RequestAccessPage({
   function start(type: RequestType): void {
     setRequestType(type)
     if (type === 'member') {
-      // Identificação path: probe the handle first. An unclaimed handle (409
-      // pin_setup_required) routes to the first-access claim flow; otherwise
-      // the member re-link form opens with the handle prefilled.
+      // Identificação path: probe the handle first. A known character without a
+      // PIN routes to the print-first claim; an account that already has a PIN is
+      // refused outright (owner rule 2026-10-23); unknown handles keep the
+      // staff-approved re-link form.
       setIdentifyHandle(handle)
       setIdentifyStatus({ kind: 'idle' })
       setStep('identify')
@@ -109,32 +111,43 @@ export function RequestAccessPage({
     if (h.length === 0) return
     setIdentifyStatus({ kind: 'submitting' })
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-pin`, {
-        method: 'POST',
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ discord_handle: h, pin: '0000' }),
-      })
-      const body: { error?: string } = await res.json().catch(() => ({}))
-      if (res.status === 409 && body.error === 'pin_setup_required') {
-        // Unclaimed handle -> first-access claim flow.
+      const status = await firstAccessIdentify(h)
+      // Owner rule (2026-10-23): an account that already has a PIN refuses the
+      // PIN system entirely. No relink form, no PIN boxes — log in with the
+      // nickname + PIN, or ask staff for a reset.
+      if (status === 'claimed') {
+        setIdentifyStatus({
+          kind: 'error',
+          message: 'Essa conta já tem PIN. Entre com o nick e o PIN.',
+          backToLogin: true,
+        })
+        return
+      }
+      // A known character without a PIN claims it by PRINT (Phase 10): the
+      // handle only prefills the first-access screen.
+      if (status === 'unclaimed') {
         onFirstAccess?.(h)
         if (!onFirstAccess) {
-          setIdentifyStatus({ kind: 'error', message: 'Fluxo de primeiro acesso indisponível.', backToLogin: false })
+          setIdentifyStatus({
+            kind: 'error',
+            message: 'Fluxo de primeiro acesso indisponível.',
+            backToLogin: false,
+          })
         }
         return
       }
-      // Claimed or unknown handle -> member re-link form.
+      // Handle unknown to the registry: the member re-link form (staff approval).
       setHandle(h)
       setRequestType('member')
       setStep('form')
       setStatus({ kind: 'idle' })
       setRequestId(null)
     } catch {
-      setIdentifyStatus({ kind: 'error', message: 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.', backToLogin: false })
+      setIdentifyStatus({
+        kind: 'error',
+        message: 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
+        backToLogin: false,
+      })
     }
   }
 
@@ -344,6 +357,15 @@ export function RequestAccessPage({
               <p role="alert" className="text-sm font-semibold text-destructive">
                 {identifyStatus.message}
               </p>
+            )}
+            {identifyStatus.kind === 'error' && identifyStatus.backToLogin && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Voltar para o login
+              </button>
             )}
             <button
               type="submit"

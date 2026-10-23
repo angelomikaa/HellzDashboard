@@ -964,6 +964,26 @@ export async function firstAccessLookup(
 }
 
 /**
+ * Handle-only probe for the request-access "Identificação" step (0020). It
+ * answers whether the typed handle already owns an account and, decisively,
+ * whether that account already has a PIN: a claimed account must never reach a
+ * PIN form again (owner rule 2026-10-23) — only staff can reset it.
+ */
+export type FirstAccessIdentifyStatus = 'claimed' | 'unclaimed' | 'none'
+
+export async function firstAccessIdentify(handle: string): Promise<FirstAccessIdentifyStatus> {
+  const body = await edgeFetch<{ status?: unknown }>('first-access', {
+    action: 'identify',
+    discord_handle: handle,
+  })
+  const status = body.status
+  if (status !== 'claimed' && status !== 'unclaimed' && status !== 'none') {
+    throw new FunctionError(200, 'invalid_response', 'malformed identify status')
+  }
+  return status
+}
+
+/**
  * Queue a 'registration' request (handle + print identity + proof). The officer
  * approval registers the character WITHOUT a PIN, so the player retries the
  * first-access flow and sets it there.
