@@ -4,9 +4,11 @@ import {
   CLASS_ALIASES,
   OFFICIAL_CLASSES,
   matchClassName,
+  nicknameFromLayout,
   parseBasicProfileText,
   validateIdentity,
   validateIdentityDraft,
+  type OcrWord,
 } from './identity'
 
 // Phase 8 (08-03): the class list is the DB seed (15 transcendent names) and
@@ -257,6 +259,107 @@ describe('parseBasicProfileText — pt-BR client sample', () => {
     expect(parseBasicProfileText('BE\nSoldierHelIz\nClasse Criador\nID 17069').nickname).toBe(
       'SoldierHelIz',
     )
+  })
+})
+
+// 08.10 hotfix (2026-10-22): a real capture prefilled the nickname with the
+// fragment "dh" — a crop had cut the name open and the text parser took any
+// short line as a name. The nickname is now decided from the card's LAYOUT:
+// the game prints it LEFT-ALIGNED with the class label directly below it.
+// Word boxes below are the measured tesseract `blocks` output of the real
+// samples (`.secrets/ocr-samples`, gitignored) and of the owner's capture.
+describe('nicknameFromLayout — the name is the band left-aligned above the class label', () => {
+  const at = (text: string, x0: number, y0: number, x1: number, y1: number): OcrWord => ({
+    text,
+    x0,
+    y0,
+    x1,
+    y1,
+  })
+
+  // sampidentityaryah.jpg (725x341), the owner-reported capture: "Aryah"@169
+  // sits 1px right of "Classe"@170. The portrait edge ("i", "ay", "0") is noise.
+  it('reads the owner-reported capture', () => {
+    const words = [
+      at('ay', 104, 31, 153, 48),
+      at('0', 137, 27, 157, 52),
+      at('i', 130, 49, 146, 79),
+      at('Aryah', 169, 25, 245, 56),
+      at('Classe', 170, 71, 245, 93),
+      at('Sumo', 277, 73, 328, 90),
+      at('Sacerdote', 338, 72, 432, 90),
+      at('1D', 476, 73, 498, 91),
+      at('39943Z', 505, 66, 607, 93),
+    ]
+    expect(nicknameFromLayout(words, 725)).toEqual({ anchored: true, nickname: 'Aryah' })
+  })
+
+  // Same capture cropped to the card header: SPARSE_TEXT split the name into
+  // "A" + "ryah" and the portrait frame pulled "C" into the band.
+  it('glues a name the OCR split in two and ignores the frame blob', () => {
+    const words = [
+      at('C', 15, 9, 153, 49),
+      at('gl', 130, 49, 146, 76),
+      at('A', 169, 26, 188, 48),
+      at('ryah', 190, 25, 245, 56),
+      at('Classe', 170, 71, 245, 93),
+      at('Sumo', 277, 73, 332, 90),
+      at('Sacerdote', 338, 72, 432, 90),
+    ]
+    expect(nicknameFromLayout(words, 725)).toEqual({ anchored: true, nickname: 'Aryah' })
+  })
+
+  // Samplebasicptbr.png (707x345): the copy/edit badge prints as "SN" right
+  // next to the name — short, so it is dropped instead of becoming "Ahrya SN".
+  it('discards the edit-pencil badge printed beside the name', () => {
+    const words = [
+      at('Ahrya', 167, 32, 244, 63),
+      at('SN', 253, 53, 288, 67),
+      at('Classe', 168, 78, 243, 100),
+      at('Sumo', 275, 80, 330, 97),
+      at('Sacerdote', 336, 79, 430, 97),
+    ]
+    expect(nicknameFromLayout(words, 707)).toEqual({ anchored: true, nickname: 'Ahrya' })
+  })
+
+  // sampbasicideal.png (691x416) — the English "Job" label.
+  it('anchors on the English label too', () => {
+    const words = [
+      at('MA', 58, 113, 76, 126),
+      at('Ahrya', 158, 104, 235, 135),
+      at('Job', 157, 150, 197, 176),
+      at('Gypsy', 266, 152, 334, 178),
+    ]
+    expect(nicknameFromLayout(words, 691)).toEqual({ anchored: true, nickname: 'Ahrya' })
+  })
+
+  it('never prefills a fragment of a name the crop cut open', () => {
+    // Only the tail of the name survived and the class band is out of frame:
+    // there is nothing to anchor on, so the text parser must stay silent
+    // (strict shape: 3 letters, capitalised when unanchored).
+    expect(nicknameFromLayout([at('ryah', 0, 25, 55, 56)], 140)).toEqual({
+      anchored: false,
+      nickname: null,
+    })
+    expect(parseBasicProfileText('ryah\nID 39943').nickname).toBe(null)
+    expect(parseBasicProfileText('dh\nID 39943').nickname).toBe(null)
+
+    // Same fragment WITH the class band: the name no longer starts where the
+    // label starts, so the layout refuses it instead of prefilling "ryah".
+    const cut = [at('ryah', 20, 25, 75, 56), at('Classe', 0, 71, 75, 93)]
+    expect(nicknameFromLayout(cut, 140)).toEqual({ anchored: true, nickname: null })
+  })
+
+  it('keeps a two-word nickname apart and refuses OCR noise', () => {
+    const words = [
+      at('Dark', 30, 20, 95, 50),
+      at('Knight', 108, 20, 190, 50),
+      at('Classe', 30, 66, 130, 88),
+    ]
+    expect(nicknameFromLayout(words, 300)).toEqual({ anchored: true, nickname: 'Dark Knight' })
+
+    const noise = [at('y Arvah /', 20, 20, 120, 50), at('Classe', 20, 66, 90, 88)]
+    expect(nicknameFromLayout(noise, 300)).toEqual({ anchored: true, nickname: null })
   })
 })
 

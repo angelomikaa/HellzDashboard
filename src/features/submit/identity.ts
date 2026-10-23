@@ -253,15 +253,23 @@ const NICKNAME_KEYWORDS = [
  * positional evidence: the game prints the nickname there, so "Helz2010" is
  * a real nickname) — standalone lines stay digit-free so the ID/power rows
  * are never mistaken for a name.
+ *
+ * STRICT SHAPE (2026-10-22, owner-reported "dh" prefill): a nickname is a
+ * printed word run, so it must carry at least 3 letters and consist only of
+ * letters/digits/spaces starting with a letter. Fragments left by a crop that
+ * cut a name open ("dh", "ah", "oy", "Pp", "IL", "WZ") and OCR noise glued to
+ * punctuation ("y Arvah /") are rejected — the field stays empty and the
+ * player types the real name (D-03: never guess an identity).
  */
 function nicknameCandidate(value: string, allowDigits: boolean): string | null {
   const candidate = value
     .replace(/^[^A-Za-zÀ-ÿ0-9]+/, '')
     .replace(/[|_]+$/g, '')
     .trim()
-  if (candidate.length < 2 || candidate.length > 20) return null
+  if (candidate.length < 3 || candidate.length > 20) return null
+  if ((candidate.match(/[A-Za-zÀ-ÿ]/g) ?? []).length < 3) return null
+  if (!/^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 ]*$/.test(candidate)) return null
   if (!allowDigits && /[0-9]/.test(candidate)) return null
-  if (!/[A-Za-zÀ-ÿ]/.test(candidate)) return null
   const lower = candidate.toLowerCase()
   if (NICKNAME_KEYWORDS.some((word) => new RegExp(`\\b${word}\\b`, 'i').test(lower))) return null
   if (matchClassName(candidate) !== null) return null
@@ -355,12 +363,16 @@ export function parseBasicProfileText(text: string): BasicProfileFields {
   }
 
   // 3. Fallback: the first standalone line that looks like a name (no class
-  //    band readable at all, or bands the OCR already separated).
+  //    band readable at all, or bands the OCR already separated). Without the
+  //    class band there is no positional evidence, so demand a CAPITALISED
+  //    first letter: a crop that cut a name open leaves a lowercase fragment
+  //    ("ryah", "yah Vd", "dh") and that must stay unread (D-03) instead of
+  //    being prefilled as the player's nickname.
   if (nickname === null) {
     for (const line of lines.slice(0, 5)) {
       if (CLASS_LABEL.test(line)) continue
       const candidate = nicknameCandidate(line, false)
-      if (candidate !== null) {
+      if (candidate !== null && /^[A-ZÀ-Ý]/.test(candidate)) {
         nickname = candidate
         break
       }
@@ -368,6 +380,105 @@ export function parseBasicProfileText(text: string): BasicProfileFields {
   }
 
   return { nickname, char_id, char_class }
+}
+
+// ---------------------------------------------------------------------------
+// Structural nickname read (word boxes)
+// ---------------------------------------------------------------------------
+//
+// Owner report (2026-10-22): a capture whose crop cut the name open prefilled
+// the nickname with the OCR fragment "dh". Text alone cannot tell a fragment
+// from a short name, but the card's LAYOUT can: the game prints the nickname
+// LEFT-ALIGNED with the class label directly below it. Measured on every
+// sample (.secrets/ocr-samples):
+//
+//   sampbasicideal.png   "Ahrya"@158,104,235,135   "Job"@157,150,197,176
+//   Samplebasicptbr.png  "Ahrya"@167,32,244,63     "Classe"@168,78,243,100
+//   sampidentityaryah    "Aryah"@169,25,245,56     "Classe"@170,71,245,93
+//
+// Same card, one crop that starts inside the name (L190): only "ryah"@0
+// survives and the class band is gone — nothing to anchor on, so the strict
+// shape rules above refuse it instead of prefilling "ryah"/"dh".
+
+/** One OCR word with its pixel box (tesseract `blocks: true` output). */
+export interface OcrWord {
+  text: string
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+}
+
+/** The class band is the anchor; when it is found it OWNS the nickname field
+ *  (`nickname: null` means "the card header is not in this capture", never
+ *  "fall back to guessing from lines"). */
+export interface NicknameLayout {
+  anchored: boolean
+  nickname: string | null
+}
+
+const CLASS_LABEL_WORD = /^(?:job|class|classe|clase)[:.]?$/i
+
+/**
+ * The nickname of the card header, decided from the word boxes:
+ * the word directly ABOVE the class label whose left edge matches the label's
+ * (the game prints the name left-aligned with "Job"/"Classe"), with fragments
+ * of the same printed word glued back together ("A" + "ryah" -> "Aryah") and
+ * the edit-pencil icon / copy badge discarded.
+ */
+export function nicknameFromLayout(words: readonly OcrWord[], imageWidth: number): NicknameLayout {
+  const usable = words.filter(
+    (word) =>
+      typeof word.text === 'string' &&
+      word.text.trim() !== '' &&
+      Number.isFinite(word.x0) &&
+      Number.isFinite(word.y1),
+  )
+  // Anchor = the topmost class-label word ("Classe"/"Job"/...). The job-level
+  // row prints "Classe/Nv40" as ONE token, which this pattern cannot match.
+  const label = usable
+    .filter((word) => CLASS_LABEL_WORD.test(word.text.trim()))
+    .sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0)[0]
+  if (label === undefined) return { anchored: false, nickname: null }
+
+  // One text line up. A word overlapping the label's own band (the copy badge,
+  // a portrait edge) is not part of the name band.
+  const labelHeight = Math.max(1, label.y1 - label.y0)
+  const band = usable.filter((word) => {
+    if (word === label) return false
+    const gap = label.y0 - word.y1
+    return gap >= -0.25 * labelHeight && gap <= 1.5 * labelHeight
+  })
+  if (band.length === 0) return { anchored: true, nickname: null }
+
+  const tolerance = Math.max(3, 0.015 * imageWidth)
+  const start = band
+    .filter((word) => Math.abs(word.x0 - label.x0) <= tolerance)
+    .sort((a, b) => a.x0 - b.x0 || a.y0 - b.y0)[0]
+  // A crop that cut the name open leaves its first surviving glyph to the
+  // right of the label edge: nothing is aligned, so the field stays empty
+  // instead of prefilling a fragment like "ryah"/"dh".
+  if (start === undefined) return { anchored: true, nickname: null }
+
+  // Extend over the rest of the printed name: a glyph run with normal word
+  // spacing. The edit-pencil icon / copy badge is printed SMALLER than the
+  // name's glyphs and sits apart, so it never enters the name.
+  const nameHeight = Math.max(1, start.y1 - start.y0)
+  let text = start.text.trim()
+  const toTheRight = band
+    .filter((word) => word.x0 >= start.x1 - 1)
+    .sort((a, b) => a.x0 - b.x0)
+  let previous = start
+  for (const word of toTheRight) {
+    if (word.x0 - previous.x1 > 0.6 * nameHeight) break
+    if (word.y1 - word.y0 < 0.6 * nameHeight) break
+    const next = word.text.trim()
+    // Glue a cut word back together ("A"+"ryah"); keep a real word boundary.
+    const glued = previous.text.trim().length <= 2 || /^[a-zà-ÿ]/.test(next)
+    text += glued ? next : ` ${next}`
+    previous = word
+  }
+  return { anchored: true, nickname: nicknameCandidate(text, true) }
 }
 
 const ID_ERROR = 'Informe o ID do personagem (somente números, até 12 dígitos).'

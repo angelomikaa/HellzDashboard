@@ -72,7 +72,7 @@ import {
 } from './structure'
 import { sanityAccepts } from './sanity'
 import { parseTooltipValue } from './tooltip'
-import { parseBasicProfileText, type BasicProfileFields } from '../identity'
+import { nicknameFromLayout, parseBasicProfileText, type BasicProfileFields, type OcrWord } from '../identity'
 
 /** One full Basic-screen profile read (08-03 D-03): OCR text + parsed identity. */
 export interface BasicProfileRead extends BasicProfileFields {
@@ -478,9 +478,44 @@ export function profileFromRawText(text: string): BasicProfileFields {
   return parseBasicProfileText(text)
 }
 
+/** Flatten tesseract `blocks: true` output into the word boxes the identity
+ *  layout reads (tolerates any missing level — the worker shape is not ours). */
+function wordsFromBlocks(data: unknown): OcrWord[] {
+  type Box = { x0?: number; y0?: number; x1?: number; y1?: number }
+  type Word = { text?: string; bbox?: Box }
+  const blocks = (
+    data as {
+      blocks?: Array<{
+        paragraphs?: Array<{ lines?: Array<{ words?: Word[] }> }>
+      }>
+    }
+  ).blocks
+  const words: OcrWord[] = []
+  for (const block of blocks ?? []) {
+    for (const paragraph of block.paragraphs ?? []) {
+      for (const line of paragraph.lines ?? []) {
+        for (const word of line.words ?? []) {
+          const box = word.bbox
+          if (!box || typeof word.text !== 'string' || word.text.trim() === '') continue
+          words.push({
+            text: word.text,
+            x0: box.x0 ?? 0,
+            y0: box.y0 ?? 0,
+            x1: box.x1 ?? 0,
+            y1: box.y1 ?? 0,
+          })
+        }
+      }
+    }
+  }
+  return words
+}
+
 /**
  * Read the character identity (nickname / ID / job) from a Basic screenshot in
- * ONE full-canvas OCR pass, parsing the text with the pure identity module.
+ * ONE full-canvas OCR pass: the text is parsed with the pure identity module and
+ * the nickname is decided from the word boxes (it is printed left-aligned with
+ * the class label — text alone cannot tell a name from a crop-cut fragment).
  *
  * Used by first access (D-03) and the member request form. The existing worker
  * is shared; PSM is switched to SPARSE_TEXT for this read and restored to the
@@ -500,13 +535,20 @@ export async function readBasicProfile(
     tessedit_char_whitelist: PROFILE_WHITELIST,
   })
   try {
-    const { data } = await worker.recognize(canvas)
+    // `blocks` carries the word boxes the nickname layout needs (the class
+    // label is the anchor the name is left-aligned with).
+    const { data } = await worker.recognize(canvas, {}, { blocks: true, text: true })
     const raw = data.text || ''
     // 08.10: a rejected claim is otherwise undiagnosable (the UI can only say
     // "não conseguimos ler"). Dev-only, this device's own text — never shipped
     // to a log service and never part of a request body.
     if (import.meta.env?.DEV) console.debug('[ocr] identity raw text:', JSON.stringify(raw))
-    return { ...profileFromRawText(raw), raw_text: raw }
+    const parsed = profileFromRawText(raw)
+    const layout = nicknameFromLayout(wordsFromBlocks(data), canvas.width)
+    // A located class band means the card header is in this capture: the
+    // layout decides the nickname (null = "not readable", never a guess).
+    const nickname = layout.anchored ? layout.nickname : parsed.nickname
+    return { nickname, char_id: parsed.char_id, char_class: parsed.char_class, raw_text: raw }
   } finally {
     // Restore the wizard's block segmentation; ocrRect sets its own whitelist
     // before every read, but PSM is worker-global.
