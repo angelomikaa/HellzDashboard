@@ -105,6 +105,18 @@ begin
     raise exception 'already_member';
   end if;
 
+  -- 0020 owner rule (2026-10-23): a handle that already belongs to an ACTIVE
+  -- account refuses the PIN/registration system entirely. A claimed handle logs
+  -- in; an unclaimed one is matched by nickname or fixed by an officer.
+  select m.id into v_member
+  from members m
+  where m.active
+    and lower(btrim(m.discord_handle)) = lower(v_handle)
+  limit 1;
+  if v_member is not null then
+    raise exception 'already_member';
+  end if;
+
   select * into v_existing
   from membership_requests r
   where r.status = 'pending'
@@ -135,7 +147,7 @@ end;
 $$;
 
 comment on function public.create_registration_request(text, text, text, text, text) is
-  'Service-role-only first-access registration write (Phase 10). Stores handle + print identity + proof as a pending registration request with NO PIN (pin_hash NULL) - the PIN is set after the officer approval. Idempotent per pending handle/char_id (returns duplicate=true). Refuses rows the registry already holds: already_member. Exceptions: invalid_handle/dummy_handle/invalid_identity/unknown_class/invalid_proof/already_member. No caller gate by design - grant is service_role only (the first-access Edge Function).';
+  'Service-role-only first-access registration write (Phase 10). Stores handle + print identity + proof as a pending registration request with NO PIN (pin_hash NULL) - the PIN is set after the officer approval. Idempotent per pending handle/char_id (returns duplicate=true). Refuses rows the registry already holds, including BY HANDLE: a Discord handle that belongs to an ACTIVE member refuses the PIN/registration system entirely (owner rule 2026-10-23). Exceptions: invalid_handle/dummy_handle/invalid_identity/unknown_class/invalid_proof/already_member. No caller gate by design - grant is service_role only (the first-access Edge Function).';
 
 -- ---------------------------------------------------------------------------
 -- 4. claim_pin_by_nickname - service-role only (setup-pin Edge Function).

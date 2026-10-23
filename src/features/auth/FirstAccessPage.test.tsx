@@ -16,6 +16,7 @@ import {
   registrationProblem,
   setupErrorCopy,
   statusMessage,
+  statusBackToLogin,
   submitFirstAccess,
   submitRegistration,
   type FirstAccessDeps,
@@ -105,10 +106,22 @@ describe('registry status gates the flow', () => {
 
   it('explains every non-ready status without asking for a PIN', () => {
     expect(statusMessage('pin_set')).toContain('já tem PIN')
+    expect(statusMessage('handle_claimed')).toContain('Discord já tem personagem com PIN')
+    expect(statusMessage('handle_registered')).toContain('nick do print não confere')
     expect(statusMessage('pending')).toContain('aprovação')
     expect(statusMessage('unknown')).toContain('lista da guilda')
     expect(statusMessage('identity_mismatch')).toContain('não confere')
     expect(statusMessage('ambiguous_identity')).toContain('Mais de um cadastro')
+  })
+
+  it('refuses the PIN system for a handle that already has one', () => {
+    for (const status of ['handle_claimed', 'handle_registered'] as const) {
+      expect(canSetPin(status)).toBe(false)
+      expect(canRequestRegistration(status)).toBe(false)
+    }
+    // Claimed handles go straight back to the login.
+    expect(statusBackToLogin('handle_claimed')).toBe(true)
+    expect(statusBackToLogin('handle_registered')).toBe(false)
   })
 })
 
@@ -136,7 +149,16 @@ describe('firstAccessProblem — submit blocking order', () => {
   })
 
   it('keeps the PIN setter closed for a non-claimable registry answer', () => {
-    for (const status of ['unknown', 'pin_set', 'pending', 'identity_mismatch', 'ambiguous_identity', null] as const) {
+    for (const status of [
+      'unknown',
+      'pin_set',
+      'pending',
+      'identity_mismatch',
+      'ambiguous_identity',
+      'handle_claimed',
+      'handle_registered',
+      null,
+    ] as const) {
       expect(firstAccessProblem({ ...VALID, status })).toBe('status')
     }
     expect(firstAccessProblemMessage('status')).toContain('Verifique o personagem')
@@ -307,7 +329,7 @@ describe('submitRegistration — officer approval path', () => {
 
   it('maps server refusals to pt-BR copy', async () => {
     expect(registrationErrorCopy(new FunctionError(409, 'already_registered', 'x'))).toContain(
-      'já foi cadastrado',
+      'já está cadastrado',
     )
     expect(registrationErrorCopy(new FunctionError(400, 'unknown_class', 'x'))).toContain(
       'classe lida',

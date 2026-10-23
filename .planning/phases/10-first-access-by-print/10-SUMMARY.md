@@ -18,8 +18,15 @@ the flow. Login itself becomes **character nickname + PIN**.
 | `unknown` | "Enviar print para aprovação" → `registration` request → officer queue |
 | `pending` | "Cadastre enviado. Aguarde a aprovação." |
 | `pin_set` | "Já tem PIN. Entre com o nick e o PIN." |
+| `handle_claimed` | the typed Discord handle belongs to a claimed account → PIN system refused |
+| `handle_registered` | the handle exists without a PIN but the print nickname does not match → officer |
 | `identity_mismatch` | printed char_id ≠ registered char_id → officer |
 | `ambiguous_identity` | more than one active row shares the nickname → officer |
+
+A Discord handle that already belongs to an ACTIVE member refuses the whole
+PIN/registration system (owner rule 2026-10-23): no PIN setter, no registration
+request, no queue spam. Login also accepts the handle as a fallback for the
+nickname field, and a claimed account can only be reached through its PIN.
 
 Approval (`approve_request` v3) creates/reactivates the member **unclaimed**
 (`pin_hash NULL`, `claimed_at NULL`). The next attempt answers `ready` and the

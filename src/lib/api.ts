@@ -802,6 +802,10 @@ export type FirstAccessStatus =
   | 'unknown'
   | 'identity_mismatch'
   | 'ambiguous_identity'
+  /** The typed Discord handle already belongs to a claimed account. */
+  | 'handle_claimed'
+  /** The typed handle exists (no PIN yet) but the print nickname does not match. */
+  | 'handle_registered'
 
 export interface FirstAccessLookupInput {
   nickname: string
@@ -934,6 +938,8 @@ const FIRST_ACCESS_STATUSES: readonly FirstAccessStatus[] = [
   'unknown',
   'identity_mismatch',
   'ambiguous_identity',
+  'handle_claimed',
+  'handle_registered',
 ]
 
 /**

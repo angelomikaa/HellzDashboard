@@ -70,6 +70,24 @@ Deno.serve(async (req: Request) => {
 
   const now = new Date()
 
+  // Discord handles are stored as typed; compare case-insensitively without
+  // letting a handle's `%`/`_` act as LIKE wildcards.
+  const escapeLike = (value: string): string => value.replace(/[\\%_]/g, (ch) => `\\${ch}`)
+
+  async function memberByHandle(value: string): Promise<MemberRow | null> {
+    const { data, error } = await admin
+      .from('members')
+      .select('id, display_name, role, pin_hash, active')
+      .eq('active', true)
+      .ilike('discord_handle', escapeLike(value))
+      .limit(2)
+    if (error) throw new Error('handle lookup failed')
+    const rows = (data ?? []) as MemberRow[]
+    // discord_handle is UNIQUE; more than one hit means a broken registry, which
+    // must never be guessed (uniform 401).
+    return rows.length === 1 ? rows[0] : null
+  }
+
   // Resolve the registry row before touching the lockout: since 0020 attempts
   // are counted per ACCOUNT (members.id), so the same person cannot dodge the
   // window by switching between nickname and legacy handle.
@@ -85,14 +103,23 @@ Deno.serve(async (req: Request) => {
     // Two active members sharing a nickname cannot be told apart: never guess.
     if (rows.length > 1) return json({ error: 'ambiguous_identity' }, 409)
     member = rows[0] ?? null
-  } else {
-    const { data, error } = await admin
-      .from('members')
-      .select('id, display_name, role, pin_hash, active')
-      .eq('discord_handle', legacyHandle)
-      .maybeSingle()
-    if (error) return json({ error: 'server_error' }, 500)
-    member = (data as MemberRow | null) ?? null
+  }
+  if (!member && legacyHandle.length > 0) {
+    try {
+      member = await memberByHandle(legacyHandle)
+    } catch {
+      return json({ error: 'server_error' }, 500)
+    }
+  }
+  // 2026-10-23 owner report: typing the DISCORD HANDLE in the login field must
+  // still log the account in (and, when a PIN exists, never reach the PIN
+  // setup path — only a NULL pin_hash does that).
+  if (!member && nickname.length > 0) {
+    try {
+      member = await memberByHandle(nickname)
+    } catch {
+      return json({ error: 'server_error' }, 500)
+    }
   }
 
   // Shared failure path: missing account, inactive member and wrong PIN return

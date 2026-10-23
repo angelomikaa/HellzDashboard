@@ -6,6 +6,10 @@
 //     -> 200 { status }
 //        'ready'             registry row exists, no PIN yet -> PIN setter
 //        'pin_set'           registry row already claimed -> login instead
+//        'handle_claimed'    the typed Discord handle belongs to a claimed
+//                            account -> the PIN system is refused entirely
+//        'handle_registered' the typed handle exists but the print nickname does
+//                            not match it -> officer, never a new registration
 //        'pending'           a registration request awaits an officer
 //        'unknown'           no registry row and no pending request
 //        'identity_mismatch' registry row holds a DIFFERENT char_id
@@ -41,6 +45,8 @@ type LookupStatus =
   | 'unknown'
   | 'identity_mismatch'
   | 'ambiguous_identity'
+  | 'handle_claimed'
+  | 'handle_registered'
 
 interface MemberRow {
   id: string
@@ -105,6 +111,26 @@ Deno.serve(async (req: Request) => {
       if (row.char_id !== null && row.char_id !== charId) return 'identity_mismatch'
       return row.pin_hash === null ? 'ready' : 'pin_set'
     }
+
+    // Owner rule (2026-10-23): a Discord handle that already belongs to an
+    // ACTIVE account refuses the PIN system entirely. A claimed handle can never
+    // queue a new registration; an unclaimed one is an account waiting for its
+    // nickname to match, which an officer resolves.
+    if (handle.length > 0) {
+      const { data: byHandle, error: handleErr } = await admin
+        .from('members')
+        .select('id, pin_hash')
+        .eq('active', true)
+        .ilike('discord_handle', escapeLike(handle))
+        .limit(2)
+      if (handleErr) throw new Error('handle lookup failed')
+      const handleRows = (byHandle ?? []) as { id: string; pin_hash: string | null }[]
+      if (handleRows.length > 1) return 'ambiguous_identity'
+      if (handleRows.length === 1) {
+        return handleRows[0].pin_hash === null ? 'handle_registered' : 'handle_claimed'
+      }
+    }
+
     if (handle.length > 0) {
       const { data: pending, error: pendingErr } = await admin
         .from('membership_requests')
@@ -155,7 +181,13 @@ Deno.serve(async (req: Request) => {
   // status instead of queueing a request that can never be approved.
   try {
     const status = await lookupStatus()
-    if (status === 'ready' || status === 'pin_set' || status === 'identity_mismatch') {
+    if (
+      status === 'ready' ||
+      status === 'pin_set' ||
+      status === 'identity_mismatch' ||
+      status === 'handle_claimed' ||
+      status === 'handle_registered'
+    ) {
       return json({ error: 'already_registered' }, 409)
     }
     if (status === 'ambiguous_identity') return json({ error: 'ambiguous_identity' }, 409)

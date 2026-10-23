@@ -63,10 +63,14 @@ export function statusMessage(status: FirstAccessStatus): string {
   switch (status) {
     case 'pin_set':
       return 'Este personagem já tem PIN. Entre com o nick e o PIN.'
+    case 'handle_claimed':
+      return 'Este Discord já tem personagem com PIN. Entre com o nick e o PIN.'
     case 'pending':
       return 'Cadastro enviado. Aguarde a aprovação de um oficial e tente de novo.'
     case 'unknown':
       return 'Não encontramos este personagem na lista da guilda. Você pode enviar o print para aprovação de um oficial.'
+    case 'handle_registered':
+      return 'Este Discord já está cadastrado, mas o nick do print não confere. Fale com um oficial.'
     case 'identity_mismatch':
       return 'O ID do print não confere com o cadastro deste nick. Fale com um oficial.'
     case 'ambiguous_identity':
@@ -78,7 +82,7 @@ export function statusMessage(status: FirstAccessStatus): string {
 
 /** The statuses that should offer the "back to login" action. */
 export function statusBackToLogin(status: FirstAccessStatus): boolean {
-  return status === 'pin_set'
+  return status === 'pin_set' || status === 'handle_claimed'
 }
 
 export interface FirstAccessDraft {
@@ -344,7 +348,7 @@ export function registrationErrorCopy(error: FunctionError): string {
     case 'request_pending':
       return REQUEST_ALREADY_PENDING
     case 'already_registered':
-      return 'Este personagem já foi cadastrado. Tente de novo: o PIN já pode ser definido.'
+      return 'Este personagem ou Discord já está cadastrado. Entre com o nick e o PIN — se o PIN não existir, fale com um oficial.'
     case 'unknown_class':
       return 'A classe lida não foi reconhecida. Envie outro print.'
     case 'ambiguous_identity':

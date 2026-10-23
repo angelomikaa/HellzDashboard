@@ -190,6 +190,24 @@ describe('first-access — lookup + registration (0020)', () => {
     expect(headers(calls[0]).Authorization).toBe('Bearer test-anon-key')
   })
 
+  it('accepts every documented status, including the claimed-handle refusals', async () => {
+    for (const status of [
+      'ready',
+      'pin_set',
+      'pending',
+      'unknown',
+      'identity_mismatch',
+      'ambiguous_identity',
+      'handle_claimed',
+      'handle_registered',
+    ] as const) {
+      nextResponse = () => res(200, JSON.stringify({ status }))
+      await expect(
+        firstAccessLookup({ nickname: 'Ahrya', char_id: '32980' }),
+      ).resolves.toBe(status)
+    }
+  })
+
   it('rejects an unknown lookup status as invalid_response', async () => {
     nextResponse = () => res(200, JSON.stringify({ status: 'maybe' }))
     await expect(

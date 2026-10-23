@@ -157,6 +157,9 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPage
               disabled={locked}
               className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
+            <p className="text-xs text-muted">
+              O nick que aparece no print. O usuário do Discord também funciona.
+            </p>
           </div>
           <PinBoxes value={pin} onChange={setPin} disabled={disabled} autoFocus />
           {status.kind === 'needs-setup' && (

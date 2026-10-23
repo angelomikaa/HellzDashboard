@@ -104,8 +104,23 @@ Deno.serve(async (req: Request) => {
 
   const now = new Date()
 
+  const escapeLike = (value: string): string => value.replace(/[\\%_]/g, (ch) => `\\${ch}`)
+
+  async function memberByHandle(value: string): Promise<MemberRow | null> {
+    const { data, error } = await admin
+      .from('members')
+      .select('id, display_name, role, pin_hash, active, char_id')
+      .eq('active', true)
+      .ilike('discord_handle', escapeLike(value))
+      .limit(2)
+    if (error) throw new Error('handle lookup failed')
+    const rows = (data ?? []) as MemberRow[]
+    return rows.length === 1 ? rows[0] : null
+  }
+
   // Resolve the registry row: nickname first (Phase 10), handle for a cached
-  // pre-Phase-10 bundle. Ambiguous nicknames can never mint a session.
+  // pre-Phase-10 bundle (or a client that typed the handle in the nickname
+  // field). Ambiguous nicknames can never mint a session.
   let member: MemberRow | null = null
   if (nickname.length > 0) {
     const { data, error } = await admin
@@ -117,14 +132,20 @@ Deno.serve(async (req: Request) => {
     const rows = (data ?? []) as MemberRow[]
     if (rows.length > 1) return json({ error: 'ambiguous_identity' }, 409)
     member = rows[0] ?? null
-  } else {
-    const { data, error } = await admin
-      .from('members')
-      .select('id, display_name, role, pin_hash, active, char_id')
-      .eq('discord_handle', legacyHandle)
-      .maybeSingle()
-    if (error) return json({ error: 'server_error' }, 500)
-    member = (data as MemberRow | null) ?? null
+  }
+  if (!member && legacyHandle.length > 0) {
+    try {
+      member = await memberByHandle(legacyHandle)
+    } catch {
+      return json({ error: 'server_error' }, 500)
+    }
+  }
+  if (!member && nickname.length > 0) {
+    try {
+      member = await memberByHandle(nickname)
+    } catch {
+      return json({ error: 'server_error' }, 500)
+    }
   }
 
   // Unknown/inactive character: uniform refusal. There is no account to lock,
