@@ -15,7 +15,7 @@
 // samples deviate at most 0.01% and must stay no-crop (pinned below +
 // harness test A on the real bytes).
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { clipboardImage, decodeUpload, needsCrop, statusMessage } from './OcrCapture'
+import { decodeUpload, needsCrop, statusMessage } from './OcrCapture'
 
 describe('needsCrop — D-05 aspect-deviation trigger (>5%, exclusive)', () => {
   it('an optimal crop (identical aspect) never triggers cropping', () => {
@@ -221,83 +221,3 @@ describe('decodeUpload — decode fallback chain (D-05-UAT-8)', () => {
   })
 })
 
-// Owner checkpoint round 14 (Windows): a screenshot already sits in the
-// clipboard, so the dropzone click reads it first. These tests lock the
-// EXTRACTION contract only — first image item wins, and every other case
-// (no API, denied permission, no image, failing item read) degrades to null
-// without throwing, which is what makes the file picker the fallback.
-describe('clipboardImage — Windows screenshot shortcut (round 14)', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  it('returns the first image item as a File (Win+Shift+S lands as image/png)', async () => {
-    const blob = new Blob(['print'], { type: 'image/png' })
-    const getType = vi.fn(async () => blob)
-    vi.stubGlobal('navigator', {
-      clipboard: {
-        read: vi.fn(async () => [
-          { types: ['text/plain'], getType: vi.fn() },
-          { types: ['text/html', 'image/png'], getType },
-        ]),
-      },
-    })
-    const file = await clipboardImage()
-    expect(file).not.toBeNull()
-    expect(file?.type).toBe('image/png')
-    expect(file?.name).toBe('captura.png')
-    expect(getType).toHaveBeenCalledWith('image/png')
-  })
-
-  it('names a JPEG clipboard item .jpg', async () => {
-    vi.stubGlobal('navigator', {
-      clipboard: {
-        read: vi.fn(async () => [
-          {
-            types: ['image/jpeg'],
-            getType: vi.fn(async () => new Blob(['jpg'], { type: 'image/jpeg' })),
-          },
-        ]),
-      },
-    })
-    expect((await clipboardImage())?.name).toBe('captura.jpg')
-  })
-
-  it('returns null when the clipboard holds no image', async () => {
-    vi.stubGlobal('navigator', {
-      clipboard: { read: vi.fn(async () => [{ types: ['text/plain'], getType: vi.fn() }]) },
-    })
-    expect(await clipboardImage()).toBeNull()
-  })
-
-  it('returns null when the API is missing, permission is denied, or the item read fails', async () => {
-    vi.stubGlobal('navigator', {})
-    expect(await clipboardImage()).toBeNull()
-
-    vi.stubGlobal('navigator', { clipboard: {} })
-    expect(await clipboardImage()).toBeNull()
-
-    vi.stubGlobal('navigator', {
-      clipboard: {
-        read: vi.fn(async () => {
-          throw new Error('denied')
-        }),
-      },
-    })
-    expect(await clipboardImage()).toBeNull()
-
-    vi.stubGlobal('navigator', {
-      clipboard: {
-        read: vi.fn(async () => [
-          {
-            types: ['image/png'],
-            getType: vi.fn(async () => {
-              throw new Error('item gone')
-            }),
-          },
-        ]),
-      },
-    })
-    expect(await clipboardImage()).toBeNull()
-  })
-})

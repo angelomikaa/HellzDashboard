@@ -27,6 +27,7 @@ import {
   type ProspectStep,
 } from './requestFlow'
 import { OcrCapture } from '../submit/OcrCapture'
+import { ExampleShot } from '../submit/ExampleShot'
 import { ReviewStep } from '../submit/ReviewStep'
 import { OCR_FIELD_FAILURE, StatGroupStep } from '../submit/StatGroupStep'
 import { DefenseStep } from '../submit/DefenseStep'
@@ -283,18 +284,7 @@ export function ProspectApplicationPage({
         {step === 1 && (
           <div className="mt-6 flex flex-col gap-5">
             <div className="flex w-full flex-col gap-4 rounded-lg border border-line bg-surface p-4 lg:flex-row lg:items-stretch">
-              <a
-                href="/examples/basic.png"
-                target="_blank"
-                rel="noreferrer"
-                className="mx-auto block w-full max-w-xs shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:mx-0 lg:w-80"
-              >
-                <img
-                  src="/examples/basic.png"
-                  alt="Exemplo da tela básica do personagem"
-                  className="h-auto w-full rounded-md border border-line object-contain"
-                />
-              </a>
+              <ExampleShot src="/examples/basic.png" alt="Exemplo da tela básica do personagem" />
               <div className="min-w-0 flex-1">
                 <OcrCapture
                   capture="basic"

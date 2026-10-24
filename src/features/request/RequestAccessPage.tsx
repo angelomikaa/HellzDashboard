@@ -405,7 +405,11 @@ export function RequestAccessPage({
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
-      <div className="neon-ring w-full max-w-lg rounded-lg border border-line bg-surface p-6">
+      {/* max-w-2xl (strip parity, owner report 2026-10-23): the proof capture
+          sits in ONE strip — example beside the upload zone, both 160 px —
+          like every wizard strip; the narrower card forced the zone onto a
+          full-width line of its own. */}
+      <div className="neon-ring w-full max-w-2xl rounded-lg border border-line bg-surface p-6">
         <h1 className="text-center text-2xl font-bold leading-[1.2] text-content">
           {prospect ? 'Recrutamento' : 'Identificação'}
         </h1>

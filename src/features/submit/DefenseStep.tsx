@@ -131,12 +131,17 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
                   rel="noopener noreferrer"
                   className="shrink-0"
                 >
+                  {/* Alignment rule (owner report 2026-10-23): the example
+                      renders at the capture zone's height (h-40), width by
+                      aspect — same standard as every capture surface. The
+                      width/height attrs keep the intrinsic-ratio hint so the
+                      h-40/w-auto lock causes no layout shift while loading. */}
                   <img
                     src={card.example}
                     alt={`Exemplo tooltip ${card.label}`}
                     width={160}
                     height={120}
-                    className="rounded border border-line"
+                    className="h-40 w-auto rounded border border-line object-contain"
                     loading="lazy"
                   />
                 </a>

@@ -61,7 +61,7 @@ describe('FirstAccessPage — structure (Phase 10)', () => {
     )
     expect(html).toContain('Primeiro acesso')
     expect(html).toContain('first-access-handle')
-    expect(html).toContain('Comprovante (print do personagem, JPEG)')
+    expect(html).toContain('Comprovante (print do personagem)')
     // The PIN setter is gated by the registry lookup, never shown upfront.
     expect(html).not.toContain('PIN (4 dígitos)')
     expect(html).not.toContain('Criar meu PIN')

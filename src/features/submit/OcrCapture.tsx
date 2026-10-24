@@ -22,12 +22,16 @@
 // surfaces a cancelled-feedback status line (and the overlay's decline
 // button is relabelled accordingly) that clears on the next upload.
 //
-// Clipboard-first click (owner checkpoint round 14): on Windows a screenshot
-// (PrtScn / Win+Shift+S) lands in the clipboard, so clicking the dropzone
-// tries navigator.clipboard.read() FIRST and only opens the file picker
-// when there is no image (or the API/permission is unavailable). The read
-// stays inside the user gesture and the bytes never leave the device.
-import { useRef, useState, type DragEvent } from 'react'
+// Capture-parity extraction (owner report 2026-10-23): the dropzone entry —
+// drag-and-drop, the clipboard-first click (round 14: a Windows PrtScn /
+// Win+Shift+S screenshot pastes with one click; the picker only opens when
+// the clipboard has no image) and the hidden image/* picker — now lives in
+// CaptureDropzone.tsx, shared with the identification ProofField, so every
+// capture surface in the app is one and the same system. The bytes still
+// never leave the device in this flow (the proof flow re-encodes its own
+// JPEG upload copy).
+import { useState } from 'react'
+import { CaptureDropzone } from './CaptureDropzone'
 import { CropOverlay } from './CropOverlay'
 import type { CaptureKey, OcrFieldOutcome } from './ocr'
 import { CAPTURES } from './ocr/regions'
@@ -106,7 +110,6 @@ export async function decodeUpload(file: Blob): Promise<ImageBitmap> {
 
 // Locked UI-SPEC copy (definition site — comments describe, never quote).
 const CTA_LABEL = 'Faça upload dos seus status aqui'
-const CTA_HINT = 'Arraste o print ou clique para colar a captura'
 
 const STATUS_READING = 'Lendo captura…'
 const STATUS_DONE = 'Leitura concluída — confira os valores abaixo.'
@@ -142,31 +145,6 @@ export function statusMessage(status: OcrStatus): StatusLine | null {
     case 'cancelled':
       return { text: STATUS_CANCELLED, tone: 'muted' }
   }
-}
-
-/**
- * The clipboard image as a File, or null when there is nothing usable.
- * Windows screenshots (PrtScn / Win+Shift+S) arrive as an `image/*` item;
- * ANY failure — missing API, denied permission, unfocused document, a
- * clipboard holding only text — degrades to null so the caller can fall
- * back to the file picker. Never throws.
- */
-export async function clipboardImage(): Promise<File | null> {
-  const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard
-  if (typeof clipboard?.read !== 'function') return null
-  try {
-    const items = await clipboard.read()
-    for (const item of items) {
-      const type = item.types.find((t) => t.startsWith('image/'))
-      if (type === undefined) continue
-      const blob = await item.getType(type)
-      const ext = type === 'image/jpeg' ? 'jpg' : type.slice('image/'.length)
-      return new File([blob], `captura.${ext}`, { type })
-    }
-  } catch {
-    // Expected: the picker is the fallback path, not an error state.
-  }
-  return null
 }
 
 interface OcrCaptureProps {
@@ -207,10 +185,6 @@ export function OcrCapture({
 }: OcrCaptureProps) {
   const [status, setStatus] = useState<OcrStatus>('idle')
   const [cropBitmap, setCropBitmap] = useState<ImageBitmap | null>(null)
-  // Drag-and-drop state (owner feedback, 07.2-06 checkpoint round 3): the
-  // capture field is a dropzone, not a plain button.
-  const [dragActive, setDragActive] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const running = status === 'reading'
   const line = statusMessage(status)
 
@@ -290,94 +264,16 @@ export function OcrCapture({
     onRunStateChange(false)
   }
 
-  /**
-   * Click = clipboard first (round 14): a Windows screenshot is already in
-   * the clipboard, so one click reads it without opening the picker. The
-   * picker only appears when the clipboard has no image — or when there is
-   * no Clipboard API / permission.
-   */
-  function handleZoneClick(): void {
-    if (running || disabled) return
-    void (async () => {
-      const fromClipboard = await clipboardImage()
-      if (fromClipboard !== null) {
-        await handleFile(fromClipboard)
-        return
-      }
-      fileInputRef.current?.click()
-    })()
-  }
-
   return (
     <div className="flex flex-col gap-2">
-      {/* Dropzone (owner feedback, 07.2-06 checkpoint round 3): drag a print
-          here OR click to browse. A real <button> keeps it keyboard
-          reachable; the drag handlers only add the pointer affordance. */}
-      <button
-        type="button"
-        disabled={disabled || running}
-        aria-busy={running}
-        onClick={handleZoneClick}
-        onDragEnter={(e: DragEvent<HTMLButtonElement>) => {
-          e.preventDefault()
-          if (!disabled && !running) setDragActive(true)
-        }}
-        onDragOver={(e: DragEvent<HTMLButtonElement>) => {
-          e.preventDefault()
-          if (!disabled && !running) setDragActive(true)
-        }}
-        onDragLeave={(e: DragEvent<HTMLButtonElement>) => {
-          e.preventDefault()
-          setDragActive(false)
-        }}
-        onDrop={(e: DragEvent<HTMLButtonElement>) => {
-          e.preventDefault()
-          setDragActive(false)
-          if (disabled || running) return
-          const file = e.dataTransfer.files?.[0]
-          if (file) void handleFile(file)
-        }}
-        className={`flex min-h-40 w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 py-6 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
-          dragActive
-            ? 'border-accent bg-accent/10'
-            : 'border-line bg-surface hover:border-accent'
-        }`}
-      >
-        {/* Upload icon: arrow-up-from-bracket shape (05-UI-SPEC). */}
-        <svg
-          aria-hidden="true"
-          width="28"
-          height="28"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="text-muted"
-        >
-          <path d="M8 11V3" />
-          <path d="M4 7l4-4 4 4" />
-          <path d="M2 13h12" />
-        </svg>
-        <span className="text-base font-semibold text-content">
-          {running ? 'Lendo captura…' : CTA_LABEL}
-        </span>
-        <span className="text-sm text-muted">
-          {CTA_HINT}
-        </span>
-      </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          // Reset so re-selecting the SAME file re-runs the read (D-15).
-          e.target.value = ''
-          if (file) void handleFile(file)
-        }}
+      {/* The shared capture surface (extracted 2026-10-23): dropzone with
+          drag-and-drop, clipboard-first click and the hidden picker — the
+          exact same entry the identification proof uses. */}
+      <CaptureDropzone
+        label={CTA_LABEL}
+        running={running}
+        disabled={disabled}
+        onFile={(file) => void handleFile(file)}
       />
       {line !== null && (
         <p

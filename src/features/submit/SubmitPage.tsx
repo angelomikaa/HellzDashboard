@@ -30,6 +30,7 @@ import type { NeoFootSession } from '../auth/session'
 import { FUNCTION_LABELS } from '../../lib/groups'
 import { prefillIdentity } from '../request/requestFlow'
 import { HistoryList } from './HistoryList'
+import { ExampleShot } from './ExampleShot'
 import { OcrCapture } from './OcrCapture'
 import { ReviewStep } from './ReviewStep'
 import { OCR_FIELD_FAILURE, StatGroupStep } from './StatGroupStep'
@@ -589,18 +590,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   the example shot + the OCR upload box occupy ONE full-width
                   strip; the fields are ONLY below it. */}
               <div className="flex w-full flex-col gap-4 rounded-lg border border-line bg-surface p-4 lg:flex-row lg:items-stretch">
-                <a
-                  href="/examples/basic.png"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mx-auto block w-full max-w-xs shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:mx-0 lg:w-80"
-                >
-                  <img
-                    src="/examples/basic.png"
-                    alt="Exemplo da tela básica do personagem"
-                    className="h-auto w-full rounded-md border border-line object-contain"
-                  />
-                </a>
+                <ExampleShot src="/examples/basic.png" alt="Exemplo da tela básica do personagem" />
                 <div className="min-w-0 flex-1">
                   {/* OCR entry for the basic header capture (08-04: the same
                       upload reads combat_power AND the identity profile;
