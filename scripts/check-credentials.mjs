@@ -7,14 +7,14 @@
  *
  *   R1 bcrypt hash literal        $2a$/2b$/2y$ cost 22 chars + 53 chars
  *   R2 PIN assignment literal     OWNER_PIN/MEMBER_PIN/OFFICER_PIN/PIN/FIXTURE_PIN = 'dddd'
- *   R3 live owner handle          satturne (the production owner handle)
+ *   R3 live owner handle          the production owner handle ('satt' + 'urne')
  *   R4 placeholder staff handles  officer-handle / member-handle in whitelist.sql
  *
  * Prints one `OFFENDER: <path>:<line>: <rule>` line per match and exits 1.
  * Prints `CREDENTIAL GATE PASSED (<n> files scanned)` and exits 0 when clean.
  *
  * The patterns are built from string fragments so this file does not
- * self-trigger on R3/R4 (the literal `satturne` never appears in source).
+ * self-trigger on R3/R4 (the literal owner handle is built from string fragments).
  *
  * Note: `supabase/seeds/whitelist.sql` still contains the owner hash/handle
  * until plan 08.1-06 lands, and this gate is expected to report that single
