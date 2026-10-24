@@ -11,6 +11,7 @@ import {
   type IdentityQueueRow,
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
+import { PoringEmpty } from '../assets/PoringEmpty'
 import { ConfirmDialog } from './ConfirmDialog'
 
 const NETWORK_ERROR =
@@ -124,7 +125,10 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
       {rows === null ? (
         <p className="text-base text-muted">Carregando…</p>
       ) : rows.length === 0 ? (
-        <p className="text-center text-base text-muted">{EMPTY_MESSAGE}</p>
+        <div className="mt-2 flex flex-col items-center gap-2">
+          <PoringEmpty />
+          <p className="text-center text-base text-muted">{EMPTY_MESSAGE}</p>
+        </div>
       ) : (
         rows.map((row) => {
           const failed = failedProofs.has(row.proof_id)

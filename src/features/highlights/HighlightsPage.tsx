@@ -31,6 +31,7 @@ import { ApiError, fetchPromotion, type PromotionSection } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { tierForOvr } from '../dashboard/presentation'
 import { ClassCrest } from '../assets/ClassCrest'
+import { PoringEmpty } from '../assets/PoringEmpty'
 import { PromotionCard } from './PromotionCard'
 
 // Enumeration-safe pt-BR copy (shared UI contract, copied verbatim from
@@ -94,7 +95,8 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
 
   if (impecavelSections.length === 0) {
     return (
-      <section className="rounded-lg border border-line bg-surface p-6">
+      <section className="rounded-lg border border-line bg-surface p-6 text-center">
+        <PoringEmpty />
         <p className="text-sm text-muted">
           Ainda não há jogadores Impecáveis — o topo do ranking de cada classe aparecerá aqui
           assim que alguém alcançar a faixa máxima.

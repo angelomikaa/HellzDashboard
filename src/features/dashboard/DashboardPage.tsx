@@ -46,6 +46,7 @@ import { CardPhotoUpload } from './CardPhotoUpload'
 import { keyStatStripModel, priorityKeySet } from './keyStatStrip'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { portraitSrcFor } from '../assets/ClassCrest'
+import { PoringEmpty } from '../assets/PoringEmpty'
 import { TIER_BORDER_DISPLAY } from './tierDisplay'
 import { cardFilename, downloadCard, type CardExportData } from '../export/cardExport'
 
@@ -211,7 +212,8 @@ export function DashboardPage({
       ) : report === null ? (
         <p className="text-base text-muted">Carregando…</p>
       ) : report.stats.every((s) => s.own_value === null) ? (
-        <section className="rounded-lg border border-line bg-surface p-6">
+        <section className="rounded-lg border border-line bg-surface p-6 text-center">
+          <PoringEmpty />
           <h2 className="text-xl font-semibold text-content">{EMPTY_TITLE}</h2>
           <p className="mt-2 text-base text-muted">{EMPTY_BODY}</p>
           <button

@@ -27,6 +27,7 @@ import { formatStatValue } from '../../lib/parseStatValue'
 import { tierForPoints } from '../dashboard/presentation'
 import { TIER_BORDER_DISPLAY, TIER_TEXT_DISPLAY } from '../dashboard/tierDisplay'
 import { ClassCrest } from '../assets/ClassCrest'
+import { PoringEmpty } from '../assets/PoringEmpty'
 import { applyViewSort, type RankSortKey } from './rankView'
 import type { NeoFootSession } from '../auth/session'
 
@@ -179,7 +180,10 @@ export function RankPage({ session }: { session: NeoFootSession }) {
       ) : displayRows === null ? (
         <p className="mt-6 text-base text-muted">Carregando…</p>
       ) : displayRows.length === 0 ? (
-        <p className="mt-6 text-center text-base text-muted">{EMPTY_MESSAGE}</p>
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <PoringEmpty />
+          <p className="text-base text-muted">{EMPTY_MESSAGE}</p>
+        </div>
       ) : (
         <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-max text-left text-sm">
