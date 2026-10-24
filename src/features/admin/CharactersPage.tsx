@@ -41,7 +41,6 @@ import { classLabel } from '../../lib/classLabels'
 import { validateIdentityDraft, OFFICIAL_CLASSES } from '../submit/identity'
 import type { CharFunction } from '../submit/identity'
 import { ClassCrest } from '../assets/ClassCrest'
-import { PoringEmpty } from '../assets/PoringEmpty'
 import { PinBoxes } from '../auth/PinBoxes'
 import { ConfirmDialog } from './ConfirmDialog'
 
@@ -591,12 +590,9 @@ export function CharactersPage({
           )}
 
           {data.members.length === 0 ? (
-            <div className="mt-6 flex flex-col items-center gap-2">
-              <PoringEmpty />
-              <p className="text-center text-base text-muted">
-                Nenhum membro na lista branca ainda.
-              </p>
-            </div>
+            <p className="mt-6 text-center text-base text-muted">
+              Nenhum membro na lista branca ainda.
+            </p>
           ) : (
             <>
               {/* Owner feedback (07.2-06 checkpoint): token filters by class and
@@ -709,16 +705,13 @@ export function CharactersPage({
                 </FilterDisclosure>
               </div>
               {visibleMembers.length === 0 ? (
-                <div className="mt-6 flex flex-col items-center gap-2">
-                  <PoringEmpty />
-                  <p className="text-center text-base text-muted">
-                    {pinFilter === 'pending' && pinFilteredMembers.length === 0
-                      ? 'Nenhum membro com PIN pendente.'
-                      : pinFilter === 'active' && pinFilteredMembers.length === 0
-                        ? 'Nenhum membro com PIN ativo.'
-                        : NO_FILTER_MATCH}
-                  </p>
-                </div>
+                <p className="mt-6 text-center text-base text-muted">
+                  {pinFilter === 'pending' && pinFilteredMembers.length === 0
+                    ? 'Nenhum membro com PIN pendente.'
+                    : pinFilter === 'active' && pinFilteredMembers.length === 0
+                      ? 'Nenhum membro com PIN ativo.'
+                      : NO_FILTER_MATCH}
+                </p>
               ) : (
             <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
               {/* Owner gate round 4 (07.1-02): per-character card list. The

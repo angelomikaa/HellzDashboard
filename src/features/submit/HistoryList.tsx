@@ -5,7 +5,6 @@
 import { useEffect, useState } from 'react'
 import { ApiError, fetchMySubmissions, type SubmissionRow } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
-import { PoringEmpty } from '../assets/PoringEmpty'
 
 // Enumeration-safe copy (UI contract): never expose HTTP codes or internals.
 const NETWORK_ERROR =
@@ -71,10 +70,7 @@ export function HistoryList({ session, onNewSubmission }: HistoryListProps) {
       ) : rows === null ? (
         <p className="mt-4 text-base text-muted">Carregando…</p>
       ) : rows.length === 0 ? (
-        <div className="mt-4 flex flex-col items-center gap-2">
-          <PoringEmpty />
-          <p className="text-base text-muted">Você ainda não enviou status.</p>
-        </div>
+        <p className="mt-4 text-base text-muted">Você ainda não enviou status.</p>
       ) : (
         <ul className="mt-4 flex flex-col gap-2">
           {rows.map((row) => (

@@ -45,18 +45,10 @@
     "Rebellion": 62
   },
   "notes": [
-    "Owner decisions 2026-10-23 (ROOCDB asset swap): (1) icons switch from the 7 shared base-role icons to the per-job Trans-2ª game emblems — every class gets its OWN icon, Rebellion included; (2) the card photo placeholder becomes the per-job full-body class art (ClassCrest.portraitSrcFor) instead of the small icon (crestSrcFor) the three card surfaces had to use before; (3) placeholder gender = female for every dual-gender class (Bard=Menestrel male art, Gypsy=Cigana female art — the jobs themselves are gender-locked); (4) Rebellion drops the 1920×1000 research-sample PNGs for the proper Insurgente class art; (5) the poring mascot (misc below) illustrates empty states.",
+    "Owner decisions 2026-10-23 (ROOCDB asset swap): (1) icons switch from the 7 shared base-role icons to the per-job Trans-2ª game emblems — every class gets its OWN icon, Rebellion included; (2) the card photo placeholder becomes the per-job full-body class art (ClassCrest.portraitSrcFor) instead of the small icon (crestSrcFor) the three card surfaces had to use before; (3) placeholder gender = female for every dual-gender class (Bard=Menestrel male art, Gypsy=Cigana female art — the jobs themselves are gender-locked); (4) Rebellion drops the 1920×1000 research-sample PNGs for the proper Insurgente class art. (The poring mascot tried in the same pass was REJECTED by the owner on first visual — small and artifacted at 64px display — and is gone; the manifest carries no misc assets.)",
     "Resolution reality: game emblem icons are 56×56 (native UI size — ClassCrest renders them at 32/48px); hero art is 1197×1309 except the Gunslinger line (Insurgente ~388-392px), which is the only official per-job art that exists for Rebellion.",
     "ROOCDB URLs are stable (no content hashes) — a fetcher re-run refreshes the committed files; the committed copies under public/assets/ keep the panel self-hosted (D-15) and the canvas export same-origin/taint-free (T-072-13).",
     "Old naming carried .png files from roocamer.gnjoy.game; this manifest supersedes them with .webp — the fetcher accepts both PNG and WebP magic."
-  ],
-  "misc": [
-    {
-      "file": "poring.webp",
-      "url": "https://roocdb.com/nav/poring.webp",
-      "out_dir": "public/assets",
-      "reason": "poring mascot for empty states (owner decision 2026-10-23)"
-    }
   ],
   "classes": [
     {

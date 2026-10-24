@@ -14,7 +14,6 @@ import {
 import type { NeoFootSession } from '../auth/session'
 import { FUNCTION_LABELS } from '../../lib/groups'
 import { classLabel } from '../../lib/classLabels'
-import { PoringEmpty } from '../assets/PoringEmpty'
 import { ConfirmDialog } from './ConfirmDialog'
 
 const NETWORK_ERROR =
@@ -155,10 +154,7 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
       {rows === null ? (
         <p className="text-base text-muted">Carregando…</p>
       ) : rows.length === 0 ? (
-        <div className="mt-2 flex flex-col items-center gap-2">
-          <PoringEmpty />
-          <p className="text-center text-base text-muted">{EMPTY_MESSAGE}</p>
-        </div>
+        <p className="text-center text-base text-muted">{EMPTY_MESSAGE}</p>
       ) : (
         rows.map((row) => {
           const isExpanded = expandedId === row.request_id

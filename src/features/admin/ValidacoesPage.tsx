@@ -17,7 +17,6 @@ import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER, type GroupKey } from '../..
 import { formatStatValue } from '../../lib/parseStatValue'
 import { ClassCrest } from '../assets/ClassCrest'
 import { classLabel } from '../../lib/classLabels'
-import { PoringEmpty } from '../assets/PoringEmpty'
 import { ConfirmDialog } from './ConfirmDialog'
 import { IdentityReview } from './IdentityReview'
 import { RequestReview } from './RequestReview'
@@ -199,10 +198,7 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
             </p>
           )}
           {rows.length === 0 ? (
-            <div className="mt-6 flex flex-col items-center gap-2">
-              <PoringEmpty />
-              <p className="text-base text-muted">{EMPTY_MESSAGE}</p>
-            </div>
+            <p className="mt-6 text-center text-base text-muted">{EMPTY_MESSAGE}</p>
           ) : (
             <div className="mt-6 flex flex-col gap-3">
               {rows.map((row) => {

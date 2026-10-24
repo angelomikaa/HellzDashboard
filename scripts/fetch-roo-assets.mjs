@@ -11,8 +11,8 @@
  * unless it is already absolute (http/https). Entries with a `local` source
  * are copied from the repo. Entries marked expected_missing with no source
  * are the DESIGNED missing state (D-16): recorded in the summary, never
- * fatal. The optional `manifest.misc` array fetches non-class assets (e.g.
- * the poring mascot) into their own out_dir.
+ * fatal. The optional `manifest.misc` array fetches non-class assets into
+ * their own out_dir (unused today — kept for future generic assets).
  *
  * GENERATED-style loud-abort on catalog drift: the manifest's class set must
  * equal the canonical 15-class set in supabase/seeds/classes.sql — if the
@@ -123,7 +123,7 @@ for (const entry of manifest.classes) {
   }
 }
 
-// Optional non-class assets (manifest.misc): poring mascot etc. Each entry is
+// Optional non-class assets (manifest.misc). Each entry is
 // { file, url, out_dir } — resolved relative to the repo root and created on
 // demand. Same designed-missing semantics as class files.
 for (const entry of manifest.misc ?? []) {
