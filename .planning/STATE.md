@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
-status: completed
-stopped_at: Phase 10 polish pass applied (orange error token, neon ring on the access cards + dashboard hero, outline secondary buttons, one-message claimed refusal, PIN-less recruitment via migration 0022 + redeployed request-access, smoke residue purged with scripts/smoke-cleanup.mjs)
-last_updated: "2026-10-23T22:10:00.000Z"
-last_activity: "2026-10-23 (late, cont.) -- pt-BR class names implemented: shared classLabels display map (owner calls Bard=Menestrel, Rebellion=Insurgente) across every render site incl. the card job line + monogram, catalog keys stay canonical English; OCR aliases gained the verified base prints (Mercenario/Discipulo/Justiceiro/Vigia) + the owner-confirmed Insurgente. On top of the earlier ROOCDB asset swap + harness fonts-gate fix. build/lint green, 634/634 tests green."
+status: executing
+last_updated: "2026-10-24T02:36:35.994Z"
+last_activity: 2026-10-24 -- Phase 08.1 execution started
 progress:
-  total_phases: 7
+  total_phases: 9
   completed_phases: 5
-  total_plans: 31
-  completed_plans: 31
-  percent: 100
+  total_plans: 40
+  completed_plans: 33
+  percent: 83
 ---
 
 # Project State
@@ -21,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 **Core value:** Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
-**Current focus:** Phase 9 complete — next candidates: Phase 9.1 (Hidden Raw Defenses) or Phase 10 (Personalized Home Landing Tab)
+**Current focus:** Phase 08.1 — the-codebase-was-deployed-to-github-and-then-to-vercel-meani
 
 ## Current Position
 
-Phase: 09 (Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats)
-Plan: 5 of 5 (executed), 09-06 env-gated
-Status: Phase 9 complete — migration 0018 (stat_direction, class_key_stats PK rebuild to (class, function, stat) + backfill, set_key_stat_v2 KEYU ordered set, my_report/class_top5/get_promotion rewritten for value-proportional points + last_validated_at); client setKeyStat wrapper + setRelevantStat removal + KeyStatsPage role selector; rankMath value-proportional spec + 22 locked test vectors; smoke-rank/smoke-promotion re-baselined; dashboard percentilePhrase removed; KeyStatsPage.test.tsx (8 tests). 548 tests pass, build green. 09-06 live smoke deferred — requires SUPABASE_ACCESS_TOKEN/SUPABASE_PROJECT_REF.
-Last activity: 2026-10-22 -- Phase 9 plans 09-01..09-05 executed and committed (9df6209).
+Phase: 08.1 (the-codebase-was-deployed-to-github-and-then-to-vercel-meani) — EXECUTING
+Plan: 1 of 10
+Status: Executing Phase 08.1
+Last activity: 2026-10-24 -- Phase 08.1 execution started
 
 ## Accumulated Context
 
@@ -110,7 +109,7 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Polish pass 2026-10-23 — recruitment has no PIN]: the prospect never chooses a PIN. The request form hides both PIN boxes and sends none (`requestFormProblem(draft, { requirePin: false })`), `ProspectDraft`/`buildProspectPayload` carry no `pin`, `request-access` accepts a missing PIN for `request_type: 'prospect'`, and migration **0022** stores `pin_hash NULL` (any PIN a cached client still sends is dropped). Approval therefore creates the member **unclaimed** (0020 behaviour) and the PIN is defined at first access. A duplicate prospect application answers `request_pending` → "Você já tem uma solicitação em análise." (there is no credential to supersede with).
 - [Polish pass 2026-10-23 — smoke purge]: 17 forgotten `smoke-*` fixtures were purged from LIVE (17 members, 10 submissions, 7 requests, 9 identity-history rows; backup at `%TEMP%\neofoot-smoke-backup.json`). The roster is now the owner + 7 officers and **zero** fake members, so percentiles are computed against real data again. `scripts/smoke-cleanup.mjs` reports by default and deletes with `--apply` (handles starting with `smoke` only) so future residue is one command away.
 
-- [ROOCDB asset swap 2026-10-23, owner decisions]: class imagery source moves from the roocamer.gnjoy.game bundle (hash-brittle URLs, only SEVEN shared base-role icons, Rebellion omitted, Bard/Gypsy at the base-tier art) to roocdb.com's game-extracted assets (stable un-hashed URLs). (1) ICONS = per-job Trans-2ª game emblems — one per class, Rebellion included; (2) the CARD PHOTO PLACEHOLDER = per-job full-body class art via new `ClassCrest.portraitSrcFor` (the three card surfaces previously had to reuse the small icon through `crestSrcFor`); (3) placeholder gender = FEMALE for the 13 dual-gender classes, Bard = male Menestrel art, Gypsy = female Cigana art (jobs are gender-locked) — carried per-class in the manifest's `placeholder_gender`; (4) Rebellion drops the 1920×1000 research-sample PNGs for the proper Insurgente art (ROOCDB 388×388/392×484 — the only official per-job art that exists for that line); (5) the PORING mascot illustrates the empty states (PoringEmpty, aria-hidden, self-hosted public/assets/poring.webp). All assets .webp now (hero art 1197×1309 ≈5× smaller than the old PNGs); fetcher accepts WebP magic, absolute URLs and a manifest `misc` section. Mapping method: walked the live ROOCDB class pages reading each EVOLUTION button's img src+alt (icon numbers + hero ids recorded in the manifest).
+- [ROOCDB asset swap 2026-10-23, owner decisions]: class imagery source moves from the roocamer.gnjoy.game bundle (hash-brittle URLs, only SEVEN shared base-role icons, Rebellion omitted, Bard/Gypsy at the base-tier art) to roocdb.com's game-extracted assets (stable un-hashed URLs). (1) ICONS = per-job Trans-2ª game emblems — one per class, Rebellion included; (2) the CARD PHOTO PLACEHOLDER = per-job full-body class art via new `ClassCrest.portraitSrcFor` (the three card surfaces previously had to reuse the small icon through `crestSrcFor`); (3) placeholder gender = FEMALE for the 13 dual-gender classes, Bard = male Menestrel art, Gypsy = female Cigana art (jobs are gender-locked) — carried per-class in the manifest's `placeholder_gender`; (4) Rebellion drops the 1920×1000 research-sample PNGs for the proper Insurgente art (ROOCDB 388×388/392×484 — the only official per-job art that exists for that line); (5) the PORING mascot was tried on the empty states and REJECTED by the owner on first visual (2026-10-23 late: read as small and artifacted at the 64px display) — removed entirely (component, usages, asset, manifest entry); do not re-propose without a higher-quality source. All assets .webp now (hero art 1197×1309 ≈5× smaller than the old PNGs); fetcher accepts WebP magic, absolute URLs and a (now unused) manifest `misc` section. Mapping method: walked the live ROOCDB class pages reading each EVOLUTION button's img src+alt (icon numbers + hero ids recorded in the manifest).
 - [ROOCDB swap — harness race fixed 2026-10-23]: the card-render-check on-page audit intermittently false-failed the stress mounts (all 18 stat-column centering violations, uniformly shifted) — root cause: the mounted CardSvg's fonts gate (Promise → setState → concurrent re-render) sometimes flips just past the audit's single 150ms tick, so the audit read the mid-flip ESTIMATE-metric plan against REAL-metric expected centers. Reproduced 2×, then green 2× after the audit awaits `document.fonts.ready` + one extra 60ms commit tick. Harness race only — the app's own mounts self-correct on the next frame. Gates at commit: build ✓, 629/629 tests ✓, headless card check ALL GATES PASS 2× consecutive (tier probes on the new webp photos, file-vs-app diff 0 / ≤0.07%, on-page audit 0 violations ×4 mounts, scale tracking 2.0).
 - [pt-BR class names — IMPLEMENTED 2026-10-23 (late), owner decisions same day]: the panel displays pt-BR class names through ONE shared display map (`src/lib/classLabels.ts`, the FUNCTION_LABELS pattern — `classLabel()` with unknown-key passthrough + '—' for null); the catalog keys stay canonical English everywhere (RPCs, RLS, OCR, assets, admin catalog extension). Table: Assassin Cross=Algoz, Lord Knight=Lorde, High Wizard=Arquimago, Sniper=Atirador de Elite, High Priest=Sumo Sacerdote, Mastersmith=Mestre-Ferreiro, Paladin=Paladino, Professor=Professor, Stalker=Desordeiro, Biochemist=Criador, Champion=Mestre, Bard=**Menestrel** (owner call — the client print at the ranked Trans-2ª stage), Gypsy=Cigana, Summoner=Invocador, Rebellion=**Insurgente** (owner call). Fan translations are WRONG for this game (Campeão/Alto Mago/Perseguidor/Bioquímico — never used). Render sites: Personagens roster/filter/edit-select, Destaques sections, Ranking select+table, Stats-Chave select, the three card surfaces (card job line + monogram derive from the LABEL; the KEY keeps driving portraitSrcFor), OvrHero, Submit header, Validacoes row + enviosIdentityLine, RequestReview row + requestRowSubtitle, IdentityReview, Prospect summary — vocabulary locked by classLabels.test.ts (full OFFICIAL_CLASSES coverage, pairwise-distinct, fallback contract). OCR side: CLASS_ALIASES gained the verified base prints Mercenario/Discipulo/Justiceiro/Vigia + the owner-confirmed Insurgente print (the official web API leaves the Gunslinger line untranslated; the game prints these). Commits 1c9046f (display) + 460407f (OCR). 634/634 tests, build green.
 
