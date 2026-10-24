@@ -20,11 +20,34 @@
  * Never prints token/anon-key values (only `anon key present (len=NNN)`).
  */
 
+import { readFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
+
+function loadEnvFile() {
+  try {
+    const raw = readFileSync('.env', 'utf8')
+    const env = {}
+    for (const line of raw.split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
+      if (m) env[m[1]] = m[2]
+    }
+    return env
+  } catch {
+    return {}
+  }
+}
 
 const DEPLOY_URL = process.env.DEPLOY_URL || 'https://hellz-dashboard.vercel.app'
 const PROJECT_REF = 'thdxyxsjafimxgxpmpqs'
-const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+const envFile = loadEnvFile()
+const SUPABASE_URL =
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || envFile.VITE_SUPABASE_URL
+const ANON_KEY =
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  envFile.VITE_SUPABASE_ANON_KEY ||
+  envFile.SUPABASE_ANON_KEY
+const MGMT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || envFile.SUPABASE_ACCESS_TOKEN
 
 const failures = []
 let passed = 0
@@ -117,8 +140,8 @@ async function main() {
   }
 
   // ---- 4. Auth function reachability --------------------------------------
-  if (ANON_KEY) {
-    const vp = await fetchText(`${DEPLOY_URL}/functions/v1/verify-pin`, {
+  if (SUPABASE_URL && ANON_KEY) {
+    const vp = await fetchText(`${SUPABASE_URL}/functions/v1/verify-pin`, {
       method: 'POST',
       headers: {
         apikey: ANON_KEY,
@@ -135,7 +158,7 @@ async function main() {
       vp.status === 401 && (vpBody.error === 'invalid_credentials' || vpBody.error === 'pin_setup_required'),
       `HTTP ${vp.status} body=${vp.text.slice(0, 120)}`,
     )
-    const su = await fetchText(`${DEPLOY_URL}/functions/v1/step-up`, {
+    const su = await fetchText(`${SUPABASE_URL}/functions/v1/step-up`, {
       method: 'POST',
       headers: {
         apikey: ANON_KEY,
@@ -158,15 +181,24 @@ async function main() {
   const dotenvTracked = lsFiles.includes('.env')
   check('no tracked .env in repo', !dotenvTracked)
 
-  let sbpGrep = ''
+  // sbp_ scan: detect actual committed management-token values (sbp_ + long
+  // base64), not doc mentions of the token name. The real token lives only in
+  // gitignored .env.
+  const sbpToken = /sbp_[A-Za-z0-9\-_]{20,}/
+  let sbpRaw = ''
   try {
-    sbpGrep = execSync("git grep -n \"sbp_\" -- . ':!*.md'", {
-      encoding: 'utf8',
-    })
-  } catch (err) {
-    sbpGrep = '' // non-zero exit = no matches (clean)
+    sbpRaw = execSync('git grep -n "sbp_"', { encoding: 'utf8' })
+  } catch {
+    sbpRaw = '' // non-zero exit = no matches (clean)
   }
-  check('no sbp_ literal in tracked non-md files', sbpGrep.trim() === '')
+  const sbpOffenders = sbpRaw
+    .split(/\r?\n/)
+    .filter((line) => /\.md:/.test(line) || sbpToken.test(line))
+  // keep only non-md lines that contain a real token value
+  const realTokenHits = sbpRaw
+    .split(/\r?\n/)
+    .filter((line) => !/\.md:/.test(line) && sbpToken.test(line))
+  check('no sbp_ management-token value committed to tracked files', realTokenHits.length === 0)
 
   // ---- Summary ------------------------------------------------------------
   console.log('')
