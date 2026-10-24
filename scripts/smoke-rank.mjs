@@ -30,43 +30,24 @@
  */
 import { readFileSync } from 'node:fs'
 import bcrypt from 'bcryptjs'
+import { supabaseConfig, FIXTURE_PIN, assertFixtureRole } from './smoke-config.mjs'
 
 // ---------------------------------------------------------------------------
-// Config
+// Config (credentials from smoke-config.mjs: env or .env, never hardcoded)
 // ---------------------------------------------------------------------------
 
-function loadEnvFile() {
-  try {
-    const raw = readFileSync('.env', 'utf8')
-    const env = {}
-    for (const line of raw.split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
-      if (m) env[m[1]] = m[2]
-    }
-    return env
-  } catch {
-    return {}
-  }
-}
-
-const envFile = loadEnvFile()
-const SUPABASE_URL = process.env.SUPABASE_URL || envFile.VITE_SUPABASE_URL
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || envFile.VITE_SUPABASE_ANON_KEY
-const MGMT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN
-const PROJECT_REF = process.env.SUPABASE_PROJECT_REF
-
-if (!SUPABASE_URL || !ANON_KEY) {
-  console.error('[smoke-rank] Missing SUPABASE_URL or SUPABASE_ANON_KEY (env or .env VITE_*)')
-  process.exit(1)
-}
-if (!MGMT_TOKEN || !PROJECT_REF) {
-  console.error('Missing SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF')
+let SUPABASE_URL, ANON_KEY, MGMT_TOKEN, PROJECT_REF
+try {
+  ;({ url: SUPABASE_URL, anonKey: ANON_KEY, mgmtToken: MGMT_TOKEN, projectRef: PROJECT_REF } = supabaseConfig())
+} catch (err) {
+  console.error(`[smoke-rank] ${err.message}`)
   process.exit(1)
 }
 
-const OFFICER_HANDLE = 'officer-handle'
-const PIN = '1234'
 const CLASS = 'ZZRankSquad'
+// Throwaway officer fixture — unique handle per run so a crashed prior run
+// cannot 409 the insert (discord_handle is UNIQUE).
+const OFFICER_HANDLE = `smoke-rank-officer-${Date.now()}`
 const HANDLES = ['zz-rank-a', 'zz-rank-b', 'zz-rank-c']
 const KEY_STATS = ['hp', 'sp', 'patk', 'pdef', 'matk', 'mdef']
 
@@ -101,7 +82,7 @@ function check(name, cond, detail = '') {
 }
 
 /** Login via the deployed verify-pin function; both gateway headers required (01-02). */
-async function login(handle) {
+async function login(handle, pin = FIXTURE_PIN) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-pin`, {
     method: 'POST',
     headers: {
@@ -109,7 +90,7 @@ async function login(handle) {
       Authorization: `Bearer ${ANON_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ discord_handle: handle, pin: PIN }),
+    body: JSON.stringify({ discord_handle: handle, pin }),
   })
   if (!res.ok) {
     throw new Error(`login failed for ${handle}: HTTP ${res.status} ${await res.text()}`)
@@ -176,12 +157,16 @@ function numEq(actual, expected) {
 
 async function cleanup() {
   await mgmtQuery(
-    `delete from submissions where member_id in (select id from members where discord_handle in ('zz-rank-a','zz-rank-b','zz-rank-c'));`,
+    `delete from submissions where member_id in (select id from members where discord_handle in ('zz-rank-a','zz-rank-b','zz-rank-c','${OFFICER_HANDLE}'));`,
   )
-  await mgmtQuery(`delete from members where discord_handle in ('zz-rank-a','zz-rank-b','zz-rank-c');`)
+  await mgmtQuery(
+    `delete from members where discord_handle in ('zz-rank-a','zz-rank-b','zz-rank-c','${OFFICER_HANDLE}');`,
+  )
   await mgmtQuery(`delete from class_key_stats where class_name = '${CLASS}';`)
   await mgmtQuery(`delete from classes where class_name = '${CLASS}';`)
-  await mgmtQuery(`delete from pin_login_attempts where discord_handle in ('zz-rank-a','zz-rank-b','zz-rank-c');`)
+  await mgmtQuery(
+    `delete from pin_login_attempts where discord_handle in ('zz-rank-a','zz-rank-b','zz-rank-c','${OFFICER_HANDLE}');`,
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -189,9 +174,6 @@ async function cleanup() {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log(`[smoke-rank] Logging in as ${OFFICER_HANDLE} (PIN placeholder)`)
-  const officer = await login(OFFICER_HANDLE)
-
   // Defensive pre-clean: a previously crashed run must not break this one
   // (unique handles / class PK) — also proves the second consecutive run works.
   await cleanup()
@@ -200,7 +182,19 @@ async function main() {
     // ---- Setup ------------------------------------------------------------
     await mgmtQuery(`insert into classes (class_name) values ('${CLASS}');`)
 
-    const pinHash = bcrypt.hashSync(PIN, 10)
+    // Provision a throwaway officer fixture (role officer). This script no
+    // longer logs in as the placeholder staff row (inactive since 08.1-01/02);
+    // every fixture is created and removed in this run.
+    const officerPinHash = bcrypt.hashSync(FIXTURE_PIN, 10)
+    await mgmtQuery(
+      `insert into members (discord_handle, display_name, pin_hash, role, active, char_class, char_function) ` +
+        `values ('${OFFICER_HANDLE}', 'SMOKE Rank Officer', '${officerPinHash}', 'officer', true, '${CLASS}', 'suporte');`,
+    )
+    const officerSession = await login(OFFICER_HANDLE)
+    assertFixtureRole(officerSession, 'officer')
+    const officer = officerSession
+
+    const pinHash = bcrypt.hashSync(FIXTURE_PIN, 10)
     for (const h of HANDLES) {
       await mgmtQuery(
         `insert into members (discord_handle, display_name, pin_hash, role, active, char_class, char_function) ` +
@@ -212,7 +206,7 @@ async function main() {
     for (const h of HANDLES) {
       sessions[h] = await login(h)
     }
-    console.log('[smoke-rank] Officer + 3 zz-rank members logged in')
+    console.log('[smoke-rank] Throwaway officer + 3 zz-rank members logged in via verify-pin')
 
     for (const h of HANDLES) {
       const pStats = Object.entries(FIXTURES[h]).map(([stat_key, value]) => ({ stat_key, value }))

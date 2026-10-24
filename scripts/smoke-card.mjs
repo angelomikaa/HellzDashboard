@@ -46,44 +46,25 @@
  */
 import { readFileSync } from 'node:fs'
 import bcrypt from 'bcryptjs'
+import { supabaseConfig, FIXTURE_PIN } from './smoke-config.mjs'
 
 // ---------------------------------------------------------------------------
-// Config
+// Config (credentials from smoke-config.mjs: env or .env, never hardcoded)
 // ---------------------------------------------------------------------------
 
-function loadEnvFile() {
-  try {
-    const raw = readFileSync('.env', 'utf8')
-    const env = {}
-    for (const line of raw.split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
-      if (m) env[m[1]] = m[2]
-    }
-    return env
-  } catch {
-    return {}
-  }
-}
-
-const envFile = loadEnvFile()
-const SUPABASE_URL = process.env.SUPABASE_URL || envFile.VITE_SUPABASE_URL
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || envFile.VITE_SUPABASE_ANON_KEY
-const MGMT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN // STRICT: session env only
-const PROJECT_REF = process.env.SUPABASE_PROJECT_REF // STRICT: session env only
-
-if (!SUPABASE_URL || !ANON_KEY) {
-  console.error('[smoke-card] Missing SUPABASE_URL or SUPABASE_ANON_KEY (env or .env VITE_*)')
-  process.exit(1)
-}
-if (!MGMT_TOKEN || !PROJECT_REF) {
-  console.error(
-    'Missing SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF (session env only — ' +
-      'map the owner token into the session env, never into any file)',
-  )
+let SUPABASE_URL, ANON_KEY, MGMT_TOKEN, PROJECT_REF
+try {
+  ;({
+    url: SUPABASE_URL,
+    anonKey: ANON_KEY,
+    mgmtToken: MGMT_TOKEN,
+    projectRef: PROJECT_REF,
+  } = supabaseConfig())
+} catch (err) {
+  console.error(`[smoke-card] ${err.message}`)
   process.exit(1)
 }
 
-const PIN = '1234'
 const CLASS = 'smoke_card_cls'
 const KEY_STATS = ['hp', 'sp', 'patk', 'pdef', 'matk', 'mdef']
 const RELEVANT_STATS = ['crit', 'healing_done'] // non-key stats for D-05 probes
@@ -129,7 +110,7 @@ function check(name, cond, detail = '') {
 }
 
 /** Login via the deployed verify-pin function; both gateway headers required (01-02). */
-async function login(handle) {
+async function login(handle, pin = FIXTURE_PIN) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-pin`, {
     method: 'POST',
     headers: {
@@ -137,7 +118,7 @@ async function login(handle) {
       Authorization: `Bearer ${ANON_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ discord_handle: handle, pin: PIN }),
+    body: JSON.stringify({ discord_handle: handle, pin }),
   })
   if (!res.ok) {
     throw new Error(`login failed for ${handle}: HTTP ${res.status} ${await res.text()}`)
@@ -279,7 +260,7 @@ async function main() {
         KEY_STATS.map((k) => `('${CLASS}', '${k}')`).join(', ') +
         `;`,
     )
-    const pinHash = bcrypt.hashSync(PIN, 10)
+    const pinHash = bcrypt.hashSync(FIXTURE_PIN, 10)
     for (const h of ALL_HANDLES) {
       const [role, fn] = ROLES[h]
       await mgmtQuery(

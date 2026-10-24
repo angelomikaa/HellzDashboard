@@ -54,44 +54,25 @@
  */
 import { readFileSync } from 'node:fs'
 import bcrypt from 'bcryptjs'
+import { supabaseConfig, FIXTURE_PIN } from './smoke-config.mjs'
 
 // ---------------------------------------------------------------------------
-// Config
+// Config (credentials from smoke-config.mjs: env or .env, never hardcoded)
 // ---------------------------------------------------------------------------
 
-function loadEnvFile() {
-  try {
-    const raw = readFileSync('.env', 'utf8')
-    const env = {}
-    for (const line of raw.split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
-      if (m) env[m[1]] = m[2]
-    }
-    return env
-  } catch {
-    return {}
-  }
-}
-
-const envFile = loadEnvFile()
-const SUPABASE_URL = process.env.SUPABASE_URL || envFile.VITE_SUPABASE_URL
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || envFile.VITE_SUPABASE_ANON_KEY
-const MGMT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN // STRICT: session env only
-const PROJECT_REF = process.env.SUPABASE_PROJECT_REF // STRICT: session env only
-
-if (!SUPABASE_URL || !ANON_KEY) {
-  console.error('[smoke-identity] Missing SUPABASE_URL or SUPABASE_ANON_KEY (env or .env VITE_*)')
-  process.exit(1)
-}
-if (!MGMT_TOKEN || !PROJECT_REF) {
-  console.error(
-    'Missing SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF (session env only — ' +
-      'map the owner token into the session env, never into any file)',
-  )
+let SUPABASE_URL, ANON_KEY, MGMT_TOKEN, PROJECT_REF
+try {
+  ;({
+    url: SUPABASE_URL,
+    anonKey: ANON_KEY,
+    mgmtToken: MGMT_TOKEN,
+    projectRef: PROJECT_REF,
+  } = supabaseConfig())
+} catch (err) {
+  console.error(`[smoke-identity] ${err.message}`)
   process.exit(1)
 }
 
-const PIN = '1234'
 const CLASS = 'smoke_idn_cls'
 const KEY_STATS = ['hp', 'sp', 'patk', 'pdef', 'matk', 'mdef']
 const RUN_ID = `smoke-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -190,7 +171,7 @@ function check(name, cond, detail = '') {
 
 const sqlStr = (s) => `'${String(s).replace(/'/g, "''")}'`
 
-async function login(handle) {
+async function login(handle, pin = FIXTURE_PIN) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-pin`, {
     method: 'POST',
     headers: {
@@ -198,7 +179,7 @@ async function login(handle) {
       Authorization: `Bearer ${ANON_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ discord_handle: handle, pin: PIN }),
+    body: JSON.stringify({ discord_handle: handle, pin }),
   })
   if (!res.ok) {
     throw new Error(`login failed for ${handle}: HTTP ${res.status} ${await res.text()}`)
@@ -210,7 +191,7 @@ async function login(handle) {
   return body.session
 }
 
-async function loginProbe(handle) {
+async function loginProbe(handle, pin = FIXTURE_PIN) {
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-pin`, {
       method: 'POST',
@@ -219,7 +200,7 @@ async function loginProbe(handle) {
         Authorization: `Bearer ${ANON_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ discord_handle: handle, pin: PIN }),
+      body: JSON.stringify({ discord_handle: handle, pin }),
     })
     return { status: res.status, ok: res.ok, text: await res.text() }
   } catch (err) {

@@ -37,41 +37,25 @@
 import { readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import bcrypt from 'bcryptjs'
+import { supabaseConfig, FIXTURE_PIN } from './smoke-config.mjs'
 
 // ---------------------------------------------------------------------------
-// Config
+// Config (credentials from smoke-config.mjs: env or .env, never hardcoded)
 // ---------------------------------------------------------------------------
 
-function loadEnvFile() {
-  try {
-    const raw = readFileSync('.env', 'utf8')
-    const env = {}
-    for (const line of raw.split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
-      if (m) env[m[1]] = m[2]
-    }
-    return env
-  } catch {
-    return {}
-  }
-}
-
-const envFile = loadEnvFile()
-const SUPABASE_URL = process.env.SUPABASE_URL || envFile.VITE_SUPABASE_URL
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || envFile.VITE_SUPABASE_ANON_KEY
-const MGMT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN
-const PROJECT_REF = process.env.SUPABASE_PROJECT_REF
-
-if (!SUPABASE_URL || !ANON_KEY) {
-  console.error('[smoke-officer] Missing SUPABASE_URL or SUPABASE_ANON_KEY (env or .env VITE_*)')
-  process.exit(1)
-}
-if (!MGMT_TOKEN || !PROJECT_REF) {
-  console.error('Missing SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF')
+let SUPABASE_URL, ANON_KEY, MGMT_TOKEN, PROJECT_REF
+try {
+  ;({
+    url: SUPABASE_URL,
+    anonKey: ANON_KEY,
+    mgmtToken: MGMT_TOKEN,
+    projectRef: PROJECT_REF,
+  } = supabaseConfig())
+} catch (err) {
+  console.error(`[smoke-officer] ${err.message}`)
   process.exit(1)
 }
 
-const PIN = '1234'
 const CLASS = 'smoke_cls'
 const HANDLES = {
   owner: 'smoke_owner',
@@ -116,7 +100,7 @@ function check(name, cond, detail = '') {
 }
 
 /** Login via the deployed verify-pin function; both gateway headers required (01-02). */
-async function login(handle) {
+async function login(handle, pin = FIXTURE_PIN) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-pin`, {
     method: 'POST',
     headers: {
@@ -124,7 +108,7 @@ async function login(handle) {
       Authorization: `Bearer ${ANON_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ discord_handle: handle, pin: PIN }),
+    body: JSON.stringify({ discord_handle: handle, pin }),
   })
   if (!res.ok) {
     throw new Error(`login failed for ${handle}: HTTP ${res.status} ${await res.text()}`)
@@ -137,7 +121,7 @@ async function login(handle) {
 }
 
 /** Non-throwing login probe — for refusal assertions (inactive member, D-04). */
-async function loginProbe(handle) {
+async function loginProbe(handle, pin = FIXTURE_PIN) {
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-pin`, {
       method: 'POST',
@@ -146,7 +130,7 @@ async function loginProbe(handle) {
         Authorization: `Bearer ${ANON_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ discord_handle: handle, pin: PIN }),
+      body: JSON.stringify({ discord_handle: handle, pin }),
     })
     const text = await res.text()
     return { status: res.status, ok: res.ok, text }
@@ -185,7 +169,7 @@ async function rest(path, { method = 'GET', token = null, body = null, extraHead
 
 /** Step-up re-PIN (0017): exchange the member session + PIN for a single-use
  *  token that set_member_role requires in the X-Step-Up header. */
-async function stepUp(session, pin = PIN) {
+async function stepUp(session, pin = FIXTURE_PIN) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/step-up`, {
     method: 'POST',
     headers: {
@@ -271,7 +255,7 @@ async function main() {
   try {
     // ---- Setup: throwaway class + 5 members + 3 pending submissions ------
     await mgmtQuery(`insert into classes (class_name) values ('${CLASS}');`)
-    const pinHash = bcrypt.hashSync(PIN, 10)
+    const pinHash = bcrypt.hashSync(FIXTURE_PIN, 10)
     for (const h of ALL_HANDLES) {
       const [role, fn] = ROLES[h]
       await mgmtQuery(

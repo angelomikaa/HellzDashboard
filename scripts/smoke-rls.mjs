@@ -21,45 +21,31 @@
  * Exits non-zero on any FAIL. Prints "RLS SMOKE PASSED" only if all pass.
  */
 import { readFileSync } from 'node:fs'
+import bcrypt from 'bcryptjs'
+import { supabaseConfig, FIXTURE_PIN, requireLiveCredential, assertFixtureRole } from './smoke-config.mjs'
 
 // ---------------------------------------------------------------------------
-// Config
+// Config (credentials from smoke-config.mjs: env or .env, never hardcoded)
 // ---------------------------------------------------------------------------
 
-function loadEnvFile() {
-  try {
-    const raw = readFileSync('.env', 'utf8')
-    const env = {}
-    for (const line of raw.split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
-      if (m) env[m[1]] = m[2]
-    }
-    return env
-  } catch {
-    return {}
-  }
-}
-
-const envFile = loadEnvFile()
-const SUPABASE_URL = process.env.SUPABASE_URL || envFile.VITE_SUPABASE_URL
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || envFile.VITE_SUPABASE_ANON_KEY
-const MGMT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN
-const PROJECT_REF = process.env.SUPABASE_PROJECT_REF
-
-if (!SUPABASE_URL || !ANON_KEY) {
-  console.error('[smoke-rls] Missing SUPABASE_URL or SUPABASE_ANON_KEY (env or .env VITE_*)')
-  process.exit(1)
-}
-if (!MGMT_TOKEN || !PROJECT_REF) {
-  console.error('Missing SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF')
+let SUPABASE_URL, ANON_KEY, MGMT_TOKEN, PROJECT_REF
+try {
+  ;({
+    url: SUPABASE_URL,
+    anonKey: ANON_KEY,
+    mgmtToken: MGMT_TOKEN,
+    projectRef: PROJECT_REF,
+  } = supabaseConfig())
+} catch (err) {
+  console.error(`[smoke-rls] ${err.message}`)
   process.exit(1)
 }
 
-const MEMBER_HANDLE = 'member-handle'
-const OFFICER_HANDLE = 'officer-handle'
-const OWNER_HANDLE = 'satturne'
-const PIN = '1234'
-const OWNER_PIN = '0192'
+// Throwaway fixtures — unique handles per run so a crashed prior run cannot
+// 409 the insert (discord_handle is UNIQUE). This script no longer authenticates
+// as the placeholder staff rows.
+const MEMBER_HANDLE = `smoke-rls-member-${Date.now()}`
+const OFFICER_HANDLE = `smoke-rls-officer-${Date.now()}`
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -76,7 +62,7 @@ function check(name, cond, detail = '') {
 }
 
 /** Login via the deployed verify-pin function; both gateway headers required (01-02). */
-async function login(handle, pin = PIN) {
+async function login(handle, pin = FIXTURE_PIN) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-pin`, {
     method: 'POST',
     headers: {
@@ -146,10 +132,21 @@ async function mgmtQuery(sql) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log(`[smoke-rls] Logging in as ${MEMBER_HANDLE} and ${OFFICER_HANDLE} (PIN placeholder)`)
-  const member = await login(MEMBER_HANDLE)
-  const officer = await login(OFFICER_HANDLE)
-  console.log('[smoke-rls] Both logins OK')
+  // Provision throwaway member + officer fixtures (role member / officer).
+  // This script no longer authenticates as the placeholder staff rows.
+  const pinHash = bcrypt.hashSync(FIXTURE_PIN, 10)
+  await mgmtQuery(
+    `insert into members (discord_handle, display_name, pin_hash, role, active) values ` +
+      `('${MEMBER_HANDLE}', 'SMOKE RLS Member', '${pinHash}', 'member', true), ` +
+      `('${OFFICER_HANDLE}', 'SMOKE RLS Officer', '${pinHash}', 'officer', true);`,
+  )
+  const memberSession = await login(MEMBER_HANDLE)
+  assertFixtureRole(memberSession, 'member')
+  const member = memberSession
+  const officerSession = await login(OFFICER_HANDLE)
+  assertFixtureRole(officerSession, 'officer')
+  const officer = officerSession
+  console.log('[smoke-rls] Throwaway member + officer logged in via verify-pin')
 
   // 1. anon sees NO member rows. After migration 0005 revokes ALL privileges on
   //    members from anon, PostgREST answers 42501 permission denied; the pre-0005
@@ -223,13 +220,27 @@ async function main() {
     !officerClassInsert.ok,
     `HTTP ${officerClassInsert.status}`,
   )
-  const owner = await login(OWNER_HANDLE, OWNER_PIN)
-  const ownerClassInsert = await rest('/classes', {
-    method: 'POST',
-    token: owner.access_token,
-    body: { class_name: 'ZZSmokeTest' },
-  })
-  check('owner POST /classes -> 201', ownerClassInsert.status === 201, `HTTP ${ownerClassInsert.status}`)
+  // Owner-only probe: requires SMOKE_OWNER_HANDLE / SMOKE_OWNER_PIN env vars
+  // (never committed). Skipped — with an explicit SKIP line, not a silent pass
+  // and not a FAIL — when the owner creds are absent.
+  let owner
+  try {
+    const ownerCreds = requireLiveCredential('owner')
+    owner = await login(ownerCreds.handle, ownerCreds.pin)
+  } catch (err) {
+    console.log(`SKIP: owner POST /classes (${err.message})`)
+  }
+  if (owner) {
+    const ownerClassInsert = await rest('/classes', {
+      method: 'POST',
+      token: owner.access_token,
+      body: { class_name: 'ZZSmokeTest' },
+    })
+    check('owner POST /classes -> 201', ownerClassInsert.status === 201, `HTTP ${ownerClassInsert.status}`)
+    await mgmtQuery(`delete from classes where class_name = 'ZZSmokeTest';`)
+  } else {
+    console.log('SKIP: owner POST /classes -> 201 (no SMOKE_OWNER_* credentials)')
+  }
 
   // 8. officer CANNOT touch role (column not granted — privilege escalation blocked).
   const rolePatchRes = await rest(`/members?id=eq.${member.member_id}`, {
@@ -361,6 +372,13 @@ async function main() {
   }
   await mgmtQuery(`delete from classes where class_name = 'ZZSmokeTest';`)
   console.log('PASS: cleanup removed ZZSmokeTest class')
+  await mgmtQuery(
+    `delete from members where discord_handle in ('${MEMBER_HANDLE}','${OFFICER_HANDLE}');`,
+  )
+  await mgmtQuery(
+    `delete from pin_login_attempts where discord_handle in ('${MEMBER_HANDLE}','${OFFICER_HANDLE}');`,
+  )
+  console.log('PASS: cleanup removed throwaway member + officer fixtures')
 
   if (failures.length === 0) {
     console.log('RLS SMOKE PASSED')

@@ -39,45 +39,32 @@
  */
 import { readFileSync } from 'node:fs'
 import bcrypt from 'bcryptjs'
+import { supabaseConfig, FIXTURE_PIN, assertFixtureRole } from './smoke-config.mjs'
 
 // ---------------------------------------------------------------------------
-// Config
+// Config (credentials from smoke-config.mjs: env or .env, never hardcoded)
 // ---------------------------------------------------------------------------
 
-function loadEnvFile() {
-  try {
-    const raw = readFileSync('.env', 'utf8')
-    const env = {}
-    for (const line of raw.split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
-      if (m) env[m[1]] = m[2]
-    }
-    return env
-  } catch {
-    return {}
-  }
-}
-
-const envFile = loadEnvFile()
-const SUPABASE_URL = process.env.SUPABASE_URL || envFile.VITE_SUPABASE_URL
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || envFile.VITE_SUPABASE_ANON_KEY
-const MGMT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN
-const PROJECT_REF = process.env.SUPABASE_PROJECT_REF
-
-if (!SUPABASE_URL || !ANON_KEY) {
-  console.error('[smoke-promotion] Missing SUPABASE_URL or SUPABASE_ANON_KEY (env or .env VITE_*)')
-  process.exit(1)
-}
-if (!MGMT_TOKEN || !PROJECT_REF) {
-  console.error('Missing SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF')
+let SUPABASE_URL, ANON_KEY, MGMT_TOKEN, PROJECT_REF
+try {
+  ;({
+    url: SUPABASE_URL,
+    anonKey: ANON_KEY,
+    mgmtToken: MGMT_TOKEN,
+    projectRef: PROJECT_REF,
+  } = supabaseConfig())
+} catch (err) {
+  console.error(`[smoke-promotion] ${err.message}`)
   process.exit(1)
 }
 
-const PIN = '1234'
-const OFFICER_HANDLE = 'officer-handle' // placeholder staff row (whitelist seed, PIN 1234)
 const PROMO_CLASS = 'smoke_promo_cls'
 const SPARE_CLASS = 'smoke_spare_cls'
 const KEY_STATS = ['hp', 'sp', 'patk', 'pdef', 'matk', 'mdef']
+// Throwaway officer fixture — unique handle per run so a crashed prior run
+// cannot 409 the insert (discord_handle is UNIQUE). This script no longer
+// authenticates as the placeholder staff row (inactive since 08.1-01/02).
+const OFFICER_HANDLE = `smoke-promo-officer-${Date.now()}`
 const HANDLES = {
   a: 'zz-promo-a',
   b: 'zz-promo-b',
@@ -207,10 +194,10 @@ async function sleep(ms) {
 async function cleanup() {
   await mgmtQuery(
     `delete from submissions where member_id in ` +
-      `(select id from members where discord_handle in (${ALL_HANDLES.map((h) => `'${h}'`).join(',')}));`,
+      `(select id from members where discord_handle in (${[...ALL_HANDLES, OFFICER_HANDLE].map((h) => `'${h}'`).join(',')}));`,
   )
   await mgmtQuery(
-    `delete from members where discord_handle in (${ALL_HANDLES.map((h) => `'${h}'`).join(',')});`,
+    `delete from members where discord_handle in (${[...ALL_HANDLES, OFFICER_HANDLE].map((h) => `'${h}'`).join(',')});`,
   )
   await mgmtQuery(
     `delete from class_key_stats where class_name in ('${PROMO_CLASS}', '${SPARE_CLASS}');`,
@@ -219,7 +206,7 @@ async function cleanup() {
     `delete from classes where class_name in ('${PROMO_CLASS}', '${SPARE_CLASS}');`,
   )
   await mgmtQuery(
-    `delete from pin_login_attempts where discord_handle in (${ALL_HANDLES.map((h) => `'${h}'`).join(',')});`,
+    `delete from pin_login_attempts where discord_handle in (${[...ALL_HANDLES, OFFICER_HANDLE].map((h) => `'${h}'`).join(',')});`,
   )
 }
 
@@ -237,6 +224,18 @@ async function main() {
     await mgmtQuery(
       `insert into classes (class_name) values ('${PROMO_CLASS}'), ('${SPARE_CLASS}');`,
     )
+    // Provision a throwaway officer fixture (role officer) BEFORE the key-stat
+    // setup loop, which authenticates as this officer. This script no longer
+    // logs in as the placeholder staff row (inactive since 08.1-01/02).
+    const officerPinHash = bcrypt.hashSync(FIXTURE_PIN, 10)
+    await mgmtQuery(
+      `insert into members (discord_handle, display_name, pin_hash, role, active, char_class, char_function) ` +
+        `values ('${OFFICER_HANDLE}', 'SMOKE Promo Officer', '${officerPinHash}', 'officer', true, '${PROMO_CLASS}', 'suporte');`,
+    )
+    const officerSession = await login(OFFICER_HANDLE)
+    assertFixtureRole(officerSession, 'officer')
+    const officer = officerSession
+
     // Key-stat config via set_key_stat_v2 (Phase 9 KEYU): 6 key stats for
     // PROMO_CLASS in the dps build role. SPARE_CLASS left without keys ->
     // OVR null -> section hidden (D-13).
@@ -252,7 +251,7 @@ async function main() {
         `HTTP ${cfg.status} body=${cfg.text}`,
       )
     }
-    const pinHash = bcrypt.hashSync(PIN, 10)
+    const pinHash = bcrypt.hashSync(FIXTURE_PIN, 10)
     for (const m of MEMBERS) {
       await mgmtQuery(
         `insert into members (discord_handle, display_name, pin_hash, role, active, char_class, char_function) ` +
@@ -264,8 +263,7 @@ async function main() {
     for (const m of MEMBERS) {
       sessions[m.handle] = await login(m.handle)
     }
-    const officer = await login(OFFICER_HANDLE)
-    console.log('[smoke-promotion] 5 fixture members + placeholder officer logged in')
+    console.log('[smoke-promotion] Throwaway officer + 5 fixture members logged in via verify-pin')
 
     // Booster set: 20 non-key catalog keys, deterministic order.
     const catalog = await rest('/stat_catalog?select=stat_key&order=stat_key.asc', {
