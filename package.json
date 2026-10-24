@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify:deploy": "node scripts/check-deployment.mjs",
+    "verify:phase": "node scripts/verify-phase-08.1.mjs",
     "preview": "vite preview",
     "ocr:assets": "node scripts/copy-ocr-assets.mjs",
     "predev": "npm run ocr:assets",
