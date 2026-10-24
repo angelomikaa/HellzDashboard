@@ -113,16 +113,22 @@ Cross-cutting constraints: deploy order invariant — migration 0014 (nullable `
 
 **Goal:** The live panel at https://hellz-dashboard.vercel.app/ is secured for public deployment: login connection error fixed (urgent ops), dummy data purged and stays purged, generic placeholder handles rotated to real owner/officer/member handles with fresh PIN hashes, and the identification system hardened (staff handle prefix namespace separate from members; session JWT bound to device fingerprint; step-up re-PIN for role changes/hierarchy only, owner-only hierarchy power). Nothing from Phase 08.1 is deferred; Phase 9 items (Fine Ranks) are out of scope.
 
-**Requirements**: TBD (security hardening; no new requirement IDs beyond Phase 8's WHIT-01..10 / IDEN-01..03 which are Complete)
+**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06 (added 2026-10-23 — the original 08.1 items had no requirement IDs and three of the four claims shipped unproven; see REQUIREMENTS.md "Deployment Security Hardening")
 
 **Depends on:** Phase 8
-**Plans:** 4 plans
+**Plans:** 10 plans — 08.1-01..08.1-05 executed (5/5; 08.1-05 superseded by 08.1-04 + migration 0017); 08.1-06..08.1-10 gap closure for the residual security gaps verified live on 2026-10-23
 
 Plans:
-- [ ] 08.1-01-PLAN.md — Dummy purge: run purge-dummies.sql via apply-seed.mjs, zero-dummy verification (four zeros), re-run smoke matrix, stay purged until release — Wave 1
-- [ ] 08.1-02-PLAN.md — Generic handle rotation: replace owner-handle/officer-handle/member-handle with real staff-prefixed handles + fresh hashes via apply-seed.mjs (hashes never committed), update smoke scripts to new handles — Wave 2
-- [ ] 08.1-03-PLAN.md — Device fingerprint binding: verify-pin binds device_fp (User-Agent + IP) to JWT; client sends X-Device-Fingerprint header; mismatch invalidates session — Wave 2
-- [ ] 08.1-04-PLAN.md — Step-up re-PIN: re-PIN required for role changes/hierarchy only; ordinary member flows not stepped up; only owner has hierarchy power; short-lived step-up token — Wave 3
+- [x] 08.1-01-PLAN.md — Dummy purge: purge-dummies.sql via apply-seed.mjs, zero-dummy verification (four zeros), smoke matrix re-run — Wave 1 — executed (73 dummies + 17 `smoke-idn-*` rows purged)
+- [x] 08.1-02-PLAN.md — Generic handle rotation: real owner handle + fresh hash applied out-of-band via apply-seed.mjs (hash never committed) — Wave 2 — executed (rotation itself superseded by 08.1-06)
+- [x] 08.1-03-PLAN.md — Device fingerprint binding: verify-pin mints `device_fp`, client sends `X-Device-Fingerprint` — Wave 2 — executed BUT never enforced (closed by 08.1-08)
+- [x] 08.1-04-PLAN.md — Step-up re-PIN: re-PIN for role changes/hierarchy only, owner-only hierarchy power, single-use device-bound token — Wave 3 — executed
+- [x] 08.1-05-PLAN.md — Step-up plan duplicate — superseded (no-op; delivered by 08.1-04 + 0017)
+- [ ] 08.1-06-PLAN.md — Credential retirement + sentinel guard: migration 0023 (neutralize `*-handle` rows + `members_sentinel_not_privileged` CHECK), credential-free whitelist seed, `scripts/set-member-pin.mjs`, owner PIN rotation — Wave 2 — SEC-01, SEC-02
+- [ ] 08.1-07-PLAN.md — Hosting hardening + release gate: `vercel.json` security headers (CSP report-only) and `scripts/check-deployment.mjs` (bundle env, secret scan, header scan, function reachability) — Wave 1 — SEC-03
+- [ ] 08.1-08-PLAN.md — Server-enforced device binding: UA-only fingerprint on both sides, migration 0024 (`assert_device_bound()` on the four staff RPCs), client `device_mismatch` handling — Wave 3 — SEC-04
+- [ ] 08.1-09-PLAN.md — Smoke-harness credential hygiene: `scripts/smoke-config.mjs` (env creds + per-run fixture PIN), all seven smoke scripts migrated, `scripts/check-credentials.mjs` repo gate — Wave 1 — SEC-05
+- [ ] 08.1-10-PLAN.md — Live verification battery + owner walk: `scripts/verify-phase-08.1.mjs` (local gates, release gate, live SQL invariants, behaviour probes, smoke matrix) and `08.1-VERIFICATION.md` — Wave 4 — SEC-06
 
 ### Phase 08.10: pt-BR OCR Identity (HOTFIX, INSERTED)
 

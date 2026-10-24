@@ -95,6 +95,17 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 5. Priest (16, single Suporte role) is the only class guaranteed to satisfy n≥3 under role-scoped cohorts
 6. Key-stat config workload is now per populated (class, build-role) combo — lazy configuration expected
 
+### Deployment Security Hardening (Phase 08.1)
+
+Added 2026-10-23 when Phase 08.1 gap-closure planning found that three of the phase's four original claims had shipped as theater or been left unproven (device binding never enforced, owner credentials committed, no release gate on a public URL). These are the measurable statements the phase now has to satisfy.
+
+- [ ] **SEC-01**: No live PIN, bcrypt hash or real staff handle is committed to the repository — the whitelist seed is a credential-free, re-runnable template, and a repo gate fails when a hash/PIN/handle reappears
+- [ ] **SEC-02**: Placeholder-shaped identities (`*-handle`) can never hold an officer/owner role or a PIN — enforced by a database CHECK constraint evaluated on every write, replacing the rejected `stf-`/`off-` staff-prefix namespace (D-16)
+- [ ] **SEC-03**: The production deployment serves hardening headers (nosniff, frame-deny, referrer, permissions, CSP report-only) and a one-command release gate that fails on a bundle-env regression or a leaked secret
+- [ ] **SEC-04**: Session device binding is server-enforced: client and server compute the same User-Agent-only fingerprint, it is minted into the JWT at login and first access, and the four privilege-mutating staff RPCs reject a mismatch with `device_mismatch`
+- [ ] **SEC-05**: The live smoke harness contains no production credential — credentials come from `SMOKE_*` env vars or per-run throwaway fixtures with a random 4-digit PIN
+- [ ] **SEC-06**: Every 08.1 security claim is re-verified against the live deployment in one battery run and recorded in `08.1-VERIFICATION.md`, with an owner walk for the behaviours no script can judge
+
 ## v2 Requirements
 
 Deferred to a future release. Tracked but not in the v1.1 roadmap.
@@ -167,6 +178,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IDEN-01 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
 | IDEN-02 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
 | IDEN-03 | Phase 8 — Whitelist Lifecycle, Self-Request & Identity | Complete |
+| SEC-01 | Phase 08.1 — Security Hardening for Public Deployment | Planned (08.1-06) |
+| SEC-02 | Phase 08.1 — Security Hardening for Public Deployment | Planned (08.1-06) |
+| SEC-03 | Phase 08.1 — Security Hardening for Public Deployment | Planned (08.1-07) |
+| SEC-04 | Phase 08.1 — Security Hardening for Public Deployment | Planned (08.1-08) |
+| SEC-05 | Phase 08.1 — Security Hardening for Public Deployment | Planned (08.1-09) |
+| SEC-06 | Phase 08.1 — Security Hardening for Public Deployment | Planned (08.1-10) |
 
 ## Phase 8 evidence pointers (2026-10-21)
 
