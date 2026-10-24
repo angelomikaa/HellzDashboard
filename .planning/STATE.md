@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
-status: ready_to_plan
-last_updated: "2026-10-24T05:35:43.228Z"
-last_activity: 2026-10-24 -- Phase 09.1 execution started
+status: planning
+last_updated: "2026-10-24T06:19:44.747Z"
+last_activity: 2026-10-24
 progress:
   total_phases: 9
   completed_phases: 7
-  total_plans: 40
-  completed_plans: 38
-  percent: 78
+  total_plans: 43
+  completed_plans: 40
+  percent: 93
 ---
 
 # Project State
@@ -134,8 +134,8 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-23 (late, cont.) — pt-BR class names IMPLEMENTED and committed (1c9046f display: shared classLabels map + every render site incl. the card job line/monogram; 460407f OCR: verified base prints Mercenario/Discipulo/Justiceiro/Vigia + owner-confirmed Insurgente). On top of the earlier ROOCDB asset swap (5580923/bede08d/bdadd1a) and its harness fonts-gate fix. Gates this session: build green, lint 0, 634/634 tests green (incl. 5 new classLabels locks + the Gunslinger-line OCR pins). STATE.md decisions carry the full vocabulary table. Pending: owner `git push` (private repo — the agent shell cannot authenticate) and the Vercel redeploy.
-Resume file: .planning/phases/09.1-hidden-raw-defenses-rpdef-rmdef/09.1-02-PLAN.md
+Last session: 2026-10-24T06:19:44.637Z
+Resume file: .planning/phases/10-first-access-by-print/10-CONTEXT.md
 
 ## Performance Metrics
 
