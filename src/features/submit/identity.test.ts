@@ -89,9 +89,22 @@ describe('matchClassName — localized (pt-BR / es) class names', () => {
     expect(matchClassName('Desordeiro')).toBe('Stalker')
     expect(matchClassName('Cigana')).toBe('Gypsy')
     expect(matchClassName('Menestrel')).toBe('Bard')
+    expect(matchClassName('Invocador')).toBe('Summoner')
     // base classes follow the same rename rule as the English containment
     expect(matchClassName('Cavaleiro')).toBe('Lord Knight')
     expect(matchClassName('Alquimista')).toBe('Biochemist')
+    expect(matchClassName('Mercenário')).toBe('Assassin Cross')
+    expect(matchClassName('Discípulo')).toBe('Summoner')
+  })
+
+  it('maps the Gunslinger line prints to Rebellion (owner-confirmed 2026-10-23)', () => {
+    // The official web API leaves this line untranslated, but the pt-BR game
+    // client prints Justiceiro (base) / Vigia (Sentry) / Insurgente (Trans 2ª).
+    expect(matchClassName('Insurgente')).toBe('Rebellion')
+    expect(matchClassName('Justiceiro')).toBe('Rebellion')
+    expect(matchClassName('Vigia')).toBe('Rebellion')
+    // "Futuro Invocador" resolves through the Invocador alias containment
+    expect(matchClassName('Futuro Invocador')).toBe('Summoner')
   })
 
   it('prefers the longest spelling so truncated Mastersmith is not Champion', () => {

@@ -93,9 +93,16 @@ function levenshtein(a: string, b: string): number {
  * matched in the same normalized space (case/accent/punctuation-insensitive).
  */
 export const CLASS_ALIASES: Readonly<Record<string, string>> = {
-  // pt-BR (bRO / RO Origin Americas)
+  // pt-BR (RO Origin Americas client) — the TRANSCENDENT prints plus the
+  // base-tier prints that map up to their Trans-2ª catalog entry exactly
+  // like the English containment rule ("Cavaleiro" -> "Lord Knight").
+  // Vocabulary verified 2026-10-23 against the official LANG=pt job-intro
+  // API + the ROOCDB game-extracted data (full table in lib/classLabels);
+  // owner-confirmed: the Basic screen prints "Insurgente" for Rebellion
+  // (the official web API leaves the Gunslinger line untranslated).
   algoz: 'Assassin Cross',
   assassino: 'Assassin Cross',
+  mercenario: 'Assassin Cross', // "Mercenário" — the base Assassin print
   lorde: 'Lord Knight',
   cavaleiro: 'Lord Knight',
   arquimago: 'High Wizard',
@@ -122,6 +129,10 @@ export const CLASS_ALIASES: Readonly<Record<string, string>> = {
   cigana: 'Gypsy',
   odalisca: 'Gypsy',
   invocador: 'Summoner',
+  discipulo: 'Summoner', // "Discípulo" — the Doram base print
+  insurgente: 'Rebellion', // the Trans-2ª print (owner-confirmed 2026-10-23)
+  justiceiro: 'Rebellion', // "Justiceiro" — the base Gunslinger print
+  vigia: 'Rebellion', // "Vigia" — the Sentry print
   rebelde: 'Rebellion',
   // English client synonyms the catalog renames away from
   creator: 'Biochemist',
