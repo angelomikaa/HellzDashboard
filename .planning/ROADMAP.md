@@ -27,7 +27,7 @@
 - [x] Phase 08.10: pt-BR OCR Identity — HOTFIX: the identity band reads the live pt-BR client ("Classe Criador"), localized class names map to the English catalog, and an unreadable field is named in the retry copy (1/1 plan) — completed 2026-10-22
 - [x] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0018; renumbered: Phase 7 took 0012, Phase 07.2 takes 0013, Phase 8 takes 0014, Phase 8 gap closure consumed 0015, Phase 08.1 took 0016, Phase 08.1 step-up consumed 0017): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (5/5 plans, 09-06 env-gated) — completed 2026-10-22
 - [ ] Phase 9.1: Hidden Raw Defenses (RPDEF/RMDEF) — two tooltip OCR captures inside the Especial step; raw defense computed read-only from Equipment DEF / (1 + DEF%); transient equipment values; `rpdef`/`rmdef` remap all `pdef`/`mdef` key positions preserving order; migration 0019 after 0018 (2 plans)
-- [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (0/0 plans)
+- [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (3/3 plans)
 
 </details>
 
@@ -190,7 +190,11 @@ Plans:
   2. A member more than 7 days since their last validated submission sees a stale-data CTA navigating to Enviar Status; a member who never submitted sees the evergreen first-submission variant; a member with fresh data sees no banner — the strictly-greater-than-7-days boundary is locked in a test
   3. The home tab shows only the player's own data — Destaques keeps the guild-wide EAFC cards and the aggregates-only discipline is unchanged
   4. (Owner feedback 2026-10-20) Destaques promo cards render in a premium scroll-snap slider (1-up mobile, 3-up desktop, keyboard + swipe reachable, server order preserved); access stays members-only — the public visitor-homepage idea is explicitly deferred (owner decision 2026-10-20)
-**Plans**: TBD
+**Plans**: 3/3 plans (see `.planning/phases/10-first-access-by-print/`)
+Plans:
+- [ ] 10-01-PLAN.md — Início tab shell + MyReport last_validated_at + InicioPage skeleton — Wave 1
+- [ ] 10-02-PLAN.md — Stale-data CTA + top-3 best-stats strip + boundary tests — Wave 2
+- [ ] 10-03-PLAN.md — Destaques scroll-snap slider + keyboard + swipe (SHWC-01) — Wave 1
 
 Cross-cutting constraints: no router library — `'inicio'` joins the existing `App.tsx` Tab union pattern; no date library — epoch-diff arithmetic on the ISO string; no client-side points recomputation (AGENTS.md non-negotiable); the slider is CSS scroll-snap only (no new npm dependency, no autoplay — 07.1 D-05 static-only rule).
 **UI hint**: yes
@@ -212,8 +216,8 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 (8 is independent 
 | 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 3/6 | In Progress|  |
 | 08.10. pt-BR OCR Identity (hotfix) | v1.1 | 1/1 | Complete | 2026-10-22 |
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 5/5 | Complete | 2026-10-22 |
-| 9.1. Hidden Raw Defenses (RPDEF/RMDEF) | v1.1 | 1/2 | In Progress | - |
-| 10. Personalized Home Landing Tab | v1.1 | 0/0 | Not started | - |
+| 9.1. Hidden Raw Defenses (RPDEF/RMDEF) | v1.1 | 2/2 | Complete    | 2026-10-24 |
+| 10. Personalized Home Landing Tab | v1.1 | 3/3 | Planned | - |
 
 ---
 *Roadmap created: 2026-10-07 · v1.0 archived 2026-10-13 · v1.1 roadmap created 2026-10-13 · revised 2026-10-22 (added Phase 9.1 Hidden Raw Defenses — 5 phases, DEF-01..DEF-06 requirements)*
