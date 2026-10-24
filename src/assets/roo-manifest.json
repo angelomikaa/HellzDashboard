@@ -1,247 +1,218 @@
 {
-  "source_site": "https://roocamer.gnjoy.game",
-  "asset_base": "https://file.joymaker.com/game/rooc/web/assets/",
-  "discovered": "2026-10-16 � the roocamer.gnjoy.game job-intro SPA renders its imagery from the Joymaker CDN (file.joymaker.com). Each job file name comes from the official data endpoint (https://rooc-official-am-api.joymaker.com/api/rooc/job-intro: img_male/img_female per job) and the CDN URL (vite content hash) was extracted from the site bundle asset map (main-BVKl7piB.js). Hashed URLs change on site redeploys � the fetcher records 404s as designed-missing (D-16: graceful, never fatal), and the committed files under public/assets/classes/ keep the panel self-hosted (D-15).",
+  "source_site": "https://roocdb.com",
+  "asset_base": "https://roocdb.com/professions/",
+  "discovered": "2026-10-23 — ROOCDB (roocdb.com, fan database 'extracted straight from the game') hosts the game's own class imagery under stable, un-hashed URLs: the per-job class-emblem icons (professions/UI_Common_Profession_Icon_<n>.webp) and the per-job full-body class art (professions/hero/<id>_<gender>.webp, 1197×1309; the Gunslinger line is lower-res: 9102 female 388×388 / male 392×484). This replaces the 2026-10-16 discovery from roocamer.gnjoy.game (whose file.joymaker.com CDN URLs are vite-hash-brittle and whose icon set was only the SEVEN base-role icons — classes sharing a line shared an icon, Rebellion had none at all). Mapping gathered 2026-10-23 by walking the live ROOCDB class pages (base button → EVOLUÇÕES buttons, reading each button's <img> src+alt).",
   "naming": {
-    "portrait_female": "class-f-<slug>.png",
-    "portrait_male": "class-m-<slug>.png",
-    "icon": "class-icon-<slug>.png",
-    "slug": "lowercase class name, spaces -> hyphens"
+    "portrait_female": "class-f-<slug>.webp",
+    "portrait_male": "class-m-<slug>.webp",
+    "icon": "class-icon-<slug>.webp",
+    "slug": "lowercase class name, spaces -> hyphens",
+    "placeholder_gender": "which portrait the card photo placeholder uses (owner decision 2026-10-23: female for every dual-gender class; Bard is male-only art, Gypsy female-only)"
+  },
+  "hero_id_map": {
+    "note": "hero art id scheme: <line><branch><slot> — 2=Espadachim 3=Noviço 4=Mago 5=Gatuno 6=Mercador 7=Arqueiro 8=Doram 9=Justiceiro; branch 1=2-1 line, 2=2-2 line; slot 2=Trans 2ª. Performer line: 7202=Menestrel (male), 7212=Cigana (female).",
+    "Assassin Cross": 5102,
+    "Lord Knight": 2102,
+    "High Wizard": 4102,
+    "Sniper": 7102,
+    "High Priest": 3102,
+    "Mastersmith": 6102,
+    "Paladin": 2202,
+    "Professor": 4202,
+    "Stalker": 5202,
+    "Biochemist": 6202,
+    "Champion": 3202,
+    "Bard": 7202,
+    "Gypsy": 7212,
+    "Summoner": 8102,
+    "Rebellion": 9102
+  },
+  "icon_number_map": {
+    "Assassin Cross": 16,
+    "Lord Knight": 14,
+    "High Wizard": 15,
+    "Sniper": 18,
+    "High Priest": 17,
+    "Mastersmith": 19,
+    "Paladin": 23,
+    "Professor": 31,
+    "Stalker": 33,
+    "Biochemist": 25,
+    "Champion": 21,
+    "Bard": 27,
+    "Gypsy": 29,
+    "Summoner": 43,
+    "Rebellion": 62
   },
   "notes": [
-    "Portrait art exists for every transcendent job on the site EXCEPT Rebellion (the Gunslinger line p8 is completely omitted from the bundle � owner-confirmed). The Rebellion research samples that once lived in assets/ were removed by the owner (2026-10-17): Rebellion portraits are now the DESIGNED-missing state — the committed copies under public/assets/classes/ stay intact, and a fetcher re-run reports them MISSING without failing (D-16).",
-    "The site only provides SEVEN base-role icons (p1..p7) � there is no per-transcendent-class icon, so classes sharing a base line share the same icon (e.g. High Wizard and Professor both use the Mage icon). That is the site reality, not a mapping error.",
-    "Bard is the male-only job of the Archer second line (site art p5_*_big_22): class-m-bard uses the male art; class-f-bard never occurs in-game (expected_missing). Gypsy is its female-only counterpart: class-f-gypsy uses the female art; class-m-gypsy never occurs in-game (expected_missing)."
+    "Owner decisions 2026-10-23 (ROOCDB asset swap): (1) icons switch from the 7 shared base-role icons to the per-job Trans-2ª game emblems — every class gets its OWN icon, Rebellion included; (2) the card photo placeholder becomes the per-job full-body class art (ClassCrest.portraitSrcFor) instead of the small icon (crestSrcFor) the three card surfaces had to use before; (3) placeholder gender = female for every dual-gender class (Bard=Menestrel male art, Gypsy=Cigana female art — the jobs themselves are gender-locked); (4) Rebellion drops the 1920×1000 research-sample PNGs for the proper Insurgente class art; (5) the poring mascot (misc below) illustrates empty states.",
+    "Resolution reality: game emblem icons are 56×56 (native UI size — ClassCrest renders them at 32/48px); hero art is 1197×1309 except the Gunslinger line (Insurgente ~388-392px), which is the only official per-job art that exists for Rebellion.",
+    "ROOCDB URLs are stable (no content hashes) — a fetcher re-run refreshes the committed files; the committed copies under public/assets/ keep the panel self-hosted (D-15) and the canvas export same-origin/taint-free (T-072-13).",
+    "Old naming carried .png files from roocamer.gnjoy.game; this manifest supersedes them with .webp — the fetcher accepts both PNG and WebP magic."
+  ],
+  "misc": [
+    {
+      "file": "poring.webp",
+      "url": "https://roocdb.com/nav/poring.webp",
+      "out_dir": "public/assets",
+      "reason": "poring mascot for empty states (owner decision 2026-10-23)"
+    }
   ],
   "classes": [
     {
       "class_name": "Assassin Cross",
       "slug": "assassin-cross",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-assassin-cross.png": {
-          "url": "p6_female_big_2s-HcfL_Etn.png"
-        },
-        "class-m-assassin-cross.png": {
-          "url": "p6_male_big_2s-DcW31H4s.png"
-        },
-        "class-icon-assassin-cross.png": {
-          "url": "p6_icon-UrY423Qj.png"
-        }
+        "class-icon-assassin-cross.webp": { "url": "UI_Common_Profession_Icon_16.webp" },
+        "class-f-assassin-cross.webp": { "url": "hero/5102_female.webp" },
+        "class-m-assassin-cross.webp": { "url": "hero/5102_male.webp" }
       }
     },
     {
       "class_name": "Lord Knight",
       "slug": "lord-knight",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-lord-knight.png": {
-          "url": "p4_female_big_2s-Dr2jNxCJ.png"
-        },
-        "class-m-lord-knight.png": {
-          "url": "p4_male_big_2s-4yTnSfXC.png"
-        },
-        "class-icon-lord-knight.png": {
-          "url": "p4_icon-Dnfdhm1Q.png"
-        }
+        "class-icon-lord-knight.webp": { "url": "UI_Common_Profession_Icon_14.webp" },
+        "class-f-lord-knight.webp": { "url": "hero/2102_female.webp" },
+        "class-m-lord-knight.webp": { "url": "hero/2102_male.webp" }
       }
     },
     {
       "class_name": "High Wizard",
       "slug": "high-wizard",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-high-wizard.png": {
-          "url": "p2_female_big_2s-Dvi65k6n.png"
-        },
-        "class-m-high-wizard.png": {
-          "url": "p2_male_big_2s-CMUitOaY.png"
-        },
-        "class-icon-high-wizard.png": {
-          "url": "p2_icon-DdvLkIQy.png"
-        }
+        "class-icon-high-wizard.webp": { "url": "UI_Common_Profession_Icon_15.webp" },
+        "class-f-high-wizard.webp": { "url": "hero/4102_female.webp" },
+        "class-m-high-wizard.webp": { "url": "hero/4102_male.webp" }
       }
     },
     {
       "class_name": "Sniper",
       "slug": "sniper",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-sniper.png": {
-          "url": "p5_female_big_2s-B1HCtDnW.png"
-        },
-        "class-m-sniper.png": {
-          "url": "p5_male_big_2s-Dp43bfHV.png"
-        },
-        "class-icon-sniper.png": {
-          "url": "p5_icon-Cexq0XB1.png"
-        }
+        "class-icon-sniper.webp": { "url": "UI_Common_Profession_Icon_18.webp" },
+        "class-f-sniper.webp": { "url": "hero/7102_female.webp" },
+        "class-m-sniper.webp": { "url": "hero/7102_male.webp" }
       }
     },
     {
       "class_name": "High Priest",
       "slug": "high-priest",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-high-priest.png": {
-          "url": "p3_female_big_2s-wFr-0Go0.png"
-        },
-        "class-m-high-priest.png": {
-          "url": "p3_male_big_2s-DvmVO6tU.png"
-        },
-        "class-icon-high-priest.png": {
-          "url": "p3_icon-Ci67obyD.png"
-        }
+        "class-icon-high-priest.webp": { "url": "UI_Common_Profession_Icon_17.webp" },
+        "class-f-high-priest.webp": { "url": "hero/3102_female.webp" },
+        "class-m-high-priest.webp": { "url": "hero/3102_male.webp" }
       }
     },
     {
       "class_name": "Mastersmith",
       "slug": "mastersmith",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-mastersmith.png": {
-          "url": "p1_female_big_2s-BtVOZ_s4.png"
-        },
-        "class-m-mastersmith.png": {
-          "url": "p1_male_big_2s-CYtx9QZZ.png"
-        },
-        "class-icon-mastersmith.png": {
-          "url": "p1_icon-BeHnHg1I.png"
-        }
+        "class-icon-mastersmith.webp": { "url": "UI_Common_Profession_Icon_19.webp" },
+        "class-f-mastersmith.webp": { "url": "hero/6102_female.webp" },
+        "class-m-mastersmith.webp": { "url": "hero/6102_male.webp" }
       }
     },
     {
       "class_name": "Paladin",
       "slug": "paladin",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-paladin.png": {
-          "url": "p4_female_big_2s2-C5pA8CEG.png"
-        },
-        "class-m-paladin.png": {
-          "url": "p4_male_big_2s2-CjeMC7bv.png"
-        },
-        "class-icon-paladin.png": {
-          "url": "p4_icon-Dnfdhm1Q.png"
-        }
+        "class-icon-paladin.webp": { "url": "UI_Common_Profession_Icon_23.webp" },
+        "class-f-paladin.webp": { "url": "hero/2202_female.webp" },
+        "class-m-paladin.webp": { "url": "hero/2202_male.webp" }
       }
     },
     {
       "class_name": "Professor",
       "slug": "professor",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-professor.png": {
-          "url": "p2_female_big_2s2-gW_S7tpr.png"
-        },
-        "class-m-professor.png": {
-          "url": "p2_male_big_2s2-BnDXivJC.png"
-        },
-        "class-icon-professor.png": {
-          "url": "p2_icon-DdvLkIQy.png"
-        }
+        "class-icon-professor.webp": { "url": "UI_Common_Profession_Icon_31.webp" },
+        "class-f-professor.webp": { "url": "hero/4202_female.webp" },
+        "class-m-professor.webp": { "url": "hero/4202_male.webp" }
       }
     },
     {
       "class_name": "Stalker",
       "slug": "stalker",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-stalker.png": {
-          "url": "p6_female_big_2s2-DDpWydMK.png"
-        },
-        "class-m-stalker.png": {
-          "url": "p6_male_big_2s2-DGiUHLbk.png"
-        },
-        "class-icon-stalker.png": {
-          "url": "p6_icon-UrY423Qj.png"
-        }
+        "class-icon-stalker.webp": { "url": "UI_Common_Profession_Icon_33.webp" },
+        "class-f-stalker.webp": { "url": "hero/5202_female.webp" },
+        "class-m-stalker.webp": { "url": "hero/5202_male.webp" }
       }
     },
     {
       "class_name": "Biochemist",
       "slug": "biochemist",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-biochemist.png": {
-          "url": "p1_female_big_2s2-Dtr3fgEF.png"
-        },
-        "class-m-biochemist.png": {
-          "url": "p1_male_big_2s2-Bog4VmhW.png"
-        },
-        "class-icon-biochemist.png": {
-          "url": "p1_icon-BeHnHg1I.png"
-        }
+        "class-icon-biochemist.webp": { "url": "UI_Common_Profession_Icon_25.webp" },
+        "class-f-biochemist.webp": { "url": "hero/6202_female.webp" },
+        "class-m-biochemist.webp": { "url": "hero/6202_male.webp" }
       }
     },
     {
       "class_name": "Champion",
       "slug": "champion",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-champion.png": {
-          "url": "p3_female_big_2s2-A69myc_3.png"
-        },
-        "class-m-champion.png": {
-          "url": "p3_male_big_2s2-BiJc-QiW.png"
-        },
-        "class-icon-champion.png": {
-          "url": "p3_icon-Ci67obyD.png"
-        }
+        "class-icon-champion.webp": { "url": "UI_Common_Profession_Icon_21.webp" },
+        "class-f-champion.webp": { "url": "hero/3202_female.webp" },
+        "class-m-champion.webp": { "url": "hero/3202_male.webp" }
       }
     },
     {
       "class_name": "Bard",
       "slug": "bard",
+      "placeholder_gender": "male",
       "files": {
-        "class-f-bard.png": {
+        "class-icon-bard.webp": { "url": "UI_Common_Profession_Icon_27.webp" },
+        "class-m-bard.webp": { "url": "hero/7202_male.webp" },
+        "class-f-bard.webp": {
           "expected_missing": true,
-          "reason": "Bard is the male-only job of the Archer second line � a female Bard never occurs in-game"
-        },
-        "class-m-bard.png": {
-          "url": "p5_male_big_22-DugvF0fD.png"
-        },
-        "class-icon-bard.png": {
-          "url": "p5_icon-Cexq0XB1.png"
+          "reason": "the Bard catalog entry is the male-only performer line (Menestrel) — a female never occurs in-game"
         }
       }
     },
     {
       "class_name": "Gypsy",
       "slug": "gypsy",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-gypsy.png": {
-          "url": "p5_female_big_22-BW_y4L3d.png"
-        },
-        "class-m-gypsy.png": {
+        "class-icon-gypsy.webp": { "url": "UI_Common_Profession_Icon_29.webp" },
+        "class-f-gypsy.webp": { "url": "hero/7212_female.webp" },
+        "class-m-gypsy.webp": {
           "expected_missing": true,
-          "reason": "Gypsy is the female-only job of the Archer second line � a male Gypsy never occurs in-game"
-        },
-        "class-icon-gypsy.png": {
-          "url": "p5_icon-Cexq0XB1.png"
+          "reason": "the Gypsy catalog entry is the female-only performer line (Cigana) — a male never occurs in-game"
         }
       }
     },
     {
       "class_name": "Summoner",
       "slug": "summoner",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-summoner.png": {
-          "url": "p7_female_big_2s-CBPqBAWO.png"
-        },
-        "class-m-summoner.png": {
-          "url": "p7_male_big_2s-DIQbMsVF.png"
-        },
-        "class-icon-summoner.png": {
-          "url": "p7_icon-Cz9rZ2Ap.png"
-        }
+        "class-icon-summoner.webp": { "url": "UI_Common_Profession_Icon_43.webp" },
+        "class-f-summoner.webp": { "url": "hero/8102_female.webp" },
+        "class-m-summoner.webp": { "url": "hero/8102_male.webp" }
       }
     },
     {
       "class_name": "Rebellion",
       "slug": "rebellion",
+      "placeholder_gender": "female",
       "files": {
-        "class-f-rebellion.png": {
-          "expected_missing": true,
-          "reason": "the Gunslinger line (p8) is completely omitted from the roocamer surface (owner-confirmed) � the repo samples were removed by the owner (2026-10-17); the committed public/assets/classes copies stay, and fetcher re-runs report MISSING (D-16)"
-        },
-        "class-m-rebellion.png": {
-          "expected_missing": true,
-          "reason": "the Gunslinger line (p8) is completely omitted from the roocamer surface (owner-confirmed) � the repo samples were removed by the owner (2026-10-17); the committed public/assets/classes copies stay, and fetcher re-runs report MISSING (D-16)"
-        },
-        "class-icon-rebellion.png": {
-          "expected_missing": true,
-          "reason": "no p8 icon exists on the site (owner: 'classes like rebellion are completely omitted') � ClassCrest renders the D-16 monogram fallback"
-        }
+        "class-icon-rebellion.webp": { "url": "UI_Common_Profession_Icon_62.webp" },
+        "class-f-rebellion.webp": { "url": "hero/9102_female.webp" },
+        "class-m-rebellion.webp": { "url": "hero/9102_male.webp" }
       }
     }
   ]

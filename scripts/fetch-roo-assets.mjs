@@ -4,11 +4,15 @@
  * public/assets/classes/ (plan 07.2-05, ASST-01 / D-15/D-16).
  *
  * Reads the committed manifest (src/assets/roo-manifest.json) and downloads
- * each file from the roocamer.gnjoy.game CDN (file.joymaker.com) with a
- * browser-like User-Agent. Entries with a `local` source are copied from the
- * repo (Rebellion's research samples — the site omits the Gunslinger line
- * entirely). Entries marked expected_missing with no source are the DESIGNED
- * missing state (D-16): recorded in the summary, never fatal.
+ * each file with a browser-like User-Agent. Since the 2026-10-23 ROOCDB swap
+ * the source is roocdb.com (stable, un-hashed game-extracted URLs — per-job
+ * Trans-2ª emblem icons + per-job full-body class art, see the manifest's
+ * discovered/notes); `source.url` is resolved against `manifest.asset_base`
+ * unless it is already absolute (http/https). Entries with a `local` source
+ * are copied from the repo. Entries marked expected_missing with no source
+ * are the DESIGNED missing state (D-16): recorded in the summary, never
+ * fatal. The optional `manifest.misc` array fetches non-class assets (e.g.
+ * the poring mascot) into their own out_dir.
  *
  * GENERATED-style loud-abort on catalog drift: the manifest's class set must
  * equal the canonical 15-class set in supabase/seeds/classes.sql — if the
@@ -75,14 +79,21 @@ for (const entry of manifest.classes) {
     const label = `${entry.class_name} → ${fileName}`
     try {
       if (typeof source.url === 'string') {
-        const res = await fetch(manifest.asset_base + source.url, {
-          headers: { 'User-Agent': USER_AGENT, Accept: 'image/png,image/*;q=0.8,*/*;q=0.5' },
+        // Absolute URLs pass through; manifest-relative ones resolve against asset_base.
+        const target = /^https?:\/\//.test(source.url) ? source.url : manifest.asset_base + source.url
+        const res = await fetch(target, {
+          headers: { 'User-Agent': USER_AGENT, Accept: 'image/png,image/webp,image/*;q=0.8,*/*;q=0.5' },
         })
         const buf = Buffer.from(await res.arrayBuffer())
-        // Cloudflare/CDN error pages can return 200 HTML — verify it is a PNG.
+        // Cloudflare/CDN error pages can return 200 HTML — verify the image
+        // magic: PNG (\x89PNG) or WebP (RIFF....WEBP).
         const isPng = buf.length > 8 && buf.subarray(1, 4).toString('ascii') === 'PNG'
-        if (!res.ok || !isPng) {
-          rows.push({ label, status: 'MISSING', note: `HTTP ${res.status}${isPng ? '' : ' (non-image body)'}` })
+        const isWebp =
+          buf.length > 12 &&
+          buf.subarray(0, 4).toString('ascii') === 'RIFF' &&
+          buf.subarray(8, 12).toString('ascii') === 'WEBP'
+        if (!res.ok || (!isPng && !isWebp)) {
+          rows.push({ label, status: 'MISSING', note: `HTTP ${res.status}${isPng || isWebp ? '' : ' (non-image body)'}` })
           missingCount++
           continue
         }
@@ -109,6 +120,38 @@ for (const entry of manifest.classes) {
       rows.push({ label, status: 'MISSING', note: `network error: ${err instanceof Error ? err.message : String(err)}` })
       missingCount++
     }
+  }
+}
+
+// Optional non-class assets (manifest.misc): poring mascot etc. Each entry is
+// { file, url, out_dir } — resolved relative to the repo root and created on
+// demand. Same designed-missing semantics as class files.
+for (const entry of manifest.misc ?? []) {
+  const label = `misc → ${entry.file}`
+  try {
+    const target = /^https?:\/\//.test(entry.url) ? entry.url : manifest.asset_base + entry.url
+    const res = await fetch(target, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'image/png,image/webp,image/*;q=0.8,*/*;q=0.5' },
+    })
+    const buf = Buffer.from(await res.arrayBuffer())
+    const isPng = buf.length > 8 && buf.subarray(1, 4).toString('ascii') === 'PNG'
+    const isWebp =
+      buf.length > 12 &&
+      buf.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buf.subarray(8, 12).toString('ascii') === 'WEBP'
+    if (!res.ok || (!isPng && !isWebp)) {
+      rows.push({ label, status: 'MISSING', note: `HTTP ${res.status}` })
+      missingCount++
+      continue
+    }
+    const destDir = path.join(ROOT, entry.out_dir ?? 'public/assets/classes')
+    mkdirSync(destDir, { recursive: true })
+    writeDest(path.join(destDir, entry.file), buf)
+    rows.push({ label, status: 'OK', note: `${(buf.length / 1024).toFixed(0)} KB` })
+    okCount++
+  } catch (err) {
+    rows.push({ label, status: 'MISSING', note: `network error: ${err instanceof Error ? err.message : String(err)}` })
+    missingCount++
   }
 }
 
