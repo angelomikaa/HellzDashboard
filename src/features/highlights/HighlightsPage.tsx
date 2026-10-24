@@ -31,6 +31,7 @@ import { ApiError, fetchPromotion, type PromotionSection } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { tierForOvr } from '../dashboard/presentation'
 import { ClassCrest } from '../assets/ClassCrest'
+import { classLabel } from '../../lib/classLabels'
 import { PoringEmpty } from '../assets/PoringEmpty'
 import { PromotionCard } from './PromotionCard'
 
@@ -138,7 +139,7 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
                   never a broken image. */}
               <ClassCrest charClass={section.class_name} size="md" />
               <h2 className="font-display text-2xl font-semibold text-content">
-                {section.class_name}
+                {classLabel(section.class_name)}
               </h2>
             </div>
             {/* 07.2-05 (D-14/D-21 pre-pass): the round-3 crest cards are

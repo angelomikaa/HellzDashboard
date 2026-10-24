@@ -23,6 +23,7 @@ import {
   type RoleRankRow,
 } from '../../lib/api'
 import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER } from '../../lib/groups'
+import { classLabel } from '../../lib/classLabels'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { tierForPoints } from '../dashboard/presentation'
 import { TIER_BORDER_DISPLAY, TIER_TEXT_DISPLAY } from '../dashboard/tierDisplay'
@@ -167,7 +168,7 @@ export function RankPage({ session }: { session: NeoFootSession }) {
           <option value="">— todas as classes</option>
           {classes.map((className) => (
             <option key={className} value={className}>
-              {className}
+              {classLabel(className)}
             </option>
           ))}
         </select>
@@ -226,7 +227,7 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                         <div className="font-mono text-xs text-muted">{row.char_id}</div>
                       )}
                     </td>
-                    <td className="px-2 py-2 text-muted">{row.char_class}</td>
+                    <td className="px-2 py-2 text-muted">{classLabel(row.char_class)}</td>
                     <td className="px-2 py-2">
                       {/* Display rounding ONLY (Math.round) — the OVR arrives
                           opaque from the RPC; null = insufficient data. */}

@@ -37,6 +37,7 @@ import {
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { FUNCTION_LABELS } from '../../lib/groups'
+import { classLabel } from '../../lib/classLabels'
 import { validateIdentityDraft, OFFICIAL_CLASSES } from '../submit/identity'
 import type { CharFunction } from '../submit/identity'
 import { ClassCrest } from '../assets/ClassCrest'
@@ -633,7 +634,7 @@ export function CharactersPage({
                 <FilterDisclosure
                   id="class"
                   label="Classe"
-                  value={filterClass === '' ? 'Todas' : filterClass}
+                  value={filterClass === '' ? 'Todas' : classLabel(filterClass)}
                   open={openFilters.class}
                   onToggle={() =>
                     setOpenFilters((prev) => ({ ...prev, class: !prev.class }))
@@ -663,7 +664,7 @@ export function CharactersPage({
                           : 'border-line text-muted hover-control hover:text-content'
                       }`}
                     >
-                      {className}
+                      {classLabel(className)}
                     </button>
                   ))}
                 </FilterDisclosure>
@@ -802,7 +803,7 @@ export function CharactersPage({
                               <option value="">—</option>
                               {data.classes.map((className) => (
                                 <option key={className} value={className}>
-                                  {className}
+                                  {classLabel(className)}
                                 </option>
                               ))}
                             </select>
@@ -879,7 +880,7 @@ export function CharactersPage({
                         </span>
                         <span className="text-sm text-muted">{member.discord_handle}</span>
                         <span className="text-sm text-muted">
-                          Classe: <span className="text-content">{member.char_class ?? '—'}</span>
+                          Classe: <span className="text-content">{classLabel(member.char_class)}</span>
                         </span>
                         <span className="text-sm text-muted">
                           Função: <span className="text-content">{FUNCTION_LABELS[member.char_function]}</span>

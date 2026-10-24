@@ -10,6 +10,7 @@
 // border/padding so the Painel can merge it with the key-stat mini cards into
 // one wide strip. The strip's border owns the tier color (ovrTierFor).
 import type { MyReport } from '../../lib/api'
+import { classLabel } from '../../lib/classLabels'
 import { FUNCTION_LABELS } from '../../lib/groups'
 import { tierForOvr, type Tier } from './presentation'
 import { TIER_BORDER_DISPLAY, TIER_TEXT_GLOW } from './tierDisplay'
@@ -38,8 +39,7 @@ export function OvrHero({
   const rounded = sufficient && ovr.value !== null ? Math.round(ovr.value) : null
   const tier = ovrTierFor(ovr)
   const display = rounded !== null ? rounded : '—'
-  const classLine =
-    charClass === null ? '—' : `${charClass} · ${FUNCTION_LABELS[charFunction]}`
+  const classLine = `${classLabel(charClass)} · ${FUNCTION_LABELS[charFunction]}`
   const explanation =
     rounded !== null
       ? null

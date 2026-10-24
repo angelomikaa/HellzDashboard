@@ -16,6 +16,7 @@ import {
 import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER, type GroupKey } from '../../lib/groups'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { ClassCrest } from '../assets/ClassCrest'
+import { classLabel } from '../../lib/classLabels'
 import { PoringEmpty } from '../assets/PoringEmpty'
 import { ConfirmDialog } from './ConfirmDialog'
 import { IdentityReview } from './IdentityReview'
@@ -237,12 +238,12 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                              )}
                              {(row.nickname || row.char_id) && row.char_class && ' · '}
                              {row.char_class !== null && row.char_class !== undefined && row.char_class !== '' && (
-                               <span>{row.char_class}</span>
+                               <span>{classLabel(row.char_class)}</span>
                              )}
                            </span>
                          )}
                          <span className="text-sm text-muted">
-                           {row.char_class ?? '—'} · {FUNCTION_LABELS[row.char_function]} ·{' '}
+                           {classLabel(row.char_class)} · {FUNCTION_LABELS[row.char_function]} ·{' '}
                            {dateTimeFormatter.format(new Date(row.submitted_at))}
                          </span>
                        </span>
@@ -396,7 +397,8 @@ export function enviosIdentityLine(row: OfficerQueueRow): string | null {
   const parts: string[] = []
   if (row.nickname !== null && row.nickname !== undefined && row.nickname !== '') parts.push(row.nickname)
   if (row.char_id !== null && row.char_id !== undefined && row.char_id !== '') parts.push(row.char_id)
-  if (row.char_class !== null && row.char_class !== undefined && row.char_class !== '') parts.push(row.char_class)
+  if (row.char_class !== null && row.char_class !== undefined && row.char_class !== '')
+    parts.push(classLabel(row.char_class))
   return parts.length > 0 ? parts.join(' · ') : null
 }
 

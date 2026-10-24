@@ -12,6 +12,7 @@ import {
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { PoringEmpty } from '../assets/PoringEmpty'
+import { classLabel } from '../../lib/classLabels'
 import { ConfirmDialog } from './ConfirmDialog'
 
 const NETWORK_ERROR =
@@ -141,7 +142,7 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
                 </p>
                 <p className="text-sm text-muted">
                   #{row.char_id} · {row.nickname}
-                  {row.char_class ? ` · ${row.char_class}` : ''}
+                  {row.char_class ? ` · ${classLabel(row.char_class)}` : ''}
                 </p>
                 {failed ? (
                   <p className="text-sm text-muted">Comprovante indisponível.</p>

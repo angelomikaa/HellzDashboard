@@ -37,6 +37,7 @@ import type { OcrFieldOutcome } from '../submit/ocr'
 import { WIZARD_GROUPS, type GroupInputs } from '../submit/wizard'
 import { withDerivedDefenses, RAW_DEFENSE_STAT_KEYS } from '../submit/rawDefense'
 import { FUNCTION_LABELS } from '../../lib/groups'
+import { classLabel } from '../../lib/classLabels'
 
 export const PROSPECT_LOAD_ERROR = 'Não foi possível carregar o formulário.'
 
@@ -231,7 +232,7 @@ export function ProspectApplicationPage({
         <div className="rounded-md border border-line bg-dominant px-3 py-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Aplicação</p>
           <p className="mt-1 text-sm font-semibold text-content">
-            {`${draft.nickname} · ID ${draft.char_id} · ${draft.char_class} · ${FUNCTION_LABELS[draft.char_function]}`}
+            {`${draft.nickname} · ID ${draft.char_id} · ${classLabel(draft.char_class)} · ${FUNCTION_LABELS[draft.char_function]}`}
           </p>
           {identityError !== null && (
             <div className="mt-2 flex flex-col gap-2">

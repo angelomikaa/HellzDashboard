@@ -39,6 +39,7 @@ import {
 import type { NeoFootSession } from '../auth/session'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { portraitSrcFor } from '../assets/ClassCrest'
+import { classLabel } from '../../lib/classLabels'
 import { CardSvg } from '../cards/CardSvg'
 import type { CardExportData } from '../export/cardExport'
 
@@ -234,21 +235,27 @@ export function CardPhotoUpload({
   // Live card preview: my_card's key stats + OVR, the stored photo
   // (or the class-portrait fallback / monogram). OVR-null members (insufficient
   // data) get the upload UI without the card — tierForOvr needs a number.
+  // The job line prints the pt-BR label (classLabels, owner decision
+  // 2026-10-23); the KEY keeps driving the asset lookups and the monogram
+  // follows the label.
   const preview: CardExportData | null =
     card !== null && card.char_class !== null && card.ovr.value !== null
-      ? {
-          name: displayName ?? session.display_name,
-          charClass: card.char_class,
-          charFunction: card.char_function,
-          ovr: Math.round(card.ovr.value),
-          stats: card.key_stats.map((k) => ({
-            label_short: k.label_short,
-            value: k.own_value === null ? '—' : formatStatValue(k.own_value, k.value_type),
-            points: k.points,
-          })),
-          photoSrc: photoUrl ?? portraitSrcFor(card.char_class),
-          monogramLetter: card.char_class.charAt(0).toUpperCase(),
-        }
+      ? (() => {
+          const jobLabel = classLabel(card.char_class)
+          return {
+            name: displayName ?? session.display_name,
+            charClass: jobLabel,
+            charFunction: card.char_function,
+            ovr: Math.round(card.ovr.value),
+            stats: card.key_stats.map((k) => ({
+              label_short: k.label_short,
+              value: k.own_value === null ? '—' : formatStatValue(k.own_value, k.value_type),
+              points: k.points,
+            })),
+            photoSrc: photoUrl ?? portraitSrcFor(card.char_class),
+            monogramLetter: jobLabel.charAt(0).toUpperCase(),
+          }
+        })()
       : null
 
   // Owner checkpoint round 6: ONE inline, icon-only action row — alter photo,

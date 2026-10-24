@@ -23,6 +23,7 @@ import {
   type StatCatalogEntry,
 } from '../../lib/api'
 import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER } from '../../lib/groups'
+import { classLabel } from '../../lib/classLabels'
 import type { NeoFootSession } from '../auth/session'
 
 // Renders one ordered-set chip for a catalog entry within a (class, build-role)
@@ -225,7 +226,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
               <option value="">—</option>
               {classes.map((className) => (
                 <option key={className} value={className}>
-                  {className}
+                  {classLabel(className)}
                 </option>
               ))}
             </select>

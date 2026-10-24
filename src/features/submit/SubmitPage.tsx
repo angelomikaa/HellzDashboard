@@ -28,6 +28,7 @@ import {
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { FUNCTION_LABELS } from '../../lib/groups'
+import { classLabel } from '../../lib/classLabels'
 import { prefillIdentity } from '../request/requestFlow'
 import { HistoryList } from './HistoryList'
 import { ExampleShot } from './ExampleShot'
@@ -584,7 +585,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
           {step === 1 && (
             <div className="mt-6 flex flex-col gap-5">
               <h2 className="text-xl font-semibold text-content">
-                {`${me.display_name} — ${me.char_class} (${FUNCTION_LABELS[me.char_function]})`}
+                {`${me.display_name} — ${classLabel(me.char_class)} (${FUNCTION_LABELS[me.char_function]})`}
               </h2>
               {/* Capture strip (owner feedback, 07.2-06 checkpoint round 2):
                   the example shot + the OCR upload box occupy ONE full-width

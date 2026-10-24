@@ -40,6 +40,7 @@ import { fetchCardPhotoByPath, type PromotionCardRow } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { portraitSrcFor } from '../assets/ClassCrest'
+import { classLabel } from '../../lib/classLabels'
 import { CardSvg } from '../cards/CardSvg'
 import { cardFilename, downloadCard, type CardExportData } from '../export/cardExport'
 
@@ -93,11 +94,15 @@ export function PromotionCard({
   // payload the card renders — values pre-formatted (formatStatValue),
   // photo = the member's submitted screenshot (blob object URL) or the
   // class portrait (self-hosted, D-15) — both same-origin, the canvas can
-  // never be tainted. CardSvg consumes the identical object.
-  const exportData: CardExportData = useMemo(
-    () => ({
+  // never be tainted. CardSvg consumes the identical object. The card's job
+  // line prints the pt-BR label (classLabels, owner decision 2026-10-23)
+  // while the KEY keeps driving the asset lookups; the monogram follows the
+  // label so the fallback letter always matches the printed name.
+  const exportData: CardExportData = useMemo(() => {
+    const jobLabel = classLabel(charClass)
+    return {
       name: card.display_name,
-      charClass,
+      charClass: jobLabel,
       charFunction: card.char_function,
       ovr: Math.round(card.ovr),
       stats: card.highlights.map((h) => ({
@@ -106,10 +111,9 @@ export function PromotionCard({
         points: h.points,
       })),
       photoSrc: photoUrl ?? portraitSrcFor(charClass),
-      monogramLetter: charClass.charAt(0).toUpperCase(),
-    }),
-    [card, charClass, photoUrl],
-  )
+      monogramLetter: jobLabel.charAt(0).toUpperCase(),
+    }
+  }, [card, charClass, photoUrl])
 
   async function handleDownload(): Promise<void> {
     setGenerating(true)
@@ -126,7 +130,7 @@ export function PromotionCard({
   return (
     <div className="flex flex-col gap-2">
       <article
-        aria-label={`${card.display_name} — ${charClass}`}
+        aria-label={`${card.display_name} — ${classLabel(charClass)}`}
         className="w-full"
       >
         {/* Round 5: the owner's card.svg IS the card — portrait 27:40 (its

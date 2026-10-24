@@ -13,6 +13,7 @@ import {
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { FUNCTION_LABELS } from '../../lib/groups'
+import { classLabel } from '../../lib/classLabels'
 import { PoringEmpty } from '../assets/PoringEmpty'
 import { ConfirmDialog } from './ConfirmDialog'
 
@@ -181,7 +182,7 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
                     #{row.char_id} · {row.nickname}
                   </p>
                   <p className="text-sm text-muted">
-                    {row.char_class} · {FUNCTION_LABELS[row.char_function]}
+                    {classLabel(row.char_class)} · {FUNCTION_LABELS[row.char_function]}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className="rounded-full border border-line px-2 py-0.5 text-xs font-semibold text-muted">
@@ -350,7 +351,7 @@ export function requestRowTitle(charId: string, nickname: string): string {
 }
 
 export function requestRowSubtitle(charClass: string, charFunction: StaffRequestRow['char_function']): string {
-  return `${charClass} · ${FUNCTION_LABELS[charFunction]}`
+  return `${classLabel(charClass)} · ${FUNCTION_LABELS[charFunction]}`
 }
 
 export function requestEmptyMessage(): string {

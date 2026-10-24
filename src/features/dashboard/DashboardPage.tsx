@@ -46,6 +46,7 @@ import { CardPhotoUpload } from './CardPhotoUpload'
 import { keyStatStripModel, priorityKeySet } from './keyStatStrip'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { portraitSrcFor } from '../assets/ClassCrest'
+import { classLabel } from '../../lib/classLabels'
 import { PoringEmpty } from '../assets/PoringEmpty'
 import { TIER_BORDER_DISPLAY } from './tierDisplay'
 import { cardFilename, downloadCard, type CardExportData } from '../export/cardExport'
@@ -154,9 +155,13 @@ export function DashboardPage({
   // button is disabled in exactly that state.
   const exportData: CardExportData | null = useMemo(() => {
     if (myCard === null || myCard.char_class === null || myCard.ovr.value === null) return null
+    // The card's job line prints the pt-BR label (classLabels, owner
+    // decision 2026-10-23); the KEY keeps driving the asset lookups, and
+    // the monogram follows the label so it always matches the print.
+    const jobLabel = classLabel(myCard.char_class)
     return {
       name: ownName,
-      charClass: myCard.char_class,
+      charClass: jobLabel,
       charFunction: myCard.char_function,
       ovr: Math.round(myCard.ovr.value),
       stats: myCard.key_stats.map((k) => ({
@@ -165,7 +170,7 @@ export function DashboardPage({
         points: k.points,
       })),
       photoSrc: photoUrl ?? portraitSrcFor(myCard.char_class),
-      monogramLetter: myCard.char_class.charAt(0).toUpperCase(),
+      monogramLetter: jobLabel.charAt(0).toUpperCase(),
     }
   }, [myCard, photoUrl, ownName])
 
