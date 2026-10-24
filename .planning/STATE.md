@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
-status: executing
-last_updated: "2026-10-24T02:36:35.994Z"
-last_activity: 2026-10-24 -- Phase 08.1 execution started
+status: ready_to_plan
+last_updated: "2026-10-24T05:35:43.228Z"
+last_activity: 2026-10-24 -- Phase 09.1 execution started
 progress:
   total_phases: 9
-  completed_phases: 5
+  completed_phases: 7
   total_plans: 40
-  completed_plans: 33
-  percent: 83
+  completed_plans: 38
+  percent: 78
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 **Core value:** Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
-**Current focus:** Phase 08.1 — the-codebase-was-deployed-to-github-and-then-to-vercel-meani
+**Current focus:** Phase 09.1 — hidden-raw-defenses-rpdef-rmdef
 
 ## Current Position
 
-Phase: 08.1 (the-codebase-was-deployed-to-github-and-then-to-vercel-meani) — EXECUTING
-Plan: 1 of 10
-Status: Executing Phase 08.1
-Last activity: 2026-10-24 -- Phase 08.1 execution started
+Phase: 10
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-24
 
 ## Accumulated Context
 
