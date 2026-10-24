@@ -30,3 +30,14 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+
+## Production release gate
+
+Run `npm run verify:deploy` after every deploy to `https://hellz-dashboard.vercel.app/`. It asserts:
+
+- the served HTML carries the hardening headers (`x-content-type-options: nosniff`, `x-frame-options: DENY`, CSP report-only with `frame-ancestors 'none'`, etc.),
+- the deployed JS bundle contains the Supabase project ref and leaks no secret (`service_role`, `sbp_`, `NEFOOT_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, no `Missing VITE_SUPABASE_URL`),
+- the `verify-pin` and `step-up` Edge Functions are reachable and answering,
+- no tracked `.env` and no `sbp_` literal in tracked non-markdown files.
+
+A `FAIL` blocks the release — do not weaken the gate to make it pass.

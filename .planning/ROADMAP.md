@@ -116,7 +116,7 @@ Cross-cutting constraints: deploy order invariant — migration 0014 (nullable `
 **Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06 (added 2026-10-23 — the original 08.1 items had no requirement IDs and three of the four claims shipped unproven; see REQUIREMENTS.md "Deployment Security Hardening")
 
 **Depends on:** Phase 8
-**Plans:** 10 plans — 08.1-01..08.1-05 executed (5/5; 08.1-05 superseded by 08.1-04 + migration 0017); 08.1-06..08.1-10 gap closure for the residual security gaps verified live on 2026-10-23
+**Plans:** 5/10 plans executed
 
 Plans:
 - [x] 08.1-01-PLAN.md — Dummy purge: purge-dummies.sql via apply-seed.mjs, zero-dummy verification (four zeros), smoke matrix re-run — Wave 1 — executed (73 dummies + 17 `smoke-idn-*` rows purged)
