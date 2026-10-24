@@ -1,5 +1,5 @@
 // ClassCrest — the D-16/D-17 class-imagery component (plan 07.2-05, ASST-01).
-// Renders the self-hosted class icon (public/assets/classes/class-icon-<slug>.png,
+// Renders the self-hosted class icon (public/assets/classes/class-icon-<slug>.webp,
 // committed per D-15) when the manifest says it exists, ELSE the D-16 neutral
 // fallback: a tasteful monogram tile (class initial, display font, surface
 // styling, tier-neutral line border). NEVER a broken image:
@@ -10,6 +10,12 @@
 //     manifest was optimistic but the committed file is absent.
 // Same-origin only (canvas-taint rule, T-072-13): the src is always a root-
 // relative '/assets/classes/...' path — never an http(s) URL.
+//
+// 2026-10-23 ROOCDB swap (owner decision): icons are the per-job Trans-2ª
+// game emblems (one per class — Rebellion included; previously the 7 shared
+// base-role icons), and portraitSrcFor exposes the per-job full-body class
+// art as the card photo placeholder (previously the three card surfaces
+// had to reuse the small icon via crestSrcFor).
 //
 // Pure presentational + decorative (aria-hidden): every consumer already
 // labels the surrounding content (section header text, card name, etc.).
@@ -26,6 +32,7 @@ interface RooFileSource {
 interface RooClassEntry {
   class_name: string
   slug: string
+  placeholder_gender?: 'male' | 'female'
   files: Record<string, RooFileSource>
 }
 
@@ -38,19 +45,47 @@ export function classSlug(charClass: string): string {
   return charClass.toLowerCase().replace(/ /g, '-')
 }
 
-/** class → '/assets/classes/class-icon-<slug>.png' for every class whose
+function hasSource(file: RooFileSource | undefined): boolean {
+  return file !== undefined && (typeof file.url === 'string' || typeof file.local === 'string')
+}
+
+/** class → '/assets/classes/class-icon-<slug>.webp' for every class whose
  *  manifest icon entry carries a source (url or local). A file that the
  *  fetcher could not place (D-16 designed-missing) has no source and gets NO
  *  entry here — those classes go straight to the monogram. */
 const ICON_SRC: ReadonlyMap<string, string> = new Map(
   CLASSES.flatMap((entry) => {
-    const file = entry.files[`class-icon-${entry.slug}.png`]
-    const hasSource = file !== undefined && (typeof file.url === 'string' || typeof file.local === 'string')
-    return hasSource
-      ? [[entry.class_name, `/assets/classes/class-icon-${entry.slug}.png`] as const]
+    const file = entry.files[`class-icon-${entry.slug}.webp`]
+    return hasSource(file)
+      ? [[entry.class_name, `/assets/classes/class-icon-${entry.slug}.webp`] as const]
       : []
   }),
 )
+
+/** The card photo placeholder (2026-10-23 owner decision): the per-job
+ *  full-body class art, gender picked by the manifest's placeholder_gender
+ *  (female for every dual-gender class; Bard=male Menestrel art,
+ *  Gypsy=female Cigana art — the jobs themselves are gender-locked).
+ *  Same manifest-driven existence rule as ICON_SRC; null → the card falls
+ *  back to its own ASST-01 monogram tile (never the small icon, which would
+ *  look broken stretched over the photo area). */
+const PORTRAIT_SRC: ReadonlyMap<string, string> = new Map(
+  CLASSES.flatMap((entry) => {
+    if (entry.placeholder_gender === undefined) return []
+    const fileName = `class-${entry.placeholder_gender === 'male' ? 'm' : 'f'}-${entry.slug}.webp`
+    return hasSource(entry.files[fileName])
+      ? [[entry.class_name, `/assets/classes/${fileName}`] as const]
+      : []
+  }),
+)
+
+/** Same-origin portrait URL for the card photo area (PromotionCard / Painel
+ *  own-card / CardPhotoUpload preview), resolved by the SAME manifest lookup
+ *  ClassCrest uses — null means the export draws the D-16 monogram tile
+ *  instead. Never returns an http(s) URL (T-072-13). */
+export function portraitSrcFor(charClass: string): string | null {
+  return PORTRAIT_SRC.get(charClass) ?? null
+}
 
 /** Same-origin crest URL for canvas export (cardExport crestSrc), resolved by
  *  the SAME manifest lookup ClassCrest renders — null means the export draws

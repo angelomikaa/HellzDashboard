@@ -66,9 +66,9 @@ const base: CardExportData = {
 
 const CASES: Array<{ tier: string; ovr: number; photo: string | null }> = [
   { tier: 'bronze', ovr: 60, photo: null }, // monogram fallback path
-  { tier: 'silver', ovr: 70, photo: '/assets/classes/class-icon-high-wizard.png' },
-  { tier: 'gold', ovr: 80, photo: '/assets/classes/class-icon-assassin-cross.png' },
-  { tier: 'platinum', ovr: 87, photo: '/assets/classes/class-icon-lord-knight.png' },
+  { tier: 'silver', ovr: 70, photo: '/assets/classes/class-f-high-wizard.webp' },
+  { tier: 'gold', ovr: 80, photo: '/assets/classes/class-f-assassin-cross.webp' },
+  { tier: 'platinum', ovr: 87, photo: '/assets/classes/class-f-lord-knight.webp' },
 ]
 
 function isWhiteish(d: Uint8ClampedArray): boolean {
@@ -690,6 +690,17 @@ async function auditMount(
   // headless virtual time never pumps frames) are enough to flush the
   // commit before measuring.
   await new Promise<void>((resolve) => setTimeout(resolve, 150))
+  // The mounted CardSvg gates its measurer on its OWN fonts effect
+  // (Promise → setState → concurrent re-render). Measured 2026-10-23: the
+  // flip occasionally lands just past the first 150ms tick — the audited
+  // DOM then still carries the pre-flip (estimate-metric) plan and every
+  // stat column reads uniformly shifted against the expected (real-metric)
+  // centers: a harness race, not a product defect (the app's own mounts
+  // self-correct on the next frame; only this synchronous audit sees the
+  // mid-flip state). Await the (settled) fonts.ready plus one more commit
+  // tick so the audited DOM is always the post-flip plan.
+  await document.fonts.ready
+  await new Promise<void>((resolve) => setTimeout(resolve, 60))
   void fetch(`/__progress?audit=w${width}`, { method: 'POST', body: 'mounted' }).catch(() => {})
 
   const svg = host.querySelector('svg')
@@ -762,7 +773,7 @@ async function auditOnPage(): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {}
   // The showcase-data case (short name) and a stress case (long name — the
   // clamp path) at TWO display widths each.
-  const showcase: CardExportData = { ...base, ovr: 87, photoSrc: '/assets/classes/class-icon-lord-knight.png' }
+  const showcase: CardExportData = { ...base, ovr: 87, photoSrc: '/assets/classes/class-f-lord-knight.webp' }
   const stress: CardExportData = {
     ...showcase,
     name: 'Alexander von Hohenzollern-Sigmaringen',

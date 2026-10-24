@@ -38,7 +38,7 @@ import {
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { formatStatValue } from '../../lib/parseStatValue'
-import { crestSrcFor } from '../assets/ClassCrest'
+import { portraitSrcFor } from '../assets/ClassCrest'
 import { CardSvg } from '../cards/CardSvg'
 import type { CardExportData } from '../export/cardExport'
 
@@ -246,7 +246,7 @@ export function CardPhotoUpload({
             value: k.own_value === null ? '—' : formatStatValue(k.own_value, k.value_type),
             points: k.points,
           })),
-          photoSrc: photoUrl ?? crestSrcFor(card.char_class),
+          photoSrc: photoUrl ?? portraitSrcFor(card.char_class),
           monogramLetter: card.char_class.charAt(0).toUpperCase(),
         }
       : null

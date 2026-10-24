@@ -65,7 +65,7 @@ const data: CardExportData = {
     { label_short: 'PAT', value: '2.345', points: 12 },
     { label_short: 'SPM', value: '67,8%', points: 88 },
   ],
-  photoSrc: '/assets/classes/class-icon-assassin-cross.png',
+  photoSrc: '/assets/classes/class-f-assassin-cross.webp',
   monogramLetter: 'A',
 }
 
@@ -296,7 +296,7 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     expect(plan.photo.kind).toBe('image')
     if (plan.photo.kind === 'image') {
-      expect(plan.photo.src).toBe('/assets/classes/class-icon-assassin-cross.png')
+      expect(plan.photo.src).toBe('/assets/classes/class-f-assassin-cross.webp')
     }
   })
 

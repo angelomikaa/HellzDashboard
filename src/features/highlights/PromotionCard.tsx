@@ -39,7 +39,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchCardPhotoByPath, type PromotionCardRow } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { formatStatValue } from '../../lib/parseStatValue'
-import { crestSrcFor } from '../assets/ClassCrest'
+import { portraitSrcFor } from '../assets/ClassCrest'
 import { CardSvg } from '../cards/CardSvg'
 import { cardFilename, downloadCard, type CardExportData } from '../export/cardExport'
 
@@ -105,7 +105,7 @@ export function PromotionCard({
         value: formatStatValue(h.value, h.value_type),
         points: h.points,
       })),
-      photoSrc: photoUrl ?? crestSrcFor(charClass),
+      photoSrc: photoUrl ?? portraitSrcFor(charClass),
       monogramLetter: charClass.charAt(0).toUpperCase(),
     }),
     [card, charClass, photoUrl],

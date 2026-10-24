@@ -45,7 +45,7 @@ import { CollapsibleGroup } from './CollapsibleGroup'
 import { CardPhotoUpload } from './CardPhotoUpload'
 import { keyStatStripModel, priorityKeySet } from './keyStatStrip'
 import { formatStatValue } from '../../lib/parseStatValue'
-import { crestSrcFor } from '../assets/ClassCrest'
+import { portraitSrcFor } from '../assets/ClassCrest'
 import { TIER_BORDER_DISPLAY } from './tierDisplay'
 import { cardFilename, downloadCard, type CardExportData } from '../export/cardExport'
 
@@ -104,7 +104,7 @@ export function DashboardPage({
       // The member's stored screenshot for the download's photo area —
       // BLOB → object URL (T-072-13: never a cross-origin URL, the export
       // canvas can never be tainted). Any failure degrades to the class
-      // portrait via crestSrcFor.
+      // portrait via portraitSrcFor.
       fetchCardPhoto(session).catch(() => null),
     ])
       .then(([r, card, photoBlob]) => {
@@ -163,7 +163,7 @@ export function DashboardPage({
         value: k.own_value === null ? '—' : formatStatValue(k.own_value, k.value_type),
         points: k.points,
       })),
-      photoSrc: photoUrl ?? crestSrcFor(myCard.char_class),
+      photoSrc: photoUrl ?? portraitSrcFor(myCard.char_class),
       monogramLetter: myCard.char_class.charAt(0).toUpperCase(),
     }
   }, [myCard, photoUrl, ownName])
@@ -211,7 +211,7 @@ export function DashboardPage({
       ) : report === null ? (
         <p className="text-base text-muted">Carregando…</p>
       ) : report.stats.every((s) => s.own_value === null) ? (
-        <section className="rounded-lg border border-line bg-surface p-6 text-center">
+        <section className="rounded-lg border border-line bg-surface p-6">
           <h2 className="text-xl font-semibold text-content">{EMPTY_TITLE}</h2>
           <p className="mt-2 text-base text-muted">{EMPTY_BODY}</p>
           <button
