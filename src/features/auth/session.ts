@@ -61,22 +61,19 @@ export function isExpired(s: NeoFootSession): boolean {
 }
 
 // D-17: client-side device fingerprint (SHA-256 of navigator.userAgent).
-// Computed once per page load; sent as X-Device-Fingerprint on every API
-// request so the server can enforce session-device binding.
+// Must be byte-identical to the server counterpart:
+// supabase/functions/_shared/device.ts (computeDeviceFingerprint).
+// Memoized once per page load so the hash is not recomputed per request.
+let clientDeviceFpCache: string | null = null
+
 export async function computeDeviceFingerprintClient(): Promise<string> {
+  if (clientDeviceFpCache !== null) return clientDeviceFpCache
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
   const buf = new TextEncoder().encode(ua)
   const hash = await crypto.subtle.digest('SHA-256', buf)
   const hex = Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
+  clientDeviceFpCache = hex
   return hex
-}
-
-// D-17: returns true when the session's device_fp matches the current
-// device fingerprint (or when deviceFp is absent — backward compatible with
-// pre-binding sessions). Used by api.ts to decide whether to re-auth.
-export function isDeviceBound(session: NeoFootSession, currentFp: string): boolean {
-  if (!session.deviceFp) return true // pre-binding session, no enforcement yet
-  return session.deviceFp === currentFp
 }

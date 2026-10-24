@@ -23,6 +23,7 @@ import {
   errorMessage,
   json,
   mintSession,
+  deviceFingerprintFromRequest,
   proofByteLength,
   rowToState,
 } from '../_shared/session.ts'
@@ -279,11 +280,14 @@ Deno.serve(async (req: Request) => {
 
   let session
   try {
-    session = await mintSession({
-      id: claimed.member_id,
-      display_name: claimed.display_name ?? member.display_name,
-      role: claimed.role ?? member.role,
-    })
+    session = await mintSession(
+      {
+        id: claimed.member_id,
+        display_name: claimed.display_name ?? member.display_name,
+        role: claimed.role ?? member.role,
+      },
+      await deviceFingerprintFromRequest(req),
+    )
   } catch {
     return json({ error: 'server_error' }, 500)
   }

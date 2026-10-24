@@ -35,22 +35,9 @@ export function rowToState(
 
 export const SESSION_SECONDS = 7 * 24 * 60 * 60 // D-06: 7-day session
 
-// D-17: device fingerprint = SHA-256(user agent + IP). Bound to the JWT at
-// login; invalidated on mismatch (requires re-login).
-export async function computeDeviceFingerprint(
-  ua: string | null,
-  ip: string | null,
-): Promise<string> {
-  const input = ((ua ?? '') + '|' + (ip ?? '')).trim()
-  const buf = new TextEncoder().encode(input)
-  const hash = await crypto.subtle.digest('SHA-256', buf)
-  const hex = Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-  return hex
-}
-
-export const DEVICE_FP_CLAIM = 'device_fp'
+// Device fingerprint + claim live in ./device.ts (single source of truth, 08.1-08).
+// Re-exported here so every importer keeps working unchanged.
+export { DEVICE_FP_CLAIM, computeDeviceFingerprint } from './device.ts'
 
 export interface EnvConfig {
   supabaseUrl: string

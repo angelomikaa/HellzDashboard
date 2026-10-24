@@ -16,7 +16,7 @@ import {
   envConfig,
   json,
   mintSession,
-  computeDeviceFingerprint,
+  deviceFingerprintFromRequest,
   rowToState,
 } from '../_shared/session.ts'
 import {
@@ -194,11 +194,11 @@ Deno.serve(async (req: Request) => {
 
   // Mint the 7-day custom-claim JWT (D-06) through the shared module — the exact
   // same block setup-pin uses, so both functions return an identical session.
-  // D-17: bind device fingerprint (user agent + IP) to the JWT so a stolen
-  // session is invalidated from a different device.
-  const ua = req.headers.get('user-agent') ?? null
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
-  const deviceFp = await computeDeviceFingerprint(ua, ip)
+  // D-17: bind device fingerprint (User-Agent only) to the JWT so a stolen
+  // session is invalidated from a different device. IP is excluded — the
+  // browser cannot read its public IP, so an IP-derived value can never match
+  // the client and breaks on mobile networks.
+  const deviceFp = await deviceFingerprintFromRequest(req)
 
   let session
   try {
