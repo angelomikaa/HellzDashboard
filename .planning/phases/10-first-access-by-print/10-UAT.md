@@ -3,24 +3,25 @@ status: testing
 phase: 10-first-access-by-print
 source: [10-01-SUMMARY.md, 10-02-SUMMARY.md, 10-03-SUMMARY.md]
 started: 2026-10-24T04:00:00Z
-updated: 2026-10-24T04:00:00Z
+updated: 2026-10-24T22:30:00Z
 ---
 
 ## Current Test
 <!-- OVERWRITE each test - shows where we are -->
 
-number: 8
-name: Slider keyboard navigation
+number: 9
+name: Slider swipe navigation
 expected: |
-  Clicking/tabbing into the slider and pressing ArrowLeft/ArrowRight scrolls
-  exactly one card per keypress (page itself does not scroll).
+  On a touch device (or touch emulation), swiping left/right on the slider
+  scrolls one card in the swipe direction.
 awaiting: user response
 
 ## Tests
 
 ### 1. Início tab in navigation
-expected: After logging in, the nav bar shows an "Início" tab between "Painel" and "Enviar Status". Clicking it opens the personalized home page.
+expected: After logging in, the nav bar shows "Painel | Início | Enviar Status" (no standalone Destaques tab), with Início active by default. Clicking Painel opens the detailed dashboard.
 result: pass
+note: 2026-10-24 owner correction — Início is the landing page and the default tab; Destaques was absorbed into it.
 
 ### 2. Own OVR card on Início
 expected: The Início page shows your own OVR card (the same OvrHero style as Painel): OVR number with tier color (or the insufficient-data explanation), your name, and your class · function line.
@@ -42,31 +43,51 @@ result: pass
 expected: With data validated 7 days ago or less, no banner appears between the OVR card and the best-stats strip.
 result: pass
 
-### 7. Destaques scroll-snap slider
-expected: Destaques renders each class's Impecável cards in a horizontal sideways-scrolling slider — one card per view at mobile width, three visible per view on desktop (lg).
+### 7. Início scroll-snap slider
+expected: Início renders each class's Impecável cards in a horizontal sideways-scrolling slider — one card per view at mobile width, three visible per view on desktop (lg). The slider renders for visitors and members alike.
 result: pass
-note: First attempt blanked the whole UI (G-1). After the hook-order fix + page error boundary, re-tested clean.
+note: First attempt blanked the whole UI (G-1). After the hook-order fix + page error boundary, re-tested clean. Re-verified on the public landing after the Início/Destaques merge.
 
 ### 8. Slider keyboard navigation
 expected: Clicking/tabbing into the slider and pressing ArrowLeft/ArrowRight scrolls exactly one card per keypress (page itself does not scroll).
-result: issue
+result: pass
 report: "nope, it looks static - shoud look like a carousel, with the middle card being in the spotlight"
-note: Root cause fixed (G-2) — re-test pending.
+note: Root cause fixed (G-2). Live re-test: next-arrow centers card 2 (scrollLeft 336 → 672, spotlight follows), ArrowRight centers the last card with the page not scrolling, next disabled at the end. The carousel component is unchanged by the Início merge.
 
 ### 9. Slider swipe navigation
 expected: On a touch device (or touch emulation), swiping left/right on the slider scrolls one card in the swipe direction.
 result: [pending]
 
-### 10. Server order + members-only unchanged
-expected: The slider shows cards in the same server order as before (no re-sorting), and Destaques still requires login — a logged-out visitor sees nothing.
-result: [pending]
+### 10. Server order + public showcase
+expected: The slider shows cards in the same server order as before (no re-sorting). The showcase is now PUBLIC: a logged-out visitor sees the Impecáveis cards (name, class, OVR, 6 key stats, photo) on Início, and the anon RPC never returns key-stat config.
+result: pass
+note: anon `get_promotion_public` → 200, 1 section / 3 cards, field census exactly {display_name, char_function, ovr, photo_path, highlights{stat_key,label,label_short,value_type,value,points}}; no weight/selection_order/is_key strings in the payload. Anon `get_promotion` still 401.
+
+### 11. Public landing (visitor)
+expected: Opening the site without a session lands on Início with the Hellz header (Solicitar acesso + Entrar) and the Impecáveis showcase; no personal OVR/top-3/CTA blocks.
+result: pass
+note: Verified in a cleared-storage browser tab.
+
+### 12. Member landing (after login)
+expected: After login the default tab is Início, showing the personal OVR card + top-3 strip above the same showcase; the Destaques tab is gone.
+result: pass
+note: Verified live as the Smoke Sumo Um fixture (OVR 97, top-3 FLEE/Recuperação de SP/Refino MDEF).
+
+### 13. Logout returns to the landing
+expected: Clicking Sair (or an expired session) returns to the public Início, not the login card; Entrar reopens the login.
+result: pass
+
+### 14. Showcase photos
+expected: Cards show the member's submitted screenshot where one exists and fall back to the class portrait otherwise (no broken image); the photo loads without a session.
+result: pass
+note: `photo_path` restored on both RPCs (0026 regression). Anon storage GET → 200 for an active member's object, 404/400 for missing objects → portrait fallback.
 
 ## Summary
 
-total: 10
-passed: 7
-issues: 1
-pending: 2
+total: 14
+passed: 13
+issues: 0
+pending: 1
 skipped: 0
 blocked: 0
 
@@ -133,4 +154,33 @@ verification: live in the browser as a smoke fixture — scrollWidth 1756 >
   672, spotlight follows), ArrowRight centers the last card with the page not
   scrolling, next disabled at the end. tsc clean; oxlint 0 errors; 670/670
   vitest; vite build green.
-status: fixed — awaiting re-test of test 8
+status: fixed — re-tested PASS (test 8)
+
+## Scope correction (owner, 2026-10-24)
+
+report: "the original planning messed up things. Destaques and Inicio were
+  supposed to be the same page - a page that can be seen when a visitor
+  arrives and also visible to logged in users - this is why its called inicio,
+  its a landing page. the tab destaques is follow the right direction, the
+  current tab inicio is pointless"
+
+decision: full public showcase (name, class, OVR, 6 key stats, photo) + ONE
+  Início tab (owner answers to the two boundary questions).
+
+shipped: |
+  - Migration 0029 (scripts/gen-0029.mjs, generated from the live prosrc):
+    get_promotion_public() (anon grant, member gate removed) +
+    is_public_card_photo() storage predicate + anon SELECT policy on
+    card-photos for ACTIVE members; photo_path restored on BOTH showcase RPCs
+    (0026 regression: the hand-written hotfix had dropped it).
+  - InicioPage is the landing: PersonalHome (session only) + PromotionShowcase
+    (everyone). HighlightsPage deleted; PromotionCard/HighlightsCarousel are
+    session-free and fetch photos with the anon key.
+  - App: 'destaques' removed from Tab/nav, default tab 'inicio'.
+  - RequireAuth: new 'landing' default view (PublicLanding shell); logout and
+    expired sessions return there; LoginPage gained "← Voltar para o início".
+
+verification: anon RPC 200 with the closed field census; anon storage 200 for
+  an active member photo; member get_promotion still gated; live browser:
+  visitor landing + member landing + logout-to-landing + photo render.
+  tsc clean; oxlint 0 errors; 670/670 vitest; vite build green.

@@ -66,3 +66,23 @@
 
 - Public visitor homepage — explicitly deferred (owner decision 2026-10-20)
 - Animation/skeleton work outside Phase 10 — 07.1 D-05 static-only remains in force for all other phases
+
+---
+
+## Owner correction — 2026-10-24 (UAT round 2): Início IS the landing page
+
+**User:** "the original planning messed up things. Destaques and Inicio were supposed to be the same page - a page that can be seen when a visitor arrives and also visible to logged in users - this is why its called inicio, its a landing page. the tab destaques is follow the right direction, the current tab inicio is pointless"
+
+| Question | Choice |
+|----------|--------|
+| Who sees the landing page? | **Yes — full public showcase**: name, class, OVR, 6 key stats and photo visible to anonymous visitors; Entrar CTA for personal data. Requires an anon-callable server read path. |
+| Tab structure | **One tab**: Início absorbs Destaques (personal blocks for members + showcase for everyone); the Destaques tab is removed. |
+
+**Decisions captured:**
+- D-10-04-1: Início is the single landing page and the app's default tab; `'destaques'` leaves the `Tab` union and the nav.
+- D-10-04-2: the showcase is public — migration 0029 adds `get_promotion_public()` (same body as `get_promotion`, member gate removed, anon grant) and a storage predicate (`is_public_card_photo`) granting anon read of ACTIVE members' `card-photos` objects. Key-stat config remains unserialised.
+- D-10-04-3: logout / expired session / first visit all land on the public Início, not the login card.
+- D-10-04-4: 0026 regression fixed — `photo_path` restored on both showcase RPCs, so cards show the member's submitted screenshot again (fallback: class portrait).
+- D-10-04-5: `HighlightsPage` is deleted; `PromotionShowcase` is the one showcase tree rendered in both states.
+
+**Supersedes:** the 2026-10-20 "public visitor homepage deferred" decision (recorded above under Deferred Ideas).

@@ -182,21 +182,22 @@ Plans:
 **UI hint**: yes
 
 ### Phase 10: Personalized Home Landing Tab
-**Goal**: Login lands players on a personalized home — their own OVR and best stats at a glance, with a clear nudge when their data is stale — while Destaques keeps the guild-wide EAFC celebration.
+**Goal**: Início is the guild LANDING page — a visitor who is not logged in sees the Impecáveis showcase and can Entrar/Solicitar acesso; after login the same page adds the member's own OVR and best stats with a stale-data nudge. One page, two audiences (owner correction 2026-10-24).
 **Depends on**: Phase 9 (`my_report` gains `last_validated_at` in migration 0014 — shipped there, consumed here)
 **Requirements**: HOME-01, HOME-02, SHWC-01
 **Success Criteria** (what must be TRUE):
-  1. After login, members land on a new Início tab showing their own OVR card (reused OvrHero) and a top-3 best-stats strip (value + points + tier badge), sorted client-side from fields the payload already returns
+  1. After login, members land on Início showing their own OVR card (reused OvrHero) and a top-3 best-stats strip (value + points + tier badge), sorted client-side from fields the payload already returns
   2. A member more than 7 days since their last validated submission sees a stale-data CTA navigating to Enviar Status; a member who never submitted sees the evergreen first-submission variant; a member with fresh data sees no banner — the strictly-greater-than-7-days boundary is locked in a test
-  3. The home tab shows only the player's own data — Destaques keeps the guild-wide EAFC cards and the aggregates-only discipline is unchanged
-  4. (Owner feedback 2026-10-20) Destaques promo cards render in a premium scroll-snap slider (1-up mobile, 3-up desktop, keyboard + swipe reachable, server order preserved); access stays members-only — the public visitor-homepage idea is explicitly deferred (owner decision 2026-10-20)
-**Plans**: 3/3 plans (see `.planning/phases/10-first-access-by-print/`)
+  3. The personal blocks show only the player's own data; the showcase below them keeps the guild-wide EAFC cards and the aggregates-only discipline is unchanged
+  4. Início promo cards render in a premium scroll-snap slider (1-up mobile, 3-up desktop, keyboard + swipe reachable, server order preserved). Início is PUBLIC: a visitor without a session sees the same showcase via the anon-callable `get_promotion_public()` (migration 0029) plus an Entrar CTA; the standalone Destaques tab is removed (owner correction 2026-10-24, reversing the 2026-10-20 deferral)
+**Plans**: 3/3 plans + owner-correction rework (see `.planning/phases/10-first-access-by-print/`)
 Plans:
 - [ ] 10-01-PLAN.md — Início tab shell + MyReport last_validated_at + InicioPage skeleton — Wave 1
 - [ ] 10-02-PLAN.md — Stale-data CTA + top-3 best-stats strip + boundary tests — Wave 2
 - [ ] 10-03-PLAN.md — Destaques scroll-snap slider + keyboard + swipe (SHWC-01) — Wave 1
+- [ ] 10-04-REWORK (owner correction 2026-10-24) — Início absorbs Destaques; public landing via 0029 (`get_promotion_public` + anon card-photos read); default tab Início; photo_path restored (0026 regression)
 
-Cross-cutting constraints: no router library — `'inicio'` joins the existing `App.tsx` Tab union pattern; no date library — epoch-diff arithmetic on the ISO string; no client-side points recomputation (AGENTS.md non-negotiable); the slider is CSS scroll-snap only (no new npm dependency, no autoplay — 07.1 D-05 static-only rule).
+Cross-cutting constraints: no router library — `'inicio'` joins the existing `App.tsx` Tab union pattern; no date library — epoch-diff arithmetic on the ISO string; no client-side points recomputation (AGENTS.md non-negotiable); the slider is CSS scroll-snap only (no new npm dependency, no autoplay — 07.1 D-05 static-only rule); the public showcase is server-enforced (anon grant on one closed-field RPC + one storage predicate) — never UI-only gating.
 **UI hint**: yes
 
 ## Progress

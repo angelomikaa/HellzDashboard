@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Phase 10 delivers the Personalized Home Landing Tab ("Início"): after login, members land on a new Início tab showing their own OVR card (reused OvrHero) and a top-3 best-stats strip (value + points + tier badge), sorted client-side from `my_report` stats. A stale-data CTA appears when data is strictly >7 days old (navigating to Enviar Status); members who never submitted see an evergreen first-submission variant; fresh data shows no banner. Destaques stays members-only (public visitor homepage explicitly deferred) but converts from a CSS grid to a premium scroll-snap slider (1-up mobile, 3-up desktop at `lg`, keyboard + swipe reachable, server order preserved).
+Phase 10 delivers the guild LANDING page ("Início") — one page for two audiences (owner correction 2026-10-24, superseding the original "personalized tab + separate Destaques tab" split). A visitor without a session opens the site on Início and sees the Impecáveis showcase (anon-callable `get_promotion_public`, migration 0029) plus Entrar/Solicitar acesso; after login the same page adds the member's own OVR card (reused OvrHero) and a top-3 best-stats strip (value + points + tier badge) sorted client-side from `my_report` stats. A stale-data CTA appears when data is strictly >7 days old (navigating to Enviar Status); members who never submitted see an evergreen first-submission variant; fresh data shows no banner. The showcase is a premium scroll-snap slider (1-up mobile, 3-up desktop at `lg`, keyboard + swipe reachable, server order preserved) rendered identically for visitors and members; the standalone Destaques tab is removed.
 
 Scope anchor from ROADMAP.md: requirements HOME-01, HOME-02, SHWC-01. Constraints: no router library — `'inicio'` joins the existing `Tab` union pattern; no date library — epoch-diff arithmetic on the ISO string; no client-side points recomputation (AGENTS.md non-negotiable); CSS scroll-snap only, no autoplay.
 </domain>
@@ -94,7 +94,7 @@ Downstream agents MUST read these before planning or implementing.
 <deferred>
 ## Deferred Ideas
 
-- Public visitor homepage — explicitly deferred (owner decision 2026-10-20). Destaques stays members-only; slider conversion is members-only too.
+- ~~Public visitor homepage~~ — NO LONGER DEFERRED. Owner correction 2026-10-24 ("Destaques and Inicio were supposed to be the same page … this is why its called inicio, its a landing page") reverses the 2026-10-20 deferral. Shipped in the 10-04 rework: `get_promotion_public()` (0029, anon grant, closed field list) + a storage predicate granting anon read of ACTIVE members' `card-photos` objects; the Destaques tab is removed and Início is the default tab for everyone.
 - Animation/skeleton work outside Phase 10 (07.1 D-05 static-only remains in force for all other phases).
 
 </deferred>

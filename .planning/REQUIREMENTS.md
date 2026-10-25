@@ -28,10 +28,10 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 
 ### Personalized Home
 
-- [ ] **HOME-01**: After login, members land on a new Início tab showing their own OVR card (reused OvrHero) and a top-3 best-stats strip (value + points + tier badge)
+- [ ] **HOME-01**: Início is the default landing tab: after login, members see their own OVR card (reused OvrHero) and a top-3 best-stats strip (value + points + tier badge); visitors without a session see the same page with the public showcase and an Entrar CTA
 - [ ] **HOME-02**: Members with more than 7 days since their last validated submission see a stale-data CTA navigating to Enviar Status; members who never submitted see an evergreen first-submission variant; fresh data shows no banner
 - [ ] **HOME-03**: `my_report` gains only `last_validated_at` — closed-payload discipline holds (zero new per-stat fields, zero key-stat hints)
-- [ ] **SHWC-01** (owner feedback 2026-10-20): Destaques renders its promo cards as a premium scroll-snap slider (1-up mobile, 3-up desktop, keyboard + swipe reachable) — members-only access stays unchanged for now (public visitor homepage explicitly deferred)
+- [ ] **SHWC-01** (owner feedback 2026-10-20; amended 2026-10-24): Início renders the promo cards as a premium scroll-snap slider (1-up mobile, 3-up desktop, keyboard + swipe reachable, server order preserved). The showcase is PUBLIC — anon-callable `get_promotion_public()` + anon read of active members' card photos (migration 0029); the standalone Destaques tab is removed and Início is the landing page
 
 ### Unified Key/Relevant Selection
 
