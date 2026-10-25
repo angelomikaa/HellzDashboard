@@ -86,3 +86,14 @@
 - D-10-04-5: `HighlightsPage` is deleted; `PromotionShowcase` is the one showcase tree rendered in both states.
 
 **Supersedes:** the 2026-10-20 "public visitor homepage deferred" decision (recorded above under Deferred Ideas).
+
+---
+
+## Owner correction — 2026-10-24 (UAT round 2, showcase): the carousel must loop
+
+**User:** "lets make it round - the current carousel is like a straight line, if im in the first card, i can see empty space to the left. the behavior should look like a loop, currently it has a beggining and an end"
+
+**Decisions captured:**
+- D-10-04-6: the showcase row is an endless loop, not a bounded strip. It renders the server-ordered list three times, starts on the middle copy and silently re-centres there after the scroll settles, so the first card always shows the last one peeking in from the left and the last shows the first on the right. Outer copies are `inert`/`aria-hidden` duplicates; the spotlight is keyed by logical index so the seam jump is invisible (no class/transition change).
+- D-10-04-7: arrows and ← →/Home/End never disable and never reach a physical end (except a single-card section); manual flings to either end normalise back into the middle copy. No autoplay — 07.1 D-05 still holds.
+- D-10-04-8: the public photo fetch is memoised per storage path (one network request per member) because the loop renders each card three times.

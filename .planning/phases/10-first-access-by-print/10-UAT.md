@@ -46,13 +46,13 @@ result: pass
 ### 7. Início scroll-snap slider
 expected: Início renders each class's Impecável cards in a horizontal sideways-scrolling slider — one card per view at mobile width, three visible per view on desktop (lg). The slider renders for visitors and members alike.
 result: pass
-note: First attempt blanked the whole UI (G-1). After the hook-order fix + page error boundary, re-tested clean. Re-verified on the public landing after the Início/Destaques merge.
+note: First attempt blanked the whole UI (G-1). After the hook-order fix + page error boundary, re-tested clean. Re-verified on the public landing after the Início/Destaques merge, and again after the loop rework (G-3).
 
 ### 8. Slider keyboard navigation
 expected: Clicking/tabbing into the slider and pressing ArrowLeft/ArrowRight scrolls exactly one card per keypress (page itself does not scroll).
 result: pass
 report: "nope, it looks static - shoud look like a carousel, with the middle card being in the spotlight"
-note: Root cause fixed (G-2). Live re-test: next-arrow centers card 2 (scrollLeft 336 → 672, spotlight follows), ArrowRight centers the last card with the page not scrolling, next disabled at the end. The carousel component is unchanged by the Início merge.
+note: Root cause fixed (G-2). Live re-test: next-arrow centers card 2 (scrollLeft 336 → 672, spotlight follows), ArrowRight centers the last card with the page not scrolling. The carousel component is unchanged by the Início merge. G-3 made the row loop, so the arrows no longer disable at the ends and ArrowRight past the last card wraps to the first (verified live: scrollLeft stays inside the middle copy, 1008..1680).
 
 ### 9. Slider swipe navigation
 expected: On a touch device (or touch emulation), swiping left/right on the slider scrolls one card in the swipe direction.
@@ -155,6 +155,44 @@ verification: live in the browser as a smoke fixture — scrollWidth 1756 >
   scrolling, next disabled at the end. tsc clean; oxlint 0 errors; 670/670
   vitest; vite build green.
 status: fixed — re-tested PASS (test 8)
+
+### G-3 (test 8, round 2): the carousel was a straight line
+
+report: "lets make it round - the current carousel is like a straight line, if
+  im in the first card, i can see empty space to the left. the behavior should
+  look like a loop, currently it has a beggining and an end"
+
+root_cause: |
+  The row was a single copy of the list with edge padding: the first card
+  could be centered but had nothing to its left (only padding), the last had
+  nothing to its right, and the arrows disabled at both ends. There was no
+  wrap-around, so the "loop" the owner expected never existed.
+
+fix: |
+  - Render the server-ordered list THREE times when there is more than one
+    card, start on the middle copy (layout effect, before paint), and silently
+    jump by whole copies back onto the middle copy once the scroll settles
+    (`loopIndex`, new pure helper + 5 unit tests). The outer copies are
+    `inert` + `aria-hidden` duplicates; they exist only so a centered card
+    always has a real neighbour on both sides.
+  - The spotlight is keyed by LOGICAL index (slot % card count), shared by all
+    three copies, so the invisible jump changes no class and fires no
+    transition (no scale/opacity pop at the seam).
+  - Arrows/← →/Home/End always navigate from the middle copy and never disable
+    (except a single-card section); held keys and rapid presses cannot walk
+    into a physical end, and a manual fling to either end normalises back.
+  - `fetchCardPhotoByPathPublic` now shares one promise per storage path, so
+    the three copies still download each photo once (measured: 3 requests for
+    9 rendered cards).
+
+verification: live on the public landing — 9 slots / 6 clones, initial
+  scrollLeft 1008 (middle copy, "1 de 3" centered) with the last card visible
+  to its left; prev wraps to the middle last card (scrollLeft 1680, spotlight
+  logical 2); next past the last wraps to the first; 7 rapid ArrowRight presses
+  and manual scrolls to 0 / max both settle inside the middle copy; Home/End
+  land on the middle first/last. tsc clean; oxlint 0 errors; 675/675 vitest
+  (44 files); vite build green.
+status: fixed — live-verified; test 9 (touch swipe) still pending
 
 ## Scope correction (owner, 2026-10-24)
 
