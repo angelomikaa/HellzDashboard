@@ -19,29 +19,34 @@ awaiting: user response
 ## Tests
 
 ### 1. Início tab in navigation
-expected: After logging in, the nav bar shows "Painel | Início | Enviar Status" (no standalone Destaques tab), with Início active by default. Clicking Painel opens the detailed dashboard.
+expected: After logging in, the nav bar shows "Início | Painel | Enviar Status" (Início LEFTMOST, no standalone Destaques tab), with PAINEL active by default — the owner (round 9): "the panel is the first screen the user sees when logged in, meaning he starts navigation on the second tab, not the first one". Clicking Painel opens the detailed dashboard; Início is the showcase landing.
 result: pass
-note: 2026-10-24 owner correction — Início is the landing page and the default tab; Destaques was absorbed into it.
+note: 2026-10-24 owner correction — Início is the landing page, Destaques absorbed. 2026-10-25 owner correction (round 9) — Início moved LEFTMOST and the default tab became Painel; live-verified with an officer session (nav order Início→Painel→Enviar Status→staff tabs, aria-current on Painel).
 
 ### 2. Own OVR card on Início
 expected: The Início page shows your own OVR card (the same OvrHero style as Painel): OVR number with tier color (or the insufficient-data explanation), your name, and your class · function line.
 result: pass
+note: SUPERSEDED 2026-10-25 (round 9, G-10): the owner removed the personal blocks from Início ("the inicio page when logged in show a few stats over the carousel, but they are redundant"). Início is the showcase only; the own OVR card lives in Painel. This test now belongs to the Painel surface.
 
 ### 3. Top-3 best-stats strip
 expected: Below the OVR card, up to 3 of your best stats appear as tiles — stat label, formatted value (pt-BR, % where percentual), raw points number in the tier color — highest points first.
 result: pass
+note: SUPERSEDED 2026-10-25 (round 9, G-10): removed from Início with the rest of PersonalHome (redundant over the carousel).
 
 ### 4. Stale-data CTA (>7 days)
 expected: When your last validated submission is more than 7 days old, a banner appears: "Seus dados estão desatualizados — envie um novo status para manter seu ranking em dia." with an "Enviar Status" button that opens the submit wizard.
 result: pass
+note: SUPERSEDED 2026-10-25 (round 9, G-10): the Início CTA banners were removed with PersonalHome. The stale-data UX now lives in Painel only.
 
 ### 5. First-submission variant (never submitted)
 expected: An account that never submitted sees the evergreen banner: "Envie seus status para ver seu OVR e seus melhores stats." with the same "Enviar Status" button.
 result: pass
+note: SUPERSEDED 2026-10-25 (round 9, G-10): removed from Início with PersonalHome.
 
 ### 6. Fresh data shows no banner
 expected: With data validated 7 days ago or less, no banner appears between the OVR card and the best-stats strip.
 result: pass
+note: SUPERSEDED 2026-10-25 (round 9, G-10): moot on Início — the whole personal block is gone.
 
 ### 7. Início scroll-snap slider
 expected: Início renders each class's Impecável cards in a horizontal sideways-scrolling slider — one card per view at mobile width, three visible per view on desktop (lg). The slider renders for visitors and members alike.
@@ -464,6 +469,51 @@ verification: card-render-check ALL GATES PASS — svgDiffRatio 0 AND
   upload renders the screenshot path (y == window top, width == window
   width). tsc clean; oxlint 0 errors.
 status: fixed — harness-verified + live-verified (commit 0aa2184)
+
+### G-10 (round 9): redundant Início stats, nav order, and blind validation checks
+
+report: "now, the inicio page when logged in show a few stats over the
+  carousel, but they are redundant - lets remove it. Also the inicio tab
+  must be leftmost of the panel, even though the panel is the first screen
+  the user sees when logged in, meaning he starts navigation on the second
+  tab, not the first one. lastly, we need a quick notification system to
+  ping officers when validations are necessary, currently they need to
+  blindly check the tab to see if something new arrived"
+
+fix: |
+  - Início is the Impecáveis showcase ONLY: PersonalHome (own OVR card,
+    top-3 best stats, stale/first CTAs, the my_report fetch and its
+    skeletons) is deleted — InicioPage renders PromotionShowcase for
+    members and visitors alike (UAT tests 2-6 superseded). This also
+    removes the aliased-narrowing pattern the Vercel TS fix had to guard.
+  - Nav order Início | Painel | Enviar Status | (staff tabs), Início
+    LEFTMOST, and the default tab after login is PAINEL — the owner's
+    "starts navigation on the second tab".
+  - Officer notification badge on the Validações tab: migration 0030 adds
+    pending_validation_count() (SECURITY DEFINER, officer/owner gate
+    verbatim, two integers mirroring the officer_queue and
+    staff_identity_queue cohorts EXACTLY — polls never drag payloads).
+    usePendingValidations polls every 60s + on window focus; the ValidacoesTab
+    button shows a pulsing count pill (both queues summed, "9+" past nine,
+    aria-label carries the number; animate-pulse dies under
+    prefers-reduced-motion). Members get 'forbidden' → null → no badge, no
+    poll.
+
+verification: 0030 applied live via the Management API path + bookkeeping
+  row (function SECURITY DEFINER; authenticated granted, anon refused;
+  direct-SQL parity matches). Live E2E with a temporarily elevated smoke
+  fixture (smoke-bio-01 → officer, reverted after; the bio fixtures were
+  re-seeded with the shared known PIN): login lands on PAINEL with Início
+  leftmost (aria-current on Painel); with 1 pending submission inserted the
+  badge renders "Validações — 1 pendente" (pill 1, pulse) and the tab lists
+  exactly that row ("Smoke Criador Dois"); after teardown the badge clears.
+  Member JWT probe: pending_validation_count answers 'forbidden' (HTTP 400
+  P0001). A REAL officer adjudicated (rejected) one of the test rows
+  mid-verification — the queue was being watched live. Início as a logged-in
+  officer starts at "Os Impecáveis da Hellz" with no personal blocks.
+  tsc clean; oxlint 0 errors; admin/shell/auth tests 76/76; vite build
+  green.
+status: fixed — live-verified end to end
 
 ## Scope correction (owner, 2026-10-24)
 
