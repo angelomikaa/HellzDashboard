@@ -269,10 +269,18 @@
    peeking in on both sides (the row never shows its physical ends). The card
    width is a custom property so the slot and the padding can never drift.
    Scrollbar is hidden: the visible arrows + peeking neighbours carry the
-   affordance, and keyboard/scroll still work. */
+   affordance, and keyboard/scroll still work.
+
+   padding-block is GLOW ROOM, not spacing: `overflow-x: auto` makes the
+   scroller clip on BOTH axes, and the spotlight drop-shadow follows the whole
+   slot — card AND the "Baixar card" button. With only pb-4 the halo was hard-
+   cropped at the bottom edge (and at the top, where there was no padding at
+   all). 2rem top / 3rem bottom keeps the card halo and the lower button glow
+   inside the clip box at the breathing peak. */
 .carousel-scroller {
   --carousel-card: min(78vw, 18rem);
   padding-inline: calc((100% - var(--carousel-card)) / 2);
+  padding-block: 2rem 3rem;
   scrollbar-width: none;
 }
 
@@ -298,7 +306,7 @@
     filter: drop-shadow(0 0 12px rgb(220 53 56 / 0.35));
   }
   50% {
-    filter: drop-shadow(0 0 24px rgb(220 53 56 / 0.65));
+    filter: drop-shadow(0 0 20px rgb(220 53 56 / 0.6));
   }
 }
 

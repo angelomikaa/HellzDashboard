@@ -235,7 +235,7 @@ export function HighlightsCarousel({
 
       <div
         ref={scrollerRef}
-        className="carousel-scroller overflow-x-auto snap-x snap-mandatory pb-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/50"
+        className="carousel-scroller overflow-x-auto snap-x snap-mandatory focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/50"
         role="region"
         aria-roledescription="carrossel"
         aria-label={label}
