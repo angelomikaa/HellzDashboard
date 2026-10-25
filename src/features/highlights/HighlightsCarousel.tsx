@@ -262,7 +262,16 @@ export function HighlightsCarousel({
                     : 'scale-[0.92] opacity-55'
                 }`}
               >
-                <PromotionCard card={card} charClass={charClass} />
+                {/* Entry reveal (Phase 10 D-01/D-02): staggered by logical
+                    card so the three loop copies share one delay. The wrapper
+                    animates opacity/transform only, so the <li> keeps owning
+                    the spotlight's opacity/scale. */}
+                <div
+                  className="showcase-reveal"
+                  style={{ animationDelay: `${logical * 70}ms` }}
+                >
+                  <PromotionCard card={card} charClass={charClass} />
+                </div>
               </li>
             )
           })}

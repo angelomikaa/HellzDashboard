@@ -286,11 +286,45 @@
   }
 }
 
-/* The centered card's static spotlight: a red halo that follows the card's
-   alpha shape (drop-shadow, not box-shadow — the card is an SVG with rounded
-   corners). Static only, no animation (07.1 D-05). */
+/* The centered card's spotlight: a red halo that follows the card's alpha
+   shape (drop-shadow, not box-shadow — the card is an SVG with rounded
+   corners). Phase 10 D-01/D-02 (the neon ring is the complexity bar): the
+   halo breathes slowly instead of sitting dead still. The global
+   prefers-reduced-motion rule removes the animation, leaving this exact
+   static frame. */
+@keyframes spotlight-breathe {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 12px rgb(220 53 56 / 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 24px rgb(220 53 56 / 0.65));
+  }
+}
+
 @utility carousel-spotlight {
   filter: drop-shadow(0 0 14px rgb(220 53 56 / 0.45));
+  animation: spotlight-breathe 4s ease-in-out infinite;
+}
+
+/* Showcase entry (Phase 10 D-01/D-02): each card rises and fades in once,
+   staggered by its logical index (the loop's three copies share the delay).
+   `backwards` keeps it hidden during the delay and hands the element back to
+   its normal styles afterwards, so the spotlight's opacity/scale classes
+   still win. The global reduced-motion rule removes it entirely. */
+@keyframes showcase-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility showcase-reveal {
+  animation: showcase-card-in 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 /* page headings inherit the display font (D-07) — one rule, zero component churn */

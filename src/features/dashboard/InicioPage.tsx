@@ -147,20 +147,57 @@ function PersonalHome({
   }
 
   if (loading) {
-    return <p className="text-base text-muted">Carregando…</p>
+    // D-03: skeleton loaders instead of the static "Carregando…" pattern.
+    // Shapes mirror the OVR hero + top-3 strip so nothing shifts when the
+    // report lands; the pulse dies under prefers-reduced-motion.
+    return (
+      <section aria-busy="true" aria-label="Resumo do personagem" className="flex flex-col gap-6">
+        <div
+          aria-hidden="true"
+          className="animate-pulse rounded-lg border border-line bg-surface/70 p-6"
+        >
+          <div className="h-3 w-10 rounded bg-line" />
+          <div className="mt-3 h-12 w-20 rounded bg-line" />
+          <div className="mt-3 h-5 w-40 rounded bg-line" />
+          <div className="mt-2 h-4 w-52 rounded bg-line" />
+        </div>
+        <div
+          aria-hidden="true"
+          className="animate-pulse rounded-lg border border-line bg-surface/70 p-6"
+        >
+          <div className="h-3 w-40 rounded bg-line" />
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {[0, 1, 2].map((index) => (
+              <div
+                key={index}
+                className="h-20 rounded border border-line bg-dominant"
+              />
+            ))}
+          </div>
+        </div>
+        <p role="status" className="sr-only">
+          Carregando…
+        </p>
+      </section>
+    )
   }
 
   return (
     <section aria-label="Resumo do personagem" className="flex flex-col gap-6">
-      <OvrHero
-        ovr={report.ovr}
-        displayName={session.display_name}
-        charClass={report.char_class}
-        charFunction={report.char_function}
-        layout="card"
-      />
+      <div className="showcase-reveal">
+        <OvrHero
+          ovr={report.ovr}
+          displayName={session.display_name}
+          charClass={report.char_class}
+          charFunction={report.char_function}
+          layout="card"
+        />
+      </div>
       {(banner === 'first' || banner === 'stale') && (
-        <section className="rounded-lg border border-line bg-surface p-6">
+        <section
+          className="showcase-reveal rounded-lg border border-line bg-surface p-6"
+          style={{ animationDelay: '80ms' }}
+        >
           <p className="text-base text-muted">{banner === 'first' ? CTA_FIRST : CTA_STALE}</p>
           <button
             type="button"
@@ -172,7 +209,10 @@ function PersonalHome({
         </section>
       )}
       {top3.length > 0 && (
-        <section className="rounded-lg border border-line bg-surface p-6">
+        <section
+          className="showcase-reveal rounded-lg border border-line bg-surface p-6"
+          style={{ animationDelay: banner === null ? '80ms' : '160ms' }}
+        >
           <h2 className="text-sm font-semibold text-muted">Seus melhores stats</h2>
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
             {top3.map((stat) => (
