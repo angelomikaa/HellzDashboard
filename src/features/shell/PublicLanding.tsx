@@ -51,7 +51,7 @@ export function PublicLanding({
           {/* Same containment as the authenticated shell: a broken showcase
               must never blank the whole landing. */}
           <PageErrorBoundary>
-            <InicioPage session={null} />
+            <InicioPage />
           </PageErrorBoundary>
         </div>
       </main>

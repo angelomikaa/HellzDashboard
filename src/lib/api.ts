@@ -403,6 +403,40 @@ export async function setSubmissionStatus(
   return parseBody<number>(res)
 }
 
+// --- Round 9 (owner 2026-10-25): the Validações tab badge counts both
+// pending queues without dragging their payloads. ---
+
+export interface PendingValidationCount {
+  submissions: number
+  identity_proofs: number
+}
+
+/** Two integers from pending_validation_count (0030). Any failure resolves
+ *  null — a member session raises 'forbidden' (the badge hides, never
+ *  errors), and a network hiccup keeps the last known state instead of
+ *  blanking the badge. Server gate: officer/owner + active (never UI-only). */
+export async function fetchPendingValidationCount(
+  session: NeoFootSession,
+): Promise<PendingValidationCount | null> {
+  try {
+    const res = await restFetch(session, '/rpc/pending_validation_count', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+    const body = await parseBody<PendingValidationCount>(res)
+    if (
+      body === null ||
+      typeof body.submissions !== 'number' ||
+      typeof body.identity_proofs !== 'number'
+    ) {
+      return null
+    }
+    return { submissions: body.submissions, identity_proofs: body.identity_proofs }
+  } catch {
+    return null
+  }
+}
+
 export async function setMemberRole(
   session: NeoFootSession,
   memberId: string,

@@ -10,6 +10,7 @@ import { SubmitPage } from './features/submit/SubmitPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { InicioPage } from './features/dashboard/InicioPage'
 import { PageErrorBoundary } from './features/shell/PageErrorBoundary'
+import { usePendingValidations } from './features/shell/usePendingValidations'
 import { fetchMyIdentity } from './lib/api'
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
@@ -65,10 +66,13 @@ function IdentityName({
 }
 
 function App() {
-  // HOME-01 (Phase 10): Início is the landing page — members land there on
-  // login, with their own OVR/top-3 above the guild showcase. The detailed
-  // Painel stays one click away.
-  const [tab, setTab] = useState<Tab>('inicio')
+  // HOME-01 (Phase 10) + owner correction 2026-10-25 (round 9): Início is the
+  // guild landing page and sits LEFTMOST in the nav, but members land on
+  // PAINEL — the panel is the first screen (the owner's words: "the panel is
+  // the first screen the user sees when logged in, meaning he starts
+  // navigation on the second tab, not the first one"). Início is the second
+  // tab; the personal stats that used to sit over its carousel are gone.
+  const [tab, setTab] = useState<Tab>('painel')
 
   // D-06: logout is one click, no confirmation — clearSession() wipes the stored
   // session and invalidate() drops RequireAuth back to LoginPage.
@@ -107,10 +111,10 @@ function App() {
         const showRanking = tab === 'ranking' && isStaff
         // Enviar Status is for EVERY role (members submit their own stats).
         const showSubmit = tab === 'submit'
-        // Início (Phase 10, HOME-01 + owner correction 2026-10-24): the guild
-        // landing page — personal blocks + the Destaques showcase in one page.
-        // Every logged-in member; enforcement is the member-invocable
-        // my_report RPC (no role condition).
+        // Início (Phase 10, HOME-01 + round 9): the guild landing page —
+        // the Impecáveis showcase, identical for members and visitors (the
+        // redundant personal blocks were removed by owner correction
+        // 2026-10-25).
         const showInicio = tab === 'inicio'
 
         return (
@@ -135,16 +139,9 @@ function App() {
                 </header>
                 <nav aria-label="Seções" className="border-b border-line">
                   <div className="mx-auto flex w-full max-w-6xl gap-1 overflow-x-auto px-4 xl:max-w-7xl">
-                    <button
-                      type="button"
-                      onClick={() => setTab('painel')}
-                      aria-current={tab === 'painel' ? 'page' : undefined}
-                      className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                        tab === 'painel' ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
-                      }`}
-                    >
-                      Painel
-                    </button>
+                    {/* Round 9: Início is the leftmost tab (owner), but the
+                        landing tab after login is Painel — the second
+                        button. */}
                     <button
                       type="button"
                       onClick={() => setTab('inicio')}
@@ -157,6 +154,16 @@ function App() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => setTab('painel')}
+                      aria-current={tab === 'painel' ? 'page' : undefined}
+                      className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                        tab === 'painel' ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
+                      }`}
+                    >
+                      Painel
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setTab('submit')}
                       aria-current={showSubmit ? 'page' : undefined}
                       className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
@@ -166,16 +173,11 @@ function App() {
                       Enviar Status
                     </button>
                     {isStaff && (
-                      <button
-                        type="button"
-                        onClick={() => setTab('validacoes')}
-                        aria-current={showValidacoes ? 'page' : undefined}
-                        className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                          showValidacoes ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
-                        }`}
-                      >
-                        Validações
-                      </button>
+                      <ValidacoesTab
+                        session={session}
+                        active={showValidacoes}
+                        onSelect={() => setTab('validacoes')}
+                      />
                     )}
                     {isStaff && (
                       <button
@@ -214,8 +216,7 @@ function App() {
                       </button>
                     )}
                   </div>
-                </nav>
-                <main className="flex-1">
+                </nav>                <main className="flex-1">
                   {/* LAYT-01 (07.2 D-21): the ONE breakpoint system — the shell
                       widens for data views (max-w-6xl, xl:max-w-7xl). Pages that
                       need a scannable column (submit wizard, login) cap
@@ -240,7 +241,7 @@ function App() {
                       ) : showSubmit ? (
                         <SubmitPage session={session} />
                       ) : showInicio ? (
-                        <InicioPage session={session} onNavigate={setTab} />
+                        <InicioPage />
                       ) : (
                         <DashboardPage
                           session={session}
@@ -257,6 +258,53 @@ function App() {
         )
       }}
     </RequireAuth>
+  )
+}
+
+/**
+ * The Validações nav button with its round-9 notification badge (owner
+ * 2026-10-25: officers "need to blindly check the tab to see if something
+ * new arrived"). A component (not inline JSX) so the polling hook lives in
+ * a proper component context; only mounted for staff sessions, so the poll
+ * never runs for members. The pill is the count of BOTH pending queues
+ * (submissions + identity proofs, 0030) — animate-pulse is the "ping", and
+ * the global prefers-reduced-motion kill-switch freezes it. The pill itself
+ * is aria-hidden: the button's aria-label carries the number for screen
+ * readers.
+ */
+function ValidacoesTab({
+  session,
+  active,
+  onSelect,
+}: {
+  session: NeoFootSession
+  active: boolean
+  onSelect: () => void
+}) {
+  const counts = usePendingValidations(session, true)
+  const total = counts === null ? 0 : counts.submissions + counts.identity_proofs
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={active ? 'page' : undefined}
+      aria-label={
+        total > 0 ? `Validações — ${total} pendente${total === 1 ? '' : 's'}` : 'Validações'
+      }
+      className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+        active ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
+      }`}
+    >
+      Validações
+      {total > 0 && (
+        <span
+          aria-hidden="true"
+          className="ml-1.5 inline-flex h-5 min-w-5 animate-pulse items-center justify-center rounded-full bg-accent px-1 align-middle text-xs font-bold leading-none text-accent-foreground"
+        >
+          {total > 9 ? '9+' : total}
+        </span>
+      )}
+    </button>
   )
 }
 
