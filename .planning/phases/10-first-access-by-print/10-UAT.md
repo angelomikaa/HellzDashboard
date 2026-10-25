@@ -277,6 +277,93 @@ verification: live at 1296px — container 1248, card 405, scrollLeft 1264,
   errors; vite build green.
 status: fixed — live-verified on the public landing
 
+### G-6 (test 7, round 5): the class identity and the arrows sat outside the carousel
+
+report: "move the icon, the name 'sumo sacedorte' and the carousel controls
+  to inside the carousel box"
+
+root_cause: |
+  The class crest + name lived in a PromotionShowcase header row and the
+  arrows lived in their own controls row above the scroller — three stacked
+  bands per class (header, controls, cards) that read as separate blocks
+  instead of one carousel.
+
+fix: |
+  The crest, the class name (h2), the fading rule and the prev/next arrows
+  are one bar INSIDE HighlightsCarousel, directly above the cards:
+  [crest] Class name ──── [‹][›]. The rule is hidden below sm so the name and
+  the arrows stay on one line on phones. PromotionShowcase drops its header
+  row, the ClassCrest import and the section wrapper — each carousel IS the
+  class block.
+
+verification: live at 1296px — the carousel root's first child is the bar
+  (crest + h2 "Sumo Sacerdote" 24px + rule 833px + both arrows with
+  class-named aria-labels), 8px to the scroller, no class header outside a
+  carousel, headings still h1 (title) + h2 (class), the 3-up row unchanged
+  (card 405, 3 visible, scrollLeft 1264). tsc clean; oxlint 0 errors; carousel
+  tests 11/11; vite build green.
+status: fixed — live-verified on the public landing (committed 1713cdc)
+
+### G-7 (test 7, round 6): one class at a time, rotating — rebuilt from a failed draft
+
+report: draft by a previous model ("these files were made by another model
+  that failed, lets review them and proceed with the work"): one Impecável
+  class on screen, auto-advancing with a progress bar and a class switcher.
+
+review of the failed draft (review of the failed draft (defects found): |
+  - `(classIndex ?? 0 + 1) % totalClasses` parses as `classIndex ?? 1` — the
+    auto-advance re-selected the SAME class forever;
+  - the progress bar ran on a 100ms setInterval + setState — 10 re-renders/s
+    of the whole carousel for 30s, and the Tailwind transition escaped the
+    prefers-reduced-motion kill-switch;
+  - no pause control at all (WCAG 2.2.2 violation), no hover/focus pause,
+    and card browsing never deferred the rotation;
+  - class changes were silent for screen readers (the h2 swaps with no
+    announcement);
+  - `activeClassIndex` was never clamped — a sections shrink after refetch
+    rendered a blank showcase;
+  - the n/N token overflowed its 32px circle, the ⟳-only forward control was
+    cryptic, and the download button unmounted off-spotlight so the
+    items-center row bobbed on every card step;
+  - the timer lived inside the keyed carousel, so pause state could never
+    survive a class switch.
+
+fix: |
+  - ClassRotation (in PromotionShowcase) owns the machine ABOVE the per-class
+    carousel remount: one setTimeout per window, remaining-time captured at
+    the pause instant (resume continues instead of restarting), stacked
+    pause reasons (explicit button + pointer hover + keyboard focus), index
+    clamped when sections shrink, and a persistent sr-only live region
+    ("Classe n de N: <classe>") — a remounting node never announces.
+  - HighlightsCarousel renders the chrome: card arrows ←/→, a divider, then
+    ‹ n/N › (wrap-around class stepper), a pause/play toggle (aria-pressed)
+    and the drain bar; card navigation (arrows, keyboard, wheel, touch,
+    pointer) reports up so the parent re-arms the window — browsing a class
+    defers the rotation.
+  - The drain bar is pure CSS (`class-drain`, index.css): animation-play-state
+    freezes under [data-paused], the global reduced-motion rule freezes it at
+    full. Zero interval re-renders.
+  - PromotionCard keeps the button mounted on every slot but
+    visibility-hidden off-spotlight — decluttered neighbours with a
+    layout-stable row.
+  - Pure helpers in carousel.ts (AUTO_ADVANCE_MS, clampClassIndex,
+    wrapClassIndex) with 7 new unit tests (18/18 total).
+
+verification: live (dev-only 3s window + a dev-only duplicated section, both
+  removed before commit; live data has a single Impecável class): auto-advance
+  fires at the window and wraps 1→0; the ‹ › stepper steps and wraps; the
+  pause button freezes the class for 3.5s+ (reasons ground-truthed via a
+  temporary window.__rotation probe) and resume rotates again ~3s later;
+  the drain bar reads animation-play-state paused/running with data-paused;
+  a card-arrow click re-arms the window (index holds 2.8s, fires at 3.5s);
+  the real user's mouse hovering the visible tab paused rotation (pointer
+  reason, correct behavior); download buttons 3/9 visible (exactly the
+  spotlight copies) with all 9 slots the same height (646px — no bob).
+  Restored state: single class → no chrome, no live region, timer disarmed,
+  spotlight-only download intact. tsc clean; oxlint 0 errors; carousel tests
+  18/18; vite build green.
+status: fixed — live-verified on the public landing (commit de1e1d3)
+
 ## Scope correction (owner, 2026-10-24)
 
 report: "the original planning messed up things. Destaques and Inicio were

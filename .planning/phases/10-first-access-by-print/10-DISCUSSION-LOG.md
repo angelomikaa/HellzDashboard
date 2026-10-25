@@ -118,3 +118,25 @@
 **Decisions captured:**
 - D-10-04-12: at lg the carousel is exactly 3-up. The card width is derived from the showcase container (`--carousel-card: calc((100cqw - 2rem) / 3)` on `.showcase-inner`, with `.showcase-root` as the size container), so three cards fill the row and no fourth card peeks in; the skeleton reads the same variable. Mobile keeps the 1-up spotlight with peeking neighbours.
 - D-10-04-13: "Destaques" is gone. "Os Impec√°veis da Hellz" is the landing title (`h1`; the pill keeps the neon ring), and the class names move from h3 to h2. The title is 20/30/36px across mobile/sm/lg so it stays on one line at 375px.
+
+---
+
+## Owner correction ó 2026-10-25 (UAT round 5): the class identity joins the carousel
+
+**User:** "move the icon, the name 'sumo sacedorte' and the carousel controls to inside the carousel box"
+
+**Decisions captured:**
+- D-10-04-14: the class crest, the class name and the arrows are ONE bar inside HighlightsCarousel ([crest] Class name -------- [ã][õ]) directly above the cards; PromotionShowcase no longer renders a class header. The fading rule is hidden below sm so the name and the arrows share one line on phones.
+
+---
+
+## Owner correction ó 2026-10-25 (UAT round 6): one class at a time, rotating (rebuilt from a failed draft)
+
+**User:** "these files were made by another model that failed, lets review them and proceed with the work" ó the draft showed one Impec·vel class at a time with auto-advance, a progress bar and a class switcher; the review found a never-advancing timer (classIndex ?? 0 + 1 precedence), a 100ms progress interval, no pause control, silent class swaps, an unclamped index that could blank the showcase, an overflowing token and a layout-bobbing download button.
+
+**Decisions captured:**
+- D-10-04-15: the showcase renders ONE class at a time and rotates to the next every AUTO_ADVANCE_MS (30s, owner-requested), wrapping at the ends. The machine lives in PromotionShowcase/ClassRotation ABOVE the keyed per-class carousel remount so pause state survives class switches; the index is clamped when sections shrink after a refetch.
+- D-10-04-16: rotation is pausable three ways (WCAG 2.2.2): an explicit ?/? toggle, pointer hover, and keyboard focus within the showcase; reasons stack and the remaining wall-clock time is captured at the pause instant so resume CONTINUES the window. Card navigation (arrows, keyboard, wheel, touch) re-arms the window ó browsing a class defers the rotation. A persistent sr-only live region announces "Classe n de N: <classe>" on every change.
+- D-10-04-17: the window indicator is a CSS drain bar (class-drain in index.css) frozen via nimation-play-state under [data-paused] ó zero interval re-renders, covered by the global prefers-reduced-motion kill-switch (the rotation itself is a discrete remount, not motion). The class stepper is ã n/N õ (wrap-around, distinct guillemet glyphs vs the card arrows' ?/?); the count is aria-hidden decoration ó the live region is the accessible channel.
+- D-10-04-18: "Baixar card" renders on every slot but visibility-hidden off-spotlight (the failed draft unmounted it, bobbing the items-center row): neighbours stay decluttered AND the row height is constant during spotlight moves.
+- D-10-04-19: rotation helpers are pure and unit-locked in carousel.ts (AUTO_ADVANCE_MS = 30_000, clampClassIndex, wrapClassIndex; 18/18 tests). Card-level autoplay remains forbidden (07.1 D-05 holds) ó only the CLASS slot rotates.
