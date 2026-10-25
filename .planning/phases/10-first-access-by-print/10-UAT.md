@@ -9,12 +9,11 @@ updated: 2026-10-24T04:00:00Z
 ## Current Test
 <!-- OVERWRITE each test - shows where we are -->
 
-number: 7
-name: Destaques scroll-snap slider
+number: 8
+name: Slider keyboard navigation
 expected: |
-  Destaques renders each class's Impecável cards in a horizontal
-  sideways-scrolling slider — one card per view at mobile width, three
-  visible per view on desktop (lg).
+  Clicking/tabbing into the slider and pressing ArrowLeft/ArrowRight scrolls
+  exactly one card per keypress (page itself does not scroll).
 awaiting: user response
 
 ## Tests
@@ -45,13 +44,14 @@ result: pass
 
 ### 7. Destaques scroll-snap slider
 expected: Destaques renders each class's Impecável cards in a horizontal sideways-scrolling slider — one card per view at mobile width, three visible per view on desktop (lg).
-result: issue
-report: "clicking on the tab distaques makes the whole UI vanish"
-note: Root cause fixed (G-1) — re-test pending.
+result: pass
+note: First attempt blanked the whole UI (G-1). After the hook-order fix + page error boundary, re-tested clean.
 
 ### 8. Slider keyboard navigation
 expected: Clicking/tabbing into the slider and pressing ArrowLeft/ArrowRight scrolls exactly one card per keypress (page itself does not scroll).
-result: [pending]
+result: issue
+report: "nope, it looks static - shoud look like a carousel, with the middle card being in the spotlight"
+note: Root cause fixed (G-2) — re-test pending.
 
 ### 9. Slider swipe navigation
 expected: On a touch device (or touch emulation), swiping left/right on the slider scrolls one card in the swipe direction.
@@ -64,9 +64,9 @@ result: [pending]
 ## Summary
 
 total: 10
-passed: 6
+passed: 7
 issues: 1
-pending: 3
+pending: 2
 skipped: 0
 blocked: 0
 
@@ -96,4 +96,41 @@ fix: |
 
 verification: npx tsc --noEmit clean; npx oxlint src -> 0 errors; vitest 664/664
   in 43 files; npx vite build green.
-status: fixed — awaiting re-test of test 7
+status: fixed — re-tested PASS (test 7)
+
+### G-2 (test 8, major): Destaques "looks static" — not a carousel
+
+report: "nope, it looks static - shoud look like a carousel, with the middle
+  card being in the spotlight"
+
+root_cause: |
+  Three defects in the 10-03 slider, all in HighlightsPage.tsx:
+  1. `scroll-snap-x` is not a Tailwind class (the real one is `snap-x`), so
+     snapping never applied.
+  2. Slots were `max-w-[320px]`; on a wide section the row never overflowed, so
+     there was literally nothing to scroll — arrows/keys/swipe were dead
+     (the "static" report).
+  3. One `sliderRef` was shared by every class section, so navigation always
+     targeted the LAST section's scroller.
+  Presentation had no carousel affordance at all: no visible controls, no
+  peeking neighbours, no focal card.
+
+fix: |
+  - New `src/features/highlights/HighlightsCarousel.tsx` — per-section
+    component (own ref + own active index). Edge-padding centering
+    (`.carousel-scroller` in index.css pads by half the leftover space) so the
+    first AND last card can sit dead center under `snap-center`.
+  - Real carousel: card nearest the viewport center is the SPOTLIGHT (full
+    scale, full opacity, static red drop-shadow); neighbours recede
+    (scale 0.92, 55% opacity) and peek in from the edges. Prev/next buttons
+    with disabled bounds; ← → Home End on the focused scroller; native swipe.
+    No autoplay (07.1 D-05); reduced-motion kills the transitions.
+  - New pure module `carousel.ts` (`nearestCardIndex`, `clampIndex`) + 6 unit
+    tests — the spotlight rule is testable without a DOM.
+
+verification: live in the browser as a smoke fixture — scrollWidth 1756 >
+  clientWidth 1084 (scrollable), next-arrow centers card 2 (scrollLeft 336 →
+  672, spotlight follows), ArrowRight centers the last card with the page not
+  scrolling, next disabled at the end. tsc clean; oxlint 0 errors; 670/670
+  vitest; vite build green.
+status: fixed — awaiting re-test of test 8

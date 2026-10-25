@@ -26,13 +26,13 @@
 // old horizontal anatomy).
 //
 // The payload is rendered verbatim: no rank computation in TS (T-06-13).
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError, fetchPromotion, type PromotionSection } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { tierForOvr } from '../dashboard/presentation'
 import { ClassCrest } from '../assets/ClassCrest'
 import { classLabel } from '../../lib/classLabels'
-import { PromotionCard } from './PromotionCard'
+import { HighlightsCarousel } from './HighlightsCarousel'
 
 // Enumeration-safe pt-BR copy (shared UI contract, copied verbatim from
 // CharactersPage): never expose HTTP codes, gateway internals, or which
@@ -45,20 +45,9 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
   const [sections, setSections] = useState<PromotionSection[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Scroll-snap slider ref (SHWC-01): keyboard + swipe scroll one card at a
-  // time. Pure UX enhancement — no data fetching, no server order change.
-  //
-  // Hooks MUST all be declared before the first early return below. This ref
-  // (and the touch origin) used to sit after the loading/empty branches, so
-  // the first render (sections === null) ran 2 hooks and the post-fetch render
-  // ran 4 — React aborts that render with "Rendered more hooks than during the
-  // previous render", and because the shell had no error boundary the whole UI
-  // blanked as soon as Destaques loaded. oxlint react-hooks/rules-of-hooks
-  // guards the ordering from here on.
-  const sliderRef = useRef<HTMLDivElement>(null)
-  // Touch origin for the swipe gesture: a ref (not a plain `let`) so it
-  // survives re-renders instead of being reset between touchstart and touchend.
-  const touchStartX = useRef(0)
+  // Every hook lives above the early returns below (UAT round 1 crash lesson:
+  // a hook declared after a conditional return makes React abort the second
+  // render). Per-section carousel state belongs to HighlightsCarousel.
 
   useEffect(() => {
     let cancelled = false
@@ -108,33 +97,6 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
       return cards.length > 0 ? [{ ...section, cards }] : []
     }) ?? []
 
-  // Scroll-snap slider helpers (SHWC-01). Defined after the data effect but
-  // still before any early return — they close over the refs declared above.
-  function scrollOneCard(direction: -1 | 1) {
-    const slider = sliderRef.current
-    if (!slider) return
-    const firstCard = slider.firstElementChild as HTMLElement | null
-    const cardWidth = firstCard?.offsetWidth ?? Math.max(slider.clientWidth / 3, 1)
-    slider.scrollBy({ left: direction * cardWidth, behavior: 'smooth' })
-  }
-
-  function handleKeyDown(event: React.KeyboardEvent) {
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-      event.preventDefault()
-      scrollOneCard(event.key === 'ArrowLeft' ? -1 : 1)
-    }
-  }
-
-  function handleTouchStart(event: React.TouchEvent) {
-    touchStartX.current = event.touches[0].clientX
-  }
-  function handleTouchEnd(event: React.TouchEvent) {
-    const diff = event.changedTouches[0].clientX - touchStartX.current
-    const threshold = 30
-    if (Math.abs(diff) < threshold) return
-    scrollOneCard(diff > 0 ? -1 : 1)
-  }
-
   if (impecavelSections.length === 0) {
     return (
       <section className="rounded-lg border border-line bg-surface p-6">
@@ -182,31 +144,15 @@ export function HighlightsPage({ session }: { session: NeoFootSession }) {
                 {classLabel(section.class_name)}
               </h2>
             </div>
-            {/* SHWC-01: scroll-snap slider replacing the grid. 1-up mobile,
-                3-up at lg. Server order preserved (no client re-sort). */}
-            <div
-              className="mt-6 overflow-x-auto scroll-snap-x snap-mandatory whitespace-nowrap -mx-4 pb-6"
-              ref={sliderRef}
-              onKeyDown={handleKeyDown}
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              role="region"
-              aria-label="Destaques — cartazes impecáveis"
-              tabIndex={0}
-            >
-              {section.cards.map((card) => (
-                <div
-                  key={card.display_name}
-                  className="inline-block w-full max-w-[320px] shrink-0 snap-center snap-always px-2 lg:max-w-[calc(100%/3)]"
-                >
-                  <PromotionCard
-                    session={session}
-                    card={card}
-                    charClass={section.class_name}
-                  />
-                </div>
-              ))}
-            </div>
+            {/* SHWC-01 rework (UAT round 1): centered spotlight carousel —
+                one card on mobile, center card + peeking neighbours on
+                desktop. Server order preserved (no client re-sort). */}
+            <HighlightsCarousel
+              session={session}
+              cards={section.cards}
+              charClass={section.class_name}
+              label={`${classLabel(section.class_name)} — cartazes impecáveis`}
+            />
           </section>
         ))}
       </div>
