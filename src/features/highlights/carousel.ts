@@ -49,3 +49,32 @@ export function loopIndex(index: number, length: number): number {
   const offset = ((index % length) + length) % length
   return length + offset
 }
+
+// --- Class rotation (UAT round 6: one Impecável class at a time) ---
+
+/**
+ * Auto-advance window: how long one class holds the spotlight before the
+ * showcase rotates to the next (owner request, 2026-10-25). Exposed so the
+ * parent's timer and the CSS drain bar can never drift apart.
+ */
+export const AUTO_ADVANCE_MS = 30_000
+
+/**
+ * Clamp a class index into the valid range. Sections can shrink after a
+ * refetch (a player goes inactive), so a stale index must fall back to a real
+ * section instead of blanking the showcase. A non-positive total yields 0.
+ */
+export function clampClassIndex(index: number, total: number): number {
+  if (total <= 0) return 0
+  return Math.min(Math.max(index, 0), total - 1)
+}
+
+/**
+ * Wrap-around class step (+1/-1): rotation loops, so step past the last class
+ * lands on the first and vice versa — same rule as the card loop (D-10-04-6).
+ * A non-positive total yields 0.
+ */
+export function wrapClassIndex(index: number, delta: number, total: number): number {
+  if (total <= 0) return 0
+  return (((index + delta) % total) + total) % total
+}

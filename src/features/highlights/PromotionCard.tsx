@@ -49,9 +49,11 @@ const DOWNLOAD_ERROR = 'Não foi possível gerar o card. Tente novamente.'
 export function PromotionCard({
   card,
   charClass,
+  spotlight = false,
 }: {
   card: PromotionCardRow
   charClass: string
+  spotlight?: boolean
 }) {
   // CardSvg derives the tier palette from the unit-locked tierForOvr
   // banding; ovr is ALWAYS non-null on a card (the RPC omits OVR-incapable
@@ -140,14 +142,21 @@ export function PromotionCard({
           {DOWNLOAD_ERROR}
         </p>
       )}
+      {/* Round 6: only the spotlighted card carries a working "Baixar card"
+          (the receded neighbours are background reading — arrow over to make
+          a card interactive). The button STAYS MOUNTED with visibility hidden
+          instead of unmounting: mount/unmount changes the <li> height
+          mid-scroll and the items-center row bobs on every card step. */}
       <button
         type="button"
         onClick={() => {
-          void handleDownload()
+          if (spotlight) void handleDownload()
         }}
-        disabled={generating}
+        disabled={!spotlight || generating}
         aria-label={`Baixar card de ${card.display_name} (PNG)`}
-        className="rounded-md border border-line bg-surface px-3 py-2 text-sm font-semibold text-content hover-control disabled:cursor-not-allowed disabled:opacity-60"
+        className={`rounded-md border border-line bg-surface px-3 py-2 text-sm font-semibold text-content hover-control disabled:cursor-not-allowed disabled:opacity-60 ${
+          spotlight ? '' : 'invisible'
+        }`}
       >
         {generating ? 'Gerando…' : 'Baixar card'}
       </button>

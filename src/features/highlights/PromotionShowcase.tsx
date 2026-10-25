@@ -26,6 +26,20 @@
 // inside the carousel box" — the crest/name header and the arrows are now one
 // bar inside HighlightsCarousel, not a separate header row out here.
 //
+// UAT round 6 (owner, rebuilt from a failed draft): ONE Impecável class holds
+// the showcase at a time, rotating to the next every AUTO_ADVANCE_MS. The
+// rotation state machine lives HERE, above the per-class carousel remount:
+//   - pause reasons stack (explicit button + pointer hover + keyboard focus)
+//     — WCAG 2.2.2, auto-updating content must be pausable, and a carousel
+//     must never rotate away from someone mid-interaction;
+//   - the remaining wall-clock time is captured at the pause instant, so
+//     resume continues the window instead of restarting it (the CSS drain bar
+//     freezes via animation-play-state and stays in sync);
+//   - card navigation inside a class re-arms the window (browsing this class
+//     defers the rotation);
+//   - an sr-only live region announces "Classe n de N: <classe>" on change —
+//     the visible h2 swap alone is silent for screen readers.
+//
 // Data path (0029): get_promotion_public is the anon-callable twin of
 // get_promotion — same body, member gate removed. No session is threaded
 // through here, so the exact same tree renders before and after login. The
@@ -35,11 +49,12 @@
 // Impecável (top-band) cards appear. Display-layer tier filter over the
 // fetched payload, server order preserved (filter, never sort), sections left
 // empty are dropped. tierForOvr is the unit-locked banding function.
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ApiError, fetchPromotionPublic, type PromotionSection } from '../../lib/api'
 import { tierForOvr } from '../dashboard/presentation'
 import { classLabel } from '../../lib/classLabels'
 import { HighlightsCarousel } from './HighlightsCarousel'
+import { AUTO_ADVANCE_MS, clampClassIndex, wrapClassIndex } from './carousel'
 
 // Enumeration-safe pt-BR copy: never expose HTTP codes or gateway internals.
 const NETWORK_ERROR =
@@ -167,21 +182,139 @@ export function PromotionShowcase() {
     <ShowcaseShell>
       {/* No panels: each carousel owns its class header (crest + name +
           arrows) and the cards float directly on the page's neon grid.
-          Sections are separated by air, not borders. */}
-      <div className="flex w-full flex-col gap-16 pb-8 sm:gap-20 sm:pb-12">
-        {impecavelSections.map((section) => (
-          /* SHWC-01 rework (UAT rounds 1/4/5): centered spotlight carousel —
-             one card on mobile, exactly three at lg; the class header and the
-             arrows live inside the carousel component. Server order preserved
-             (no client re-sort). */
-          <HighlightsCarousel
-            key={section.class_name}
-            cards={section.cards}
-            charClass={section.class_name}
-            label={`${classLabel(section.class_name)} — cartazes impecáveis`}
-          />
-        ))}
-      </div>
+          Round 6: one class holds the showcase at a time, rotating
+          (ClassRotation below). Server order preserved (no client re-sort). */}
+      <ClassRotation sections={impecavelSections} />
     </ShowcaseShell>
+  )
+}
+
+/** Round 6: the rotating one-class view. Mounted only with at least one
+ *  Impecável section, so `sections` is never empty and the hooks below never
+ *  sit behind a conditional. Owns the whole rotation state machine — it must
+ *  live ABOVE the per-class carousel remount, or a pause would reset on every
+ *  class switch. */
+function ClassRotation({ sections }: { sections: PromotionSection[] }) {
+  const total = sections.length
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [pauseReasons, setPauseReasons] = useState({
+    button: false,
+    pointer: false,
+    focus: false,
+  })
+  const rotationPaused = pauseReasons.button || pauseReasons.pointer || pauseReasons.focus
+
+  // The armed window. remainingRef carries the wall-clock left in the
+  // current class's slot across pause/resume; windowRef lets the pause
+  // handlers read the armed window's start/delay at the instant of pausing
+  // (the effect owns the values, the handler owns the capture — the cleanup
+  // NEVER writes remainingRef, so re-arms and advances can't clobber it).
+  const remainingRef = useRef(AUTO_ADVANCE_MS)
+  const windowRef = useRef<{ startedAt: number; delay: number } | null>(null)
+  // Bumped by card navigation (onUserInteraction) to re-arm the window.
+  const [windowKey, setWindowKey] = useState(0)
+
+  /** Pause/resume one reason. Reasons stack; the first one ON captures the
+   *  remaining time (windowRef is nulled while paused, so a second reason
+   *  arriving can't re-capture), and the last one OFF re-arms the timer. */
+  const setPause = useCallback((reason: 'button' | 'pointer' | 'focus', paused: boolean) => {
+    if (paused) {
+      const armed = windowRef.current
+      if (armed) {
+        remainingRef.current = Math.max(0, armed.startedAt + armed.delay - Date.now())
+        windowRef.current = null
+      }
+    }
+    setPauseReasons((prev) => (prev[reason] === paused ? prev : { ...prev, [reason]: paused }))
+  }, [])
+
+  /** Manual class step (‹ › buttons): wraps at the ends, fresh window. */
+  const stepClass = useCallback(
+    (delta: 1 | -1) => {
+      remainingRef.current = AUTO_ADVANCE_MS
+      setActiveIndex((index) => wrapClassIndex(index, delta, total))
+    },
+    [total],
+  )
+
+  /** Card navigation inside the current class: the member is browsing, so
+   *  defer the rotation by re-arming the window. */
+  const restartWindow = useCallback(() => {
+    remainingRef.current = AUTO_ADVANCE_MS
+    setWindowKey((key) => key + 1)
+  }, [])
+
+  // The rotation timer itself. One timeout per window; every dep change is a
+  // deliberate re-arm (class switch, pause/resume, card interaction) that
+  // starts from remainingRef. Single-class showcases never rotate.
+  useEffect(() => {
+    if (total <= 1 || rotationPaused) {
+      windowRef.current = null
+      return
+    }
+    const delay = remainingRef.current
+    const startedAt = Date.now()
+    windowRef.current = { startedAt, delay }
+    const id = window.setTimeout(() => {
+      remainingRef.current = AUTO_ADVANCE_MS
+      setActiveIndex((index) => wrapClassIndex(index, 1, total))
+    }, delay)
+    return () => {
+      window.clearTimeout(id)
+      windowRef.current = null
+    }
+  }, [activeIndex, rotationPaused, total, windowKey])
+
+  // Sections can shrink after a refetch (a player went inactive) — snap the
+  // index back into range instead of rendering a blank showcase.
+  useEffect(() => {
+    setActiveIndex((index) => clampClassIndex(index, total))
+  }, [total])
+
+  const clampedIndex = clampClassIndex(activeIndex, total)
+  const section = sections[clampedIndex]
+  if (section === undefined) return null
+
+  return (
+    <div
+      className="flex w-full flex-col gap-16 pb-8 sm:gap-20 sm:pb-12"
+      onMouseEnter={() => setPause('pointer', true)}
+      onMouseLeave={() => setPause('pointer', false)}
+      onFocus={(event) => {
+        const from = event.relatedTarget
+        if (!(from instanceof Node && event.currentTarget.contains(from))) {
+          setPause('focus', true)
+        }
+      }}
+      onBlur={(event) => {
+        const to = event.relatedTarget
+        if (!(to instanceof Node && event.currentTarget.contains(to))) {
+          setPause('focus', false)
+        }
+      }}
+    >
+      {/* Screen-reader announcement of the rotation. It must be a PERSISTENT
+          node — the keyed carousel remounts per class and a remounting node
+          never announces. The visible count in the carousel bar is
+          aria-hidden; this region is the accessible channel. */}
+      {total > 1 && (
+        <span role="status" aria-live="polite" className="sr-only">
+          {`Classe ${clampedIndex + 1} de ${total}: ${classLabel(section.class_name)}`}
+        </span>
+      )}
+      <HighlightsCarousel
+        key={section.class_name}
+        cards={section.cards}
+        charClass={section.class_name}
+        label={`${classLabel(section.class_name)} — cartazes impecáveis`}
+        classIndex={clampedIndex}
+        totalClasses={total}
+        rotationPaused={rotationPaused}
+        onClassStep={stepClass}
+        onTogglePause={() => setPause('button', !pauseReasons.button)}
+        onUserInteraction={restartWindow}
+        autoAdvanceMs={AUTO_ADVANCE_MS}
+      />
+    </div>
   )
 }

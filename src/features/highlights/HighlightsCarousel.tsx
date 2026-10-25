@@ -42,9 +42,22 @@
 // UAT round 5 (owner): the class crest, the class name and the arrows used to
 // live OUTSIDE the carousel (a separate header row in PromotionShowcase plus a
 // controls row of its own). They now sit in one bar INSIDE this component —
-// [crest] Class name ──────── [‹][›] — directly above the cards, so the whole
+// [crest] Class name ──────── [←][→] — directly above the cards, so the whole
 // class block is one carousel. The fading rule is hidden on mobile to keep the
 // name and the arrows on one line.
+//
+// UAT round 6 (owner, rebuilt from a failed draft): the showcase shows ONE
+// Impecável class at a time and rotates to the next every AUTO_ADVANCE_MS.
+// The rotation STATE MACHINE lives in PromotionShowcase (the carousel remounts
+// per class, so pause state would not survive in here); this component only
+// renders the chrome and reports user interaction so the parent can re-arm
+// the window (browsing a class's cards must defer the rotation, not yank it).
+// Controls, right of the card arrows: ‹ n/N › steps classes, ‖/▶ pauses the
+// rotation (WCAG 2.2.2 — auto-updating content must be pausable; hover and
+// keyboard focus pause it too), and the class-progress bar drains the current
+// window in CSS (no interval, no re-renders, killed by the reduced-motion
+// rule). Card navigation itself stays user-driven — never autoplay (07.1
+// D-05).
 //
 // Data contract unchanged: cards render in SERVER order (highest OVR first),
 // never re-sorted here. Pure presentation — no points math in TS.
@@ -53,7 +66,7 @@ import type { PromotionCardRow } from '../../lib/api'
 import { classLabel } from '../../lib/classLabels'
 import { ClassCrest } from '../assets/ClassCrest'
 import { PromotionCard } from './PromotionCard'
-import { clampIndex, loopIndex, nearestCardIndex } from './carousel'
+import { AUTO_ADVANCE_MS, clampIndex, loopIndex, nearestCardIndex } from './carousel'
 
 const SLOT_SELECTOR = '[data-carousel-slot]'
 // Three copies is the minimum that gives the middle copy a real neighbour on
@@ -67,10 +80,24 @@ export function HighlightsCarousel({
   cards,
   charClass,
   label,
+  classIndex,
+  totalClasses,
+  rotationPaused = false,
+  onClassStep,
+  onTogglePause,
+  onUserInteraction,
+  autoAdvanceMs = AUTO_ADVANCE_MS,
 }: {
   cards: PromotionCardRow[]
   charClass: string
   label: string
+  classIndex?: number
+  totalClasses?: number
+  rotationPaused?: boolean
+  onClassStep?: (delta: 1 | -1) => void
+  onTogglePause?: () => void
+  onUserInteraction?: () => void
+  autoAdvanceMs?: number
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const looping = cards.length > 1
@@ -186,16 +213,35 @@ export function HighlightsCarousel({
     }
   }, [cards.length, nearestSlot, normalize])
 
+  // Any direct touch of the card row (wheel, touch, pointer press) tells the
+  // parent to re-arm the rotation window — the member is browsing THIS class,
+  // so the auto-advance must not yank the class away mid-read. Programmatic
+  // scrolls (arrow/keyboard navigation) re-arm via step()/handleKeyDown below.
+  useEffect(() => {
+    const scroller = scrollerRef.current
+    if (!scroller || !onUserInteraction) return
+    const userTouch = () => onUserInteraction()
+    scroller.addEventListener('wheel', userTouch, { passive: true })
+    scroller.addEventListener('touchstart', userTouch, { passive: true })
+    scroller.addEventListener('pointerdown', userTouch, { passive: true })
+    return () => {
+      scroller.removeEventListener('wheel', userTouch)
+      scroller.removeEventListener('touchstart', userTouch)
+      scroller.removeEventListener('pointerdown', userTouch)
+    }
+  }, [onUserInteraction])
+
   // One step: if we are on an outer duplicate (e.g. a rapid second press before
   // the settle jump), first snap onto the middle equivalent, THEN step one
   // card. Jump and smooth step happen in the same task, so the user only sees
   // a one-card move — never a fling across copies, never a physical end.
   const step = useCallback(
     (direction: -1 | 1) => {
+      onUserInteraction?.()
       const middle = jumpToMiddle(nearestSlot())
       centerCard(middle + direction)
     },
-    [centerCard, jumpToMiddle, nearestSlot],
+    [centerCard, jumpToMiddle, nearestSlot, onUserInteraction],
   )
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -210,9 +256,11 @@ export function HighlightsCarousel({
       step(1)
     } else if (event.key === 'Home') {
       event.preventDefault()
+      onUserInteraction?.()
       centerCard(first)
     } else if (event.key === 'End') {
       event.preventDefault()
+      onUserInteraction?.()
       centerCard(last)
     }
   }
@@ -221,10 +269,10 @@ export function HighlightsCarousel({
 
   return (
     <div>
-      {/* One bar inside the carousel: class identity on the left, arrows on
-          the right, a fading rule between them at sm+. On mobile the rule is
-          hidden so the name and the arrows stay on one line. */}
-      <div className="mb-2 flex items-center gap-3 sm:gap-4">
+      {/* One bar inside the carousel (round 5): class identity on the left,
+          controls on the right, a fading rule between them at sm+. The bar
+          wraps below sm so the controls never squeeze the class name. */}
+      <div className="mb-2 flex flex-wrap items-center gap-3 sm:gap-4">
         {/* D-17: class imagery grounds the carousel in the game; D-16:
             classes without official art render the monogram tile — never a
             broken image. */}
@@ -236,6 +284,8 @@ export function HighlightsCarousel({
           aria-hidden="true"
           className="hidden h-px flex-1 bg-gradient-to-r from-accent/40 via-line to-transparent sm:block"
         />
+        {/* Card navigation (user-driven only — 07.1 D-05). Glyphs stay
+            arrows so they can never read as the class stepper below. */}
         <div className="ml-auto flex items-center gap-2 sm:ml-0">
           <button
             type="button"
@@ -244,7 +294,7 @@ export function HighlightsCarousel({
             aria-label={`Anterior — ${label}`}
             className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface text-lg text-content hover-control disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <span aria-hidden="true">‹</span>
+            <span aria-hidden="true">←</span>
           </button>
           <button
             type="button"
@@ -253,9 +303,66 @@ export function HighlightsCarousel({
             aria-label={`Próximo — ${label}`}
             className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface text-lg text-content hover-control disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <span aria-hidden="true">›</span>
+            <span aria-hidden="true">→</span>
           </button>
         </div>
+        {/* Class rotation (round 6): ‹ n/N › steps classes (wrapping), ‖/▶
+            pauses the rotation. The count is aria-hidden — the sr-only live
+            region in PromotionShowcase announces position+class on change,
+            so screen readers never rely on this decoration. */}
+        {totalClasses !== undefined && totalClasses > 1 && classIndex !== undefined && (
+          <>
+            <span aria-hidden="true" className="hidden h-6 w-px bg-line sm:block" />
+            <div
+              className="relative flex items-center gap-1"
+              data-paused={rotationPaused || undefined}
+            >
+              <button
+                type="button"
+                onClick={() => onClassStep?.(-1)}
+                aria-label="Classe anterior"
+                className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface text-lg text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <span aria-hidden="true">‹</span>
+              </button>
+              <span
+                aria-hidden="true"
+                className="w-12 text-center font-display text-sm font-semibold tabular-nums text-content"
+              >
+                {classIndex + 1}/{totalClasses}
+              </span>
+              <button
+                type="button"
+                onClick={() => onClassStep?.(1)}
+                aria-label="Próxima classe"
+                className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface text-lg text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <span aria-hidden="true">›</span>
+              </button>
+              <button
+                type="button"
+                onClick={onTogglePause}
+                aria-pressed={rotationPaused}
+                aria-label={rotationPaused ? 'Retomar rotação de classes' : 'Pausar rotação de classes'}
+                className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface text-lg text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <span aria-hidden="true">{rotationPaused ? '▶' : '‖'}</span>
+              </button>
+              {/* Draining window (see .class-progress in index.css): the
+                  element remounts with the carousel per class, which is
+                  exactly what restarts the drain for the fresh window. */}
+              <span
+                aria-hidden="true"
+                className="class-progress absolute -bottom-2 left-1/2 w-28 max-w-full -translate-x-1/2"
+              >
+                <span
+                  className="class-progress-fill"
+                  style={{ animationDuration: `${autoAdvanceMs}ms` }}
+                />
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       <div
@@ -295,7 +402,7 @@ export function HighlightsCarousel({
                   className="showcase-reveal"
                   style={{ animationDelay: `${logical * 70}ms` }}
                 >
-                  <PromotionCard card={card} charClass={charClass} />
+                  <PromotionCard card={card} charClass={charClass} spotlight={spotlight} />
                 </div>
               </li>
             )

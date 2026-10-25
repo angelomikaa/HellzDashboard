@@ -352,6 +352,47 @@
   animation: showcase-card-in 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
+/* Class rotation window (UAT round 6): while one Impecável class holds the
+   spotlight, this bar drains over AUTO_ADVANCE_MS and the showcase rotates
+   to the next class when it empties. CSS-driven on purpose — a JS interval
+   re-rendering the carousel 10x/s just to move a bar is churn; this way the
+   bar costs nothing and the global prefers-reduced-motion kill-switch below
+   freezes it at full (the rotation itself still runs, paused by the
+   controls; the swap is a discrete remount, not motion). [data-paused]
+   freezes the drain in place so pause/resume stays in sync with the parent
+   timer, which tracks the remaining wall-clock time. */
+@keyframes class-drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.class-progress {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background-color: var(--color-line);
+  overflow: hidden;
+}
+
+.class-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background-color: var(--color-accent);
+  transform-origin: left center;
+  animation: class-drain 30s linear forwards;
+}
+
+/* [data-paused] sits on the cluster wrapper that owns the bar (round-6
+   chrome), not on the bar itself. */
+[data-paused='true'] .class-progress-fill {
+  animation-play-state: paused;
+}
+
 /* page headings inherit the display font (D-07) — one rule, zero component churn */
 @layer base {
   h1 {
