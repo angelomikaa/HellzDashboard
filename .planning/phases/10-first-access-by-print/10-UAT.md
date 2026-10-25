@@ -362,7 +362,14 @@ verification: live (dev-only 3s window + a dev-only duplicated section, both
   Restored state: single class → no chrome, no live region, timer disarmed,
   spotlight-only download intact. tsc clean; oxlint 0 errors; carousel tests
   18/18; vite build green.
-status: fixed — live-verified on the public landing (commit de1e1d3)
+post-seeding (owner, 2026-10-25): with the sanctioned `smoke-bio-%` fixtures
+  (SoldierHellz-based, see STATE) the landing now carries TWO real sections
+  for every visitor: it opens on "Criador" (Smoke Criador Um, SoldierHellz,
+  Smoke Criador Dois — all platinum 99/99/94), the chrome renders (stepper
+  1/2, pause, 30s drain bar running) and the production 30s window rotated
+  it to "Sumo Sacerdote" (2/2) with the live region announcing both states.
+status: fixed — live-verified on the public landing, rotation now
+  visitor-visible with real data (commit de1e1d3)
 
 ## Scope correction (owner, 2026-10-24)
 
