@@ -276,9 +276,11 @@
    slot — card AND the "Baixar card" button. With only pb-4 the halo was hard-
    cropped at the bottom edge (and at the top, where there was no padding at
    all). 2rem top / 3rem bottom keeps the card halo and the lower button glow
-   inside the clip box at the breathing peak. */
+   inside the clip box at the breathing peak.
+
+   The card width lives on .showcase-inner, not here: the skeleton (outside
+   the scroller) needs the exact same value. */
 .carousel-scroller {
-  --carousel-card: min(78vw, 18rem);
   padding-inline: calc((100% - var(--carousel-card)) / 2);
   padding-block: 2rem 3rem;
   scrollbar-width: none;
@@ -288,9 +290,24 @@
   display: none;
 }
 
+/* Showcase sizing (owner, UAT round 4). The root is a size container; the
+   inner wrapper owns --carousel-card because an element cannot query itself.
+   Mobile keeps the 1-up spotlight with peeking neighbours; at lg the row is
+   exactly 3-up: card = (row - two 1rem gaps) / 3, so the outer cards land
+   flush with the container edges and no fourth card peeks in. 100cqw follows
+   the showcase width, which tracks the page container (max-w-6xl, then
+   xl:max-w-7xl) without hard-coded pixel widths. */
+.showcase-root {
+  container-type: inline-size;
+}
+
+.showcase-inner {
+  --carousel-card: min(78vw, 18rem);
+}
+
 @media (min-width: 64rem) {
-  .carousel-scroller {
-    --carousel-card: 20rem;
+  .showcase-inner {
+    --carousel-card: calc((100cqw - 2rem) / 3);
   }
 }
 
