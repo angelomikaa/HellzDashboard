@@ -327,6 +327,7 @@ export interface MyReport {
   char_function: 'dps' | 'mdps' | 'suporte'
   stats: MyReportStat[] // always all 57 catalog entries, ordered group_name, label
   ovr: { value: number | null; data_sufficient: boolean }
+  last_validated_at: string | null // Phase 9 migration 0018: max(submitted_at) over own validated submissions
 }
 
 export async function fetchMyReport(session: NeoFootSession): Promise<MyReport> {

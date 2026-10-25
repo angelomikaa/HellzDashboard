@@ -9,6 +9,8 @@ import { RankPage } from './features/rank/RankPage'
 import { HighlightsPage } from './features/highlights/HighlightsPage'
 import { SubmitPage } from './features/submit/SubmitPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
+import { InicioPage } from './features/dashboard/InicioPage'
+import { PageErrorBoundary } from './features/shell/PageErrorBoundary'
 import { fetchMyIdentity } from './lib/api'
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
@@ -25,6 +27,7 @@ export type Tab =
   | 'submit'
   | 'validacoes'
   | 'destaques'
+  | 'inicio'
   | 'characters'
   | 'keystats'
   | 'ranking'
@@ -107,6 +110,10 @@ function App() {
         // (D-12); mirrors showSubmit with no role condition. Enforcement is
         // the member-invocable get_promotion RPC.
         const showHighlights = tab === 'destaques'
+        // Início (Phase 10, HOME-01): personalized home landing — own OVR +
+        // best-stats strip. Every logged-in member; enforcement is the
+        // member-invocable my_report RPC (no role condition).
+        const showInicio = tab === 'inicio'
 
         return (
           <IdentityName key={session.access_token} session={session}>
@@ -139,6 +146,16 @@ function App() {
                       }`}
                     >
                       Painel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTab('inicio')}
+                      aria-current={showInicio ? 'page' : undefined}
+                      className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                        showInicio ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
+                      }`}
+                    >
+                      Início
                     </button>
                     <button
                       type="button"
@@ -216,28 +233,36 @@ function App() {
                       need a scannable column (submit wizard, login) cap
                       themselves internally. */}
                   <div className="mx-auto w-full max-w-6xl px-4 py-6 xl:max-w-7xl">
-                    {showValidacoes ? (
-                      <ValidacoesPage session={session} />
-                    ) : showHighlights ? (
-                      <HighlightsPage session={session} />
-                    ) : showCharacters ? (
-                      <CharactersPage session={session} />
-                    ) : showKeyStats ? (
-                      <KeyStatsPage session={session} />
-                    ) : showRanking ? (
-                      // Content re-check: showRanking re-evaluates isStaff, so a
-                      // lingering staff tab across a logout/login switch renders
-                      // nothing for a member (App-stays-mounted lesson).
-                      <RankPage session={session} />
-                    ) : showSubmit ? (
-                      <SubmitPage session={session} />
-                    ) : (
-                      <DashboardPage
-                        session={session}
-                        onNavigate={setTab}
-                        identityName={identityName}
-                      />
-                    )}
+                    {/* Page errors stay inside the content region: without this
+                        boundary a render throw in one page unmounted the whole
+                        shell (blank screen, no nav). Keyed by tab so switching
+                        tabs (or "Tentar novamente") resets it. */}
+                    <PageErrorBoundary key={tab}>
+                      {showValidacoes ? (
+                        <ValidacoesPage session={session} />
+                      ) : showHighlights ? (
+                        <HighlightsPage session={session} />
+                      ) : showCharacters ? (
+                        <CharactersPage session={session} />
+                      ) : showKeyStats ? (
+                        <KeyStatsPage session={session} />
+                      ) : showRanking ? (
+                        // Content re-check: showRanking re-evaluates isStaff, so a
+                        // lingering staff tab across a logout/login switch renders
+                        // nothing for a member (App-stays-mounted lesson).
+                        <RankPage session={session} />
+                      ) : showSubmit ? (
+                        <SubmitPage session={session} />
+                      ) : showInicio ? (
+                        <InicioPage session={session} onNavigate={setTab} />
+                      ) : (
+                        <DashboardPage
+                          session={session}
+                          onNavigate={setTab}
+                          identityName={identityName}
+                        />
+                      )}
+                    </PageErrorBoundary>
                   </div>
                 </main>
               </div>
