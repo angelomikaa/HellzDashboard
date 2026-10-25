@@ -150,3 +150,13 @@
 **Decisions captured:**
 - D-10-04-20: the card photo fit is HEAD-SAFE TOP-ANCHORED on both surfaces — SVG xMidYMin slice and a canvas drawImage pinned to the crop window's top edge. Vertical-center cover-fit beheaded the full-body class portraits (and tall phone screenshots); the top anchor hides the legs instead, per the owner's "thighs and above" framing. Wide/landscape images fit by height and are untouched by the anchor.
 - D-10-04-21: the card-render-check render-diff now uses a PORTRAIT test photo (360×480 — taller than the crop window's 1.089 ratio), so the 0-diff gate LOCKS the anchor contract across the on-page SVG, the canvas export and the file-side reference; the old wide test photo made center vs top anchoring indistinguishable to the diff. A follow-up tighter crop (mid-thigh instead of knee) would need the image's measured aspect on the SVG side — recorded as an offered follow-up, not shipped.
+
+---
+
+## Owner correction — 2026-10-25 (card polish round 8): measured framing + the H mark ruling
+
+**User:** "we need to go down further - heads are still too close to the border, enough to cause visual imbalance with the card info below. the H symbol alignment must be a planned exception to the card layout, not a rule"
+
+**Decisions captured:**
+- D-10-04-22: the card photo fit is now MEASURED, not anchor-based. One pure contract (cardAssets.photoDestRect + measurePhotoSubject, a downscaled alpha scan) frames subject art head-to-thigh: the opaque figure expanded by head/side margins (PHOTO_FRAME 0.10/0.05 of figure height), cut at 0.58 of the figure, cover-fit so the body fills the crop window. The High Priest head now sits ~11.6% of the window below the top border (was ~6.7% with the round-7 anchor) and the crop lands at mid-thigh (was ~knee) — the composition balances against the name/stat bands below. Opaque member screenshots keep the round-7 top-anchored cover verbatim. The on-page SVG measures through a cache-hot probe HTMLImageElement (SVGImageElement exposes no natural size); all three paint sites (on-page SVG, canvas export, harness reference) share the one function, and the render-diff is 0/0 on every tier with a new subject-style test photo that actually exercises the measured path.
+- D-10-04-23: the Hellz brand mark ({y: 1408, size: 54}, centered in the plate tip) is a PLANNED EXCEPTION to the card layout — position and size are never derived from the parsed slots, the photo frame, or any layout rule, and no other element aligns to it; it stays byte-identical across card layout changes ("not a rule").

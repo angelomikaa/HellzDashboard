@@ -411,6 +411,60 @@ note: the visible band on the 1197x1309 portraits is the top ~84% (head to
   if the owner wants the shot tighter.
 status: fixed — harness-verified + live-verified (commit 8ef16e4)
 
+### G-9 (card surfaces, round 8): heads still flush against the border + the H mark ruling
+
+report: "we need to go down further - heads are still too close to the
+  border, enough to cause visual imbalance with the card info below. the H
+  symbol alignment must be a planned exception to the card layout, not a
+  rule"
+
+root_cause: |
+  The round-7 top anchor pinned the IMAGE top to the window top, but the
+  class art itself has the character's top at only 0.4-11.5% of its height
+  (measured live across 8 portraits: champion's fist 0.4%, biochemist 2.4%,
+  assassin-cross 11.5%) — so the head/hat landed nearly flush against the
+  photo window's top border, top-heavy against the name/stat bands below.
+  A tighter, centered composition needs the image's real subject geometry,
+  which no preserveAspectRatio mode can express (and the SVG surface had no
+  natural-size access at all — SVGImageElement has no naturalWidth).
+
+fix: |
+  - MEASURED framing (one pure contract, cardAssets.photoDestRect + 
+    measurePhotoSubject — a downscaled alpha scan finds the subject's
+    opaque bounds; used by the on-page SVG, the canvas export AND the
+    harness reference): the figure is expanded by head/side margins
+    (PHOTO_FRAME 0.10/0.05 of figure height), cut at 0.58 of the figure
+    (mid-thigh), then cover-fit so the body FILLS the window. Live math on
+    the High Priest art: head at 11.6% of the window below the top border
+    (was 6.7%), crop at ~58% of the figure (was ~84% knee).
+  - CardSvg measures via a cache-hot probe HTMLImageElement (SVG <image>
+    exposes no natural size), keyed by src; the fallback until measured is
+    the round-7 top-anchored cover.
+  - Opaque member screenshots (no detectable subject) keep round 7
+    verbatim: top-anchored cover.
+  - The Hellz mark ({y: 1408, size: 54}) is ruled a PLANNED EXCEPTION to
+    the card layout: byte-identical, never derived from the slots or the
+    photo frame, never an alignment rule for other elements (owner words:
+    "not a rule").
+  - Harness: the test photo is now subject-style art (transparent margins +
+    an inset opaque band matching real class-art extents) so the
+    render-diff exercises the MEASURED path; the mount helper polls for the
+    measured fit before serializing.
+
+verification: card-render-check ALL GATES PASS — svgDiffRatio 0 AND
+  canvasDiffRatio 0 on all four tiers (all three paint sites agree
+  pixel-perfectly through the shared photoDestRect), photo present on all
+  tiers (real portraits through the measured canvas path), 0 on-page
+  violations at 360/720 + stress, aspect + font gates ok. Export tests
+  56/56 (9 new framing locks: head off the border, thigh cut at
+  bodyFraction, cover invariants, aspect preservation, no-headroom art,
+  screenshot anchor regression locks, PHOTO_FRAME tuning pins). Live
+  landing DOM: the High Priest placeholder renders preserveAspectRatio=none
+  at x=-114.3 y=81.1 w=1348.1 h=1474.3 (headroom 11.6%); Ahrya's blob
+  upload renders the screenshot path (y == window top, width == window
+  width). tsc clean; oxlint 0 errors.
+status: fixed — harness-verified + live-verified (commit 0aa2184)
+
 ## Scope correction (owner, 2026-10-24)
 
 report: "the original planning messed up things. Destaques and Inicio were
