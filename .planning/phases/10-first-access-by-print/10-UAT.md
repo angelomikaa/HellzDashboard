@@ -225,14 +225,23 @@ fix: |
     sr-only status. Error/empty states are floating copy, not panels.
   - The member blocks (OVR, CTA, top-3) join the same reveal, staggered
     0/80/160ms.
+  - Carousel clip box given glow room (owner follow-up, same round):
+    `overflow-x: auto` clips on BOTH axes, so the old `pb-4` was hard-cropping
+    the spotlight halo where it wraps the "Baixar card" button. The scroller
+    now carries `padding-block: 2rem 3rem` in `.carousel-scroller` (top for the
+    card halo, more at the bottom for the button glow) and the breathing peak
+    was softened from 24px/0.65 to 20px/0.6 so the Gaussian tail stays inside
+    the clip box.
 
 verification: computed styles — class sections border 0px / transparent
   background / no padding; badge pseudo-element `neon-spin 5s` with the conic
   gradient; header/cards `showcase-card-in` (delays 0/70/140ms);
   centered card `spotlight-breathe 4s`; `document.getAnimations()` reports all
   of them running. Build CSS contains `showcase-reveal`, `spotlight-breathe`,
-  `animate-pulse` and `27/40`. tsc clean; oxlint 0 errors; 675/675 vitest;
-  vite build green.
+  `animate-pulse` and `27/40`. Carousel clip box computes `padding-block` =
+  `32px 48px` with no vertical overflow (`scrollHeight === clientHeight`) and
+  48px of room below the "Baixar card" button. tsc clean; oxlint 0 errors;
+  675/675 vitest; vite build green.
 status: fixed — live-verified on the public landing
 
 ## Scope correction (owner, 2026-10-24)
