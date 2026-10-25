@@ -39,10 +39,19 @@
 // (07.1 D-05). The global prefers-reduced-motion rule in index.css kills the
 // transitions; the layout still works with them off.
 //
+// UAT round 5 (owner): the class crest, the class name and the arrows used to
+// live OUTSIDE the carousel (a separate header row in PromotionShowcase plus a
+// controls row of its own). They now sit in one bar INSIDE this component —
+// [crest] Class name ──────── [‹][›] — directly above the cards, so the whole
+// class block is one carousel. The fading rule is hidden on mobile to keep the
+// name and the arrows on one line.
+//
 // Data contract unchanged: cards render in SERVER order (highest OVR first),
 // never re-sorted here. Pure presentation — no points math in TS.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PromotionCardRow } from '../../lib/api'
+import { classLabel } from '../../lib/classLabels'
+import { ClassCrest } from '../assets/ClassCrest'
 import { PromotionCard } from './PromotionCard'
 import { clampIndex, loopIndex, nearestCardIndex } from './carousel'
 
@@ -211,26 +220,42 @@ export function HighlightsCarousel({
   if (cards.length === 0) return null
 
   return (
-    <div className="mt-6">
-      <div className="mb-3 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => step(-1)}
-          disabled={!looping}
-          aria-label={`Anterior — ${label}`}
-          className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface text-lg text-content hover-control disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          <span aria-hidden="true">‹</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => step(1)}
-          disabled={!looping}
-          aria-label={`Próximo — ${label}`}
-          className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface text-lg text-content hover-control disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          <span aria-hidden="true">›</span>
-        </button>
+    <div>
+      {/* One bar inside the carousel: class identity on the left, arrows on
+          the right, a fading rule between them at sm+. On mobile the rule is
+          hidden so the name and the arrows stay on one line. */}
+      <div className="mb-2 flex items-center gap-3 sm:gap-4">
+        {/* D-17: class imagery grounds the carousel in the game; D-16:
+            classes without official art render the monogram tile — never a
+            broken image. */}
+        <ClassCrest charClass={charClass} size="md" />
+        <h2 className="font-display text-xl font-semibold text-content sm:text-2xl">
+          {classLabel(charClass)}
+        </h2>
+        <span
+          aria-hidden="true"
+          className="hidden h-px flex-1 bg-gradient-to-r from-accent/40 via-line to-transparent sm:block"
+        />
+        <div className="ml-auto flex items-center gap-2 sm:ml-0">
+          <button
+            type="button"
+            onClick={() => step(-1)}
+            disabled={!looping}
+            aria-label={`Anterior — ${label}`}
+            className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface text-lg text-content hover-control disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <span aria-hidden="true">‹</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => step(1)}
+            disabled={!looping}
+            aria-label={`Próximo — ${label}`}
+            className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface text-lg text-content hover-control disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <span aria-hidden="true">›</span>
+          </button>
+        </div>
       </div>
 
       <div

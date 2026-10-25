@@ -7,9 +7,9 @@
 //
 // UAT round 3 (owner): "removing the box and let the cards float in space" +
 // "the plan was supposed to include light animations, like the neon ring".
-// The per-class panels are gone — the crest/name header and the carousel now
-// sit directly on the neon-grid backdrop, separated only by space and a fading
-// rule. The Phase 10 soft-motion layer (10-CONTEXT D-01/D-02/D-03) is applied:
+// The per-class panels are gone — the cards sit directly on the neon-grid
+// backdrop, separated only by space. The Phase 10 soft-motion layer
+// (10-CONTEXT D-01/D-02/D-03) is applied:
 //   - the "Os Impecáveis da Hellz" title wears the existing rotating neon ring;
 //   - cards rise/fade in once, staggered (HighlightsCarousel/showcase-reveal);
 //   - the centered card's halo breathes (carousel-spotlight);
@@ -21,6 +21,10 @@
 // is exactly 3-up: --carousel-card is derived from the showcase container
 // (see .showcase-root/.showcase-inner in index.css), so three cards fill the
 // row and no fourth card peeks in. Mobile keeps the 1-up spotlight.
+//
+// UAT round 5 (owner): "move the icon, the name and the carousel controls to
+// inside the carousel box" — the crest/name header and the arrows are now one
+// bar inside HighlightsCarousel, not a separate header row out here.
 //
 // Data path (0029): get_promotion_public is the anon-callable twin of
 // get_promotion — same body, member gate removed. No session is threaded
@@ -34,7 +38,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ApiError, fetchPromotionPublic, type PromotionSection } from '../../lib/api'
 import { tierForOvr } from '../dashboard/presentation'
-import { ClassCrest } from '../assets/ClassCrest'
 import { classLabel } from '../../lib/classLabels'
 import { HighlightsCarousel } from './HighlightsCarousel'
 
@@ -162,35 +165,21 @@ export function PromotionShowcase() {
 
   return (
     <ShowcaseShell>
-      {/* No panels: the class header and the cards float directly on the
-          page's neon grid. Sections are separated by air, not borders. */}
+      {/* No panels: each carousel owns its class header (crest + name +
+          arrows) and the cards float directly on the page's neon grid.
+          Sections are separated by air, not borders. */}
       <div className="flex w-full flex-col gap-16 pb-8 sm:gap-20 sm:pb-12">
         {impecavelSections.map((section) => (
-          <section key={section.class_name} className="flex flex-col gap-2">
-            <div className="flex items-center gap-4">
-              {/* D-17: class imagery grounds the section in the game; D-16:
-                  classes without official art render the monogram tile —
-                  never a broken image. */}
-              <ClassCrest charClass={section.class_name} size="md" />
-              <h2 className="font-display text-2xl font-semibold text-content">
-                {classLabel(section.class_name)}
-              </h2>
-              {/* Fading rule: ties the floating header to the row without
-                  drawing a box around either. */}
-              <span
-                aria-hidden="true"
-                className="h-px flex-1 bg-gradient-to-r from-accent/40 via-line to-transparent"
-              />
-            </div>
-            {/* SHWC-01 rework (UAT rounds 1/4): centered spotlight carousel —
-                one card on mobile, exactly three at lg. Server order preserved
-                (no client re-sort). */}
-            <HighlightsCarousel
-              cards={section.cards}
-              charClass={section.class_name}
-              label={`${classLabel(section.class_name)} — cartazes impecáveis`}
-            />
-          </section>
+          /* SHWC-01 rework (UAT rounds 1/4/5): centered spotlight carousel —
+             one card on mobile, exactly three at lg; the class header and the
+             arrows live inside the carousel component. Server order preserved
+             (no client re-sort). */
+          <HighlightsCarousel
+            key={section.class_name}
+            cards={section.cards}
+            charClass={section.class_name}
+            label={`${classLabel(section.class_name)} — cartazes impecáveis`}
+          />
         ))}
       </div>
     </ShowcaseShell>
