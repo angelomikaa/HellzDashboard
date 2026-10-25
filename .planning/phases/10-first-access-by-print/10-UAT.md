@@ -371,6 +371,46 @@ post-seeding (owner, 2026-10-25): with the sanctioned `smoke-bio-%` fixtures
 status: fixed — live-verified on the public landing, rotation now
   visitor-visible with real data (commit de1e1d3)
 
+### G-8 (card surfaces, round 7): the photo frame beheaded the placeholders
+
+report: "one last polishment in the cards - the head of the placeholders are
+  often cut off, we must adjust the frame of the placeholders to be a shot
+  from the tighs and above, meaning we can hidden most of the legs instead
+  of the head"
+
+root_cause: |
+  Both card surfaces cover-fit the photo into the 931x856 crop window with
+  VERTICAL CENTERING (SVG preserveAspectRatio="xMidYMid slice" / canvas
+  drawImage at the window's vertical middle). The class-portrait
+  placeholders are full-body art (1197x1309, head in the top ~10%): centered
+  in the window the visible band starts ~8% into the art, cropping the head
+  off. Tall phone screenshots suffered the same cut.
+
+fix: |
+  The cover fit is now TOP-anchored on both surfaces ("a shot from the
+  thighs and above"): SVG preserveAspectRatio="xMidYMid slice" →
+  "xMidYMin slice", canvas drawImage y from b.y + (b.h - dh) / 2 → b.y.
+  Tall images (portraits, phone screenshots) lose their legs instead of
+  their head; wide/landscape images fit by height and are unaffected.
+  The render-diff harness now uses a PORTRAIT test photo (360x480, taller
+  than the window's 1.089 ratio) so the 0-diff gate actually locks the
+  anchor: with the old wide test photo the vertical fit was exact and a
+  centered render could never be told from a top-anchored one. Any surface
+  drifting back to center now breaks the diff.
+
+verification: card-render-check ALL GATES PASS — photo present on all 4
+  tiers, svgDiffRatio 0 on every tier (on-page CardSvg === file-side
+  reference, both top-anchored), canvasDiffRatio ~0.0006 (the usual
+  photo-resample AA), on-page SVG audit 0 violations at 360/720 + stress,
+  aspect gate ok. Export unit tests 47/47. Live landing DOM: every card
+  photo <image> carries xMidYMin slice (class portraits AND the blob-loaded
+  member screenshot). tsc clean; oxlint 0 errors.
+note: the visible band on the 1197x1309 portraits is the top ~84% (head to
+  ~knee/shin). A tighter mid-thigh crop needs the image's real aspect on
+  the SVG side (measure-then-zoom on both surfaces) — offered as a follow-up
+  if the owner wants the shot tighter.
+status: fixed — harness-verified + live-verified (commit 8ef16e4)
+
 ## Scope correction (owner, 2026-10-24)
 
 report: "the original planning messed up things. Destaques and Inicio were

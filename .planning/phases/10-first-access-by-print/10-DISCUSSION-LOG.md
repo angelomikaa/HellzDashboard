@@ -140,3 +140,13 @@
 - D-10-04-17: the window indicator is a CSS drain bar (class-drain in index.css) frozen via nimation-play-state under [data-paused] — zero interval re-renders, covered by the global prefers-reduced-motion kill-switch (the rotation itself is a discrete remount, not motion). The class stepper is ‹ n/N › (wrap-around, distinct guillemet glyphs vs the card arrows' ?/?); the count is aria-hidden decoration — the live region is the accessible channel.
 - D-10-04-18: "Baixar card" renders on every slot but visibility-hidden off-spotlight (the failed draft unmounted it, bobbing the items-center row): neighbours stay decluttered AND the row height is constant during spotlight moves.
 - D-10-04-19: rotation helpers are pure and unit-locked in carousel.ts (AUTO_ADVANCE_MS = 30_000, clampClassIndex, wrapClassIndex; 18/18 tests). Card-level autoplay remains forbidden (07.1 D-05 holds) — only the CLASS slot rotates.
+
+---
+
+## Owner correction — 2026-10-25 (card polish round 7): the photo frame must not crop the head
+
+**User:** "one last polishment in the cards - the head of the placeholders are often cut off, we must adjust the frame of the placeholders to be a shot from the tighs and above, meaning we can hidden most of the legs instead of the head"
+
+**Decisions captured:**
+- D-10-04-20: the card photo fit is HEAD-SAFE TOP-ANCHORED on both surfaces — SVG xMidYMin slice and a canvas drawImage pinned to the crop window's top edge. Vertical-center cover-fit beheaded the full-body class portraits (and tall phone screenshots); the top anchor hides the legs instead, per the owner's "thighs and above" framing. Wide/landscape images fit by height and are untouched by the anchor.
+- D-10-04-21: the card-render-check render-diff now uses a PORTRAIT test photo (360×480 — taller than the crop window's 1.089 ratio), so the 0-diff gate LOCKS the anchor contract across the on-page SVG, the canvas export and the file-side reference; the old wide test photo made center vs top anchoring indistinguishable to the diff. A follow-up tighter crop (mid-thigh instead of knee) would need the image's measured aspect on the SVG side — recorded as an offered follow-up, not shipped.
