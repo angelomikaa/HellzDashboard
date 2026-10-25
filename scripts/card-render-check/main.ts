@@ -43,7 +43,7 @@ import {
   estimateBebas,
   type CardExportData,
 } from '../../src/features/export/cardExport'
-import { CARD_DESIGN_HEIGHT, CARD_DESIGN_WIDTH, CARD_GEOMETRY, CARD_PLATE_GRADIENT_LINE, TIER_PALETTE } from '../../src/features/export/cardAssets'
+import { CARD_DESIGN_HEIGHT, CARD_DESIGN_WIDTH, CARD_GEOMETRY, CARD_PLATE_GRADIENT_LINE, TIER_PALETTE, measurePhotoSubject, photoDestRect, type CardRect } from '../../src/features/export/cardAssets'
 import { CardSvg } from '../../src/features/cards/CardSvg'
 import cardRaw from '../../src/assets/card.svg?raw'
 
@@ -322,22 +322,26 @@ interface MaskRect { x: number; y: number; w: number; h: number }
  *  where external URLs never load): a SMOOTH low-frequency gradient — both
  *  resampling kernels (canvas high-quality vs SVG image) agree on smooth
  *  gradients to within the tolerance, so the diff measures GEOMETRY (clip,
- *  cover-fit bounds, layer order), not browser-internal filtering. Far from
- *  every palette fill/border color. PORTRAIT (360×480 — taller than the crop
- *  window's 1.089 ratio) so the head-safe TOP anchor actually engages: with a
- *  wide test photo the vertical fit is exact and the diff could not tell a
- *  top-anchored render from a centered one (card polish round 7 lock). */
+ *  frame-fit bounds, layer order), not browser-internal filtering. Far from
+ *  every palette fill/border color.
+ *
+ *  Round 8: the gradient paints an INSET OPAQUE BAND over TRANSPARENT
+ *  margins (x 43-317, y 38-461 — extents matching the real 1197×1309 class
+ *  art: subject tops 0.4-11.5%, sides 3-97%), so the harness exercises the
+ *  MEASURED head-to-thigh framing path — the full-bleed photo it replaced
+ *  could never test it (it always fell to the screenshot anchor). The
+ *  framed fit is what both surfaces must now agree on. */
 function makeTestPhoto(): string {
   const c = document.createElement('canvas')
   c.width = 360
   c.height = 480
   const ctx = c.getContext('2d')!
-  const g = ctx.createLinearGradient(0, 0, 360, 480)
+  const g = ctx.createLinearGradient(43, 38, 317, 461)
   g.addColorStop(0, '#2255aa')
   g.addColorStop(0.55, '#7a4477')
   g.addColorStop(1, '#dd8822')
   ctx.fillStyle = g
-  ctx.fillRect(0, 0, 360, 480)
+  ctx.fillRect(43, 38, 274, 423)
   return c.toDataURL('image/png')
 }
 
@@ -362,6 +366,7 @@ function referenceCardSvg(
   palette: TierPalette,
   plan: CardPlan,
   photo: { kind: 'image'; dataUrl: string } | { kind: 'monogram'; letter: string },
+  photoDest: CardRect,
 ): string {
   let svg = cardRaw
   // Tier palette → the file's placeholder colors. ORDER MATTERS: the text
@@ -406,11 +411,13 @@ function referenceCardSvg(
   // The photo layer: clipped to the crop path, painted right after the
   // base-plate (BEFORE border-over — the file's three-layer order), scrim
   // inside the same clip. The crop area stays BORDERLESS (cls-2 fill:none
-  // is the file's own word).
+  // is the file's own word). Round 8: the image rides the SAME measured
+  // fit contract as the app (photoDestRect computed once from the test
+  // photo's measured subject bounds) — the diff locks the framing.
   const b = plan.photoBBox
   const inner =
     photo.kind === 'image'
-      ? `<image href="${photo.dataUrl}" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" preserveAspectRatio="xMidYMin slice"/>`
+      ? `<image href="${photo.dataUrl}" x="${photoDest.x}" y="${photoDest.y}" width="${photoDest.w}" height="${photoDest.h}" preserveAspectRatio="none"/>`
       : `<path d="${plan.card.cropPath}" fill="${plan.colors.monogramTile}"/>` +
         `<text x="${b.x + b.w / 2}" y="${b.y + b.h * 0.45}" text-anchor="middle" dominant-baseline="central" ` +
         `font-family="Orbitron, sans-serif" font-weight="700" font-size="${b.h * 0.2}" fill="${plan.colors.monogramText}">${photo.letter}</text>`
@@ -529,7 +536,23 @@ async function mountedCardSvgString(data: CardExportData): Promise<string> {
   const root = createRoot(host)
   root.render(createElement(CardSvg, { data }))
   await new Promise<void>((resolve) => setTimeout(resolve, 150))
-  const svg = host.querySelector('svg')
+  // Round 8: the CardSvg photo fit lands on <image> load (measure → state),
+  // a beat after mount. Wait for the measured rect (preserveAspectRatio
+  // flips from the xMidYMin-slice fallback to "none") before serializing,
+  // or the diff would compare the reference's measured fit against the
+  // app's pre-measurement fallback. Monogram cards render no crop image.
+  const svgNow = (): SVGSVGElement | null => host.querySelector('svg')
+  for (let i = 0; i < 40; i++) {
+    const candidate = svgNow()
+    const photoImage = candidate
+      ? Array.from(candidate.querySelectorAll('image')).find((img) =>
+          img.getAttribute('href') === data.photoSrc,
+        )
+      : undefined
+    if (!photoImage || photoImage.getAttribute('preserveAspectRatio') === 'none') break
+    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+  }
+  const svg = svgNow()
   if (!svg) {
     root.unmount()
     host.remove()
@@ -552,6 +575,22 @@ async function diffFileVsApp(): Promise<Record<string, unknown>> {
   ])
   await document.fonts.ready
   const photoDataUrl = makeTestPhoto()
+  // Round 8: the reference and the app must share ONE measured fit. The
+  // mounted CardSvg measures on <image> load (React state), so the harness
+  // computes the same dest here from the SAME contract functions and feeds
+  // it to the file-side reference — identical inputs, identical framing.
+  const testPhotoImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('render-diff: test photo failed to load'))
+    img.src = photoDataUrl
+  })
+  const photoDest = photoDestRect(
+    testPhotoImg.naturalWidth,
+    testPhotoImg.naturalHeight,
+    measurePhotoSubject(testPhotoImg),
+    buildCardPlan({ ...base, photoSrc: photoDataUrl }, CARD_DESIGN_WIDTH).photoBBox,
+  )
   const out: Record<string, unknown> = {}
   // The app data = the FILE's own placeholders (visual column order by the
   // rating anchors: MATK / MDMG.R alternating) — slot parity between the
@@ -596,6 +635,7 @@ async function diffFileVsApp(): Promise<Record<string, unknown>> {
           palette,
           plan,
           monogram ? { kind: 'monogram', letter: 'A' } : { kind: 'image', dataUrl: photoDataUrl },
+          photoDest,
         ),
       ),
       CARD_DESIGN_WIDTH,

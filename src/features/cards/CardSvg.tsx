@@ -50,6 +50,7 @@
 // Text lives INSIDE the <svg viewBox> coordinate space, so the fitted
 // composition scales with the card at any width.
 import { useEffect, useId, useMemo, useState } from 'react'
+import { measurePhotoSubject, photoDestRect, type CardRect } from '../export/cardAssets'
 import {
   buildCardPlan,
   CARD_PLATE_GRADIENT_LINE,
@@ -126,6 +127,48 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
   const scrimId = `card-scrim-${uid}`
   const b = plan.photoBBox
 
+  // Round-8 photo framing: the dest rect is computed from the image's own
+  // measured opaque bounds (cardAssets.measurePhotoSubject +
+  // photoDestRect — the SAME pure contract the canvas export and the
+  // harness reference use). SVG <image> elements expose NO natural size
+  // (that is an HTMLImageElement API), so the measurement loads the same
+  // URL in a throwaway HTMLImageElement — cache-hot, the SVG element just
+  // fetched it. The fit is keyed by src (a new photo re-measures; a stale
+  // fit never applies) and until it lands the image renders with the
+  // round-7 head-safe top-anchored cover (xMidYMin slice over the crop
+  // bbox).
+  const [photoFit, setPhotoFit] = useState<{ src: string; dest: CardRect } | null>(null)
+  const photoSrc = plan.photo.kind === 'image' ? plan.photo.src : null
+  useEffect(() => {
+    if (photoSrc === null) {
+      setPhotoFit(null)
+      return
+    }
+    let alive = true
+    const probe = new Image()
+    probe.onload = () => {
+      if (!alive || probe.naturalWidth <= 0 || probe.naturalHeight <= 0) return
+      setPhotoFit({
+        src: photoSrc,
+        dest: photoDestRect(
+          probe.naturalWidth,
+          probe.naturalHeight,
+          measurePhotoSubject(probe),
+          b,
+        ),
+      })
+    }
+    probe.onerror = () => {
+      if (alive) setPhotoFit(null)
+    }
+    probe.src = photoSrc
+    return () => {
+      alive = false
+    }
+  }, [photoSrc, b])
+  const measuredFit =
+    photoFit !== null && photoFit.src === photoSrc ? photoFit.dest : null
+
   return (
     <svg
       viewBox={`0 0 ${plan.width} ${plan.height}`}
@@ -189,23 +232,27 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
       />
 
       {/* Photo: member screenshot / class portrait CLIPPED TO THE CROP PATH
-          (cover-fit) — or the ASST-01 monogram (never an empty hole).
-          HEAD-SAFE ANCHOR (owner, card polish round 7): the fit is
-          TOP-anchored, never vertical-center — a full-body portrait or a
-          tall phone screenshot centered in this window loses the HEAD to
-          the crop; top-anchored it loses the LEGS instead ("a shot from
-          the thighs and above"). Wide/landscape images fit by height and
-          are unaffected (the anchor only decides which side of a TALLER
-          image survives). xMid keeps the horizontal centering. */}
+          — or the ASST-01 monogram (never an empty hole). HEAD-SAFE framing
+          (owner, card rounds 7-8): vertical-center cover-fit beheaded the
+          full-body placeholders, so round 7 top-anchored the fit ("hide the
+          legs, never the head"); round 8 goes further — subject art (class
+          portraits with real alpha margins) gets a MEASURED head-to-thigh
+          frame (cardAssets.photoDestRect: the character's opaque bounds
+          expanded by margins, cut at mid-thigh, cover-fit), so the head
+          keeps ~8-12% of window below the top border and the body fills the
+          frame against the info bands. Opaque member screenshots keep the
+          round-7 top-anchored cover. Measured rect → preserveAspectRatio
+          "none" (the rect already matches the image aspect); fallback →
+          round-7 "xMidYMin slice" until the measurement lands. */}
       <g clipPath={`url(#${cropClipId})`}>
         {plan.photo.kind === 'image' ? (
           <image
             href={plan.photo.src}
-            x={b.x}
-            y={b.y}
-            width={b.w}
-            height={b.h}
-            preserveAspectRatio="xMidYMin slice"
+            x={measuredFit ? measuredFit.x : b.x}
+            y={measuredFit ? measuredFit.y : b.y}
+            width={measuredFit ? measuredFit.w : b.w}
+            height={measuredFit ? measuredFit.h : b.h}
+            preserveAspectRatio={measuredFit ? 'none' : 'xMidYMin slice'}
           />
         ) : (
           <>

@@ -64,6 +64,8 @@ import {
   CARD_GEOMETRY,
   CARD_PLATE_GRADIENT_LINE,
   TIER_PALETTE,
+  measurePhotoSubject,
+  photoDestRect,
   resolveCardTextFill,
   scalePath,
   scaleRect,
@@ -115,9 +117,13 @@ export const CARD_FONTS = { slots: 'Bebas Neue', name: 'Orbitron' } as const
  *  render (an ADDITIVE legibility treatment, not part of the file). */
 export const SCRIM = { heightFraction: 0.65, alpha: 0.55 } as const
 
-/** The Hellz brand mark, centered in the plate tip below the stat slots
- *  (kept from rounds 3-6; card.svg has no mark slot — this is an additive
- *  brand anchor, not part of the design-space contract). */
+/** The Hellz brand mark. OWNER RULING (card polish round 8): this is a
+ *  PLANNED EXCEPTION to the card layout — its position and size are NOT
+ *  derived from the parsed slots, the photo frame, or any layout rule, and
+ *  no other element aligns to it. Keep it byte-identical across card
+ *  layout changes (rounds 3-6 placement, centered in the plate tip below
+ *  the stat slots; card.svg has no mark slot — this is an additive brand
+ *  anchor, not part of the design-space contract). */
 const MARK = { y: 1408, size: 54 } as const
 
 // ---------------------------------------------------------------------------
@@ -596,17 +602,15 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   if (plan.photo.kind === 'image') {
     const img = await loadImage(plan.photo.src)
     if (img !== null && img.width > 0 && img.height > 0) {
-    // Cover-fit within the crop bbox: scale to cover, TOP-anchored, let the
-    // crop path clip the overflow (mirrors the SVG's xMidYMin slice).
-    // HEAD-SAFE ANCHOR (owner, card polish round 7): vertical-centering
-    // beheads full-body portraits and tall screenshots — the top-anchored
-    // fit hides the legs instead ("a shot from the thighs and above").
-    // Horizontal stays centered; wide images fit by height (anchoring is
-    // a no-op for them).
-    const cover = Math.max(b.w / img.width, b.h / img.height)
-    const dw = img.width * cover
-    const dh = img.height * cover
-    ctx.drawImage(img, b.x + (b.w - dw) / 2, b.y, dw, dh)
+      // Round-8 framing (cardAssets.photoDestRect): subject art (the class
+      // portraits — real alpha margins) gets the MEASURED head-to-thigh
+      // frame so the head keeps its distance from the top border and the
+      // body fills the window; opaque screenshots keep the round-7
+      // head-safe top-anchored cover. The SAME pure function the on-page
+      // SVG and the harness reference use — the render-diff locks them.
+      const subject = measurePhotoSubject(img)
+      const dest = photoDestRect(img.width, img.height, subject, b)
+      ctx.drawImage(img, dest.x, dest.y, dest.w, dest.h)
     } else {
       drawMonogramFill(ctx, plan)
     }

@@ -573,5 +573,175 @@ export function scalePath(d: string, s: number): string {
 
 /** Scale a design-space rect onto a backing store (companion to scalePath). */
 export function scaleRect(r: CardRect, s: number): CardRect {
-  return { x: r.x * s, y: r.y * s, w: r.w * s, h: r.h * s }
+  return { x: r.x * s, y: r.y * s, h: r.h * s, w: r.w * s }
+}
+
+// ---------------------------------------------------------------------------
+// Photo framing (card polish round 8 — owner: "go down further, heads are
+// still too close to the border"). ONE shared contract for all three paint
+// sites (on-page CardSvg, canvas export, the render-diff harness reference)
+// so the framed crop cannot drift between surfaces.
+//
+// Two image kinds, detected by the measurement:
+//   - SUBJECT ART (the per-job full-body class portraits: real alpha
+//     margins around the character) gets a MEASURED head-to-thigh frame:
+//     the opaque bounds are expanded by a head/side margin, cut at
+//     BODY_FRACTION of the figure, then cover-fit so the body FILLS the
+//     window — the head lands ~8-12% below the top border and the crop
+//     line sits around mid-thigh, balancing the card info below.
+//   - OPAQUE SCREENSHOTS (member uploads: fully opaque rectangles, no
+//     detectable subject) keep the round-7 head-safe rule unchanged:
+//     top-anchored cover-fit (xMidYMin slice / drawImage at the window
+//     top) — never vertical-center, never cropping the head.
+
+/** Opaque-subject bounds in IMAGE pixels (round 8 measured via alpha scan). */
+export interface PhotoSubjectBounds {
+  top: number
+  bottom: number
+  left: number
+  right: number
+}
+
+/**
+ * Frame tuning, calibrated against the live 1197×1309 class art (measured
+ * 2026-10-25: character tops at 0.4-11.5% of the art height, bottoms at
+ * 92-99.3%). Fractions are of the measured FIGURE height (bottom - top).
+ */
+export const PHOTO_FRAME = {
+  /** How much of the figure the frame keeps below the head: 0.58 cuts at
+   *  about mid-thigh (the owner's "shot from the thighs and above"). */
+  bodyFraction: 0.58,
+  /** Breathing room above the subject's topmost opaque pixel. */
+  headMargin: 0.1,
+  /** Breathing room either side of the figure (of the figure height). */
+  sideMargin: 0.05,
+  /** Alpha threshold for the opaque scan. */
+  alphaThreshold: 40,
+  /** Bounds covering >= this fraction of EVERY side mean "no subject"
+   *  (a fully opaque screenshot) → round-7 top-anchored cover. */
+  opaqueFullBleed: 0.995,
+  /** Downscale cap for the alpha scan (speed; a thin 1px tip may fall
+   *  below threshold at this scale — acceptable, the framing is a
+   *  heuristic by design). */
+  measureMaxSide: 256,
+} as const
+
+/** Dest rect for painting the WHOLE image so the frame covers `win`.
+ *  PURE — the only place this math exists (both surfaces + the harness
+ *  call it; the render-diff gate locks them together). */
+export function photoDestRect(
+  imgW: number,
+  imgH: number,
+  subject: PhotoSubjectBounds | null,
+  win: CardRect,
+): CardRect {
+  if (imgW <= 0 || imgH <= 0) return { x: win.x, y: win.y, w: win.w, h: win.h }
+
+  if (subject === null) {
+    // Screenshot path (round 7): top-anchored cover-fit. Wide images fit
+    // by height (anchor is a no-op); tall images lose their legs, never
+    // their head.
+    const cover = Math.max(win.w / imgW, win.h / imgH)
+    return {
+      x: win.x + (win.w - imgW * cover) / 2,
+      y: win.y,
+      w: imgW * cover,
+      h: imgH * cover,
+    }
+  }
+
+  // Subject path (round 8): expand the figure by the margins, cut at the
+  // thigh line, clamp to the image, cover-fit into the window.
+  const figureH = Math.max(1, subject.bottom - subject.top)
+  const head = figureH * PHOTO_FRAME.headMargin
+  const side = figureH * PHOTO_FRAME.sideMargin
+  const frame = {
+    left: Math.max(0, subject.left - side),
+    top: Math.max(0, subject.top - head),
+    right: Math.min(imgW, subject.right + side),
+    bottom: Math.min(
+      imgH,
+      Math.max(subject.top, subject.top + figureH * PHOTO_FRAME.bodyFraction),
+    ),
+  }
+  const frameW = Math.max(1, frame.right - frame.left)
+  const frameH = Math.max(1, frame.bottom - frame.top)
+
+  // Cover: the frame fills the window on BOTH axes; overflow centers, so
+  // the SUBJECT stays centered and its head margin survives.
+  const scale = Math.max(win.w / frameW, win.h / frameH)
+  return {
+    x: win.x + (win.w - frameW * scale) / 2 - frame.left * scale,
+    y: win.y + (win.h - frameH * scale) / 2 - frame.top * scale,
+    w: imgW * scale,
+    h: imgH * scale,
+  }
+}
+
+/**
+ * Measure the opaque subject bounds of a loaded image (DOM glue — the
+ * canvas scan both surfaces share). Downscaled to PHOTO_FRAME.measureMaxSide
+ * on the long side; scans alpha > PHOTO_FRAME.alphaThreshold. Returns null
+ * for fully-opaque rectangles (member screenshots — no subject to frame).
+ * Never throws: a tainted/failed canvas degrades to the screenshot path.
+ */
+export function measurePhotoSubject(img: HTMLImageElement): PhotoSubjectBounds | null {
+  try {
+    const long = Math.max(img.naturalWidth, img.naturalHeight)
+    if (long <= 0) return null
+    const s = Math.min(1, PHOTO_FRAME.measureMaxSide / long)
+    const w = Math.max(1, Math.round(img.naturalWidth * s))
+    const h = Math.max(1, Math.round(img.naturalHeight * s))
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (ctx === null) return null
+    ctx.drawImage(img, 0, 0, w, h)
+    const data = ctx.getImageData(0, 0, w, h).data
+    const t = PHOTO_FRAME.alphaThreshold
+    const opaqueAt = (x: number, y: number) => data[(y * w + x) * 4 + 3] > t
+    let top = -1
+    let bottom = -1
+    let left = -1
+    let right = -1
+    for (let y = 0; y < h && top < 0; y++) {
+      for (let x = 0; x < w; x++) {
+        if (opaqueAt(x, y)) { top = y; break }
+      }
+    }
+    if (top < 0) return null
+    for (let y = h - 1; y >= 0 && bottom < 0; y--) {
+      for (let x = 0; x < w; x++) {
+        if (opaqueAt(x, y)) { bottom = y; break }
+      }
+    }
+    for (let x = 0; x < w && left < 0; x++) {
+      for (let y = 0; y < h; y++) {
+        if (opaqueAt(x, y)) { left = x; break }
+      }
+    }
+    for (let x = w - 1; x >= 0 && right < 0; x--) {
+      for (let y = 0; y < h; y++) {
+        if (opaqueAt(x, y)) { right = x; break }
+      }
+    }
+    const f = PHOTO_FRAME.opaqueFullBleed
+    const fullBleed =
+      top <= h * (1 - f) &&
+      bottom >= h * f &&
+      left <= w * (1 - f) &&
+      right >= w * f
+    if (fullBleed) return null
+    // Map the downscaled scan back to image pixels (ceil/floor so the
+    // bounds never clip the subject).
+    return {
+      top: Math.floor(top / s),
+      bottom: Math.ceil(bottom / s),
+      left: Math.floor(left / s),
+      right: Math.ceil(right / s),
+    }
+  } catch {
+    return null
+  }
 }

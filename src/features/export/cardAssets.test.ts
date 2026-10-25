@@ -17,7 +17,9 @@ import {
   CARD_DESIGN_HEIGHT,
   CARD_DESIGN_WIDTH,
   CARD_GEOMETRY,
+  PHOTO_FRAME,
   TIER_PALETTE,
+  photoDestRect,
   scalePath,
   scaleRect,
 } from './cardAssets'
@@ -222,5 +224,98 @@ describe('cardAssets — scalePath/scaleRect (the canvas-mapping contract)', () 
     const r = { x: 10, y: 20, w: 30, h: 40 }
     expect(scaleRect(r, 2)).toEqual({ x: 20, y: 40, w: 60, h: 80 })
     expect(scaleRect(r, 0.5)).toEqual({ x: 5, y: 10, w: 15, h: 20 })
+  })
+})
+
+// --- Card polish round 8: the measured head-to-thigh photo framing ------
+
+// The real crop window (CARD_GEOMETRY.cropBBox): ~931.7x855.9 in the
+// 1080x1600 design space.
+const WIN = CARD_GEOMETRY.cropBBox
+
+// The measured live class art (2026-10-25 probe, class-f-high-priest:
+// 1197x1309, character top 6.7%, bottom 95.5%, x 12.9-84.4%).
+const HP_BOUNDS = { top: 88, bottom: 1250, left: 155, right: 1010 }
+
+describe('photoDestRect — subject art (the class-portrait framing, round 8)', () => {
+  it('keeps the head off the top border: the subject top lands well inside the window', () => {
+    const dest = photoDestRect(1197, 1309, HP_BOUNDS, WIN)
+    // The frame is height-constrained for this art, so the frame top == the
+    // window top; the subject's own headroom (88 image px) scaled into the
+    // window is the margin the owner asked for.
+    const scale = dest.h / 1309
+    const subjectTopInWindow = 88 * scale
+    expect(subjectTopInWindow / WIN.h).toBeGreaterThan(0.08)
+    expect(subjectTopInWindow / WIN.h).toBeLessThan(0.16)
+  })
+
+  it('cuts at the thigh line, not the knee: the visible band ends at bodyFraction of the figure', () => {
+    const dest = photoDestRect(1197, 1309, HP_BOUNDS, WIN)
+    const scale = dest.h / 1309
+    // Window bottom maps to this image row:
+    const visibleBottomImageRow = (WIN.y + WIN.h - dest.y) / scale
+    const figureH = HP_BOUNDS.bottom - HP_BOUNDS.top
+    const visibleFigureFraction = (visibleBottomImageRow - HP_BOUNDS.top) / figureH
+    expect(visibleFigureFraction).toBeCloseTo(PHOTO_FRAME.bodyFraction, 2)
+  })
+
+  it('COVERS the window with the frame on both axes and keeps the image aspect', () => {
+    const dest = photoDestRect(1197, 1309, HP_BOUNDS, WIN)
+    // Aspect preserved (the whole image paints, clipped by the crop path).
+    expect(dest.w / dest.h).toBeCloseTo(1197 / 1309, 6)
+    // The frame covers the window: every window pixel maps inside the image.
+    expect(dest.x).toBeLessThanOrEqual(WIN.x)
+    expect(dest.y).toBeLessThanOrEqual(WIN.y + 0.5)
+    expect(dest.x + dest.w).toBeGreaterThanOrEqual(WIN.x + WIN.w)
+    expect(dest.y + dest.h).toBeGreaterThanOrEqual(WIN.y + WIN.h)
+  })
+
+  it('survives art with no headroom (clamped at the image top, still covers)', () => {
+    // class-f-champion: character top at 0.4% — the margin is whatever the
+    // art allows (here ~none), the fit must still cover and stay finite.
+    const dest = photoDestRect(1197, 1309, { top: 5, bottom: 1299, left: 37, right: 1151 }, WIN)
+    expect(Number.isFinite(dest.x)).toBe(true)
+    expect(dest.x).toBeLessThanOrEqual(WIN.x)
+    expect(dest.y).toBeLessThanOrEqual(WIN.y + 0.5)
+    expect(dest.x + dest.w).toBeGreaterThanOrEqual(WIN.x + WIN.w)
+    expect(dest.y + dest.h).toBeGreaterThanOrEqual(WIN.y + WIN.h)
+  })
+
+  it('clamps the frame to the image bounds (never frames outside the art)', () => {
+    const dest = photoDestRect(1197, 1309, { top: 700, bottom: 1309, left: 590, right: 607 }, WIN)
+    // A tiny off-center subject: the expanded frame clamps to the image, so
+    // the window still shows image content, not out-of-bounds void.
+    expect(dest.w / dest.h).toBeCloseTo(1197 / 1309, 6)
+  })
+})
+
+describe('photoDestRect — opaque screenshots (round-7 head-safe anchor, unchanged)', () => {
+  it('top-anchors tall phone screenshots (head safe, legs cropped)', () => {
+    const dest = photoDestRect(1080, 2400, null, WIN)
+    expect(dest.y).toBe(WIN.y)
+    expect(dest.h).toBeGreaterThan(WIN.h)
+    expect(dest.w / dest.h).toBeCloseTo(1080 / 2400, 6)
+    // Horizontal stays centered.
+    expect((WIN.x - dest.x) - (dest.x + dest.w - (WIN.x + WIN.w))).toBeCloseTo(0, 6)
+  })
+
+  it('fits wide screenshots by height exactly (anchor is a no-op)', () => {
+    const dest = photoDestRect(1920, 1080, null, WIN)
+    expect(dest.h).toBeCloseTo(WIN.h, 6)
+    expect(dest.w).toBeGreaterThan(WIN.w)
+    expect(dest.y).toBe(WIN.y)
+  })
+
+  it('guards zero-size images (never NaN into the render)', () => {
+    const dest = photoDestRect(0, 0, null, WIN)
+    expect(dest).toEqual(WIN)
+  })
+})
+
+describe('PHOTO_FRAME tuning (calibrated 2026-10-25)', () => {
+  it('keeps the owner-requested thigh cut and margins', () => {
+    expect(PHOTO_FRAME.bodyFraction).toBe(0.58)
+    expect(PHOTO_FRAME.headMargin).toBe(0.1)
+    expect(PHOTO_FRAME.sideMargin).toBe(0.05)
   })
 })
