@@ -1,19 +1,23 @@
 import { useState, type ReactNode } from 'react'
 import { RequestAccessPage, type ProspectDraft } from '../request/RequestAccessPage'
 import { ProspectApplicationPage } from '../request/ProspectApplicationPage'
+import { PublicLanding } from '../shell/PublicLanding'
 import { FirstAccessPage } from './FirstAccessPage'
 import { LoginPage } from './LoginPage'
 import { clearSession, isExpired, loadSession, type NeoFootSession } from './session'
 
 export interface AuthContext {
   session: NeoFootSession
-  /** Drops the guard back to LoginPage without touching storage (logout calls clearSession first). */
+  /** Drops the guard back to the landing page without touching storage (logout calls clearSession first). */
   invalidate: () => void
 }
 
-/** Unauthenticated views (08-03/08-04): login is the default. The
- *  application view keeps the confirmed request draft in memory only. */
+/** Unauthenticated views (08-03/08-04; Phase 10 landing). The PUBLIC LANDING
+ *  is the default — Início is the guild's landing page, so a visitor sees the
+ *  showcase before choosing Entrar. The application view keeps the confirmed
+ *  request draft in memory only. */
 export type AuthView =
+  | { kind: 'landing' }
   | { kind: 'login' }
   | { kind: 'first-access'; handle?: string }
   | { kind: 'request'; handle?: string; requestId?: string }
@@ -47,9 +51,26 @@ export function RequireAuth({ children, initialView }: RequireAuthProps) {
     }
     return stored
   })
-  const [view, setView] = useState<AuthView>(initialView ?? { kind: 'login' })
+  const [view, setView] = useState<AuthView>(initialView ?? { kind: 'landing' })
 
-  if (session) return <>{children({ session, invalidate: () => setSession(null) })}</>
+  // Logout / invalidation returns to the PUBLIC LANDING (Início), not the login
+  // card: visitors and ex-members both see the showcase, and Entrar is one
+  // click away. An expired session on mount lands there too (view default).
+  function invalidate() {
+    setView({ kind: 'landing' })
+    setSession(null)
+  }
+
+  if (session) return <>{children({ session, invalidate })}</>
+
+  if (view.kind === 'landing') {
+    return (
+      <PublicLanding
+        onLogin={() => setView({ kind: 'login' })}
+        onRequestAccess={() => setView({ kind: 'request' })}
+      />
+    )
+  }
 
   if (view.kind === 'first-access') {
     return (
@@ -78,7 +99,7 @@ export function RequireAuth({ children, initialView }: RequireAuthProps) {
       <RequestAccessPage
         initialHandle={view.handle}
         initialRequestId={view.requestId}
-        onBack={() => setView({ kind: 'login' })}
+        onBack={() => setView({ kind: 'landing' })}
         onStartApplication={(draft) => setView({ kind: 'application', draft })}
         onFirstAccess={(handle) => setView({ kind: 'first-access', handle })}
       />
@@ -90,6 +111,7 @@ export function RequireAuth({ children, initialView }: RequireAuthProps) {
       onLogin={setSession}
       onFirstAccess={() => setView({ kind: 'first-access' })}
       onRequestAccess={() => setView({ kind: 'request' })}
+      onBack={() => setView({ kind: 'landing' })}
     />
   )
 }

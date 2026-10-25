@@ -6,7 +6,6 @@ import { CharactersPage } from './features/admin/CharactersPage'
 import { KeyStatsPage } from './features/admin/KeyStatsPage'
 import { ValidacoesPage } from './features/admin/ValidacoesPage'
 import { RankPage } from './features/rank/RankPage'
-import { HighlightsPage } from './features/highlights/HighlightsPage'
 import { SubmitPage } from './features/submit/SubmitPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { InicioPage } from './features/dashboard/InicioPage'
@@ -26,7 +25,6 @@ export type Tab =
   | 'painel'
   | 'submit'
   | 'validacoes'
-  | 'destaques'
   | 'inicio'
   | 'characters'
   | 'keystats'
@@ -67,7 +65,10 @@ function IdentityName({
 }
 
 function App() {
-  const [tab, setTab] = useState<Tab>('painel')
+  // HOME-01 (Phase 10): Início is the landing page — members land there on
+  // login, with their own OVR/top-3 above the guild showcase. The detailed
+  // Painel stays one click away.
+  const [tab, setTab] = useState<Tab>('inicio')
 
   // D-06: logout is one click, no confirmation — clearSession() wipes the stored
   // session and invalidate() drops RequireAuth back to LoginPage.
@@ -106,13 +107,10 @@ function App() {
         const showRanking = tab === 'ranking' && isStaff
         // Enviar Status is for EVERY role (members submit their own stats).
         const showSubmit = tab === 'submit'
-        // Destaques (06-04): every logged-in member — celebration is the point
-        // (D-12); mirrors showSubmit with no role condition. Enforcement is
-        // the member-invocable get_promotion RPC.
-        const showHighlights = tab === 'destaques'
-        // Início (Phase 10, HOME-01): personalized home landing — own OVR +
-        // best-stats strip. Every logged-in member; enforcement is the
-        // member-invocable my_report RPC (no role condition).
+        // Início (Phase 10, HOME-01 + owner correction 2026-10-24): the guild
+        // landing page — personal blocks + the Destaques showcase in one page.
+        // Every logged-in member; enforcement is the member-invocable
+        // my_report RPC (no role condition).
         const showInicio = tab === 'inicio'
 
         return (
@@ -166,16 +164,6 @@ function App() {
                       }`}
                     >
                       Enviar Status
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTab('destaques')}
-                      aria-current={showHighlights ? 'page' : undefined}
-                      className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                        showHighlights ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
-                      }`}
-                    >
-                      Destaques
                     </button>
                     {isStaff && (
                       <button
@@ -240,8 +228,6 @@ function App() {
                     <PageErrorBoundary key={tab}>
                       {showValidacoes ? (
                         <ValidacoesPage session={session} />
-                      ) : showHighlights ? (
-                        <HighlightsPage session={session} />
                       ) : showCharacters ? (
                         <CharactersPage session={session} />
                       ) : showKeyStats ? (

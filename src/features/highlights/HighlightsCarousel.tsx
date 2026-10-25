@@ -1,6 +1,7 @@
-// HighlightsCarousel — the Destaques showcase slider (SHWC-01, reworked after
+// HighlightsCarousel — the Início showcase slider (SHWC-01, reworked after
 // UAT round 1 test 8: "it looks static — should look like a carousel, with the
-// middle card being in the spotlight").
+// middle card being in the spotlight"; Phase 10: Início is the public landing
+// page, so this renders for visitors too).
 //
 // What the previous implementation got wrong:
 //   - `scroll-snap-x` is not a Tailwind class (the real one is `snap-x`), so
@@ -26,19 +27,16 @@
 // never re-sorted here. Pure presentation — no points math in TS.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PromotionCardRow } from '../../lib/api'
-import type { NeoFootSession } from '../auth/session'
 import { PromotionCard } from './PromotionCard'
 import { clampIndex, nearestCardIndex } from './carousel'
 
 const SLOT_SELECTOR = '[data-carousel-slot]'
 
 export function HighlightsCarousel({
-  session,
   cards,
   charClass,
   label,
 }: {
-  session: NeoFootSession
   cards: PromotionCardRow[]
   charClass: string
   label: string
@@ -170,7 +168,7 @@ export function HighlightsCarousel({
                     : 'scale-[0.92] opacity-55'
                 }`}
               >
-                <PromotionCard session={session} card={card} charClass={charClass} />
+                <PromotionCard card={card} charClass={charClass} />
               </li>
             )
           })}

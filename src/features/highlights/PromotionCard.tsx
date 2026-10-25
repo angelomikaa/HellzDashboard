@@ -1,9 +1,9 @@
-// PromotionCard — the Destaques showcase card wrapper (07.2-05, CARD-02/
-// D-10/D-13; checkpoint round 3 superseding design). Pure presentational:
-// the payload arrives opaque from the member-invocable get_promotion RPC
-// and is rendered verbatim — nothing is recomputed here (rank math lives
-// only in Postgres; tier banding via the unit-locked tierForOvr/tierForPoints
-// presentation functions).
+// PromotionCard — the Início showcase card wrapper (07.2-05, CARD-02/
+// D-10/D-13; checkpoint round 3 superseding design; Phase 10 public landing).
+// Pure presentational: the payload arrives opaque from the showcase RPC
+// (get_promotion_public for everyone, 0029) and is rendered verbatim —
+// nothing is recomputed here (rank math lives only in Postgres; tier banding
+// via the unit-locked tierForOvr/tierForPoints presentation functions).
 //
 // ROUND 5 (owner supersession: "check the new card.svg — this one file
 // becomes the source of truth for card design"): the card body is now
@@ -36,8 +36,7 @@
 // disabled + 'Gerando…'; failure → inline enumeration-safe role=alert copy,
 // never raw errors.
 import { useEffect, useMemo, useState } from 'react'
-import { fetchCardPhotoByPath, type PromotionCardRow } from '../../lib/api'
-import type { NeoFootSession } from '../auth/session'
+import { fetchCardPhotoByPathPublic, type PromotionCardRow } from '../../lib/api'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { portraitSrcFor } from '../assets/ClassCrest'
 import { classLabel } from '../../lib/classLabels'
@@ -48,11 +47,9 @@ import { cardFilename, downloadCard, type CardExportData } from '../export/cardE
 const DOWNLOAD_ERROR = 'Não foi possível gerar o card. Tente novamente.'
 
 export function PromotionCard({
-  session,
   card,
   charClass,
 }: {
-  session: NeoFootSession
   card: PromotionCardRow
   charClass: string
 }) {
@@ -64,28 +61,29 @@ export function PromotionCard({
   // payload's storage path) as a BLOB → object URL; null until it lands,
   // then the class portrait shows through (the fallback chain's middle rung)
   // and the card re-renders with the real photo. The object URL is revoked
-  // on unmount/re-fetch.
+  // on unmount/re-fetch. 0029: this uses the ANON storage path so the very
+  // same card renders on the public landing (no session) and inside the app.
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   useEffect(() => {
     let alive = true
     let objectUrl: string | null = null
     const path = typeof card.photo_path === 'string' ? card.photo_path : ''
     if (path !== '') {
-      fetchCardPhotoByPath(session, path)
+      fetchCardPhotoByPathPublic(path)
         .then((blob) => {
           if (!alive || blob === null) return
           objectUrl = URL.createObjectURL(blob)
           setPhotoUrl(objectUrl)
         })
         .catch(() => {
-          /* unreachable (fetchCardPhotoByPath resolves null) — degrade to portrait */
+          /* unreachable (fetchCardPhotoByPathPublic resolves null) — degrade to portrait */
         })
     }
     return () => {
       alive = false
       if (objectUrl !== null) URL.revokeObjectURL(objectUrl)
     }
-  }, [session, card.photo_path])
+  }, [card.photo_path])
 
   const [generating, setGenerating] = useState(false)
   const [failed, setFailed] = useState(false)

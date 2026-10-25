@@ -1,7 +1,21 @@
-// InicioPage — the personalized home landing tab (Phase 10, HOME-01/HOME-02).
-// Renders the member's own OVR card (reused OvrHero) from my_report, a stale-data
-// CTA when data is strictly >7 days old, and a top-3 best-stats strip. Points and
-// OVR arrive opaque from the RPC — never recomputed client-side (AGENTS.md).
+// InicioPage — the guild LANDING page (Phase 10, HOME-01/HOME-02; owner
+// correction 2026-10-24: "Destaques and Inicio were supposed to be the same
+// page - a page that can be seen when a visitor arrives and also visible to
+// logged in users - this is why its called inicio, its a landing page").
+//
+// One page, two audiences:
+//   - visitor (no session): the Impecáveis showcase only, fetched with the
+//     anon-callable get_promotion_public RPC (0029). The public shell around
+//     it (mark + Entrar/Solicitar acesso) lives in PublicLanding.
+//   - member: the same showcase PLUS the personal blocks — own OVR card
+//     (reused OvrHero) from my_report, the stale-data CTA when data is
+//     strictly >7 days old (evergreen first-submission variant when never
+//     submitted), and a top-3 best-stats strip.
+//
+// The showcase is not duplicated for members: the exact same
+// PromotionShowcase tree renders in both states, so what a visitor previews is
+// what a member sees. Points and OVR arrive opaque from the RPCs — never
+// recomputed client-side (AGENTS.md).
 //
 // Mount-fetch pattern mirroring DashboardPage: useEffect with cancelled flag,
 // fetchMyReport(session), ApiError kind -> NETWORK_ERROR/SESSION_ERROR pt-BR
@@ -10,6 +24,7 @@ import { useEffect, useState } from 'react'
 import { ApiError, fetchMyReport, type MyReport } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import type { Tab } from '../../App'
+import { PromotionShowcase } from '../highlights/PromotionShowcase'
 import { OvrHero } from './OvrHero'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { tierForPoints, type Tier } from './presentation'
@@ -65,7 +80,32 @@ export function extractTop3(report: MyReport): Array<{
     }))
 }
 
+/**
+ * The landing page. `session` is null for visitors: the personal blocks are
+ * omitted entirely and only the showcase renders. `onNavigate` is required
+ * whenever a session exists (the stale/first CTA needs to reach Enviar Status).
+ */
 export function InicioPage({
+  session,
+  onNavigate,
+}: {
+  session: NeoFootSession | null
+  onNavigate?: (tab: Tab) => void
+}) {
+  return (
+    <div className="flex flex-col gap-12">
+      {session !== null && onNavigate !== undefined && (
+        <PersonalHome session={session} onNavigate={onNavigate} />
+      )}
+      <PromotionShowcase />
+    </div>
+  )
+}
+
+/** Member-only personal blocks: own OVR, stale CTA, top-3 strip. Its own
+ *  component so the hooks are unconditional (InicioPage itself has none) and
+ *  a visitor render never fetches my_report. */
+function PersonalHome({
   session,
   onNavigate,
 }: {

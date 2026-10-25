@@ -507,11 +507,11 @@ export interface PromotionCardRow {
   // 07.2-05 round 7 photo consistency (owner decision 3): the member's
   // card-photos STORAGE OBJECT PATH (bucket + key, server-composed from the
   // member id — never a public URL; the bucket is private and its RLS grants
-  // ACTIVE members read, showcase visibility IS the feature). The client
-  // fetches it as a BLOB (T-072-13 canvas-taint discipline — the same rule
-  // as the Painel own-card) and falls back to the class portrait when the
-  // object doesn't exist (no upload yet → 404). No key-stat/config data
-  // rides this field.
+  // ACTIVE members read, plus anon read for the public landing in 0029 —
+  // showcase visibility IS the feature). The client fetches it as a BLOB
+  // (T-072-13 canvas-taint discipline — the same rule as the Painel own-card)
+  // and falls back to the class portrait when the object doesn't exist (no
+  // upload yet → 404). No key-stat/config data rides this field.
   photo_path: string
 }
 
@@ -528,6 +528,42 @@ export async function fetchPromotion(session: NeoFootSession): Promise<Promotion
   // stat_key/label/label_short/value_type/value/points — key-stat CONFIG
   // (weights/toggles) is never serialised (smoke-card.mjs probe 7d locks the census).
   const res = await restFetch(session, '/rpc/get_promotion', { method: 'POST', body: JSON.stringify({}) })
+  return (await parseBody<PromotionSection[]>(res)) ?? []
+}
+
+/**
+ * Public landing showcase (0029, owner decision 2026-10-24): the anon-callable
+ * twin of get_promotion — Início is the guild's landing page, visible to
+ * visitors before login. Same closed payload (display_name, char_function,
+ * ovr, photo_path, the 6 key stats with stat_key/label/label_short/value_type/
+ * value/points); key-stat CONFIG is still never serialised. No session, no
+ * member JWT — the anon key is the only credential.
+ */
+export async function fetchPromotionPublic(): Promise<PromotionSection[]> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !anonKey) {
+    throw new ApiError(0, 'network', 'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+  let res: Response
+  try {
+    res = await fetch(`${supabaseUrl}/rest/v1/rpc/get_promotion_public`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    })
+  } catch (err) {
+    throw new ApiError(0, 'network', err instanceof Error ? err.message : 'network error')
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    const kind = res.status === 401 ? 'unauthorized' : 'server'
+    throw new ApiError(res.status, kind, `HTTP ${res.status}: ${body.slice(0, 200)}`)
+  }
   return (await parseBody<PromotionSection[]>(res)) ?? []
 }
 
@@ -616,7 +652,7 @@ export async function fetchRoleRank(
   // 'unknown_class'. D-18/D-20: per-stat value + points + class_average is the
   // sanctioned officials visibility expansion. Rows arrive SERVER-ORDERED
   // (ovr desc nulls last, display_name) — never re-sort client-side; filter
-  // only (HighlightsPage discipline). Composite React keys use member_id
+  // only (PromotionShowcase discipline). Composite React keys use member_id
   // (display_name has no unique constraint).
   const res = await restFetch(session, '/rpc/role_rank', {
     method: 'POST',
@@ -725,6 +761,19 @@ export async function deleteCardPhoto(session: NeoFootSession): Promise<void> {
   throw new ApiError(res.status, kind, `HTTP ${res.status} removing card photo`)
 }
 
+/** Defense in depth for a server-composed showcase photo path: only
+ *  bucket-internal, single-segment keys pass — anything else (foreign bucket,
+ *  traversal, query junk) is refused before a network call. */
+function isSafeCardPhotoPath(path: string): boolean {
+  return (
+    path.startsWith('card-photos/') &&
+    !path.includes('..') &&
+    !path.includes('?') &&
+    !path.includes('#') &&
+    !path.includes('//')
+  )
+}
+
 /** ANOTHER member's card photo, by the STORAGE PATH the get_promotion RPC
  *  composes (07.2-05 round 7 photo consistency). Same blob discipline as
  *  fetchCardPhoto (T-072-13): the blob becomes an object URL in the UI, so
@@ -739,17 +788,30 @@ export async function fetchCardPhotoByPath(
   session: NeoFootSession,
   path: string,
 ): Promise<Blob | null> {
-  if (
-    !path.startsWith('card-photos/') ||
-    path.includes('..') ||
-    path.includes('?') ||
-    path.includes('#') ||
-    path.includes('//')
-  ) {
-    return null
-  }
+  if (!isSafeCardPhotoPath(path)) return null
   try {
     const res = await storageFetch(session, path)
+    if (!res.ok) return null
+    return await res.blob()
+  } catch {
+    return null
+  }
+}
+
+/** Public landing variant of fetchCardPhotoByPath (0029): the anon key is the
+ *  only credential, so the showcase renders for visitors and members alike.
+ *  Migration 0029 grants anon SELECT on card-photos objects whose folder is an
+ *  ACTIVE member id — exactly the path the showcase payload carries. Same
+ *  blob/same-origin discipline and the same null-degrades-to-portrait rule. */
+export async function fetchCardPhotoByPathPublic(path: string): Promise<Blob | null> {
+  if (!isSafeCardPhotoPath(path)) return null
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !anonKey) return null
+  try {
+    const res = await fetch(`${supabaseUrl}/storage/v1/object/${path}`, {
+      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+    })
     if (!res.ok) return null
     return await res.blob()
   } catch {

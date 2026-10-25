@@ -16,6 +16,8 @@ export interface LoginPageProps {
   /** 409 pin_setup_required -> first-access claim (identity comes from the print). */
   onFirstAccess: () => void
   onRequestAccess: () => void
+  /** Phase 10: return to the public Início landing (visitors arrive there). */
+  onBack?: () => void
 }
 
 const NETWORK_ERROR = 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
@@ -27,7 +29,7 @@ const NETWORK_ERROR = 'Não foi possível conectar ao servidor. Verifique sua co
 // Phase 8 (08-03, D-02): the PIN is entered in the shared 2FA-style PinBoxes —
 // four masked boxes, no auto-submit. The PIN lives only in the transient form
 // state + the HTTPS request body (T-08-18): never stored, logged or in a URL.
-export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPageProps) {
+export function LoginPage({ onLogin, onFirstAccess, onRequestAccess, onBack }: LoginPageProps) {
   const [nickname, setNickname] = useState('')
   const [pin, setPin] = useState('')
   const [status, setStatus] = useState<LoginStatus>({ kind: 'idle' })
@@ -139,6 +141,15 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess }: LoginPage
   return (
     <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
       <div className="neon-ring w-full max-w-96 rounded-lg border border-line bg-surface p-6">
+        {onBack !== undefined && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-2 text-sm font-semibold text-muted hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            ← Voltar para o início
+          </button>
+        )}
         <img src={hellzMark} alt="Hellz" className="mx-auto mb-3 mt-2 h-20 w-20 glow-accent" />
         <h1 className="text-center text-3xl font-bold leading-[1.2] text-content">Hellz</h1>
         <p className="mt-1 text-center text-sm font-medium text-muted">Painel Geral</p>
