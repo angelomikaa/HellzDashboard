@@ -262,11 +262,12 @@
   background-image: linear-gradient(135deg, #f26d6f, #e9b44c, #3fb950, #58a6ff);
 }
 
-/* Destaques carousel (SHWC-01 rework, UAT round 1 2026-10-24). The scroller
-   pads by half the leftover space on each side, so the FIRST and LAST card can
-   both sit dead center under `snap-center` — without that padding the first
-   card can never reach the middle and the "spotlight" would start offset. The
-   card width is a custom property so the slot and the padding can never drift.
+/* Destaques carousel (SHWC-01 rework, UAT round 1 2026-10-24; loop in round 2).
+   The scroller pads by half the leftover space on each side, so ANY card can
+   sit dead center under `snap-center` — the loop renders the list three times
+   and starts on the middle copy, so a centred card always has a real neighbour
+   peeking in on both sides (the row never shows its physical ends). The card
+   width is a custom property so the slot and the padding can never drift.
    Scrollbar is hidden: the visible arrows + peeking neighbours carry the
    affordance, and keyboard/scroll still work. */
 .carousel-scroller {

@@ -31,3 +31,21 @@ export function clampIndex(index: number, length: number): number {
   if (length <= 0) return 0
   return Math.min(Math.max(index, 0), length - 1)
 }
+
+/**
+ * Map ANY physical slot index of the 3-copy loop (UAT round 2: "make it round")
+ * onto the equivalent slot of the MIDDLE copy.
+ *
+ * The carousel renders the server-ordered list three times so every logical
+ * card has a real neighbour on both sides — the first card shows the last one
+ * peeking in from the left, the last shows the first on the right. Navigation
+ * and post-scroll normalisation always work from the middle copy; the outer
+ * copies are inert duplicates. `length` is the logical card count (one copy),
+ * so for 3 cards the middle copy is 3..5: 0→3, 2→5, 6→3, -1→5.
+ * A non-positive length yields 0 (no cards to map).
+ */
+export function loopIndex(index: number, length: number): number {
+  if (length <= 0) return 0
+  const offset = ((index % length) + length) % length
+  return length + offset
+}

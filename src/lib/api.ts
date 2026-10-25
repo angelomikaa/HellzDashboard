@@ -798,25 +798,45 @@ export async function fetchCardPhotoByPath(
   }
 }
 
+/** In-flight/settled photo requests, keyed by storage path. The looping
+ *  showcase (UAT round 2) renders each logical card three times, so without
+ *  this every card would download its photo 3×. Sharing the promise keeps one
+ *  network request per path; each consumer still makes its own object URL.
+ *  A null result is evicted so a transient failure can retry on remount. */
+const publicCardPhotoCache = new Map<string, Promise<Blob | null>>()
+
 /** Public landing variant of fetchCardPhotoByPath (0029): the anon key is the
  *  only credential, so the showcase renders for visitors and members alike.
  *  Migration 0029 grants anon SELECT on card-photos objects whose folder is an
  *  ACTIVE member id — exactly the path the showcase payload carries. Same
  *  blob/same-origin discipline and the same null-degrades-to-portrait rule. */
-export async function fetchCardPhotoByPathPublic(path: string): Promise<Blob | null> {
-  if (!isSafeCardPhotoPath(path)) return null
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-  if (!supabaseUrl || !anonKey) return null
-  try {
-    const res = await fetch(`${supabaseUrl}/storage/v1/object/${path}`, {
-      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
-    })
-    if (!res.ok) return null
-    return await res.blob()
-  } catch {
-    return null
-  }
+export function fetchCardPhotoByPathPublic(path: string): Promise<Blob | null> {
+  if (!isSafeCardPhotoPath(path)) return Promise.resolve(null)
+  const cached = publicCardPhotoCache.get(path)
+  if (cached) return cached
+
+  const request = (async (): Promise<Blob | null> => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+    if (!supabaseUrl || !anonKey) return null
+    try {
+      const res = await fetch(`${supabaseUrl}/storage/v1/object/${path}`, {
+        headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+      })
+      if (!res.ok) return null
+      return await res.blob()
+    } catch {
+      return null
+    }
+  })()
+
+  publicCardPhotoCache.set(path, request)
+  void request.then((blob) => {
+    if (blob === null && publicCardPhotoCache.get(path) === request) {
+      publicCardPhotoCache.delete(path)
+    }
+  })
+  return request
 }
 
 // ---------------------------------------------------------------------------
