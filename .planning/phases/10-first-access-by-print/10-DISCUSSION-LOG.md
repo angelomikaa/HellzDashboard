@@ -97,3 +97,14 @@
 - D-10-04-6: the showcase row is an endless loop, not a bounded strip. It renders the server-ordered list three times, starts on the middle copy and silently re-centres there after the scroll settles, so the first card always shows the last one peeking in from the left and the last shows the first on the right. Outer copies are `inert`/`aria-hidden` duplicates; the spotlight is keyed by logical index so the seam jump is invisible (no class/transition change).
 - D-10-04-7: arrows and ← →/Home/End never disable and never reach a physical end (except a single-card section); manual flings to either end normalise back into the middle copy. No autoplay — 07.1 D-05 still holds.
 - D-10-04-8: the public photo fetch is memoised per storage path (one network request per member) because the loop renders each card three times.
+
+---
+
+## Owner correction — 2026-10-24 (UAT round 3): float the cards + the Phase 10 motion plan
+
+**User:** "i believe that removing the box and let the cards float in space wil give a even more modern edge to our landing - also the plan was supposed to include light animations, like the neon ring we already have, but the model seem to have completed ignored this part of the plan"
+
+**Decisions captured:**
+- D-10-04-9: the showcase is panel-less — the class header (crest + name + fading accent rule) and the cards float directly on the neon-grid backdrop; sections are separated by space, never borders.
+- D-10-04-10: the Phase 10 soft-motion layer (D-01/D-02) is now on the landing: the existing `neon-ring` on the "Os Impecáveis da Hellz" badge, a staggered card reveal (`showcase-card-in`), and a breathing spotlight halo (`spotlight-breathe`). CSS-only, no new dependencies, all removed by `prefers-reduced-motion`.
+- D-10-04-11: D-03 skeletons replace both Phase 10 "Carregando…" states — card-shaped slots for the showcase and OVR/top-3 shapes for the member blocks, with an sr-only status. Error and empty states are floating copy, not panels.

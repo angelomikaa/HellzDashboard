@@ -194,6 +194,47 @@ verification: live on the public landing — 9 slots / 6 clones, initial
   (44 files); vite build green.
 status: fixed — live-verified; test 9 (touch swipe) still pending
 
+### G-4 (tests 7/8, round 3): the showcase sat in boxes and ignored the motion plan
+
+report: "i believe that removing the box and let the cards float in space wil
+  give a even more modern edge to our landing - also the plan was supposed to
+  include light animations, like the neon ring we already have, but the model
+  seem to have completed ignored this part of the plan"
+
+root_cause: |
+  PromotionShowcase wrapped every class section in a
+  `rounded-xl border-2 border-line bg-surface p-6` panel — the "box" around the
+  cards. Separately, the Phase 10 soft-motion decisions (10-CONTEXT D-01
+  animations allowed, D-02 neon ring as the complexity bar, D-03 skeleton
+  loaders) never reached a plan task: the landing had no reveal, no ring, and
+  both Phase 10 loading states still printed the static "Carregando…".
+
+fix: |
+  - Panels removed: class crest + name + a fading accent rule, then the
+    carousel, float directly on the page's neon-grid backdrop. Sections are
+    separated by air (gap-16/20), not borders.
+  - "Os Impecáveis da Hellz" badge now wears the existing `neon-ring`
+    (rotating conic frame, 5s, reduced-motion safe).
+  - Cards enter with a staggered fade/rise (`showcase-card-in` /
+    `showcase-reveal`, 70ms per logical card; the loop's three copies share
+    the delay so the seam stays invisible).
+  - The spotlight halo breathes (`spotlight-breathe`, 4s) instead of sitting
+    dead still; reduced motion freezes the static frame.
+  - Loading states are skeletons (D-03): three card-shaped pulsing slots for
+    the showcase and OVR/top-3 shapes for the member blocks, each with an
+    sr-only status. Error/empty states are floating copy, not panels.
+  - The member blocks (OVR, CTA, top-3) join the same reveal, staggered
+    0/80/160ms.
+
+verification: computed styles — class sections border 0px / transparent
+  background / no padding; badge pseudo-element `neon-spin 5s` with the conic
+  gradient; header/cards `showcase-card-in` (delays 0/70/140ms);
+  centered card `spotlight-breathe 4s`; `document.getAnimations()` reports all
+  of them running. Build CSS contains `showcase-reveal`, `spotlight-breathe`,
+  `animate-pulse` and `27/40`. tsc clean; oxlint 0 errors; 675/675 vitest;
+  vite build green.
+status: fixed — live-verified on the public landing
+
 ## Scope correction (owner, 2026-10-24)
 
 report: "the original planning messed up things. Destaques and Inicio were
