@@ -323,18 +323,21 @@ interface MaskRect { x: number; y: number; w: number; h: number }
  *  resampling kernels (canvas high-quality vs SVG image) agree on smooth
  *  gradients to within the tolerance, so the diff measures GEOMETRY (clip,
  *  cover-fit bounds, layer order), not browser-internal filtering. Far from
- *  every palette fill/border color. */
+ *  every palette fill/border color. PORTRAIT (360×480 — taller than the crop
+ *  window's 1.089 ratio) so the head-safe TOP anchor actually engages: with a
+ *  wide test photo the vertical fit is exact and the diff could not tell a
+ *  top-anchored render from a centered one (card polish round 7 lock). */
 function makeTestPhoto(): string {
   const c = document.createElement('canvas')
-  c.width = 480
-  c.height = 360
+  c.width = 360
+  c.height = 480
   const ctx = c.getContext('2d')!
-  const g = ctx.createLinearGradient(0, 0, 480, 360)
+  const g = ctx.createLinearGradient(0, 0, 360, 480)
   g.addColorStop(0, '#2255aa')
   g.addColorStop(0.55, '#7a4477')
   g.addColorStop(1, '#dd8822')
   ctx.fillStyle = g
-  ctx.fillRect(0, 0, 480, 360)
+  ctx.fillRect(0, 0, 360, 480)
   return c.toDataURL('image/png')
 }
 
@@ -407,7 +410,7 @@ function referenceCardSvg(
   const b = plan.photoBBox
   const inner =
     photo.kind === 'image'
-      ? `<image href="${photo.dataUrl}" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" preserveAspectRatio="xMidYMid slice"/>`
+      ? `<image href="${photo.dataUrl}" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" preserveAspectRatio="xMidYMin slice"/>`
       : `<path d="${plan.card.cropPath}" fill="${plan.colors.monogramTile}"/>` +
         `<text x="${b.x + b.w / 2}" y="${b.y + b.h * 0.45}" text-anchor="middle" dominant-baseline="central" ` +
         `font-family="Orbitron, sans-serif" font-weight="700" font-size="${b.h * 0.2}" fill="${plan.colors.monogramText}">${photo.letter}</text>`

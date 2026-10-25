@@ -189,8 +189,14 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
       />
 
       {/* Photo: member screenshot / class portrait CLIPPED TO THE CROP PATH
-          (preserveAspectRatio slice over the crop bbox = cover-fit) — or
-          the ASST-01 monogram (never an empty hole). */}
+          (cover-fit) — or the ASST-01 monogram (never an empty hole).
+          HEAD-SAFE ANCHOR (owner, card polish round 7): the fit is
+          TOP-anchored, never vertical-center — a full-body portrait or a
+          tall phone screenshot centered in this window loses the HEAD to
+          the crop; top-anchored it loses the LEGS instead ("a shot from
+          the thighs and above"). Wide/landscape images fit by height and
+          are unaffected (the anchor only decides which side of a TALLER
+          image survives). xMid keeps the horizontal centering. */}
       <g clipPath={`url(#${cropClipId})`}>
         {plan.photo.kind === 'image' ? (
           <image
@@ -199,7 +205,7 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
             y={b.y}
             width={b.w}
             height={b.h}
-            preserveAspectRatio="xMidYMid slice"
+            preserveAspectRatio="xMidYMin slice"
           />
         ) : (
           <>

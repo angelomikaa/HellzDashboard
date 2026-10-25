@@ -596,12 +596,17 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   if (plan.photo.kind === 'image') {
     const img = await loadImage(plan.photo.src)
     if (img !== null && img.width > 0 && img.height > 0) {
-      // Cover-fit within the crop bbox: scale to cover, center, let the
-      // crop path clip the overflow (mirrors the SVG's slice behavior).
-      const cover = Math.max(b.w / img.width, b.h / img.height)
-      const dw = img.width * cover
-      const dh = img.height * cover
-      ctx.drawImage(img, b.x + (b.w - dw) / 2, b.y + (b.h - dh) / 2, dw, dh)
+    // Cover-fit within the crop bbox: scale to cover, TOP-anchored, let the
+    // crop path clip the overflow (mirrors the SVG's xMidYMin slice).
+    // HEAD-SAFE ANCHOR (owner, card polish round 7): vertical-centering
+    // beheads full-body portraits and tall screenshots — the top-anchored
+    // fit hides the legs instead ("a shot from the thighs and above").
+    // Horizontal stays centered; wide images fit by height (anchoring is
+    // a no-op for them).
+    const cover = Math.max(b.w / img.width, b.h / img.height)
+    const dw = img.width * cover
+    const dh = img.height * cover
+    ctx.drawImage(img, b.x + (b.w - dw) / 2, b.y, dw, dh)
     } else {
       drawMonogramFill(ctx, plan)
     }
