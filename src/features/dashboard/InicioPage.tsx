@@ -134,7 +134,11 @@ function PersonalHome({
     }
   }, [session])
 
-  const loading = report === null && error === null
+  // Narrowing note: guard `report === null` DIRECTLY below, never through a
+  // `const loading = report === null && error === null` alias — aliased
+  // condition narrowing breaks on some TypeScript builds (Vercel TS18047) even
+  // though newer local tsc accepts it. The error branch above already
+  // returned, so `report === null` here is exactly the loading state.
   const banner = report !== null ? extractStaleBanner(report) : null
   const top3 = report !== null ? extractTop3(report) : []
 
@@ -146,7 +150,7 @@ function PersonalHome({
     )
   }
 
-  if (loading) {
+  if (report === null) {
     // D-03: skeleton loaders instead of the static "Carregando…" pattern.
     // Shapes mirror the OVR hero + top-3 strip so nothing shifts when the
     // report lands; the pulse dies under prefers-reduced-motion.
