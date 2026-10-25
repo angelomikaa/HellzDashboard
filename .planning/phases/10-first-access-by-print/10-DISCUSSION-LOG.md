@@ -108,3 +108,13 @@
 - D-10-04-9: the showcase is panel-less — the class header (crest + name + fading accent rule) and the cards float directly on the neon-grid backdrop; sections are separated by space, never borders.
 - D-10-04-10: the Phase 10 soft-motion layer (D-01/D-02) is now on the landing: the existing `neon-ring` on the "Os Impecáveis da Hellz" badge, a staggered card reveal (`showcase-card-in`), and a breathing spotlight halo (`spotlight-breathe`). CSS-only, no new dependencies, all removed by `prefers-reduced-motion`.
 - D-10-04-11: D-03 skeletons replace both Phase 10 "Carregando…" states — card-shaped slots for the showcase and OVR/top-3 shapes for the member blocks, with an sr-only status. Error and empty states are floating copy, not panels.
+
+---
+
+## Owner correction — 2026-10-24 (UAT round 4): 3-up row + "Os Impecáveis da Hellz" as the title
+
+**User:** "lets scale the cards to keep only 3 cards in the screen, and also remove the nome destaques, and make 'Os impecáveis da hellz' the title of the landing"
+
+**Decisions captured:**
+- D-10-04-12: at lg the carousel is exactly 3-up. The card width is derived from the showcase container (`--carousel-card: calc((100cqw - 2rem) / 3)` on `.showcase-inner`, with `.showcase-root` as the size container), so three cards fill the row and no fourth card peeks in; the skeleton reads the same variable. Mobile keeps the 1-up spotlight with peeking neighbours.
+- D-10-04-13: "Destaques" is gone. "Os Impecáveis da Hellz" is the landing title (`h1`; the pill keeps the neon ring), and the class names move from h3 to h2. The title is 20/30/36px across mobile/sm/lg so it stays on one line at 375px.

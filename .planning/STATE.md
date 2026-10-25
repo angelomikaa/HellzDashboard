@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 10
-Plan: 10-01 + 10-02 + 10-03 complete + 10-04 owner-correction rework (Início absorbs Destaques; public landing via 0029) + G-3 looping carousel + G-4 panel-less landing with the Phase 10 motion/skeleton layer
-Status: UAT in progress — tests 1-8 and 10-14 pass; test 9 (slider swipe, touch device) pending; G-3 and G-4 live-verified
+Plan: 10-01 + 10-02 + 10-03 complete + 10-04 owner-correction rework (Início absorbs Destaques; public landing via 0029) + G-3 looping carousel + G-4 panel-less landing with the Phase 10 motion/skeleton layer + G-5 exact 3-up row and "Os Impecáveis da Hellz" as the landing title
+Status: UAT in progress — tests 1-8 and 10-14 pass; test 9 (slider swipe, touch device) pending; G-3, G-4 and G-5 live-verified
 Last activity: 2026-10-24
 
 ## Accumulated Context

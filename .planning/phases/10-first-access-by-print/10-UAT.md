@@ -46,7 +46,7 @@ result: pass
 ### 7. Início scroll-snap slider
 expected: Início renders each class's Impecável cards in a horizontal sideways-scrolling slider — one card per view at mobile width, three visible per view on desktop (lg). The slider renders for visitors and members alike.
 result: pass
-note: First attempt blanked the whole UI (G-1). After the hook-order fix + page error boundary, re-tested clean. Re-verified on the public landing after the Início/Destaques merge, and again after the loop rework (G-3).
+note: First attempt blanked the whole UI (G-1). After the hook-order fix + page error boundary, re-tested clean. Re-verified on the public landing after the Início/Destaques merge, and again after the loop rework (G-3). G-5 made the 3-up exact: the cards now derive their width from the showcase container, so no fourth card peeks in on wide screens.
 
 ### 8. Slider keyboard navigation
 expected: Clicking/tabbing into the slider and pressing ArrowLeft/ArrowRight scrolls exactly one card per keypress (page itself does not scroll).
@@ -242,6 +242,39 @@ verification: computed styles — class sections border 0px / transparent
   `32px 48px` with no vertical overflow (`scrollHeight === clientHeight`) and
   48px of room below the "Baixar card" button. tsc clean; oxlint 0 errors;
   675/675 vitest; vite build green.
+status: fixed — live-verified on the public landing
+
+### G-5 (test 7, round 4): a fourth card peeked in, and "Destaques" still owned the title
+
+report: "lets scale the cards to keep only 3 cards in the screen, and also
+  remove the nome destaques, and make 'Os impecáveis da hellz' the title of
+  the landing"
+
+root_cause: |
+  Test 7 always expected "three visible per view on desktop (lg)", but the card
+  width was a fixed 20rem: on a 1280+ container, three 20rem cards plus gaps
+  leave ~60px over, so a fourth card peeked in from the right. Separately, the
+  showcase still opened on a generic "Destaques" h2 with "Os Impecáveis da
+  Hellz" as a small badge underneath — the landing had no real title.
+
+fix: |
+  - 3-up at lg: `--carousel-card` = (row - two 1rem gaps) / 3, derived from
+    the showcase width with a container query (`.showcase-root` is the size
+    container; `.showcase-inner` owns the variable because an element cannot
+    query itself). Exactly three cards fill the row and no fourth card peeks
+    in. Mobile keeps the 1-up spotlight; the skeleton reads the same variable,
+    so loading and loaded geometry match.
+  - "Destaques" removed. "Os Impecáveis da Hellz" is now the page `h1` (the
+    pill keeps the neon ring); the class names move `h3` → `h2`, so the
+    outline is h1 (landing) → h2 (class). The title scales 20/30/36px across
+    mobile/sm/lg and stays on one line at 375px.
+
+verification: live at 1296px — container 1248, card 405, scrollLeft 1264,
+  exactly 3 slots intersect the scroller (offsets -421 / 0 / +421), the
+  visible spotlight copy sits at offset 0, no fourth card; h1 = "Os Impecáveis
+  da Hellz" at 36px / 550px wide with `neon-spin 5s` on its ring; headings are
+  h1 (title) + h2 (class) and no "Destaques" text remains. tsc clean; oxlint 0
+  errors; vite build green.
 status: fixed — live-verified on the public landing
 
 ## Scope correction (owner, 2026-10-24)
