@@ -929,13 +929,9 @@ export interface SetupPinInput {
   proof_data_url: string
 }
 
-/** first-access lookup answer (0020, 0032). One state per status. */
+/** first-access lookup answer (0020). One state per status. */
 export type FirstAccessStatus =
   | 'ready'
-  /** Unclaimed row, but no officer authorized the claim yet (0032). */
-  | 'claim_review'
-  /** The claim print awaits an officer decision (0032). */
-  | 'claim_pending'
   | 'pin_set'
   | 'pending'
   | 'unknown'
@@ -958,14 +954,10 @@ export interface FirstAccessRequestInput {
   char_id: string
   nickname: string
   char_class: string
-  proof_data_url: string
-}
-
-/** 0032: an unclaimed registry row's print, queued for officer authorization. */
-export interface FirstAccessClaimInput {
-  char_id: string
-  nickname: string
-  char_class: string
+  /** 0033 one-go registration: the player-chosen PIN travels with the request;
+   *  the officer approval activates it. */
+  pin: string
+  confirm_pin: string
   proof_data_url: string
 }
 
@@ -1082,8 +1074,6 @@ export async function setupPin(input: SetupPinInput): Promise<NeoFootSession> {
 
 const FIRST_ACCESS_STATUSES: readonly FirstAccessStatus[] = [
   'ready',
-  'claim_review',
-  'claim_pending',
   'pin_set',
   'pending',
   'unknown',
@@ -1158,24 +1148,6 @@ export async function requestFirstAccess(
     status: 'pending',
     duplicate: body.duplicate === true,
   }
-}
-
-/**
- * Queue the print of an UNCLAIMED registry row for officer authorization (0032).
- * No session is minted: the player comes back after the officer confirms the
- * registry Discord handle, and only then does the lookup answer 'ready'.
- */
-export async function requestClaim(
-  input: FirstAccessClaimInput,
-): Promise<{ status: 'pending'; duplicate: boolean }> {
-  const body = await edgeFetch<{ status?: unknown; duplicate?: unknown }>('first-access', {
-    action: 'claim',
-    ...input,
-  })
-  if (body.status !== 'pending') {
-    throw new FunctionError(200, 'invalid_response', 'unexpected claim status')
-  }
-  return { status: 'pending', duplicate: body.duplicate === true }
 }
 
 /**
@@ -1314,11 +1286,6 @@ export interface IdentityQueueRow {
   char_class: string | null
   proof_path: string
   created_at: string
-  /** 0032: false => the member has no PIN yet, so this proof is a first-access
-   *  authorization (confirm the registry handle with the player first). */
-  pin_set: boolean
-  /** 0032: the row already holds an officer authorization. */
-  claim_authorized: boolean
 }
 
 export interface IdentityHistoryRow {

@@ -6,7 +6,6 @@ import {
   firstAccessIdentify,
   firstAccessLookup,
   requestAccess,
-  requestClaim,
   requestFirstAccess,
   requestStepUp,
   setupPin,
@@ -195,8 +194,6 @@ describe('first-access — lookup + registration (0020)', () => {
   it('accepts every documented status, including the claimed-handle refusals', async () => {
     for (const status of [
       'ready',
-      'claim_review',
-      'claim_pending',
       'pin_set',
       'pending',
       'unknown',
@@ -243,7 +240,7 @@ describe('first-access — lookup + registration (0020)', () => {
     })
   })
 
-  it('posts action request with handle + identity + proof', async () => {
+  it('posts action request with handle + identity + proof + the chosen PIN', async () => {
     nextResponse = () =>
       res(200, JSON.stringify({ request_id: 'req-9', status: 'pending', duplicate: false }))
     await expect(
@@ -252,12 +249,23 @@ describe('first-access — lookup + registration (0020)', () => {
         char_id: '32980',
         nickname: 'Ahrya',
         char_class: 'Gypsy',
+        pin: '1234',
+        confirm_pin: '1234',
         proof_data_url: 'data:image/jpeg;base64,AAAA',
       }),
     ).resolves.toEqual({ request_id: 'req-9', status: 'pending', duplicate: false })
 
     expect(calls[0].url).toBe('https://test-project.supabase.co/functions/v1/first-access')
-    expect(JSON.parse(String(calls[0].init.body))).toMatchObject({ action: 'request' })
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+      action: 'request',
+      discord_handle: 'ahrya',
+      char_id: '32980',
+      nickname: 'Ahrya',
+      char_class: 'Gypsy',
+      pin: '1234',
+      confirm_pin: '1234',
+      proof_data_url: 'data:image/jpeg;base64,AAAA',
+    })
   })
 
   it('keeps the duplicate flag and maps server refusals', async () => {
@@ -269,6 +277,8 @@ describe('first-access — lookup + registration (0020)', () => {
         char_id: '32980',
         nickname: 'Ahrya',
         char_class: 'Gypsy',
+        pin: '1234',
+        confirm_pin: '1234',
         proof_data_url: 'data:image/jpeg;base64,AAAA',
       }),
     ).resolves.toMatchObject({ duplicate: true })
@@ -280,6 +290,8 @@ describe('first-access — lookup + registration (0020)', () => {
         char_id: '32980',
         nickname: 'Ahrya',
         char_class: 'Gypsy',
+        pin: '1234',
+        confirm_pin: '1234',
         proof_data_url: 'data:image/jpeg;base64,AAAA',
       }),
     ).rejects.toMatchObject({ status: 409, code: 'already_registered' })
@@ -291,61 +303,8 @@ describe('first-access — lookup + registration (0020)', () => {
         char_id: '32980',
         nickname: 'Ahrya',
         char_class: 'Gypsy',
-        proof_data_url: 'data:image/jpeg;base64,AAAA',
-      }),
-    ).rejects.toMatchObject({ code: 'invalid_response' })
-  })
-
-  // 0032 stopgap: an unclaimed registry row's print goes to an officer for
-  // authorization; no typed handle, no request_id, no session.
-  it('posts action claim with the print identity only', async () => {
-    nextResponse = () => res(200, JSON.stringify({ status: 'pending', duplicate: false }))
-    await expect(
-      requestClaim({
-        char_id: '32980',
-        nickname: 'Ahrya',
-        char_class: 'Gypsy',
-        proof_data_url: 'data:image/jpeg;base64,AAAA',
-      }),
-    ).resolves.toEqual({ status: 'pending', duplicate: false })
-
-    expect(calls[0].url).toBe('https://test-project.supabase.co/functions/v1/first-access')
-    expect(JSON.parse(String(calls[0].init.body))).toEqual({
-      action: 'claim',
-      char_id: '32980',
-      nickname: 'Ahrya',
-      char_class: 'Gypsy',
-      proof_data_url: 'data:image/jpeg;base64,AAAA',
-    })
-  })
-
-  it('keeps the claim duplicate flag and maps refusals', async () => {
-    nextResponse = () => res(200, JSON.stringify({ status: 'pending', duplicate: true }))
-    await expect(
-      requestClaim({
-        char_id: '32980',
-        nickname: 'Ahrya',
-        char_class: 'Gypsy',
-        proof_data_url: 'data:image/jpeg;base64,AAAA',
-      }),
-    ).resolves.toEqual({ status: 'pending', duplicate: true })
-
-    nextResponse = () => res(409, JSON.stringify({ error: 'already_authorized' }))
-    await expect(
-      requestClaim({
-        char_id: '32980',
-        nickname: 'Ahrya',
-        char_class: 'Gypsy',
-        proof_data_url: 'data:image/jpeg;base64,AAAA',
-      }),
-    ).rejects.toMatchObject({ status: 409, code: 'already_authorized' })
-
-    nextResponse = () => res(200, JSON.stringify({ status: 'ready' }))
-    await expect(
-      requestClaim({
-        char_id: '32980',
-        nickname: 'Ahrya',
-        char_class: 'Gypsy',
+        pin: '1234',
+        confirm_pin: '1234',
         proof_data_url: 'data:image/jpeg;base64,AAAA',
       }),
     ).rejects.toMatchObject({ code: 'invalid_response' })

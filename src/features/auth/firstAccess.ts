@@ -7,13 +7,19 @@
 // Phase 10 (owner decision 2026-10-23): the Discord handle is no longer the
 // identity key. The print is read, the nickname is looked up in the registry
 // (`firstAccessLookup`) and only a claimable row unlocks the PIN setter. A
-// nickname with no registry row (or a character already claimed) never reaches
-// the PIN boxes: it becomes an officer-approved registration request or a
+// nickname with no registry row (or a character already claimed) never mints a
+// session: it becomes an officer-approved registration request or a
 // "log in / contact an officer" message.
+//
+// 0033 one-go registration (owner decision 2026-10-26): the PIN setter opens for
+// BOTH paths — `ready` claims immediately, `unknown` submits the PIN with the
+// registration request so the officer approval activates it and the player logs
+// in right away. Manual validation stays on: the claim still queues a pending
+// identity proof for the Identidades review, and the request still needs the
+// officer approval in Solicitações.
 import type { NeoFootSession } from './session'
 import {
   FunctionError,
-  type FirstAccessClaimInput,
   type FirstAccessStatus,
   type SetupPinInput,
 } from '../../lib/api'
@@ -59,15 +65,6 @@ export function canRequestRegistration(status: FirstAccessStatus | null): boolea
   return status === 'unknown'
 }
 
-/**
- * 0032: an unclaimed registry row whose claim no officer authorized yet. The
- * print is public data, so the page asks for it and queues an officer review
- * instead of opening the PIN setter.
- */
-export function canRequestClaim(status: FirstAccessStatus | null): boolean {
-  return status === 'claim_review'
-}
-
 /** Health message for a status that blocks the PIN setter. */
 export function statusMessage(status: FirstAccessStatus): string {
   switch (status) {
@@ -77,8 +74,6 @@ export function statusMessage(status: FirstAccessStatus): string {
       return 'Este Discord já tem personagem com PIN. Entre com o nick e o PIN.'
     case 'pending':
       return 'Cadastro enviado. Aguarde a aprovação de um oficial e tente de novo.'
-    case 'claim_pending':
-      return 'Print enviado. Aguarde a confirmação de um oficial e tente de novo.'
     case 'unknown':
       return 'Não encontramos este personagem na lista da guilda. Você pode enviar o print para aprovação de um oficial.'
     case 'handle_registered':
@@ -87,8 +82,6 @@ export function statusMessage(status: FirstAccessStatus): string {
       return 'O ID do print não confere com o cadastro deste nick. Fale com um oficial.'
     case 'ambiguous_identity':
       return 'Mais de um cadastro usa este nick. Fale com um oficial.'
-    case 'claim_review':
-      return 'Personagem encontrado. Falta a confirmação de um oficial — envie o print para autorizar o primeiro acesso.'
     case 'ready':
       return 'Personagem encontrado. Defina seu PIN.'
   }
@@ -116,9 +109,9 @@ export type FirstAccessProblem = 'handle' | 'pin' | 'mismatch' | 'proof' | 'prof
 export const STATUS_ERROR = 'Verifique o personagem no print antes de criar o PIN.'
 
 /**
- * The first blocking problem in form order, or null when submittable.
- * PIN problems only exist once the registry opened the setter, so an unknown
- * character can never be asked for a PIN — and never reaches setup-pin.
+ * The first blocking problem in form order for the CLAIM submit, or null when
+ * submittable. Only `ready` can ever claim: every other registry answer keeps
+ * the PIN setter closed (the registration path has its own validator below).
  */
 export function firstAccessProblem(draft: FirstAccessDraft): FirstAccessProblem | null {
   if (draft.proofDataUrl === null) return 'proof'
@@ -129,21 +122,21 @@ export function firstAccessProblem(draft: FirstAccessDraft): FirstAccessProblem 
     return null
   }
   // The claim path never needs the Discord handle (it is already on the registry
-  // row); only the registration request carries it.
-  if (draft.handle.trim() === '' || draft.handle.trim().length > 64) return 'handle'
-  // Registry still unknown/unclaimable: the PIN setter must stay closed.
+  // row); a blocking registry answer keeps the claim submit closed.
   return 'status'
 }
 
-/** The registration request needs the handle + print, never a PIN. */
-export type RegistrationProblem = 'handle' | 'proof' | 'profile'
+/** The registration request needs the handle + print + a 4-digit PIN (0033). */
+export type RegistrationProblem = 'handle' | 'proof' | 'profile' | 'pin' | 'mismatch'
 
 export function registrationProblem(
-  draft: Pick<FirstAccessDraft, 'handle' | 'proofDataUrl' | 'profile'>,
+  draft: Pick<FirstAccessDraft, 'handle' | 'proofDataUrl' | 'profile' | 'pin' | 'confirmPin'>,
 ): RegistrationProblem | null {
   if (draft.handle.trim() === '' || draft.handle.trim().length > 64) return 'handle'
   if (draft.proofDataUrl === null) return 'proof'
   if (!profileComplete(draft.profile)) return 'profile'
+  if (!/^\d{4}$/.test(draft.pin)) return 'pin'
+  if (draft.confirmPin !== draft.pin) return 'mismatch'
   return null
 }
 
@@ -221,14 +214,6 @@ export function setupErrorCopy(error: FunctionError): SetupErrorCopy {
         message: 'O ID do print não confere com o cadastro deste nick. Fale com um oficial.',
         clearPin: false,
         backToLogin: true,
-      }
-    case 'claim_not_authorized':
-      // 0032: the print alone never authorizes a claim.
-      return {
-        message:
-          'Este personagem ainda precisa da confirmação de um oficial. Envie o print de novo.',
-        clearPin: true,
-        backToLogin: false,
       }
     case 'ambiguous_identity':
       return {
@@ -356,11 +341,16 @@ export interface RegistrationDeps {
     char_id: string
     nickname: string
     char_class: string
+    pin: string
+    confirm_pin: string
     proof_data_url: string
   }) => Promise<{ request_id: string; status: 'pending'; duplicate: boolean }>
 }
 
-export const REQUEST_SENT = 'Print enviado. Aguarde a aprovação de um oficial e tente de novo.'
+// 0033 one-go: the request carries the PIN, so the approval activates it — the
+// player logs in with nickname + PIN right after the officer decision.
+export const REQUEST_SENT =
+  'Cadastro enviado. Após a aprovação de um oficial, entre com o nick e o PIN definidos aqui.'
 export const REQUEST_ALREADY_PENDING =
   'Já existe um cadastro aguardando aprovação para este personagem ou handle.'
 
@@ -387,8 +377,9 @@ export function registrationErrorCopy(error: FunctionError): string {
 }
 
 /**
- * Queue the officer approval for a print that has no registry match. No session
- * is minted: the player must come back after the approval to set the PIN.
+ * Queue the officer approval for a print that has no registry match. No
+ * session is minted here: the PIN travels with the request (0033 one-go), so
+ * the officer approval activates it and the player logs in directly.
  */
 export async function submitRegistration(
   draft: FirstAccessDraft,
@@ -405,96 +396,14 @@ export async function submitRegistration(
       char_id: profile.char_id,
       nickname: profile.nickname,
       char_class: profile.char_class,
+      pin: draft.pin,
+      confirm_pin: draft.confirmPin,
       proof_data_url: draft.proofDataUrl as string,
     })
     return { ok: true, requestId: result.request_id, duplicate: result.duplicate }
   } catch (err) {
     if (err instanceof FunctionError) {
       return { ok: false, message: registrationErrorCopy(err) }
-    }
-    return { ok: false, message: NETWORK_ERROR }
-  }
-}
-
-/**
- * 0032 stopgap: an unclaimed registry row is not claimable on the print alone.
- * The print goes to an officer, who confirms the REGISTRY Discord handle with
- * the player before authorizing the claim. No handle is sent: the registry row
- * already holds the authoritative one.
- */
-export type ClaimProblem = 'proof' | 'profile'
-
-export function claimProblem(
-  draft: Pick<FirstAccessDraft, 'proofDataUrl' | 'profile'>,
-): ClaimProblem | null {
-  if (draft.proofDataUrl === null) return 'proof'
-  if (!profileComplete(draft.profile)) return 'profile'
-  return null
-}
-
-export const CLAIM_SENT = 'Print enviado. Aguarde a confirmação de um oficial e tente de novo.'
-export const CLAIM_ALREADY_SENT =
-  'Já existe um print aguardando confirmação para este personagem.'
-
-export type ClaimOutcome = { ok: true; duplicate: boolean } | { ok: false; message: string }
-
-export interface ClaimDeps {
-  requestClaim: (input: FirstAccessClaimInput) => Promise<{
-    status: 'pending'
-    duplicate: boolean
-  }>
-}
-
-/** Server machine token -> pt-BR copy for the claim-authorization request. */
-export function claimErrorCopy(error: FunctionError): string {
-  switch (error.code) {
-    case 'already_authorized':
-      return 'Um oficial já autorizou este personagem. Tente de novo para criar o PIN.'
-    case 'already_registered':
-      return 'Este personagem já está cadastrado. Entre com o nick e o PIN — se o PIN não existir, fale com um oficial.'
-    case 'not_registered':
-      return 'Este personagem não está mais na lista da guilda. Fale com um oficial.'
-    case 'identity_mismatch':
-      return 'O ID do print não confere com o cadastro deste nick. Fale com um oficial.'
-    case 'ambiguous_identity':
-      return 'Mais de um cadastro usa este nick. Fale com um oficial.'
-    case 'unknown_class':
-      return 'A classe lida não foi reconhecida. Envie outro print.'
-    case 'proof_too_large':
-      return 'Comprovante muito grande (máx. 2 MB).'
-    case 'invalid_proof':
-      return 'O servidor não aceitou o comprovante. Envie de novo o print em JPEG da tela Básico.'
-    case 'network':
-      return NETWORK_ERROR
-    default:
-      return 'Não foi possível enviar o print para confirmação. Tente novamente.'
-  }
-}
-
-/**
- * Queue the officer authorization for an unclaimed row. No session is minted:
- * the player must come back after the confirmation to set the PIN.
- */
-export async function submitClaim(
-  draft: FirstAccessDraft,
-  deps: ClaimDeps,
-): Promise<ClaimOutcome> {
-  const problem = claimProblem(draft)
-  if (problem !== null) {
-    return { ok: false, message: firstAccessProblemMessage(problem) }
-  }
-  const profile = draft.profile as { nickname: string; char_id: string; char_class: string }
-  try {
-    const result = await deps.requestClaim({
-      char_id: profile.char_id,
-      nickname: profile.nickname,
-      char_class: profile.char_class,
-      proof_data_url: draft.proofDataUrl as string,
-    })
-    return { ok: true, duplicate: result.duplicate }
-  } catch (err) {
-    if (err instanceof FunctionError) {
-      return { ok: false, message: claimErrorCopy(err) }
     }
     return { ok: false, message: NETWORK_ERROR }
   }

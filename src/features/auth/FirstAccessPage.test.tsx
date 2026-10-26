@@ -3,15 +3,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { FunctionError } from '../../lib/api'
 import type { NeoFootSession } from './session'
 import {
-  CLAIM_ALREADY_SENT,
-  CLAIM_SENT,
   PROFILE_ERROR,
   REQUEST_ALREADY_PENDING,
-  canRequestClaim,
+  REQUEST_SENT,
   canRequestRegistration,
   canSetPin,
-  claimErrorCopy,
-  claimProblem,
   firstAccessProblem,
   firstAccessProblemMessage,
   profileComplete,
@@ -22,7 +18,6 @@ import {
   setupErrorCopy,
   statusMessage,
   statusBackToLogin,
-  submitClaim,
   submitFirstAccess,
   submitRegistration,
   type FirstAccessDeps,
@@ -110,17 +105,11 @@ describe('registry status gates the flow', () => {
     expect(canRequestRegistration(null)).toBe(false)
   })
 
-  // 0032 stopgap: the print is public data, so an unclaimed row whose claim no
-  // officer authorized never opens the PIN setter.
-  it('a print-only claim needs an officer before the PIN setter', () => {
-    expect(canSetPin('claim_review')).toBe(false)
-    expect(canSetPin('claim_pending')).toBe(false)
-    expect(canRequestClaim('claim_review')).toBe(true)
-    expect(canRequestClaim('claim_pending')).toBe(false)
-    expect(canRequestClaim('ready')).toBe(false)
-    expect(canRequestClaim(null)).toBe(false)
-    expect(statusMessage('claim_review')).toContain('confirmação de um oficial')
-    expect(statusMessage('claim_pending')).toContain('Aguarde a confirmação')
+  // 0033 one-go: the unknown path also asks for a PIN — the officer approval
+  // activates it, so the player never returns to a PIN setter.
+  it('a registration request carries the PIN for the approval to activate', () => {
+    expect(statusMessage('unknown')).toContain('aprovação de um oficial')
+    expect(REQUEST_SENT).toContain('entre com o nick e o PIN')
   })
 
   it('explains every non-ready status without asking for a PIN', () => {
@@ -170,8 +159,6 @@ describe('firstAccessProblem — submit blocking order', () => {
   it('keeps the PIN setter closed for a non-claimable registry answer', () => {
     for (const status of [
       'unknown',
-      'claim_review',
-      'claim_pending',
       'pin_set',
       'pending',
       'identity_mismatch',
@@ -185,15 +172,20 @@ describe('firstAccessProblem — submit blocking order', () => {
     expect(firstAccessProblemMessage('status')).toContain('Verifique o personagem')
   })
 
-  it('requires the handle only for the registration request', () => {
+  it('requires the handle and a 4-digit PIN for the registration request', () => {
     const unknown = { ...VALID, status: 'unknown' as const }
     expect(registrationProblem({ ...unknown, handle: '   ' })).toBe('handle')
     expect(registrationProblem({ ...unknown, handle: 'x'.repeat(65) })).toBe('handle')
     expect(registrationProblem(unknown)).toBe(null)
     expect(registrationProblem({ ...unknown, proofDataUrl: null })).toBe('proof')
     expect(registrationProblem({ ...unknown, profile: null })).toBe('profile')
-    // A registration request never validates PIN digits.
-    expect(registrationProblem({ ...unknown, handle: 'ahrya' })).toBe(null)
+    // 0033 one-go: the request carries the PIN, so it validates the digits.
+    expect(registrationProblem({ ...unknown, pin: '12' })).toBe('pin')
+    expect(registrationProblem({ ...unknown, pin: '12a4' })).toBe('pin')
+    expect(registrationProblem({ ...unknown, confirmPin: '4321' })).toBe('mismatch')
+    // The CLAIM validator stays claim-only: an unknown registry answer never
+    // reaches setup-pin (the registration path has its own submit).
+    expect(firstAccessProblem(unknown)).toBe('status')
   })
 
   it('uses the retry copy for an unreadable profile', () => {
@@ -301,9 +293,10 @@ describe('submitFirstAccess — mocked setupPin', () => {
   })
 })
 
-// Phase 10: a print with no registry match becomes an officer-approved
-// registration request. It must never mint a session or ask for a PIN.
-describe('submitRegistration — officer approval path', () => {
+// Phase 10 + 0033 one-go: a print with no registry match becomes an
+// officer-approved registration request that CARRIES the PIN — the approval
+// activates it, so the player logs in right away. It must never mint a session.
+describe('submitRegistration — officer approval path (0033 one-go)', () => {
   const UNKNOWN: FirstAccessDraft = { ...VALID, status: 'unknown' }
 
   function registrationDeps(result?: { request_id: string; status: 'pending'; duplicate: boolean }) {
@@ -316,7 +309,7 @@ describe('submitRegistration — officer approval path', () => {
     }
   }
 
-  it('sends handle + print identity and never a PIN', async () => {
+  it('sends handle + print identity + the chosen PIN, and mints no session', async () => {
     const d = registrationDeps()
     const outcome = await submitRegistration(UNKNOWN, d)
 
@@ -326,14 +319,20 @@ describe('submitRegistration — officer approval path', () => {
       char_id: '32980',
       nickname: 'Ahrya',
       char_class: 'Gypsy',
+      pin: '1234',
+      confirm_pin: '1234',
       proof_data_url: 'data:image/jpeg;base64,AAAA',
     })
   })
 
-  it('blocks without a handle before reaching the server', async () => {
+  it('blocks without a handle or a valid PIN before reaching the server', async () => {
     const d = registrationDeps()
-    const outcome = await submitRegistration({ ...UNKNOWN, handle: '  ' }, d)
-    expect(outcome.ok).toBe(false)
+    const noHandle = await submitRegistration({ ...UNKNOWN, handle: '  ' }, d)
+    expect(noHandle.ok).toBe(false)
+    const noPin = await submitRegistration({ ...UNKNOWN, pin: '12' }, d)
+    expect(noPin.ok).toBe(false)
+    const mismatched = await submitRegistration({ ...UNKNOWN, confirmPin: '4321' }, d)
+    expect(mismatched.ok).toBe(false)
     expect(d.requestFirstAccess).not.toHaveBeenCalled()
   })
 
@@ -369,77 +368,6 @@ describe('submitRegistration — officer approval path', () => {
     })
     expect(outcome.ok).toBe(false)
     expect(outcome.ok === false && outcome.message).not.toContain('server_error')
-  })
-})
-
-// 0032 stopgap: an unclaimed registry row whose claim no officer authorized
-// yet. The print is queued for officer confirmation — never a PIN, never a
-// typed handle (the registry row holds the authoritative one).
-describe('submitClaim — officer authorization path (0032)', () => {
-  const CLAIM: FirstAccessDraft = { ...VALID, status: 'claim_review' }
-
-  function claimDeps(result?: { status: 'pending'; duplicate: boolean }) {
-    return {
-      requestClaim: vi.fn(async () => result ?? { status: 'pending' as const, duplicate: false }),
-    }
-  }
-
-  it('sends the print identity only — no PIN and no typed handle', async () => {
-    const d = claimDeps()
-    const outcome = await submitClaim(CLAIM, d)
-
-    expect(outcome).toEqual({ ok: true, duplicate: false })
-    expect(d.requestClaim).toHaveBeenCalledWith({
-      char_id: '32980',
-      nickname: 'Ahrya',
-      char_class: 'Gypsy',
-      proof_data_url: 'data:image/jpeg;base64,AAAA',
-    })
-  })
-
-  it('blocks without a proof or a complete profile before the server', async () => {
-    const d = claimDeps()
-    const noProof = await submitClaim({ ...CLAIM, proofDataUrl: null }, d)
-    expect(noProof.ok).toBe(false)
-    expect(claimProblem({ ...CLAIM, proofDataUrl: null })).toBe('proof')
-    expect(claimProblem({ ...CLAIM, profile: null })).toBe('profile')
-    expect(d.requestClaim).not.toHaveBeenCalled()
-  })
-
-  it('reports a re-sent print without failing', async () => {
-    const outcome = await submitClaim(CLAIM, claimDeps({ status: 'pending', duplicate: true }))
-    expect(outcome).toMatchObject({ ok: true, duplicate: true })
-    expect(CLAIM_SENT).toContain('Aguarde a confirmação')
-    expect(CLAIM_ALREADY_SENT).toContain('aguardando confirmação')
-  })
-
-  it('maps server refusals to pt-BR copy', async () => {
-    expect(claimErrorCopy(new FunctionError(409, 'already_authorized', 'x'))).toContain(
-      'já autorizou',
-    )
-    expect(claimErrorCopy(new FunctionError(404, 'not_registered', 'x'))).toContain(
-      'lista da guilda',
-    )
-    expect(claimErrorCopy(new FunctionError(409, 'identity_mismatch', 'x'))).toContain(
-      'não confere',
-    )
-    expect(claimErrorCopy(new FunctionError(0, 'network', 'x'))).toContain('conexão')
-  })
-
-  it('a failed claim never advances the guard', async () => {
-    const outcome = await submitClaim(CLAIM, {
-      requestClaim: vi.fn(async () => {
-        throw new FunctionError(500, 'server_error', 'x')
-      }),
-    })
-    expect(outcome.ok).toBe(false)
-    expect(outcome.ok === false && outcome.message).not.toContain('server_error')
-  })
-
-  it('a setup-pin refusal for a missing authorization asks for a new print', () => {
-    const copy = setupErrorCopy(new FunctionError(409, 'claim_not_authorized', 'x'))
-    expect(copy.message).toContain('confirmação de um oficial')
-    expect(copy.clearPin).toBe(true)
   })
 })
 

@@ -22,12 +22,6 @@ const STALE_ROW_ERROR = 'Esta identidade já foi avaliada por outro oficial.'
 const EMPTY_MESSAGE = 'Nenhuma identidade aguardando revisão.'
 const CONFIRMED_MESSAGE = 'Identidade confirmada.'
 const REJECTED_MESSAGE = 'Identidade rejeitada.'
-const CLAIM_CONFIRMED_MESSAGE = 'Primeiro acesso autorizado.'
-const CLAIM_REJECTED_MESSAGE = 'Primeiro acesso recusado.'
-// 0032: the print alone never proves ownership — the officer must talk to the
-// person behind the REGISTRY handle before authorizing a first access.
-const CLAIM_HINT =
-  'Primeiro acesso: confirme no Discord com o dono deste personagem (handle do cadastro) antes de autorizar.'
 
 export function IdentityReview({ session }: { session: NeoFootSession }) {
   const [rows, setRows] = useState<IdentityQueueRow[] | null>(null)
@@ -61,7 +55,7 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
     setLastSuccess(null)
     try {
       await reviewIdentity(session, row.proof_id, true)
-      setLastSuccess(row.pin_set === false ? CLAIM_CONFIRMED_MESSAGE : CONFIRMED_MESSAGE)
+      setLastSuccess(CONFIRMED_MESSAGE)
       try {
         await deleteIdentityProof(session, row.proof_path)
       } catch {
@@ -92,7 +86,7 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
     setLastSuccess(null)
     try {
       await reviewIdentity(session, row.proof_id, false)
-      setLastSuccess(row.pin_set === false ? CLAIM_REJECTED_MESSAGE : REJECTED_MESSAGE)
+      setLastSuccess(REJECTED_MESSAGE)
       try {
         await deleteIdentityProof(session, row.proof_path)
       } catch {
@@ -146,9 +140,6 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
                   #{row.char_id} · {row.nickname}
                   {row.char_class ? ` · ${classLabel(row.char_class)}` : ''}
                 </p>
-                {row.pin_set === false && (
-                  <p className="text-sm font-semibold text-content">{CLAIM_HINT}</p>
-                )}
                 {failed ? (
                   <p className="text-sm text-muted">Comprovante indisponível.</p>
                 ) : (
@@ -172,7 +163,7 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
                     disabled={busy}
                     className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground"
                   >
-                    {row.pin_set === false ? 'Autorizar primeiro acesso' : 'Confirmar'}
+                    Confirmar
                   </button>
                   <button
                     type="button"
@@ -180,7 +171,7 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
                     disabled={busy}
                     className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content"
                   >
-                    {row.pin_set === false ? 'Recusar' : 'Rejeitar'}
+                    Rejeitar
                   </button>
                 </div>
               </div>
@@ -190,15 +181,13 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
       )}
       <ConfirmDialog
         open={rejectTarget !== null}
-        title={rejectTarget?.pin_set === false ? 'Recusar primeiro acesso' : 'Rejeitar identidade'}
+        title="Rejeitar identidade"
         body={
           rejectTarget === null
             ? ''
-            : rejectTarget.pin_set === false
-              ? 'Recusar este primeiro acesso? O personagem continua sem PIN e o dono pode tentar de novo.'
-              : 'Rejeitar esta identidade? O membro perderá o acesso até falar com um oficial.'
+            : 'Rejeitar esta identidade? O membro perderá o acesso até falar com um oficial.'
         }
-        confirmLabel={rejectTarget?.pin_set === false ? 'Recusar' : 'Rejeitar'}
+        confirmLabel="Rejeitar"
         destructive
         busy={busy}
         onConfirm={() => {
