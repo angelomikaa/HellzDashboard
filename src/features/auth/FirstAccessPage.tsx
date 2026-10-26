@@ -1,121 +1,94 @@
-// FirstAccessPage — claim a character by PRINT, then set the PIN (Phase 10).
+// FirstAccessPage — manual-fill first access, officer-validated (0034).
 //
-// Owner decision (2026-10-23) supersedes the handle-first claim of 08-03:
+// Owner decision 2026-10-26 (evolves Phase 10's print-first claim): the PRINT
+// is eliminated. The player TYPES the identity (Discord handle, nick, char ID,
+// class) and chooses the PIN in ONE form; every first access becomes a request
+// an OFFICER validates — with no print and no OCR there is nothing else to
+// verify identity at the boundary, so the check responsibility sits fully with
+// the admins until the Phase 11 Discord OAuth link replaces it.
 //
-//   1. Discord handle + the Basic print (the same optimal-example capture the
-//      stats wizard uses).
-//   2. The print is read (char_id / nickname / class) and looked up in the
-//      guild registry by NICKNAME.
-//   3. `ready` -> the PIN setter opens and the claim mints the session.
-//      `unknown` -> the handle + print + the chosen PIN go to an officer as a
-//      registration request (0033 one-go); the approval registers the
-//      character WITH that PIN active, so the player logs in right away.
-//      `pin_set` / `identity_mismatch` / `ambiguous_identity` -> never reach the
-//      PIN boxes; the page explains and points at the login/officer.
+//   lookup(nick, ID, handle) -> 'ready'   -> claim request: the approval
+//                                        activates the PIN on the registry row
+//                              'unknown' -> registration request: the approval
+//                                        registers the character WITH the PIN
+//                              anything else -> explain, never submit
 //
-// Manual validation stays on (owner decision 2026-10-26): the claim still
-// queues a pending identity proof for the Identidades review and the
-// registration still needs the officer approval in Solicitações.
+// No session is ever minted here: after the officer approves, the player logs
+// in with nickname + PIN.
 //
 // T-08-18: the PIN lives only in this component's state and the HTTPS request
 // body. It is never logged, persisted or put in a URL.
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import hellzMark from '../../assets/hellz-mark.svg'
+import { classLabel } from '../../lib/classLabels'
 import {
   firstAccessLookup,
+  requestClaim,
   requestFirstAccess,
-  setupPin,
   type FirstAccessStatus,
 } from '../../lib/api'
-import type { BasicProfileFields } from '../submit/identity'
-import { ProofField } from '../identity/ProofField'
+import { OFFICIAL_CLASSES } from '../submit/identity'
 import { PinBoxes } from './PinBoxes'
 import {
   REQUEST_ALREADY_PENDING,
   REQUEST_SENT,
+  canRequestClaim,
   canRequestRegistration,
-  canSetPin,
-  profileComplete,
-  profileProblemMessage,
-  profileSummary,
+  claimRequestInput,
+  registrationRequestInput,
   statusMessage,
-  submitFirstAccess,
-  submitRegistration,
+  statusBackToLogin,
+  submitFirstAccessRequest,
 } from './firstAccess'
-import { saveSession, type NeoFootSession } from './session'
 
 export interface FirstAccessPageProps {
   initialHandle?: string
-  onDone: (session: NeoFootSession) => void
   onBack: () => void
 }
 
 type Status =
   | { kind: 'idle' }
   | { kind: 'submitting' }
-  | { kind: 'error'; message: string; backToLogin: boolean }
+  | { kind: 'error'; message: string }
   | { kind: 'sent'; message: string }
 
-const OCR_FAILED = 'Não foi possível ler o print. Envie outro print.'
 const LOOKUP_FAILED = 'Não foi possível verificar o personagem agora. Tente de novo.'
+const SUBMIT_LABEL = 'Enviar solicitação'
 
-export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAccessPageProps) {
+export function FirstAccessPage({ initialHandle = '', onBack }: FirstAccessPageProps) {
   const [handle, setHandle] = useState(initialHandle)
+  const [nickname, setNickname] = useState('')
+  const [charId, setCharId] = useState('')
+  const [charClass, setCharClass] = useState('')
   const [pin, setPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
-  const [proof, setProof] = useState<string | null>(null)
-  const [profile, setProfile] = useState<BasicProfileFields | null>(null)
-  const [reading, setReading] = useState(false)
-  const [ocrError, setOcrError] = useState<string | null>(null)
   const [lookup, setLookup] = useState<FirstAccessStatus | null>(null)
   const [checking, setChecking] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [lookupNonce, setLookupNonce] = useState(0)
-  const [proofKey, setProofKey] = useState(0)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
-  const readToken = useRef(0)
   const lookupToken = useRef(0)
 
   const busy = status.kind === 'submitting'
-  const summary = profileSummary(profile)
-  const incomplete = proof !== null && !reading && ocrError === null && !profileComplete(profile)
-  const mismatch = confirmPin.length === 4 && confirmPin !== pin
-  const ready = canSetPin(lookup)
-  const canRequest = canRequestRegistration(lookup)
+  const claimable = canRequestClaim(lookup)
+  const registrable = canRequestRegistration(lookup)
+  const submittable = claimable || registrable
   const sent = status.kind === 'sent'
+  const mismatch = confirmPin.length === 4 && confirmPin !== pin
 
-  async function readProof(canvas: HTMLCanvasElement): Promise<void> {
-    const token = ++readToken.current
-    setReading(true)
-    setOcrError(null)
-    setProfile(null)
-    setLookup(null)
-    setLookupError(null)
-    try {
-      // Lazy import keeps Tesseract out of the login bundle.
-      const { readBasicProfile } = await import('../submit/ocr')
-      const read = await readBasicProfile(canvas)
-      if (token !== readToken.current) return // a newer proof superseded this read
-      setProfile(read)
-    } catch {
-      if (token === readToken.current) setOcrError(OCR_FAILED)
-    } finally {
-      if (token === readToken.current) setReading(false)
-    }
-  }
-
-  // Ask the registry once the print reads complete (and again when the Discord
-  // handle changes, since a pending registration is keyed by it).
+  // Ask the registry what the TYPED identity resolves to (and again when the
+  // handle changes, since a pending request is keyed by it).
   useEffect(() => {
-    if (!profileComplete(profile)) return
-    const printed = profile as { nickname: string; char_id: string }
+    const trimmedNick = nickname.trim()
+    const trimmedId = charId.trim()
+    if (trimmedNick === '' || !/^\d{1,12}$/.test(trimmedId)) return
     const token = ++lookupToken.current
     const timer = setTimeout(() => {
       setChecking(true)
       setLookupError(null)
       void firstAccessLookup({
-        nickname: printed.nickname,
-        char_id: printed.char_id,
+        nickname: trimmedNick,
+        char_id: trimmedId,
         discord_handle: handle.trim() || undefined,
       })
         .then((result) => {
@@ -129,57 +102,31 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
         })
     }, 350)
     return () => clearTimeout(timer)
-  }, [profile, handle, lookupNonce])
-
-  function retake(): void {
-    readToken.current += 1
-    lookupToken.current += 1
-    setReading(false)
-    setChecking(false)
-    setProof(null)
-    setProfile(null)
-    setLookup(null)
-    setLookupError(null)
-    setOcrError(null)
-    setProofKey((key) => key + 1)
-    setStatus({ kind: 'idle' })
-  }
+  }, [nickname, charId, handle, lookupNonce])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
-    // Enter in the handle field must not submit while the registry answer is
-    // missing: the PIN setter is gated on `ready`.
-    if (busy || reading || checking || !ready) return
+    if (busy || checking || !submittable) return
     setStatus({ kind: 'submitting' })
-    const outcome = await submitFirstAccess(
-      { handle, pin, confirmPin, profile, proofDataUrl: proof, status: lookup },
-      { setupPin, saveSession },
-    )
-    if (outcome.ok) {
-      // Saved once inside submitFirstAccess; the guard advances exactly once.
-      onDone(outcome.session)
-      return
+    const draft = {
+      handle,
+      nickname,
+      char_id: charId,
+      char_class: charClass,
+      pin,
+      confirmPin,
+      status: lookup,
     }
-    if (outcome.clearPin) {
-      setPin('')
-      setConfirmPin('')
-    }
-    setStatus({
-      kind: 'error',
-      message: outcome.message,
-      backToLogin: outcome.backToLogin,
+    const outcome = await submitFirstAccessRequest(draft, {
+      // 'ready' claims the registry row the typed nick resolved to; 'unknown'
+      // asks the officer to register the character. Both are officer-approved.
+      send: () =>
+        claimable
+          ? requestClaim(claimRequestInput(draft))
+          : requestFirstAccess(registrationRequestInput(draft)),
     })
-  }
-
-  async function handleRequestRegistration(): Promise<void> {
-    if (busy) return
-    setStatus({ kind: 'submitting' })
-    const outcome = await submitRegistration(
-      { handle, pin, confirmPin, profile, proofDataUrl: proof, status: lookup },
-      { requestFirstAccess },
-    )
     if (!outcome.ok) {
-      setStatus({ kind: 'error', message: outcome.message, backToLogin: false })
+      setStatus({ kind: 'error', message: outcome.message })
       return
     }
     setStatus({
@@ -188,17 +135,22 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
     })
   }
 
+  const statusLine: string | null =
+    lookupError !== null
+      ? lookupError
+      : checking
+        ? 'Verificando o personagem…'
+        : lookup !== null
+          ? statusMessage(lookup)
+          : null
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
-      {/* max-w-2xl (strip parity, owner report 2026-10-23): the proof capture
-          sits in ONE strip — example beside the upload zone, both 160 px —
-          like every wizard strip; the narrower card forced the zone onto a
-          full-width line of its own. */}
       <div className="neon-ring w-full max-w-2xl rounded-lg border border-line bg-surface p-6">
         <img src={hellzMark} alt="Hellz" className="mx-auto mb-3 mt-2 h-16 w-16 glow-accent" />
         <h1 className="text-center text-2xl font-bold leading-[1.2] text-content">Primeiro acesso</h1>
         <p className="mt-1 text-center text-sm font-medium text-muted">
-          Envie o print do personagem. O nick vem da imagem e define o seu login.
+          Preencha seus dados e escolha o PIN. Um oficial confirma o acesso e o PIN fica ativo.
         </p>
         <div aria-hidden="true" className="mx-auto mb-6 mt-4 h-px w-16 bg-line" />
 
@@ -217,107 +169,113 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
               disabled={busy}
               className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
             />
-            <p className="text-xs text-muted">
-              Usado só se o personagem ainda não estiver na lista da guilda.
-            </p>
           </div>
 
-          <ProofField
-            key={proofKey}
-            value={proof}
-            onChange={(dataUrl) => {
-              setProof(dataUrl)
-              if (dataUrl === null) {
-                setProfile(null)
-                setLookup(null)
-                setOcrError(null)
-                setLookupError(null)
-                setStatus({ kind: 'idle' })
-              }
-            }}
-            onImage={(canvas) => {
-              void readProof(canvas)
-            }}
-            disabled={busy}
-          />
+          <div className="flex flex-col gap-2">
+            <label htmlFor="first-access-nickname" className="text-sm font-semibold text-content">
+              Nick do personagem
+            </label>
+            <input
+              id="first-access-nickname"
+              type="text"
+              autoComplete="off"
+              maxLength={80}
+              value={nickname}
+              onChange={(event) => setNickname(event.target.value)}
+              disabled={busy}
+              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="first-access-char-id" className="text-sm font-semibold text-content">
+              ID do personagem
+            </label>
+            <input
+              id="first-access-char-id"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={12}
+              value={charId}
+              onChange={(event) => setCharId(event.target.value.replace(/\D/g, '').slice(0, 12))}
+              disabled={busy}
+              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="first-access-class" className="text-sm font-semibold text-content">
+              Classe
+            </label>
+            <select
+              id="first-access-class"
+              value={charClass}
+              onChange={(event) => setCharClass(event.target.value)}
+              disabled={busy}
+              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="">Selecione a classe</option>
+              {OFFICIAL_CLASSES.map((name) => (
+                <option key={name} value={name}>
+                  {classLabel(name)}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div aria-live="polite" className="rounded-md border border-line bg-dominant px-3 py-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-              Identidade lida do print
+              Verificação do personagem
             </p>
-            {reading && <p className="mt-1 text-sm text-muted">Lendo o print…</p>}
-            {!reading && summary !== null && <p className="mt-1 text-sm text-content">{summary}</p>}
-            {!reading && ocrError !== null && (
-              <p role="alert" className="mt-1 text-sm font-semibold text-error">
-                {ocrError}
-              </p>
-            )}
-            {!reading && incomplete && (
-              <p role="alert" className="mt-1 text-sm font-semibold text-error">
-                {profileProblemMessage(profile)}
-              </p>
-            )}
-            {!reading && !incomplete && summary !== null && checking && (
-              <p className="mt-1 text-sm text-muted">Verificando o personagem…</p>
-            )}
-            {!reading && summary !== null && !checking && lookupError !== null && (
-              <div className="mt-1 flex flex-col gap-2">
-                <p role="alert" className="text-sm font-semibold text-error">
-                  {lookupError}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setLookupNonce((n) => n + 1)}
-                  disabled={busy}
-                  className="text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Verificar de novo
-                </button>
-              </div>
-            )}
-            {!reading && summary !== null && !checking && lookup !== null && (
+            {statusLine !== null && (
               <p
                 className={`mt-1 text-sm ${
-                  lookup === 'ready' ? 'text-content' : 'font-semibold text-error'
+                  lookup === 'ready' || lookup === 'unknown'
+                    ? 'text-content'
+                    : lookupError !== null || checking
+                      ? 'text-muted'
+                      : 'font-semibold text-error'
                 }`}
               >
-                {statusMessage(lookup)}
+                {statusLine}
               </p>
             )}
-            {!reading && summary === null && ocrError === null && !incomplete && (
+            {statusLine === null && (
               <p className="mt-1 text-sm text-muted">
-                Selecione o print da aba Básico. O ID, o nick e a classe vêm da imagem.
+                Preencha o nick e o ID para verificar o personagem na lista da guilda.
               </p>
             )}
-            {proof !== null && (
+            {lookupError !== null && !checking && (
               <button
                 type="button"
-                onClick={retake}
+                onClick={() => setLookupNonce((n) => n + 1)}
                 disabled={busy}
-                className="mt-2 text-sm font-semibold text-muted hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-2 text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Trocar print
+                Verificar de novo
+              </button>
+            )}
+            {lookup !== null && statusBackToLogin(lookup) && (
+              <button
+                type="button"
+                onClick={onBack}
+                disabled={busy}
+                className="mt-2 text-sm font-semibold text-accent hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Voltar para o login
               </button>
             )}
           </div>
 
-          {/* 0033 one-go: the PIN setter opens for BOTH paths — `ready` claims
-              immediately, `unknown` stores the PIN with the registration
-              request so the officer approval activates it. */}
-          {(ready || canRequest) && (
-            <>
-              <PinBoxes value={pin} onChange={setPin} disabled={busy} />
-              <PinBoxes
-                value={confirmPin}
-                onChange={setConfirmPin}
-                disabled={busy}
-                label="Confirme o PIN"
-              />
-              {mismatch && (
-                <p className="text-sm font-semibold text-error">Os PINs não conferem.</p>
-              )}
-            </>
-          )}
+          <PinBoxes value={pin} onChange={setPin} disabled={busy} />
+          <PinBoxes
+            value={confirmPin}
+            onChange={setConfirmPin}
+            disabled={busy}
+            label="Confirme o PIN"
+          />
+          {mismatch && <p className="text-sm font-semibold text-error">Os PINs não conferem.</p>}
 
           {status.kind === 'error' && (
             <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
@@ -330,25 +288,14 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
             </p>
           )}
 
-          {ready && (
+          {submittable && !sent && (
             <button
               type="submit"
-              disabled={busy || reading || checking}
+              disabled={busy || checking}
               aria-busy={busy}
               className="h-11 w-full rounded-md bg-accent text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Criar meu PIN
-            </button>
-          )}
-          {canRequest && !sent && (
-            <button
-              type="button"
-              onClick={() => void handleRequestRegistration()}
-              disabled={busy || reading || checking}
-              aria-busy={busy}
-              className="h-11 w-full rounded-md bg-accent text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Enviar print para aprovação
+              {SUBMIT_LABEL}
             </button>
           )}
           {/* Owner decision 2026-10-23: one way out, styled like every other

@@ -1,16 +1,20 @@
-// NeoFoot first-access Edge Function (Phase 10, owner decision 2026-10-23)
+// NeoFoot first-access Edge Function (Phase 10; 0034 manual first access)
 //
-// Three actions, one contract:
+// Three actions, one contract — NO PRINT, NO OCR (owner decision 2026-10-26):
+// the player TYPES the identity and chooses the PIN; with nothing verifiable
+// at the boundary, EVERY first access becomes an officer-validated request.
+// The admins carry the identity check until the Phase 11 Discord link lands.
 //
 //   POST { action: 'lookup', nickname, char_id, discord_handle? }
 //     -> 200 { status }
-//        'ready'             registry row exists, no PIN yet -> PIN setter
+//        'ready'             registry row exists, unclaimed -> send a CLAIM
+//                            request (the officer approval activates the PIN)
 //        'pin_set'           registry row already claimed -> login instead
 //        'handle_claimed'    the typed Discord handle belongs to a claimed
 //                            account -> the PIN system is refused entirely
-//        'handle_registered' the typed handle exists but the print nickname does
-//                            not match it -> officer, never a new registration
-//        'pending'           a registration request awaits an officer
+//        'handle_registered' the typed handle exists but the nickname does not
+//                            match it -> officer, never a new registration
+//        'pending'           a claim/registration request awaits an officer
 //        'unknown'           no registry row and no pending request
 //        'identity_mismatch' registry row holds a DIFFERENT char_id
 //        'ambiguous_identity' more than one registry row uses the nickname
@@ -22,34 +26,35 @@
 //        relink form, no PIN boxes — log in instead or ask staff for a reset.
 //        'unclaimed' has a registry row without a PIN -> first-access claim.
 //
-//   POST { action: 'request', discord_handle, char_id, nickname, char_class,
-//          pin?, confirm_pin?, proof_data_url }
+//   POST { action: 'claim', discord_handle, char_id, nickname, char_class,
+//          pin, confirm_pin }
 //     -> 200 { request_id, status: 'pending', duplicate }
-//        Stores the handle + print identity + proof + the OPTIONAL player-chosen
-//        PIN (0033 one-go registration) as a pending 'registration' request.
-//        An officer approval registers the character WITH that PIN already
-//        active, so the player logs in right away — no second visit to a PIN
-//        setter. A request without a PIN (cached pre-0033 bundle) keeps the
-//        0020 behaviour: the approval creates the character unclaimed and the
-//        PIN is set at the next first access.
+//        0034: queues a first-access CLAIM for the unclaimed registry row the
+//        typed nickname resolves to, carrying the player-chosen PIN. An officer
+//        approves it in Solicitações; the approval activates the PIN on the
+//        row — the player logs in with nickname + PIN. No session is minted.
 //
-// The proof upload is server-generated and service-role written; every
-// non-success exit removes the orphan object. No session is ever minted here.
-// The PIN and pin_hash are never logged and never appear in any response path.
+//   POST { action: 'request', discord_handle, char_id, nickname, char_class,
+//          pin?, confirm_pin?, proof_data_url? }
+//     -> 200 { request_id, status: 'pending', duplicate }
+//        Stores the handle + TYPED identity + the OPTIONAL player-chosen PIN
+//        (0033 one-go) as a pending 'registration' request. The officer
+//        approval registers the character WITH that PIN active. Any
+//        proof_data_url a cached pre-0034 bundle still sends is IGNORED.
+//
+// No proof is uploaded, no session is ever minted here. The PIN and pin_hash
+// are never logged and never appear in any response path.
 import bcrypt from 'npm:bcryptjs@3'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
-  MAX_PROOF_BYTES,
   corsHeaders,
-  decodeProof,
   envConfig,
   errorMessage,
   json,
-  proofByteLength,
 } from '../_shared/session.ts'
 
-const MAX_BODY_BYTES = 3_500_000
-const ACTIONS = new Set(['lookup', 'request', 'identify'])
+const MAX_BODY_BYTES = 8_000 // typed identity + PIN JSON; nothing larger is legit
+const ACTIONS = new Set(['lookup', 'request', 'identify', 'claim'])
 
 type LookupStatus =
   | 'ready'
@@ -74,7 +79,7 @@ Deno.serve(async (req: Request) => {
 
   const declaredLength = Number(req.headers.get('content-length') ?? '0')
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
-    return json({ error: 'proof_too_large' }, 413)
+    return json({ error: 'invalid_request' }, 400)
   }
 
   let raw: string
@@ -83,7 +88,7 @@ Deno.serve(async (req: Request) => {
   } catch {
     return json({ error: 'invalid_request' }, 400)
   }
-  if (raw.length > MAX_BODY_BYTES) return json({ error: 'proof_too_large' }, 413)
+  if (raw.length > MAX_BODY_BYTES) return json({ error: 'invalid_request' }, 400)
 
   let body: Record<string, unknown>
   try {
@@ -161,21 +166,24 @@ Deno.serve(async (req: Request) => {
     }
 
     // Owner rule (2026-10-23): a Discord handle that already belongs to a
-    // CLAIMED account refuses the PIN system entirely — no PIN setter, no
+    // CLAIMED account refuses the PIN system entirely — no claim request, no
     // registration request, ever. This is checked before the nickname answer so
     // the handle cannot be used to reach another row.
     if (byHandle && byHandle.pin_hash !== null && byNick?.id !== byHandle.id) {
       return 'handle_claimed'
     }
-    // The handle belongs to an ACTIVE account without a PIN, but the print
-    // points at a different row: never queue a second registration for it.
+    // The handle belongs to an ACTIVE account without a PIN, but the typed
+    // nickname points at a different row: never queue a second registration
+    // for it.
     if (byHandle && byNick && byNick.id !== byHandle.id) return 'handle_registered'
 
     if (byNick) {
       if (byNick.char_id !== null && byNick.char_id !== charId) return 'identity_mismatch'
+      // 0034: 'ready' no longer opens a PIN setter — it means the row is
+      // unclaimed and a CLAIM REQUEST can be sent for an officer to approve.
       return byNick.pin_hash === null ? 'ready' : 'pin_set'
     }
-    // The handle is known without a PIN and the print nickname matches nothing:
+    // The handle is known without a PIN and the typed nickname matches nothing:
     // the account exists, so an officer fixes the nickname (never a new row).
     if (byHandle) return 'handle_registered'
 
@@ -184,7 +192,7 @@ Deno.serve(async (req: Request) => {
         .from('membership_requests')
         .select('id')
         .eq('status', 'pending')
-        .eq('request_type', 'registration')
+        .in('request_type', ['registration', 'claim'])
         .ilike('discord_handle', escapeLike(handle))
         .limit(1)
       if (pendingErr) throw new Error('pending lookup failed')
@@ -194,7 +202,7 @@ Deno.serve(async (req: Request) => {
       .from('membership_requests')
       .select('id')
       .eq('status', 'pending')
-      .eq('request_type', 'registration')
+      .in('request_type', ['registration', 'claim'])
       .eq('char_id', charId)
       .limit(1)
     if (pendingIdErr) throw new Error('pending lookup failed')
@@ -211,22 +219,10 @@ Deno.serve(async (req: Request) => {
   }
 
   const charClass = typeof body.char_class === 'string' ? body.char_class.trim() : ''
-  const proofDataUrl = typeof body.proof_data_url === 'string' ? body.proof_data_url.trim() : ''
 
   if (charClass.length === 0 || charClass.length > 40) {
     return json({ error: 'invalid_request' }, 400)
   }
-  if (proofDataUrl.length === 0) return json({ error: 'invalid_proof' }, 400)
-  if (proofByteLength(proofDataUrl) > MAX_PROOF_BYTES) {
-    return json({ error: 'proof_too_large' }, 413)
-  }
-  const proof = decodeProof(proofDataUrl, MAX_PROOF_BYTES)
-  if (!proof) return json({ error: 'invalid_proof' }, 400)
-
-  // action === 'request' (0033 one-go registration): the player picks the PIN
-  // in the same form; the officer approval activates it. The PIN is OPTIONAL
-  // at this boundary only for a cached pre-0033 bundle — a request without one
-  // keeps the 0020 behaviour (approval creates the member unclaimed).
   if (handle.length === 0) return json({ error: 'invalid_request' }, 400)
 
   const pin = typeof body.pin === 'string' ? body.pin : ''
@@ -237,8 +233,49 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // State may have moved between the lookup and this submit: answer with the
-  // status instead of queueing a request that can never be approved.
+  // 0034 first-access CLAIM: the unclaimed registry row exists ('ready') —
+  // queue the officer-validated claim carrying the player-chosen PIN. The PIN
+  // is REQUIRED on this action (the whole point of the request is to activate
+  // it); no print, no proof, no session. create_claim_request re-checks the
+  // row state under its lock and answers with precise tokens, so no separate
+  // pre-check runs here.
+  if (action === 'claim') {
+    if (!/^\d{4}$/.test(pin) || confirmPin !== pin) {
+      return json({ error: 'invalid_request' }, 400)
+    }
+    const pinHash = bcrypt.hashSync(pin, 10)
+
+    const { data, error } = await admin.rpc('create_claim_request', {
+      p_handle: handle,
+      p_char_id: charId,
+      p_nickname: nickname,
+      p_char_class: charClass,
+      p_pin_hash: pinHash,
+    })
+
+    if (error) {
+      const msg = errorMessage(error)
+      if (msg.includes('not_registered')) return json({ error: 'not_registered' }, 404)
+      if (msg.includes('already_set')) return json({ error: 'pin_already_set' }, 409)
+      if (msg.includes('identity_mismatch')) return json({ error: 'identity_mismatch' }, 409)
+      if (msg.includes('ambiguous_identity')) return json({ error: 'ambiguous_identity' }, 409)
+      if (msg.includes('already_member')) return json({ error: 'handle_claimed' }, 409)
+      if (msg.includes('dummy_handle')) return json({ error: 'invalid_request' }, 400)
+      if (msg.includes('unknown_class')) return json({ error: 'unknown_class' }, 400)
+      if (msg.includes('invalid')) return json({ error: 'invalid_request' }, 400)
+      return json({ error: 'server_error' }, 500)
+    }
+
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { request_id?: string; duplicate?: boolean }
+      | null
+    if (!row?.request_id) return json({ error: 'server_error' }, 500)
+    return json({ request_id: row.request_id, status: 'pending', duplicate: row.duplicate === true })
+  }
+
+  // action === 'request': the typed identity must still be unknown — state may
+  // have moved between the lookup and this submit, so answer with the status
+  // instead of queueing a request that can never be approved.
   try {
     const status = await lookupStatus()
     if (
@@ -256,29 +293,10 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'server_error' }, 500)
   }
 
-  const proofPath = `requests/pending/${crypto.randomUUID()}.jpg`
-  let uploaded = false
-  const removeUpload = async () => {
-    if (!uploaded) return
-    try {
-      await admin.storage.from('identity-proofs').remove([proofPath])
-    } catch {
-      // Best effort — never mask the real error.
-    }
-    uploaded = false
-  }
-
-  const { error: uploadErr } = await admin.storage
-    .from('identity-proofs')
-    .upload(proofPath, new Blob([proof.bytes.buffer as ArrayBuffer], { type: proof.mime }), {
-      contentType: proof.mime,
-      upsert: false,
-    })
-  if (uploadErr) return json({ error: 'server_error' }, 500)
-  uploaded = true
-
-  // Same cost as the claim path (setup-pin): bcryptjs in the Edge, the hash
-  // never crosses a response path and is never logged.
+  // (0033 one-go registration, 0034 manual fill): the player-chosen PIN is
+  // OPTIONAL here only for a cached pre-0033 bundle — a request without one
+  // keeps the member unclaimed (they then claim through a claim request). Any
+  // proof_data_url a cached bundle sends is ignored.
   const pinHash = pin.length > 0 ? bcrypt.hashSync(pin, 10) : null
 
   const { data, error } = await admin.rpc('create_registration_request', {
@@ -286,13 +304,12 @@ Deno.serve(async (req: Request) => {
     p_char_id: charId,
     p_nickname: nickname,
     p_char_class: charClass,
-    p_proof_path: proofPath,
+    p_proof_path: null,
     p_pin_hash: pinHash,
   })
 
   if (error) {
     const msg = errorMessage(error)
-    await removeUpload()
     if (msg.includes('already_member')) return json({ error: 'already_registered' }, 409)
     if (msg.includes('dummy_handle')) return json({ error: 'invalid_request' }, 400)
     if (msg.includes('unknown_class')) return json({ error: 'unknown_class' }, 400)
@@ -303,13 +320,8 @@ Deno.serve(async (req: Request) => {
   const row = (Array.isArray(data) ? data[0] : data) as
     | { request_id?: string; status?: string; duplicate?: boolean }
     | null
-  if (!row?.request_id) {
-    await removeUpload()
-    return json({ error: 'server_error' }, 500)
-  }
+  if (!row?.request_id) return json({ error: 'server_error' }, 500)
   const duplicate = row.duplicate === true
-  // A duplicate reuses the existing request row, so this upload is an orphan.
-  if (duplicate) await removeUpload()
 
   return json({ request_id: row.request_id, status: 'pending', duplicate })
 })

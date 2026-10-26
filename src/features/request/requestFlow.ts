@@ -407,7 +407,9 @@ export function statusView(result: RequestStatus | null): StatusView {
       ? 'Vínculo de personagem'
       : result.request_type === 'registration'
         ? 'Cadastro de personagem'
-        : 'Nova entrada'
+        : result.request_type === 'claim'
+          ? 'Primeiro acesso'
+          : 'Nova entrada'
   const created = formatRequestDate(result.created_at)
   switch (result.status) {
     case 'pending':

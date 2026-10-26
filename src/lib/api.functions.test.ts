@@ -1,16 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NeoFootSession } from '../features/auth/session'
 import {
-  FunctionError,
   fetchRequestStatus,
   firstAccessIdentify,
   firstAccessLookup,
   requestAccess,
+  requestClaim,
   requestFirstAccess,
   requestStepUp,
-  setupPin,
   type RequestAccessInput,
-  type SetupPinInput,
 } from './api'
 
 // Plan 08-03 task 2: the unauthenticated surface. Every call carries the anon
@@ -24,17 +22,6 @@ const SESSION: NeoFootSession = {
   expires_at: Math.floor(Date.now() / 1000) + 3600,
 }
 
-// 0020: the claim is keyed by the character nickname read from the print — the
-// Discord handle is no longer part of the setup-pin payload.
-const SETUP_INPUT: SetupPinInput = {
-  nickname: 'Ahrya',
-  pin: '1234',
-  confirm_pin: '1234',
-  char_id: '32980',
-  char_class: 'Gypsy',
-  proof_data_url: 'data:image/jpeg;base64,AAAA',
-}
-
 const REQUEST_INPUT: RequestAccessInput = {
   discord_handle: 'ahrya',
   pin: '1234',
@@ -46,6 +33,17 @@ const REQUEST_INPUT: RequestAccessInput = {
   char_function: 'dps',
   proof_data_url: 'data:image/jpeg;base64,AAAA',
 }
+
+// 0034 manual first access: the typed identity + PIN every claim/registration
+// request carries — no print, no proof_data_url.
+const CLAIM_INPUT = {
+  discord_handle: 'ahrya',
+  char_id: '32980',
+  nickname: 'Ahrya',
+  char_class: 'Gypsy',
+  pin: '1234',
+  confirm_pin: '1234',
+} as const
 
 function res(status: number, body: string) {
   return { ok: status >= 200 && status < 300, status, text: async () => body }
@@ -76,15 +74,16 @@ function headers(call: { init: RequestInit }): Record<string, string> {
 
 describe('anon surface — request shape', () => {
   it('targets /functions/v1/<fn> with apikey + Bearer anon and JSON body', async () => {
-    await setupPin(SETUP_INPUT)
+    nextResponse = () => res(200, JSON.stringify({ request_id: 'req-1', status: 'pending' }))
+    await requestAccess(REQUEST_INPUT)
 
     expect(calls).toHaveLength(1)
-    expect(calls[0].url).toBe('https://test-project.supabase.co/functions/v1/setup-pin')
+    expect(calls[0].url).toBe('https://test-project.supabase.co/functions/v1/request-access')
     expect(calls[0].init.method).toBe('POST')
     expect(headers(calls[0]).apikey).toBe('test-anon-key')
     expect(headers(calls[0]).Authorization).toBe('Bearer test-anon-key')
     expect(headers(calls[0])['Content-Type']).toBe('application/json')
-    expect(JSON.parse(String(calls[0].init.body))).toEqual(SETUP_INPUT)
+    expect(JSON.parse(String(calls[0].init.body))).toEqual(REQUEST_INPUT)
     // No member session header on the unauthenticated surface.
     expect(headers(calls[0]).Authorization).not.toBe(`Bearer ${SESSION.access_token}`)
   })
@@ -100,7 +99,7 @@ describe('anon surface — request shape', () => {
 
   it('throws a network FunctionError when the env is missing', async () => {
     vi.stubEnv('VITE_SUPABASE_URL', '')
-    await expect(setupPin(SETUP_INPUT)).rejects.toMatchObject({
+    await expect(requestAccess(REQUEST_INPUT)).rejects.toMatchObject({
       name: 'FunctionError',
       code: 'network',
       status: 0,
@@ -112,7 +111,7 @@ describe('anon surface — request shape', () => {
     vi.stubGlobal('fetch', async () => {
       throw new Error('offline')
     })
-    await expect(setupPin(SETUP_INPUT)).rejects.toMatchObject({
+    await expect(requestAccess(REQUEST_INPUT)).rejects.toMatchObject({
       name: 'FunctionError',
       code: 'network',
       status: 0,
@@ -120,62 +119,8 @@ describe('anon surface — request shape', () => {
   })
 })
 
-describe('setupPin — session contract', () => {
-  it('returns the validated session', async () => {
-    await expect(setupPin(SETUP_INPUT)).resolves.toEqual(SESSION)
-  })
-
-  it('rejects a malformed 200 session with invalid_response', async () => {
-    nextResponse = () => res(200, JSON.stringify({ session: { access_token: 'x' } }))
-    const error = await setupPin(SETUP_INPUT).catch((err: unknown) => err)
-    expect(error).toBeInstanceOf(FunctionError)
-    expect(error).toMatchObject({ status: 200, code: 'invalid_response' })
-  })
-
-  it('rejects a 200 without a session key', async () => {
-    nextResponse = () => res(200, JSON.stringify({ member_id: 'x' }))
-    await expect(setupPin(SETUP_INPUT)).rejects.toMatchObject({ code: 'invalid_response' })
-  })
-
-  it('maps 409 pin_already_set to the machine token', async () => {
-    nextResponse = () => res(409, JSON.stringify({ error: 'pin_already_set' }))
-    await expect(setupPin(SETUP_INPUT)).rejects.toMatchObject({
-      status: 409,
-      code: 'pin_already_set',
-    })
-  })
-
-  it('maps 401 attempts_remaining onto FunctionError', async () => {
-    nextResponse = () =>
-      res(401, JSON.stringify({ error: 'invalid_credentials', attempts_remaining: 2 }))
-    const error = await setupPin(SETUP_INPUT).catch((err: unknown) => err)
-    expect(error).toBeInstanceOf(FunctionError)
-    expect(error).toMatchObject({
-      status: 401,
-      code: 'invalid_credentials',
-      attemptsRemaining: 2,
-    })
-  })
-
-  it('maps 429 locked retry_after_seconds onto FunctionError', async () => {
-    nextResponse = () =>
-      res(429, JSON.stringify({ error: 'locked', retry_after_seconds: 240 }))
-    const error = await setupPin(SETUP_INPUT).catch((err: unknown) => err)
-    expect(error).toBeInstanceOf(FunctionError)
-    expect(error).toMatchObject({ status: 429, code: 'locked', retryAfterSeconds: 240 })
-  })
-
-  it('falls back to server_error for a non-JSON error body', async () => {
-    nextResponse = () => res(500, '<html>bad gateway</html>')
-    await expect(setupPin(SETUP_INPUT)).rejects.toMatchObject({
-      status: 500,
-      code: 'server_error',
-    })
-  })
-})
-
 describe('first-access — lookup + registration (0020)', () => {
-  it('posts action lookup with the print identity and no session', async () => {
+  it('posts action lookup with the typed identity and no session', async () => {
     nextResponse = () => res(200, JSON.stringify({ status: 'ready' }))
     await expect(
       firstAccessLookup({ nickname: 'Ahrya', char_id: '32980', discord_handle: 'ahrya' }),
@@ -240,20 +185,14 @@ describe('first-access — lookup + registration (0020)', () => {
     })
   })
 
-  it('posts action request with handle + identity + proof + the chosen PIN', async () => {
+  it('posts action request with handle + typed identity + the chosen PIN (no proof)', async () => {
     nextResponse = () =>
       res(200, JSON.stringify({ request_id: 'req-9', status: 'pending', duplicate: false }))
-    await expect(
-      requestFirstAccess({
-        discord_handle: 'ahrya',
-        char_id: '32980',
-        nickname: 'Ahrya',
-        char_class: 'Gypsy',
-        pin: '1234',
-        confirm_pin: '1234',
-        proof_data_url: 'data:image/jpeg;base64,AAAA',
-      }),
-    ).resolves.toEqual({ request_id: 'req-9', status: 'pending', duplicate: false })
+    await expect(requestFirstAccess({ ...CLAIM_INPUT })).resolves.toEqual({
+      request_id: 'req-9',
+      status: 'pending',
+      duplicate: false,
+    })
 
     expect(calls[0].url).toBe('https://test-project.supabase.co/functions/v1/first-access')
     expect(JSON.parse(String(calls[0].init.body))).toEqual({
@@ -264,50 +203,66 @@ describe('first-access — lookup + registration (0020)', () => {
       char_class: 'Gypsy',
       pin: '1234',
       confirm_pin: '1234',
-      proof_data_url: 'data:image/jpeg;base64,AAAA',
     })
   })
 
   it('keeps the duplicate flag and maps server refusals', async () => {
     nextResponse = () =>
       res(200, JSON.stringify({ request_id: 'req-9', status: 'pending', duplicate: true }))
-    await expect(
-      requestFirstAccess({
-        discord_handle: 'ahrya',
-        char_id: '32980',
-        nickname: 'Ahrya',
-        char_class: 'Gypsy',
-        pin: '1234',
-        confirm_pin: '1234',
-        proof_data_url: 'data:image/jpeg;base64,AAAA',
-      }),
-    ).resolves.toMatchObject({ duplicate: true })
+    await expect(requestFirstAccess({ ...CLAIM_INPUT })).resolves.toMatchObject({
+      duplicate: true,
+    })
 
     nextResponse = () => res(409, JSON.stringify({ error: 'already_registered' }))
-    await expect(
-      requestFirstAccess({
-        discord_handle: 'ahrya',
-        char_id: '32980',
-        nickname: 'Ahrya',
-        char_class: 'Gypsy',
-        pin: '1234',
-        confirm_pin: '1234',
-        proof_data_url: 'data:image/jpeg;base64,AAAA',
-      }),
-    ).rejects.toMatchObject({ status: 409, code: 'already_registered' })
+    await expect(requestFirstAccess({ ...CLAIM_INPUT })).rejects.toMatchObject({
+      status: 409,
+      code: 'already_registered',
+    })
 
     nextResponse = () => res(200, JSON.stringify({ status: 'pending' }))
-    await expect(
-      requestFirstAccess({
-        discord_handle: 'ahrya',
-        char_id: '32980',
-        nickname: 'Ahrya',
-        char_class: 'Gypsy',
-        pin: '1234',
-        confirm_pin: '1234',
-        proof_data_url: 'data:image/jpeg;base64,AAAA',
-      }),
-    ).rejects.toMatchObject({ code: 'invalid_response' })
+    await expect(requestFirstAccess({ ...CLAIM_INPUT })).rejects.toMatchObject({
+      code: 'invalid_response',
+    })
+  })
+
+  // 0034: the claim request — officer-validated activation of the PIN on an
+  // unclaimed registry row. Same envelope as the registration, action 'claim'.
+  it('posts action claim with the typed identity + PIN and maps its refusals', async () => {
+    nextResponse = () =>
+      res(200, JSON.stringify({ request_id: 'req-7', status: 'pending', duplicate: false }))
+    await expect(requestClaim({ ...CLAIM_INPUT })).resolves.toEqual({
+      request_id: 'req-7',
+      status: 'pending',
+      duplicate: false,
+    })
+
+    expect(calls[0].url).toBe('https://test-project.supabase.co/functions/v1/first-access')
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+      action: 'claim',
+      discord_handle: 'ahrya',
+      char_id: '32980',
+      nickname: 'Ahrya',
+      char_class: 'Gypsy',
+      pin: '1234',
+      confirm_pin: '1234',
+    })
+
+    nextResponse = () => res(409, JSON.stringify({ error: 'pin_already_set' }))
+    await expect(requestClaim({ ...CLAIM_INPUT })).rejects.toMatchObject({
+      status: 409,
+      code: 'pin_already_set',
+    })
+
+    nextResponse = () => res(404, JSON.stringify({ error: 'not_registered' }))
+    await expect(requestClaim({ ...CLAIM_INPUT })).rejects.toMatchObject({
+      status: 404,
+      code: 'not_registered',
+    })
+
+    nextResponse = () => res(200, JSON.stringify({ status: 'pending' }))
+    await expect(requestClaim({ ...CLAIM_INPUT })).rejects.toMatchObject({
+      code: 'invalid_response',
+    })
   })
 })
 

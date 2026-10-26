@@ -13,7 +13,7 @@ type LoginStatus =
 
 export interface LoginPageProps {
   onLogin: (session: NeoFootSession) => void
-  /** 409 pin_setup_required -> first-access claim (identity comes from the print). */
+  /** 409 pin_setup_required -> first access (typed identity + officer approval). */
   onFirstAccess: () => void
   onRequestAccess: () => void
   /** Phase 10: return to the public Início landing (visitors arrive there). */

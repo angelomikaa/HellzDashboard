@@ -36,12 +36,14 @@ export interface RequireAuthProps {
 //
 // Phase 8 (08-03/08-04): the unauthenticated screen is a small view machine.
 // Phase 10: login is nickname + PIN, so login only OPENS first access (409
-// pin_setup_required or the explicit entry link) — the identity itself comes
-// from the print, never from the login field. The request probe still hands its
-// typed handle over for prefill. The prospect handoff keeps the draft in memory
-// only (no session, nothing persisted — T-08-20): 08-04 renders the full-stats
-// application wizard, and a successful prospect submit returns to the request
-// view's success panel with its protocol.
+// pin_setup_required or the explicit entry link) — never a session. 0034
+// manual first access: the identity is TYPED by the player and validated by an
+// OFFICER (no print), so first access returns to the login, not to a session.
+// The request probe still hands its typed handle over for prefill. The
+// prospect handoff keeps the draft in memory only (no session, nothing
+// persisted — T-08-20): 08-04 renders the full-stats application wizard, and a
+// successful prospect submit returns to the request view's success panel with
+// its protocol.
 export function RequireAuth({ children, initialView }: RequireAuthProps) {
   const [session, setSession] = useState<NeoFootSession | null>(() => {
     const stored = loadSession()
@@ -73,13 +75,7 @@ export function RequireAuth({ children, initialView }: RequireAuthProps) {
   }
 
   if (view.kind === 'first-access') {
-    return (
-      <FirstAccessPage
-        initialHandle={view.handle}
-        onDone={setSession}
-        onBack={() => setView({ kind: 'login' })}
-      />
-    )
+    return <FirstAccessPage initialHandle={view.handle} onBack={() => setView({ kind: 'login' })} />
   }
 
   if (view.kind === 'application') {

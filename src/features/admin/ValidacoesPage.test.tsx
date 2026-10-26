@@ -25,6 +25,8 @@ describe('ValidacoesPage helpers', () => {
   it('request type badge', () => {
     expect(requestTypeBadge('member')).toContain('membro')
     expect(requestTypeBadge('prospect')).toContain('clã')
+    expect(requestTypeBadge('registration')).toContain('Cadastro')
+    expect(requestTypeBadge('claim')).toContain('Primeiro acesso')
   })
 
   it('request ovr formatting', () => {

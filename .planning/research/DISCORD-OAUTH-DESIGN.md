@@ -3,16 +3,18 @@
 **Written:** 2026-10-26 · **Status:** pre-planning brief for `/gsd-plan-phase 11`
 **Requirements:** DSCD-01..DSCD-06 (REQUIREMENTS.md "Verified Access — Claim Authorization & Discord OAuth")
 
-> **⚠ SUPERSEDED SAME DAY:** the Wave 0 stopgap described in §2 (migration 0032) was REVERTED by
-> **0033_one_go_registration.sql** at the owner's call — "registration in one go, manual validation
-> still on for the time being". The claim path answers `ready` again (immediate PIN setter) and
-> registration requests carry the PIN so the officer approval activates it. §2 is kept below as
-> history of what shipped and why; the 0032 machinery (columns, `create_claim_proof`, the
-> `claim_not_authorized` gate, the claim-review board states) no longer exists live and lives only
-> in git history, re-introducible in one migration if a real hijack changes the owner's mind.
-> **Consequence: the stolen-print claim window is OPEN until Phase 11 lands** — the interim manual
-> validations are the officer approval on registrations and the post-claim D-05 identity review
-> (reject = deactivate + unclaim). This makes Phase 11 the security-critical phase, not a
+> **⚠ SUPERSEDED TWICE, SAME DAY:** the Wave 0 stopgap described in §2 (migration 0032) was REVERTED by
+> **0033_one_go_registration.sql** (owner: one-go registration), and 0033 was then EVOLVED by
+> **0034_manual_first_access.sql** — the CURRENT contract: **the print is eliminated from Primeiro
+> acesso entirely**. The player TYPES the identity (handle, nick, char ID, class) + PIN in one form,
+> and EVERY first access is an officer-approved request (`claim` for an unclaimed registry row — the
+> approval activates the PIN on it; `registration` for an unknown character). The auto-claim Edge
+> function (setup-pin) and its RPCs are retired. §2 below is kept as history of what shipped and why;
+> the 0032 machinery lives only in git history.
+> **Consequence for Phase 11:** the officers ARE the identity check today (typed identity + their
+> judgment against the roster/Discord). DSCD-01's guarantee holds — no unclaimed row is claimable
+> without an officer decision — but it is entirely manual trust, which is exactly what the
+> Discord↔character link must automate. This makes Phase 11 the security-critical phase, not a
 > convenience phase.
 
 ---

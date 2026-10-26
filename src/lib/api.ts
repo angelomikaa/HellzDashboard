@@ -7,7 +7,6 @@
 // claims from this JWT). Missing Authorization -> empty results (RLS sees no
 // claims); missing apikey -> 401.
 import {
-  isValidSession,
   clearSession,
   type NeoFootSession,
 } from '../features/auth/session'
@@ -885,17 +884,19 @@ export function fetchCardPhotoByPathPublic(path: string): Promise<Blob | null> {
 //
 // These are the ONLY pre-session data paths. Both headers ride every call —
 // apikey (gateway auth) and Authorization: Bearer <anon> (no member JWT yet).
-// The PIN, confirmation and proof image live only in component state and this
-// request body: they are never persisted, logged or put in a URL (T-08-18).
+// The PIN and confirmation live only in component state and this request
+// body: they are never persisted, logged or put in a URL (T-08-18).
 // FunctionError carries the server's machine token plus lockout counters so
 // pages render pt-BR copy without parsing message strings. Nothing here mints
-// data access: setup-pin returns only the standard session shape, and a
-// request stays staff-gated (T-08-20).
+// data access: since 0034 every first access is an officer-validated REQUEST
+// (claim or registration) — the login happens only after the approval.
 // ---------------------------------------------------------------------------
 
-/** 'registration' (0020): a first-access print with no registry match, approved
- *  by an officer without a PIN so the player can set it on the next attempt. */
-export type RequestType = 'member' | 'prospect' | 'registration'
+/** 'registration' (0020): a typed first access with no registry match, approved
+ *  by an officer (with the PIN active since 0033). 'claim' (0034): a typed
+ *  first access for an unclaimed registry row — the approval activates the
+ *  PIN on the existing row. */
+export type RequestType = 'member' | 'prospect' | 'registration' | 'claim'
 export type RequestState = 'pending' | 'approved' | 'rejected' | 'superseded'
 
 export interface FunctionErrorExtras {
@@ -919,17 +920,9 @@ export class FunctionError extends Error {
   }
 }
 
-export interface SetupPinInput {
-  /** Character nickname read from the print — the login key since 0020. */
-  nickname: string
-  pin: string
-  confirm_pin: string
-  char_id: string
-  char_class: string
-  proof_data_url: string
-}
-
-/** first-access lookup answer (0020). One state per status. */
+/** first-access lookup answer (0020; 0034 manual fill). One state per status.
+ *  'ready' means an unclaimed registry row exists — a CLAIM REQUEST can be
+ *  sent for an officer to approve; no PIN setter opens on the client. */
 export type FirstAccessStatus =
   | 'ready'
   | 'pin_set'
@@ -939,26 +932,36 @@ export type FirstAccessStatus =
   | 'ambiguous_identity'
   /** The typed Discord handle already belongs to a claimed account. */
   | 'handle_claimed'
-  /** The typed handle exists (no PIN yet) but the print nickname does not match. */
+  /** The typed handle exists (no PIN yet) but the typed nickname does not match. */
   | 'handle_registered'
 
 export interface FirstAccessLookupInput {
   nickname: string
   char_id: string
-  /** Discord handle — only used to find a pending registration for this person. */
+  /** Discord handle — only used to find a pending request for this person. */
   discord_handle?: string
 }
 
-export interface FirstAccessRequestInput {
+/** 0034 manual first access — the typed identity every request carries. */
+export interface FirstAccessIdentityInput {
   discord_handle: string
   char_id: string
   nickname: string
   char_class: string
-  /** 0033 one-go registration: the player-chosen PIN travels with the request;
-   *  the officer approval activates it. */
+}
+
+/** 'claim' (0034): officer-validated activation of the PIN on an unclaimed
+ *  registry row. The PIN is mandatory — the approval activates it. */
+export interface FirstAccessClaimInput extends FirstAccessIdentityInput {
   pin: string
   confirm_pin: string
-  proof_data_url: string
+}
+
+/** 'request' (0033 one-go / 0034 manual fill): officer-approved registration of
+ *  a character the registry does not hold. */
+export interface FirstAccessRequestInput extends FirstAccessIdentityInput {
+  pin: string
+  confirm_pin: string
 }
 
 export interface RequestAccessInput {
@@ -985,7 +988,7 @@ export interface RequestStatus {
 }
 
 const REQUEST_STATES: readonly RequestState[] = ['pending', 'approved', 'rejected', 'superseded']
-const REQUEST_TYPES: readonly RequestType[] = ['member', 'prospect', 'registration']
+const REQUEST_TYPES: readonly RequestType[] = ['member', 'prospect', 'registration', 'claim']
 
 /** Env for the anon surface: same project URL/anon key as REST. */
 function anonEnv(): { supabaseUrl: string; anonKey: string } {
@@ -1024,7 +1027,7 @@ function optionalNumber(value: unknown): number | undefined {
  * render path).
  */
 async function edgeFetch<T>(
-  fn: 'setup-pin' | 'request-access' | 'verify-pin' | 'first-access',
+  fn: 'request-access' | 'verify-pin' | 'first-access',
   body: unknown,
 ): Promise<T> {
   const { supabaseUrl, anonKey } = anonEnv()
@@ -1060,18 +1063,9 @@ async function edgeFetch<T>(
 }
 
 /**
- * First-access claim: validates the print identity + PIN server-side and
- * returns the standard session. The caller persists it with saveSession.
+ * First-access claims and registrations are officer-validated requests since
+ * 0034 — the setup-pin auto-claim Edge Function and its RPCs are retired.
  */
-export async function setupPin(input: SetupPinInput): Promise<NeoFootSession> {
-  const body = await edgeFetch<{ session?: unknown }>('setup-pin', input)
-  // A 2xx without a well-formed session is a contract breach, not a login.
-  if (!isValidSession(body.session)) {
-    throw new FunctionError(200, 'invalid_response', 'malformed session')
-  }
-  return body.session
-}
-
 const FIRST_ACCESS_STATUSES: readonly FirstAccessStatus[] = [
   'ready',
   'pin_set',
@@ -1084,9 +1078,10 @@ const FIRST_ACCESS_STATUSES: readonly FirstAccessStatus[] = [
 ]
 
 /**
- * Ask the registry what the print's nickname resolves to (0020). God-mode:
- * this call mints nothing and stores nothing — it only decides whether the
- * page opens the PIN setter, the login hint or the approval request.
+ * Ask the registry what the TYPED nickname resolves to (0020; 0034 manual
+ * fill). God-mode: this call mints nothing and stores nothing — it only
+ * decides whether the page offers the claim request ('ready'), the
+ * registration request ('unknown') or an explanation.
  */
 export async function firstAccessLookup(
   input: FirstAccessLookupInput,
@@ -1124,19 +1119,10 @@ export async function firstAccessIdentify(handle: string): Promise<FirstAccessId
   return status
 }
 
-/**
- * Queue a 'registration' request (handle + print identity + proof). The officer
- * approval registers the character WITHOUT a PIN, so the player retries the
- * first-access flow and sets it there.
- */
-export async function requestFirstAccess(
-  input: FirstAccessRequestInput,
-): Promise<{ request_id: string; status: 'pending'; duplicate: boolean }> {
-  const body = await edgeFetch<{
-    request_id?: unknown
-    status?: unknown
-    duplicate?: unknown
-  }>('first-access', { action: 'request', ...input })
+/** Narrow the pending-request answer shared by the claim/registration calls. */
+function asPendingRequest(
+  body: { request_id?: unknown; status?: unknown; duplicate?: unknown },
+): { request_id: string; status: 'pending'; duplicate: boolean } {
   if (typeof body.request_id !== 'string' || body.request_id.length === 0) {
     throw new FunctionError(200, 'invalid_response', 'malformed request_id')
   }
@@ -1148,6 +1134,38 @@ export async function requestFirstAccess(
     status: 'pending',
     duplicate: body.duplicate === true,
   }
+}
+
+/**
+ * Queue a 'claim' request (0034 manual first access): the officer approval
+ * activates the player-chosen PIN on the unclaimed registry row. No session,
+ * no PIN echo — the player logs in after the approval.
+ */
+export async function requestClaim(
+  input: FirstAccessClaimInput,
+): Promise<{ request_id: string; status: 'pending'; duplicate: boolean }> {
+  const body = await edgeFetch<{
+    request_id?: unknown
+    status?: unknown
+    duplicate?: unknown
+  }>('first-access', { action: 'claim', ...input })
+  return asPendingRequest(body)
+}
+
+/**
+ * Queue a 'registration' request (handle + TYPED identity + the chosen PIN).
+ * The officer approval registers the character with that PIN active (0033
+ * one-go), so the player logs in right away.
+ */
+export async function requestFirstAccess(
+  input: FirstAccessRequestInput,
+): Promise<{ request_id: string; status: 'pending'; duplicate: boolean }> {
+  const body = await edgeFetch<{
+    request_id?: unknown
+    status?: unknown
+    duplicate?: unknown
+  }>('first-access', { action: 'request', ...input })
+  return asPendingRequest(body)
 }
 
 /**
@@ -1310,16 +1328,18 @@ export interface StaffRequestStat {
 
 /** staff_requests() row (D-14): pending application + server-computed OVR.
  *  `ovr`/`data_sufficient` come from the live class+function cohort; the
- *  applicant's own stats never join it. */
+ *  applicant's own stats never join it. `proof_path` is null for the 0034
+ *  manual-fill requests (claim/registration) — the officer judges from the
+ *  typed identity. */
 export interface StaffRequestRow {
   request_id: string
   discord_handle: string
-  request_type: 'member' | 'prospect' | 'registration'
+  request_type: 'member' | 'prospect' | 'registration' | 'claim'
   char_id: string
   nickname: string
   char_class: string
   char_function: 'dps' | 'mdps' | 'suporte'
-  proof_path: string
+  proof_path: string | null
   created_at: string
   member_id: string | null
   ovr: number | null

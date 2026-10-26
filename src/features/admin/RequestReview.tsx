@@ -77,10 +77,12 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
       await approveRequest(session, row.request_id, fn)
       setLastSuccess(APPROVED_MESSAGE)
       setApproveTarget(null)
-      try {
-        await deleteIdentityProof(session, row.proof_path)
-      } catch {
-        /* best-effort purge */
+      if (row.proof_path !== null) {
+        try {
+          await deleteIdentityProof(session, row.proof_path)
+        } catch {
+          /* best-effort purge */
+        }
       }
       try {
         await load()
@@ -88,17 +90,7 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
         /* keep success line */
       }
     } catch (err) {
-      const message =
-        err instanceof ApiError && err.message.includes('already_member')
-          ? 'Este handle já está ativo.'
-          : err instanceof ApiError && err.message.includes('not_pending')
-            ? STALE_ROW_ERROR
-            : err instanceof ApiError && err.message.includes('invalid_function')
-              ? 'Função inválida.'
-              : err instanceof ApiError && err.kind === 'unauthorized'
-                ? SESSION_ERROR
-                : SAVE_ERROR
-      setError(message)
+      setError(requestApproveErrorFor(err))
     } finally {
       setBusyId(null)
     }
@@ -112,10 +104,12 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
     try {
       await rejectRequest(session, row.request_id)
       setLastSuccess(REJECTED_MESSAGE)
-      try {
-        await deleteIdentityProof(session, row.proof_path)
-      } catch {
-        /* best-effort purge */
+      if (row.proof_path !== null) {
+        try {
+          await deleteIdentityProof(session, row.proof_path)
+        } catch {
+          /* best-effort purge */
+        }
       }
       try {
         await load()
@@ -159,7 +153,7 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
         rows.map((row) => {
           const isExpanded = expandedId === row.request_id
           const failed = failedProofs.has(row.request_id)
-          const url = identityProofUrl(session, row.proof_path)
+          const url = row.proof_path === null ? '' : identityProofUrl(session, row.proof_path)
           const insufficient = !row.data_sufficient || row.ovr === null
           const typeBadge = requestTypeBadge(row.request_type)
           return (
@@ -201,27 +195,43 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
               </div>
               {isExpanded && (
                 <div className="mt-3 rounded-md border border-line bg-surface p-3">
-                  <p className="text-sm text-muted">Prova de identidade:</p>
-                  {failed ? (
-                    <p className="text-sm text-muted">Comprovante indisponível.</p>
+                  {row.proof_path === null ? (
+                    // 0034 manual first access: no print — the typed identity
+                    // IS the request; the officer confirms with the person.
+                    <p className="text-sm text-muted">
+                      Primeiro acesso manual — sem comprovante. Confirme os dados com a
+                      pessoa no Discord antes de decidir.
+                    </p>
                   ) : (
-                    <img
-                      src={url}
-                      alt="Comprovante de identidade"
-                      onError={() =>
-                        setFailedProofs((prev) => {
-                          const next = new Set(prev)
-                          next.add(row.request_id)
-                          return next
-                        })
-                      }
-                      className="max-h-64 w-full object-contain"
-                    />
+                    <>
+                      <p className="text-sm text-muted">Prova de identidade:</p>
+                      {failed ? (
+                        <p className="text-sm text-muted">Comprovante indisponível.</p>
+                      ) : (
+                        <img
+                          src={url}
+                          alt="Comprovante de identidade"
+                          onError={() =>
+                            setFailedProofs((prev) => {
+                              const next = new Set(prev)
+                              next.add(row.request_id)
+                              return next
+                            })
+                          }
+                          className="max-h-64 w-full object-contain"
+                        />
+                      )}
+                    </>
                   )}
-                  {row.request_type === 'registration' ? (
+                  {row.request_type === 'claim' ? (
                     <p className="mt-3 text-sm text-muted">
-                      Primeiro acesso: a aprovação cria o cadastro do personagem. O PIN é definido
-                      pelo jogador no próximo acesso.
+                      Primeiro acesso: a aprovação ativa o PIN escolhido no cadastro existente
+                      deste personagem.
+                    </p>
+                  ) : row.request_type === 'registration' ? (
+                    <p className="mt-3 text-sm text-muted">
+                      Primeiro acesso: a aprovação cadastra o personagem e ativa o PIN escolhido
+                      pelo jogador.
                     </p>
                   ) : (
                     row.stats &&
@@ -320,6 +330,8 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
 // ---- helpers ----
 export function requestTypeBadge(requestType: StaffRequestRow['request_type']): string {
   if (requestType === 'member') return 'Já é membro'
+  // 0034: typed first access for an unclaimed registry row -> officer-activated PIN.
+  if (requestType === 'claim') return 'Primeiro acesso'
   // 0020: first access with no registry match -> officer-approved registration.
   if (requestType === 'registration') return 'Cadastro'
   return 'Novo no clã'
@@ -364,6 +376,10 @@ export function requestApproveErrorFor(error: unknown): string {
   if (message.includes('invalid_function')) return 'Função inválida.'
   if (message.includes('not_member')) return 'Handle sem cadastro de membro.'
   if (message.includes('duplicate_nickname')) return 'Este nick já pertence a outro cadastro ativo.'
+  // 0034 claim branch: the linked row moved between the request and this click.
+  if (message.includes('already_set')) return 'Este personagem já tem PIN.'
+  if (message.includes('identity_mismatch')) return 'O ID não confere com o cadastro deste nick.'
+  if (message.includes('not_registered')) return 'O cadastro deste personagem não está ativo.'
   if (error instanceof ApiError && (error.kind === 'unauthorized' || message.includes('forbidden')))
     return SESSION_ERROR
   return SAVE_ERROR
