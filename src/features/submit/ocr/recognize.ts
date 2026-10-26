@@ -73,7 +73,11 @@ import {
 import { sanityAccepts } from './sanity'
 import { parseTooltipValue } from './tooltip'
 import {
+  charIdFromText,
+  classLabelWord,
   idFromLayout,
+  identityRescueRects,
+  nicknameFromBandText,
   nicknameFromLayout,
   parseBasicProfileText,
   type BasicProfileFields,
@@ -618,6 +622,14 @@ function resampleCanvas(source: HTMLCanvasElement, width: number, height: number
  * tester's higher-resolution originals must read identically to the
  * compressed copies, not per-scale differently.
  *
+ * MOBILE RESCUE (owner report 2026-10-25: a mobile-screen print "failed to
+ * read"): when pass 1 refuses the nickname/ID, TWO label-anchored bands are
+ * re-read from the SOURCE canvas at its own scale (identityRescueRects) —
+ * the canonical resample aliases the mobile card's smaller name glyphs into
+ * fragments, but the same bands read EXACTLY at native scale (measured:
+ * "3 Caladoh #" / "¥ Classe Invocador ID 55934"). Everything still passes
+ * the strict validators — wrong prefills stay impossible (D-03).
+ *
  * Used by first access (D-03) and the member request form. The existing worker
  * is shared; PSM is switched to SPARSE_TEXT for this read and restored to the
  * wizard's SINGLE_BLOCK in `finally`, so a later readScreenshot is unaffected.
@@ -654,15 +666,84 @@ export async function readBasicProfile(
     const layout = nicknameFromLayout(words, canvas.width)
     // A located class band means the card header is in this capture: the
     // layout decides the nickname (null = "not readable", never a guess).
-    const nickname = layout.anchored ? layout.nickname : parsed.nickname
+    let nickname = layout.anchored ? layout.nickname : parsed.nickname
     // The text read wins; the word boxes rescue the one row the text cannot
     // see — "ID 17069" printed with the label glyphs glued to the number
     // reads as the single word "1017069E" (owner capture 2026-10-23).
-    const char_id = parsed.char_id ?? idFromLayout(words)
-    return { nickname, char_id, char_class: parsed.char_class, raw_text: raw }
+    let char_id = parsed.char_id ?? idFromLayout(words)
+    let char_class = parsed.char_class
+
+    // Mobile rescue: pass 1 refused while the label anchor exists → the
+    // bands re-read at the source's own scale fill ONLY the null fields.
+    if ((nickname === null || char_id === null) && source.width > 0 && source.height > 0) {
+      const label = classLabelWord(words)
+      if (label !== null) {
+        const scale = source.width / canvas.width
+        const sourceLabel: OcrWord = {
+          text: label.text,
+          x0: label.x0 * scale,
+          y0: label.y0 * scale,
+          x1: label.x1 * scale,
+          y1: label.y1 * scale,
+        }
+        const rects = identityRescueRects(sourceLabel, source.width, source.height)
+        if (nickname === null) {
+          const bandText = await ocrIdentityBand(worker, source, rects.name)
+          if (bandText !== '') {
+            const rescued = nicknameFromBandText(bandText)
+            if (rescued !== null) {
+              nickname = rescued
+              if (import.meta.env?.DEV) {
+                console.debug('[ocr] identity rescue: nickname from band', JSON.stringify(bandText))
+              }
+            }
+          }
+        }
+        if (char_id === null || char_class === null) {
+          const rowText = await ocrIdentityBand(worker, source, rects.classRow)
+          if (rowText !== '') {
+            const rowParsed = profileFromRawText(rowText)
+            // Only the still-missing fields adopt the row's parse; every
+            // value already read at the operating width wins. The ID goes
+            // through charIdFromText — the mobile row prints the glued
+            // label form ("1D55934Z") the plain text parse cannot split.
+            if (char_id === null) char_id = charIdFromText(rowText)
+            if (char_class === null && rowParsed.char_class !== null) {
+              char_class = rowParsed.char_class
+            }
+            if (import.meta.env?.DEV) {
+              console.debug('[ocr] identity rescue: class row', JSON.stringify(rowText))
+            }
+          }
+        }
+      }
+    }
+
+    return { nickname, char_id, char_class, raw_text: raw }
   } finally {
     // Restore the wizard's block segmentation; ocrRect sets its own whitelist
     // before every read, but PSM is worker-global.
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK })
   }
+}
+
+/**
+ * One raw SINGLE_LINE read of a rescue band — NO preprocessing: measured on
+ * the owner's mobile capture, the native-scale bands read exact as-is, and
+ * the ocrRect binarization recipe is calibrated for the stat panel, not this
+ * card. The PSM juggle is safe: readBasicProfile's `finally` restores the
+ * wizard's SINGLE_BLOCK after every read here.
+ */
+async function ocrIdentityBand(
+  worker: Worker,
+  source: HTMLCanvasElement,
+  rect: { left: number; top: number; width: number; height: number },
+): Promise<string> {
+  const cropped = toCanvas(cropCanvas(source, rect))
+  await worker.setParameters({
+    tessedit_pageseg_mode: PSM.SINGLE_LINE,
+    tessedit_char_whitelist: PROFILE_WHITELIST,
+  })
+  const { data } = await worker.recognize(cropped)
+  return data.text || ''
 }

@@ -43,16 +43,22 @@ import { CAPTURES } from './ocr/regions'
 // them to the crop overlay. The exact calibration frames deviate ≤0.01%
 // and stay no-crop). The tiny epsilon absorbs IEEE-754 representation
 // noise (e.g. 1.05 - 1 evaluates a hair above 0.05) so a mathematically
-// exact 5% deviation stays on the no-crop side of the boundary, as
-// documented; real deviations (0.051 and up) are orders of magnitude
-// above it.
-const CROP_DEVIATION_MAX = 0.05
+// exact deviation stays on the no-crop side of the boundary, as
+// documented; real deviations are orders of magnitude above it.
+//
+// 8% (mobile round, owner report 2026-10-25): hand-cropped MOBILE prints
+// land a few percent off the reference aspect — the owner's own caladoh.jpg
+// crop sits at 5.12%, just past the old 5% gate, and got forced through a
+// pointless re-crop. Full phone screenshots (the gate's real target) deviate
+// 43-71% and stay far above the boundary at 8%.
+const CROP_DEVIATION_MAX = 0.08
 const CROP_FLOAT_EPSILON = 1e-9
 
 /**
  * D-05 crop trigger: the optional crop prompt appears only when the
- * uploaded image's aspect deviates MORE than 5% (exclusive boundary)
- * from the capture's reference aspect. Optimal crops skip cropping.
+ * uploaded image's aspect deviates MORE than 8% (exclusive boundary)
+ * from the capture's reference aspect. Optimal crops — and tight mobile
+ * hand-crops — skip cropping.
  */
 export function needsCrop(imgAspect: number, refAspect: number): boolean {
   return Math.abs(imgAspect / refAspect - 1) > CROP_DEVIATION_MAX + CROP_FLOAT_EPSILON

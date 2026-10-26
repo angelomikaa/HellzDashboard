@@ -311,6 +311,13 @@ const IDENTITY_CANONICAL = [
   { file: 'Samplebasicptbr.png', nickname: 'Ahrya', char_id: '32980', char_class: 'High Priest' },
   { file: 'sampidentityaryah.jpg', nickname: 'Aryah', char_id: '39943', char_class: 'High Priest' },
   { file: 'sampidentitysoldierhellz.jpg', nickname: 'SoldierHellz', char_id: '17069', char_class: 'Biochemist' },
+  // Owner report 2026-10-25 ("mobile screen print failed to read"): a
+  // MOBILE capture (985x625, hand-cropped). Pass 1 refuses the name/ID
+  // (the canonical 0.73x resample aliases the mobile card's smaller name
+  // glyphs); the label-anchored band rescue re-reads at native scale and
+  // must deliver all three fields EXACTLY. Also proves the rescue stays
+  // quiet on the monitor corpus (the other four rows must be unchanged).
+  { file: 'sampidentitycaladoh.jpg', nickname: 'Caladoh', char_id: '55934', char_class: 'Summoner' },
 ]
 const hasIdentitySamples = IDENTITY_CANONICAL.every(({ file }) => existsSync(samplePath(file)))
 

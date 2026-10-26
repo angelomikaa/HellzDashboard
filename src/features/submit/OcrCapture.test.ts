@@ -17,7 +17,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
 import { decodeUpload, needsCrop, statusMessage } from './OcrCapture'
 
-describe('needsCrop — D-05 aspect-deviation trigger (>5%, exclusive)', () => {
+describe('needsCrop — D-05 aspect-deviation trigger (>8%, exclusive)', () => {
   it('an optimal crop (identical aspect) never triggers cropping', () => {
     expect(needsCrop(1.661, 1.661)).toBe(false)
   })
@@ -26,17 +26,21 @@ describe('needsCrop — D-05 aspect-deviation trigger (>5%, exclusive)', () => {
     expect(needsCrop(0.9, 1.661)).toBe(true)
   })
 
-  it('deviation of exactly 0.05 does not trigger (boundary is exclusive)', () => {
-    expect(needsCrop(1.05, 1)).toBe(false)
-    expect(needsCrop(0.95, 1)).toBe(false)
+  it('deviation of exactly 0.08 does not trigger (boundary is exclusive)', () => {
+    expect(needsCrop(1.08, 1)).toBe(false)
+    expect(needsCrop(0.92, 1)).toBe(false)
   })
 
-  it('deviation just above 0.05 triggers', () => {
-    expect(needsCrop(1.0501, 1)).toBe(true)
-    expect(needsCrop(0.9499, 1)).toBe(true)
+  it('deviation just above 0.08 triggers', () => {
+    expect(needsCrop(1.0801, 1)).toBe(true)
+    expect(needsCrop(0.9199, 1)).toBe(true)
   })
 
-  it('the samp2-vs-quasi misalignment (9.4% deviation) now triggers', () => {
+  it('mobile hand-crops in the 5-8% band skip the re-crop (owner report 2026-10-25: caladoh.jpg at 5.12% was forced through a pointless re-crop)', () => {
+    expect(needsCrop(985 / 625, 691 / 416)).toBe(false) // 5.12% off the basic reference
+  })
+
+  it('the samp2-vs-quasi misalignment (9.4% deviation) still triggers', () => {
     // 650x670 frame read against the 673x759 quasi calibration — the
     // D-05-UAT-2 case that passed the old 12% gate uncropped and produced
     // parseable-but-wrong values.
@@ -58,7 +62,7 @@ describe('needsCrop — D-05 aspect-deviation trigger (>5%, exclusive)', () => {
     expect(needsCrop(1.0, 0.854)).toBe(true) // 17.1%
   })
 
-  it('general reference: 11.2% deviation now triggers (above the 5% gate)', () => {
+  it('general reference: 11.2% deviation still triggers (above the 8% gate)', () => {
     expect(needsCrop(0.95, 0.854)).toBe(true)
   })
 

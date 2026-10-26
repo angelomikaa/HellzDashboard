@@ -574,6 +574,131 @@ export function idFromLayout(words: readonly OcrWord[]): string | null {
   return null
 }
 
+// ---------------------------------------------------------------------------
+// Mobile-capture rescue (owner report 2026-10-25: the caladoh.jpg mobile
+// print "failed to read")
+// ---------------------------------------------------------------------------
+//
+// The identity corpus is Full-HD-monitor snips calibrated at the 715px
+// operating width. The MOBILE card prints the same header with SMALLER
+// glyphs relative to the frame (name ≈31px tall on a 985px capture), so the
+// canonical 0.73x resample aliases the name band into fragments that neither
+// align with the label nor read as text — pass 1 correctly refuses. Measured
+// on the owner's capture, the SAME elements read EXACTLY at the capture's
+// native scale from tight, label-anchored bands:
+//
+//   name band   (above the label, left-aligned):  "3 Caladoh #"    → Caladoh
+//   class row   (the label's own line):           "¥ Classe  Invocador ID 55934"
+//
+// The rescue re-reads those two bands from the SOURCE canvas at its own
+// scale — geometry anchored on pass 1's class-label word box (the one
+// element that reads cleanly at both scales). Every result still passes the
+// strict validators, so a wrong prefill stays impossible (D-03).
+
+/** The topmost class-label word ("Job"/"Classe"/"Clase"...) — the anchor
+ *  both the layout rules and the mobile rescue geometry key on. */
+export function classLabelWord(words: readonly OcrWord[]): OcrWord | null {
+  const usable = words.filter(
+    (word) =>
+      typeof word.text === 'string' &&
+      word.text.trim() !== '' &&
+      Number.isFinite(word.x0) &&
+      Number.isFinite(word.y0),
+  )
+  const label = usable
+    .filter((word) => CLASS_LABEL_WORD.test(word.text.trim()))
+    .sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0)[0]
+  return label ?? null
+}
+
+export interface IdentityRescueRects {
+  /** The nickname band: starts at the label's left edge (the game prints the
+   *  name left-aligned with it), spans a generous width, and stops just
+   *  above the label row. */
+  name: { left: number; top: number; width: number; height: number }
+  /** The class row: the label's own line, wide enough for the class value
+   *  and the trailing "ID <digits>" the card prints there. */
+  classRow: { left: number; top: number; width: number; height: number }
+}
+
+/**
+ * The two rescue band rects in the coordinate space the label word box was
+ * measured in (the caller maps to source space before cropping). Calibrated
+ * against BOTH layouts: the monitor corpus (Ahrya/Job at 715) and the
+ * owner's mobile capture (Caladoh at 985 native):
+ *
+ *   corpus    name @158..135 label y0=150 h=26   → band 77..146  (inside)
+ *   mobile    name @196..230 label y0=258 h=26   → band 185..254  (inside)
+ */
+export function identityRescueRects(
+  label: OcrWord,
+  sourceWidth: number,
+  sourceHeight: number,
+): IdentityRescueRects {
+  const labelH = Math.max(1, label.y1 - label.y0)
+  const labelW = Math.max(1, label.x1 - label.x0)
+  const clamp = (rect: { left: number; top: number; width: number; height: number }) => {
+    const left = Math.max(0, Math.min(Math.round(rect.left), Math.max(0, sourceWidth - 1)))
+    const top = Math.max(0, Math.min(Math.round(rect.top), Math.max(0, sourceHeight - 1)))
+    return {
+      left,
+      top,
+      width: Math.max(1, Math.min(Math.round(rect.width), sourceWidth - left)),
+      height: Math.max(1, Math.min(Math.round(rect.height), sourceHeight - top)),
+    }
+  }
+  const pad = 0.6 * labelH
+  return {
+    name: clamp({
+      left: label.x0 - pad,
+      top: label.y0 - 2.8 * labelH,
+      width: pad + 4 * labelW,
+      height: 2.65 * labelH,
+    }),
+    classRow: clamp({
+      left: label.x0 - pad,
+      top: label.y0 - 0.6 * labelH,
+      width: pad + 8 * labelW,
+      height: 2.2 * labelH,
+    }),
+  }
+}
+
+/**
+ * The nickname from one rescue band read ("3 Caladoh #"): the tokens that
+ * pass the strict nickname shape, and ONLY when exactly one does — two
+ * passing tokens mean a multi-word name or unresolvable noise, and a
+ * partial prefill is worse than none (D-03: the player types it).
+ */
+export function nicknameFromBandText(text: string): string | null {
+  const candidates: string[] = []
+  for (const token of String(text ?? '').split(/\s+/)) {
+    const candidate = nicknameCandidate(token, false)
+    if (candidate !== null) candidates.push(candidate)
+  }
+  if (candidates.length !== 1) return null
+  return candidates[0]
+}
+
+/**
+ * The character ID from one text read (the rescue class-row's parser):
+ * the labeled "ID 55934" form first (parseBasicProfileText), then the
+ * GLUED token forms the mobile card prints at odd scales — measured
+ * 2026-10-25 on the owner's capture at 1478px: "Classe Invocador  1D55934Z"
+ * (label I→1, digits, copy badge Z, all one token). idFromToken knows
+ * those shapes; on the class ROW a digits-shaped token is the ID by the
+ * same positional trust idFromLayout applies to the word boxes.
+ */
+export function charIdFromText(text: string): string | null {
+  const parsed = parseBasicProfileText(text)
+  if (parsed.char_id !== null) return parsed.char_id
+  for (const token of String(text ?? '').split(/\s+/)) {
+    const digits = idFromToken(token.trim())
+    if (digits !== null) return digits
+  }
+  return null
+}
+
 const ID_ERROR = 'Informe o ID do personagem (somente números, até 12 dígitos).'
 const NICKNAME_ERROR = 'Informe o nick do personagem (até 80 caracteres).'
 const CLASS_ERROR = 'Selecione a classe do personagem.'

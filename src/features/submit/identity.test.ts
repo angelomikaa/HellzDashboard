@@ -3,8 +3,12 @@ import {
   CHAR_FUNCTIONS,
   CLASS_ALIASES,
   OFFICIAL_CLASSES,
+  charIdFromText,
+  classLabelWord,
   idFromLayout,
+  identityRescueRects,
   matchClassName,
+  nicknameFromBandText,
   nicknameFromLayout,
   parseBasicProfileText,
   validateIdentity,
@@ -517,5 +521,108 @@ describe('validateIdentity / validateIdentityDraft — editable identity', () =>
     expect(problems[1]).toContain('nick')
     expect(problems[2]).toContain('classe')
     expect(problems[3]).toContain('função')
+  })
+})
+
+// --- Mobile-capture rescue (owner report 2026-10-25: caladoh.jpg) --------
+
+describe('classLabelWord — the rescue anchor', () => {
+  it('finds the topmost class-label word among the boxes', () => {
+    const words: OcrWord[] = [
+      { text: 'Invocador', x0: 243, y0: 188, x1: 352, y1: 206 },
+      { text: 'Classe', x0: 142, y0: 187, x1: 212, y1: 206 },
+      { text: 'Nv40', x0: 104, y0: 353, x1: 169, y1: 373 },
+    ]
+    expect(classLabelWord(words)?.text).toBe('Classe')
+  })
+
+  it('returns null when no label exists (a cut-open crop has no anchor — the rescue must not fire)', () => {
+    expect(classLabelWord([{ text: 'ryah', x0: 0, y0: 190, x1: 60, y1: 220 }])).toBeNull()
+  })
+})
+
+describe('identityRescueRects — calibrated on both layouts', () => {
+  it('the monitor corpus layout (Ahrya/Job at the 715 operating space): the name band contains the name, excludes the label row', () => {
+    // sampbasicideal: "Ahrya"@158..135, "Job"@157,150..176 (measured)
+    const rects = identityRescueRects(
+      { text: 'Job', x0: 157, y0: 150, x1: 197, y1: 176 },
+      715,
+      454,
+    )
+    // Ahrya @158..235 x 104..135 must sit inside the name rect
+    expect(rects.name.left).toBeLessThanOrEqual(158)
+    expect(rects.name.top).toBeLessThanOrEqual(104)
+    expect(rects.name.left + rects.name.width).toBeGreaterThanOrEqual(235)
+    expect(rects.name.top + rects.name.height).toBeLessThan(150) // stops above the label
+    // "ID 32980" (printed right of the class value on the band) must fit the row rect
+    expect(rects.classRow.left).toBeLessThanOrEqual(157)
+    expect(rects.classRow.top).toBeLessThanOrEqual(150)
+    expect(rects.classRow.top + rects.classRow.height).toBeGreaterThanOrEqual(176)
+  })
+
+  it('the owner mobile capture (Caladoh at 985 native): the bands cover the measured words', () => {
+    // caladoh.jpg: label "Classe"@195.6,257.8..292,284; name "Caladoh"@204..385,196..230;
+    // ID row 586..713 @257..281 (measured 2026-10-25)
+    const rects = identityRescueRects(
+      { text: 'Classe', x0: 195.6, y0: 257.8, x1: 292.1, y1: 284 },
+      985,
+      625,
+    )
+    expect(rects.name.left).toBeLessThanOrEqual(204)
+    expect(rects.name.top).toBeLessThanOrEqual(196)
+    expect(rects.name.left + rects.name.width).toBeGreaterThanOrEqual(385)
+    expect(rects.name.top + rects.name.height).toBeLessThan(257.8) // excludes the label row
+    expect(rects.classRow.left).toBeLessThanOrEqual(195.6)
+    expect(rects.classRow.left + rects.classRow.width).toBeGreaterThanOrEqual(713)
+    expect(rects.classRow.top).toBeLessThanOrEqual(257)
+    expect(rects.classRow.top + rects.classRow.height).toBeGreaterThanOrEqual(281)
+  })
+
+  it('clamps to the canvas (a label near an edge never crops outside)', () => {
+    const rects = identityRescueRects({ text: 'Job', x0: 2, y0: 4, x1: 20, y1: 12 }, 100, 60)
+    expect(rects.name.left).toBe(0)
+    expect(rects.name.top).toBe(0)
+    expect(rects.name.left + rects.name.width).toBeLessThanOrEqual(100)
+    expect(rects.classRow.top + rects.classRow.height).toBeLessThanOrEqual(60)
+  })
+})
+
+describe('nicknameFromBandText — exactly one strict candidate (D-03)', () => {
+  it('adopts the single name-shaped token (measured mobile band read: "3 Caladoh #")', () => {
+    expect(nicknameFromBandText('3 Caladoh #')).toBe('Caladoh')
+    expect(nicknameFromBandText('Caladoh Z.')).toBe('Caladoh')
+    expect(nicknameFromBandText('Caladoh Zz')).toBe('Caladoh')
+  })
+
+  it('refuses when nothing passes the nickname shape (never a fragment prefill)', () => {
+    expect(nicknameFromBandText('py E')).toBeNull()
+    expect(nicknameFromBandText('')).toBeNull()
+  })
+
+  it('refuses when two tokens could be the name (a multi-word name is typed, never half-prefilled)', () => {
+    expect(nicknameFromBandText('Zephyr Auren #')).toBeNull()
+  })
+
+  it('never takes a class name as the nickname', () => {
+    expect(nicknameFromBandText('Invocador #')).toBeNull()
+  })
+})
+
+describe('charIdFromText — the rescue row parser (glued mobile forms)', () => {
+  it('reads the labeled form (monitor row: "Classe Criador ID 17069")', () => {
+    expect(charIdFromText('Classe Criador ID 17069')).toBe('17069')
+  })
+
+  it('splits the glued mobile form (measured at 1478px: "Classe Invocador  1D55934Z")', () => {
+    expect(charIdFromText('Classe Invocador  1D55934Z')).toBe('55934')
+  })
+
+  it('reads the bare digits form (native row: "¥ Classe Invocador ID 55934 =")', () => {
+    expect(charIdFromText('Classe Invocador ID 55934')).toBe('55934')
+  })
+
+  it('refuses rows with no ID shape (never invents a number)', () => {
+    expect(charIdFromText('Classe Invocador')).toBeNull()
+    expect(charIdFromText('')).toBeNull()
   })
 })
