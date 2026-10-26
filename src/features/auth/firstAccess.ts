@@ -13,6 +13,7 @@
 import type { NeoFootSession } from './session'
 import {
   FunctionError,
+  type FirstAccessClaimInput,
   type FirstAccessStatus,
   type SetupPinInput,
 } from '../../lib/api'
@@ -58,6 +59,15 @@ export function canRequestRegistration(status: FirstAccessStatus | null): boolea
   return status === 'unknown'
 }
 
+/**
+ * 0032: an unclaimed registry row whose claim no officer authorized yet. The
+ * print is public data, so the page asks for it and queues an officer review
+ * instead of opening the PIN setter.
+ */
+export function canRequestClaim(status: FirstAccessStatus | null): boolean {
+  return status === 'claim_review'
+}
+
 /** Health message for a status that blocks the PIN setter. */
 export function statusMessage(status: FirstAccessStatus): string {
   switch (status) {
@@ -67,6 +77,8 @@ export function statusMessage(status: FirstAccessStatus): string {
       return 'Este Discord já tem personagem com PIN. Entre com o nick e o PIN.'
     case 'pending':
       return 'Cadastro enviado. Aguarde a aprovação de um oficial e tente de novo.'
+    case 'claim_pending':
+      return 'Print enviado. Aguarde a confirmação de um oficial e tente de novo.'
     case 'unknown':
       return 'Não encontramos este personagem na lista da guilda. Você pode enviar o print para aprovação de um oficial.'
     case 'handle_registered':
@@ -75,6 +87,8 @@ export function statusMessage(status: FirstAccessStatus): string {
       return 'O ID do print não confere com o cadastro deste nick. Fale com um oficial.'
     case 'ambiguous_identity':
       return 'Mais de um cadastro usa este nick. Fale com um oficial.'
+    case 'claim_review':
+      return 'Personagem encontrado. Falta a confirmação de um oficial — envie o print para autorizar o primeiro acesso.'
     case 'ready':
       return 'Personagem encontrado. Defina seu PIN.'
   }
@@ -207,6 +221,14 @@ export function setupErrorCopy(error: FunctionError): SetupErrorCopy {
         message: 'O ID do print não confere com o cadastro deste nick. Fale com um oficial.',
         clearPin: false,
         backToLogin: true,
+      }
+    case 'claim_not_authorized':
+      // 0032: the print alone never authorizes a claim.
+      return {
+        message:
+          'Este personagem ainda precisa da confirmação de um oficial. Envie o print de novo.',
+        clearPin: true,
+        backToLogin: false,
       }
     case 'ambiguous_identity':
       return {
@@ -389,6 +411,90 @@ export async function submitRegistration(
   } catch (err) {
     if (err instanceof FunctionError) {
       return { ok: false, message: registrationErrorCopy(err) }
+    }
+    return { ok: false, message: NETWORK_ERROR }
+  }
+}
+
+/**
+ * 0032 stopgap: an unclaimed registry row is not claimable on the print alone.
+ * The print goes to an officer, who confirms the REGISTRY Discord handle with
+ * the player before authorizing the claim. No handle is sent: the registry row
+ * already holds the authoritative one.
+ */
+export type ClaimProblem = 'proof' | 'profile'
+
+export function claimProblem(
+  draft: Pick<FirstAccessDraft, 'proofDataUrl' | 'profile'>,
+): ClaimProblem | null {
+  if (draft.proofDataUrl === null) return 'proof'
+  if (!profileComplete(draft.profile)) return 'profile'
+  return null
+}
+
+export const CLAIM_SENT = 'Print enviado. Aguarde a confirmação de um oficial e tente de novo.'
+export const CLAIM_ALREADY_SENT =
+  'Já existe um print aguardando confirmação para este personagem.'
+
+export type ClaimOutcome = { ok: true; duplicate: boolean } | { ok: false; message: string }
+
+export interface ClaimDeps {
+  requestClaim: (input: FirstAccessClaimInput) => Promise<{
+    status: 'pending'
+    duplicate: boolean
+  }>
+}
+
+/** Server machine token -> pt-BR copy for the claim-authorization request. */
+export function claimErrorCopy(error: FunctionError): string {
+  switch (error.code) {
+    case 'already_authorized':
+      return 'Um oficial já autorizou este personagem. Tente de novo para criar o PIN.'
+    case 'already_registered':
+      return 'Este personagem já está cadastrado. Entre com o nick e o PIN — se o PIN não existir, fale com um oficial.'
+    case 'not_registered':
+      return 'Este personagem não está mais na lista da guilda. Fale com um oficial.'
+    case 'identity_mismatch':
+      return 'O ID do print não confere com o cadastro deste nick. Fale com um oficial.'
+    case 'ambiguous_identity':
+      return 'Mais de um cadastro usa este nick. Fale com um oficial.'
+    case 'unknown_class':
+      return 'A classe lida não foi reconhecida. Envie outro print.'
+    case 'proof_too_large':
+      return 'Comprovante muito grande (máx. 2 MB).'
+    case 'invalid_proof':
+      return 'O servidor não aceitou o comprovante. Envie de novo o print em JPEG da tela Básico.'
+    case 'network':
+      return NETWORK_ERROR
+    default:
+      return 'Não foi possível enviar o print para confirmação. Tente novamente.'
+  }
+}
+
+/**
+ * Queue the officer authorization for an unclaimed row. No session is minted:
+ * the player must come back after the confirmation to set the PIN.
+ */
+export async function submitClaim(
+  draft: FirstAccessDraft,
+  deps: ClaimDeps,
+): Promise<ClaimOutcome> {
+  const problem = claimProblem(draft)
+  if (problem !== null) {
+    return { ok: false, message: firstAccessProblemMessage(problem) }
+  }
+  const profile = draft.profile as { nickname: string; char_id: string; char_class: string }
+  try {
+    const result = await deps.requestClaim({
+      char_id: profile.char_id,
+      nickname: profile.nickname,
+      char_class: profile.char_class,
+      proof_data_url: draft.proofDataUrl as string,
+    })
+    return { ok: true, duplicate: result.duplicate }
+  } catch (err) {
+    if (err instanceof FunctionError) {
+      return { ok: false, message: claimErrorCopy(err) }
     }
     return { ok: false, message: NETWORK_ERROR }
   }

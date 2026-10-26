@@ -7,6 +7,10 @@
 //   2. The print is read (char_id / nickname / class) and looked up in the
 //      guild registry by NICKNAME.
 //   3. `ready` -> the PIN setter opens and the claim mints the session.
+//      `claim_review` -> the character exists but no officer authorized the
+//      claim yet (0032: the print is public data). The print is queued and an
+//      officer confirms the registry Discord handle with the player; the next
+//      attempt lands on `ready`.
 //      `unknown` -> the handle + print go to an officer as a registration
 //      request; once approved the character exists (without a PIN) and the next
 //      attempt lands on `ready`.
@@ -19,6 +23,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import hellzMark from '../../assets/hellz-mark.svg'
 import {
   firstAccessLookup,
+  requestClaim,
   requestFirstAccess,
   setupPin,
   type FirstAccessStatus,
@@ -27,14 +32,18 @@ import type { BasicProfileFields } from '../submit/identity'
 import { ProofField } from '../identity/ProofField'
 import { PinBoxes } from './PinBoxes'
 import {
+  CLAIM_ALREADY_SENT,
+  CLAIM_SENT,
   REQUEST_ALREADY_PENDING,
   REQUEST_SENT,
+  canRequestClaim,
   canRequestRegistration,
   canSetPin,
   profileComplete,
   profileProblemMessage,
   profileSummary,
   statusMessage,
+  submitClaim,
   submitFirstAccess,
   submitRegistration,
 } from './firstAccess'
@@ -78,6 +87,7 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
   const mismatch = confirmPin.length === 4 && confirmPin !== pin
   const ready = canSetPin(lookup)
   const canRequest = canRequestRegistration(lookup)
+  const canClaim = canRequestClaim(lookup)
   const sent = status.kind === 'sent'
 
   async function readProof(canvas: HTMLCanvasElement): Promise<void> {
@@ -184,6 +194,26 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
     })
   }
 
+  // 0032: the character exists but no officer authorized the claim yet. The
+  // print is queued; the officer confirms the registry Discord handle with the
+  // player, and the next attempt opens the PIN setter.
+  async function handleRequestClaim(): Promise<void> {
+    if (busy) return
+    setStatus({ kind: 'submitting' })
+    const outcome = await submitClaim(
+      { handle, pin, confirmPin, profile, proofDataUrl: proof, status: lookup },
+      { requestClaim },
+    )
+    if (!outcome.ok) {
+      setStatus({ kind: 'error', message: outcome.message, backToLogin: false })
+      return
+    }
+    setStatus({
+      kind: 'sent',
+      message: outcome.duplicate ? CLAIM_ALREADY_SENT : CLAIM_SENT,
+    })
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-dominant backdrop-neon-grid px-4 py-16">
       {/* max-w-2xl (strip parity, owner report 2026-10-23): the proof capture
@@ -274,7 +304,9 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
             {!reading && summary !== null && !checking && lookup !== null && (
               <p
                 className={`mt-1 text-sm ${
-                  lookup === 'ready' ? 'text-content' : 'font-semibold text-error'
+                  lookup === 'ready' || lookup === 'claim_review' || lookup === 'claim_pending'
+                    ? 'text-content'
+                    : 'font-semibold text-error'
                 }`}
               >
                 {statusMessage(lookup)}
@@ -331,6 +363,17 @@ export function FirstAccessPage({ initialHandle = '', onDone, onBack }: FirstAcc
               className="h-11 w-full rounded-md bg-accent text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               Criar meu PIN
+            </button>
+          )}
+          {canClaim && !sent && (
+            <button
+              type="button"
+              onClick={() => void handleRequestClaim()}
+              disabled={busy || reading || checking}
+              aria-busy={busy}
+              className="h-11 w-full rounded-md bg-accent text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Enviar print para confirmação
             </button>
           )}
           {canRequest && !sent && (

@@ -1,10 +1,14 @@
 // NeoFoot first-access Edge Function (Phase 10, owner decision 2026-10-23)
 //
-// Two actions, one contract:
+// Four actions, one contract:
 //
 //   POST { action: 'lookup', nickname, char_id, discord_handle? }
 //     -> 200 { status }
-//        'ready'             registry row exists, no PIN yet -> PIN setter
+//        'ready'             registry row exists, unclaimed AND officer-authorized
+//                            -> PIN setter
+//        'claim_review'      registry row exists but no officer authorized the
+//                            claim yet (0032 stopgap: the print is public data)
+//        'claim_pending'     a first-access print awaits an officer decision
 //        'pin_set'           registry row already claimed -> login instead
 //        'handle_claimed'    the typed Discord handle belongs to a claimed
 //                            account -> the PIN system is refused entirely
@@ -29,6 +33,13 @@
 //        request. An officer approval registers the character WITHOUT a PIN, so
 //        the next lookup answers 'ready'.
 //
+//   POST { action: 'claim', nickname, char_id, char_class, proof_data_url }
+//     -> 200 { status: 'pending', duplicate }
+//        0032 stopgap: queues the print of an UNCLAIMED registry row for officer
+//        review. An officer confirms it in the Identidades board after checking
+//        the registry Discord handle with the player; that confirmation is what
+//        unlocks the PIN setter ('ready' on the next lookup).
+//
 // The proof upload is server-generated and service-role written; every
 // non-success exit removes the orphan object. No session is ever minted here.
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -43,10 +54,12 @@ import {
 } from '../_shared/session.ts'
 
 const MAX_BODY_BYTES = 3_500_000
-const ACTIONS = new Set(['lookup', 'request', 'identify'])
+const ACTIONS = new Set(['lookup', 'request', 'identify', 'claim'])
 
 type LookupStatus =
   | 'ready'
+  | 'claim_review'
+  | 'claim_pending'
   | 'pin_set'
   | 'pending'
   | 'unknown'
@@ -60,6 +73,7 @@ interface MemberRow {
   pin_hash: string | null
   active: boolean
   char_id: string | null
+  claim_authorized_at: string | null
 }
 
 Deno.serve(async (req: Request) => {
@@ -106,7 +120,7 @@ Deno.serve(async (req: Request) => {
     if (handle.length === 0) return null
     const { data, error } = await admin
       .from('members')
-      .select('id, pin_hash, active, char_id')
+      .select('id, pin_hash, active, char_id, claim_authorized_at')
       .eq('active', true)
       .ilike('discord_handle', escapeLike(handle))
       .limit(2)
@@ -140,7 +154,7 @@ Deno.serve(async (req: Request) => {
   async function lookupStatus(): Promise<LookupStatus> {
     const { data, error } = await admin
       .from('members')
-      .select('id, pin_hash, active, char_id')
+      .select('id, pin_hash, active, char_id, claim_authorized_at')
       .eq('login_key', key)
       .eq('active', true)
     if (error) throw new Error('member lookup failed')
@@ -167,7 +181,19 @@ Deno.serve(async (req: Request) => {
 
     if (byNick) {
       if (byNick.char_id !== null && byNick.char_id !== charId) return 'identity_mismatch'
-      return byNick.pin_hash === null ? 'ready' : 'pin_set'
+      if (byNick.pin_hash !== null) return 'pin_set'
+      // 0032 stopgap: the print is public data (cards are posted in Discord
+      // daily), so an unclaimed row is NOT claimable on the print alone. Only an
+      // officer/owner authorization opens the PIN setter.
+      if (byNick.claim_authorized_at !== null) return 'ready'
+      const { data: pendingProof, error: proofErr } = await admin
+        .from('identity_proofs')
+        .select('id')
+        .eq('member_id', byNick.id)
+        .eq('status', 'pending')
+        .limit(1)
+      if (proofErr) throw new Error('claim proof lookup failed')
+      return (pendingProof ?? []).length > 0 ? 'claim_pending' : 'claim_review'
     }
     // The handle is known without a PIN and the print nickname matches nothing:
     // the account exists, so an officer fixes the nickname (never a new row).
@@ -204,11 +230,9 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // action === 'request'
   const charClass = typeof body.char_class === 'string' ? body.char_class.trim() : ''
   const proofDataUrl = typeof body.proof_data_url === 'string' ? body.proof_data_url.trim() : ''
 
-  if (handle.length === 0) return json({ error: 'invalid_request' }, 400)
   if (charClass.length === 0 || charClass.length > 40) {
     return json({ error: 'invalid_request' }, 400)
   }
@@ -219,12 +243,80 @@ Deno.serve(async (req: Request) => {
   const proof = decodeProof(proofDataUrl, MAX_PROOF_BYTES)
   if (!proof) return json({ error: 'invalid_proof' }, 400)
 
+  // 0032 stopgap: an unclaimed registry row needs an officer-authorized claim.
+  // The print is queued for review; the officer contacts the REGISTRY Discord
+  // handle (never a typed, spoofable one) and confirms it there.
+  if (action === 'claim') {
+    const proofPath = `claims/pending/${crypto.randomUUID()}.jpg`
+    let uploaded = false
+    const removeUpload = async () => {
+      if (!uploaded) return
+      try {
+        await admin.storage.from('identity-proofs').remove([proofPath])
+      } catch {
+        // Best effort — never mask the real error.
+      }
+      uploaded = false
+    }
+
+    const { error: uploadErr } = await admin.storage
+      .from('identity-proofs')
+      .upload(proofPath, new Blob([proof.bytes.buffer as ArrayBuffer], { type: proof.mime }), {
+        contentType: proof.mime,
+        upsert: false,
+      })
+    if (uploadErr) return json({ error: 'server_error' }, 500)
+    uploaded = true
+
+    const { data, error } = await admin.rpc('create_claim_proof', {
+      p_nickname: nickname,
+      p_char_id: charId,
+      p_char_class: charClass,
+      p_proof_path: proofPath,
+    })
+
+    if (error) {
+      const msg = errorMessage(error)
+      await removeUpload()
+      if (msg.includes('not_registered')) return json({ error: 'not_registered' }, 404)
+      if (msg.includes('already_set')) return json({ error: 'already_registered' }, 409)
+      if (msg.includes('already_authorized')) return json({ error: 'already_authorized' }, 409)
+      if (msg.includes('identity_mismatch')) return json({ error: 'identity_mismatch' }, 409)
+      if (msg.includes('unknown_class')) return json({ error: 'unknown_class' }, 400)
+      if (msg.includes('invalid')) return json({ error: 'invalid_request' }, 400)
+      return json({ error: 'server_error' }, 500)
+    }
+
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { proof_id?: string; duplicate?: boolean; replaced_path?: string | null }
+      | null
+    if (!row?.proof_id) {
+      await removeUpload()
+      return json({ error: 'server_error' }, 500)
+    }
+    // The RPC re-pointed the pending proof at this upload, so the previous
+    // object is an orphan now.
+    if (row.replaced_path) {
+      try {
+        await admin.storage.from('identity-proofs').remove([row.replaced_path])
+      } catch {
+        // Best effort — the queue row already points at the new object.
+      }
+    }
+    return json({ status: 'pending', duplicate: row.duplicate === true })
+  }
+
+  // action === 'request'
+  if (handle.length === 0) return json({ error: 'invalid_request' }, 400)
+
   // State may have moved between the lookup and this submit: answer with the
   // status instead of queueing a request that can never be approved.
   try {
     const status = await lookupStatus()
     if (
       status === 'ready' ||
+      status === 'claim_review' ||
+      status === 'claim_pending' ||
       status === 'pin_set' ||
       status === 'identity_mismatch' ||
       status === 'handle_claimed' ||

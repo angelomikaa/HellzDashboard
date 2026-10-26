@@ -243,6 +243,9 @@ Deno.serve(async (req: Request) => {
     if (msg.includes('not_registered')) return json({ error: 'not_registered' }, 404)
     if (msg.includes('ambiguous_identity')) return json({ error: 'ambiguous_identity' }, 409)
     if (msg.includes('identity_mismatch')) return json({ error: 'identity_mismatch' }, 409)
+    // 0032 stopgap: no officer authorization on the row -> the PIN setter was
+    // never supposed to open (the lookup must have been stale or forged).
+    if (msg.includes('claim_not_authorized')) return json({ error: 'claim_not_authorized' }, 409)
     if (msg.includes('invalid_identity') || msg.includes('invalid_pin')) {
       return json({ error: 'invalid_request' }, 400)
     }

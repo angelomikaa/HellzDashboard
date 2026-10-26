@@ -3,10 +3,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { FunctionError } from '../../lib/api'
 import type { NeoFootSession } from './session'
 import {
+  CLAIM_ALREADY_SENT,
+  CLAIM_SENT,
   PROFILE_ERROR,
   REQUEST_ALREADY_PENDING,
+  canRequestClaim,
   canRequestRegistration,
   canSetPin,
+  claimErrorCopy,
+  claimProblem,
   firstAccessProblem,
   firstAccessProblemMessage,
   profileComplete,
@@ -17,6 +22,7 @@ import {
   setupErrorCopy,
   statusMessage,
   statusBackToLogin,
+  submitClaim,
   submitFirstAccess,
   submitRegistration,
   type FirstAccessDeps,
@@ -104,6 +110,19 @@ describe('registry status gates the flow', () => {
     expect(canRequestRegistration(null)).toBe(false)
   })
 
+  // 0032 stopgap: the print is public data, so an unclaimed row whose claim no
+  // officer authorized never opens the PIN setter.
+  it('a print-only claim needs an officer before the PIN setter', () => {
+    expect(canSetPin('claim_review')).toBe(false)
+    expect(canSetPin('claim_pending')).toBe(false)
+    expect(canRequestClaim('claim_review')).toBe(true)
+    expect(canRequestClaim('claim_pending')).toBe(false)
+    expect(canRequestClaim('ready')).toBe(false)
+    expect(canRequestClaim(null)).toBe(false)
+    expect(statusMessage('claim_review')).toContain('confirmação de um oficial')
+    expect(statusMessage('claim_pending')).toContain('Aguarde a confirmação')
+  })
+
   it('explains every non-ready status without asking for a PIN', () => {
     expect(statusMessage('pin_set')).toContain('já tem PIN')
     expect(statusMessage('handle_claimed')).toContain('Discord já tem personagem com PIN')
@@ -151,6 +170,8 @@ describe('firstAccessProblem — submit blocking order', () => {
   it('keeps the PIN setter closed for a non-claimable registry answer', () => {
     for (const status of [
       'unknown',
+      'claim_review',
+      'claim_pending',
       'pin_set',
       'pending',
       'identity_mismatch',
@@ -348,6 +369,77 @@ describe('submitRegistration — officer approval path', () => {
     })
     expect(outcome.ok).toBe(false)
     expect(outcome.ok === false && outcome.message).not.toContain('server_error')
+  })
+})
+
+// 0032 stopgap: an unclaimed registry row whose claim no officer authorized
+// yet. The print is queued for officer confirmation — never a PIN, never a
+// typed handle (the registry row holds the authoritative one).
+describe('submitClaim — officer authorization path (0032)', () => {
+  const CLAIM: FirstAccessDraft = { ...VALID, status: 'claim_review' }
+
+  function claimDeps(result?: { status: 'pending'; duplicate: boolean }) {
+    return {
+      requestClaim: vi.fn(async () => result ?? { status: 'pending' as const, duplicate: false }),
+    }
+  }
+
+  it('sends the print identity only — no PIN and no typed handle', async () => {
+    const d = claimDeps()
+    const outcome = await submitClaim(CLAIM, d)
+
+    expect(outcome).toEqual({ ok: true, duplicate: false })
+    expect(d.requestClaim).toHaveBeenCalledWith({
+      char_id: '32980',
+      nickname: 'Ahrya',
+      char_class: 'Gypsy',
+      proof_data_url: 'data:image/jpeg;base64,AAAA',
+    })
+  })
+
+  it('blocks without a proof or a complete profile before the server', async () => {
+    const d = claimDeps()
+    const noProof = await submitClaim({ ...CLAIM, proofDataUrl: null }, d)
+    expect(noProof.ok).toBe(false)
+    expect(claimProblem({ ...CLAIM, proofDataUrl: null })).toBe('proof')
+    expect(claimProblem({ ...CLAIM, profile: null })).toBe('profile')
+    expect(d.requestClaim).not.toHaveBeenCalled()
+  })
+
+  it('reports a re-sent print without failing', async () => {
+    const outcome = await submitClaim(CLAIM, claimDeps({ status: 'pending', duplicate: true }))
+    expect(outcome).toMatchObject({ ok: true, duplicate: true })
+    expect(CLAIM_SENT).toContain('Aguarde a confirmação')
+    expect(CLAIM_ALREADY_SENT).toContain('aguardando confirmação')
+  })
+
+  it('maps server refusals to pt-BR copy', async () => {
+    expect(claimErrorCopy(new FunctionError(409, 'already_authorized', 'x'))).toContain(
+      'já autorizou',
+    )
+    expect(claimErrorCopy(new FunctionError(404, 'not_registered', 'x'))).toContain(
+      'lista da guilda',
+    )
+    expect(claimErrorCopy(new FunctionError(409, 'identity_mismatch', 'x'))).toContain(
+      'não confere',
+    )
+    expect(claimErrorCopy(new FunctionError(0, 'network', 'x'))).toContain('conexão')
+  })
+
+  it('a failed claim never advances the guard', async () => {
+    const outcome = await submitClaim(CLAIM, {
+      requestClaim: vi.fn(async () => {
+        throw new FunctionError(500, 'server_error', 'x')
+      }),
+    })
+    expect(outcome.ok).toBe(false)
+    expect(outcome.ok === false && outcome.message).not.toContain('server_error')
+  })
+
+  it('a setup-pin refusal for a missing authorization asks for a new print', () => {
+    const copy = setupErrorCopy(new FunctionError(409, 'claim_not_authorized', 'x'))
+    expect(copy.message).toContain('confirmação de um oficial')
+    expect(copy.clearPin).toBe(true)
   })
 })
 
