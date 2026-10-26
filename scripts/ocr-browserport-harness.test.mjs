@@ -654,6 +654,42 @@ describe.skipIf(!hasSamples)('offline exact-value harness — real samples throu
     },
   )
 
+  // Owner report 2026-10-26: the print "☆★RAIZA★☆" read as "SXRAIZAK 2" —
+  // the Latin whitelist has no class for the decoration, so each star was
+  // force-mapped into its nearest letter. The fixture is generated from the
+  // real Aryah card by scripts/gen-identity-decorated-sample.mjs (gitignored
+  // bytes, committed recipe): the card pixels are untouched, the stars are
+  // composited where the game prints them. The read must deliver the PLAIN
+  // nickname — the owner's ruling is to void the decoration, and eng's model
+  // cannot represent "☆"/"★" at all.
+  const DECORATED_IDENTITY = {
+    file: 'sampidentitystarname.jpg',
+    nickname: 'Aryah',
+    char_id: '39943',
+    char_class: 'High Priest',
+  }
+  const hasDecoratedIdentitySample = existsSync(samplePath(DECORATED_IDENTITY.file))
+
+  it.skipIf(!hasDecoratedIdentitySample)(
+    'K2) a Unicode-decorated nickname reads as its plain letters (owner report 2026-10-26)',
+    { timeout: 30 * 60_000 },
+    async () => {
+      const canvas = await loadSampleCanvas(DECORATED_IDENTITY.file)
+      const read = await readBasicProfile(canvas)
+      const misses = []
+      for (const field of ['nickname', 'char_id', 'char_class']) {
+        if (read[field] !== DECORATED_IDENTITY[field]) {
+          misses.push(
+            `${DECORATED_IDENTITY.file}:${field} got=${JSON.stringify(read[field])} expected=${JSON.stringify(DECORATED_IDENTITY[field])}`,
+          )
+        }
+      }
+      console.log(`[harness K2] decorated identity misses=${misses.length}`)
+      if (misses.length > 0) console.log(`[harness K2] misses:\n${misses.join('\n')}`)
+      expect(misses).toEqual([])
+    },
+  )
+
   it.skipIf(!hasIdentitySamples)(
     'L) identity read is scale-invariant: Snipping-Tool widths never dead-end, and the reported card reads exactly',
     { timeout: 30 * 60_000 },

@@ -80,6 +80,7 @@ import {
   nicknameFromBandText,
   nicknameFromLayout,
   parseBasicProfileText,
+  reconcileBandNickname,
   type BasicProfileFields,
   type OcrWord,
 } from '../identity'
@@ -630,6 +631,14 @@ function resampleCanvas(source: HTMLCanvasElement, width: number, height: number
  * "3 Caladoh #" / "¥ Classe Invocador ID 55934"). Everything still passes
  * the strict validators — wrong prefills stay impossible (D-03).
  *
+ * NICKNAME SECOND OPINION (owner report 2026-10-26: the "☆★RAIZA★☆" print
+ * read as "SXRAIZAK 2"): when a nickname WAS read, the same label-anchored
+ * name band is re-read once more with the full charset and reconciled in the
+ * pure identity module — Unicode decoration the Latin whitelist force-mapped
+ * into letters surfaces as symbols there and is trimmed ("RAIZA"), and a
+ * same-length native re-read may correct a one-glyph confusion ("YuriJr" vs
+ * "Yurilr"). No evidence → the pass-1 nickname stands (D-03).
+ *
  * Used by first access (D-03) and the member request form. The existing worker
  * is shared; PSM is switched to SPARSE_TEXT for this read and restored to the
  * wizard's SINGLE_BLOCK in `finally`, so a later readScreenshot is unaffected.
@@ -675,6 +684,7 @@ export async function readBasicProfile(
 
     // Mobile rescue: pass 1 refused while the label anchor exists → the
     // bands re-read at the source's own scale fill ONLY the null fields.
+    let rescueBand: { canvas: HTMLCanvasElement; rect: Rect } | null = null
     if ((nickname === null || char_id === null) && source.width > 0 && source.height > 0) {
       const label = classLabelWord(words)
       if (label !== null) {
@@ -689,6 +699,7 @@ export async function readBasicProfile(
         const rects = identityRescueRects(sourceLabel, source.width, source.height)
         if (nickname === null) {
           const bandText = await ocrIdentityBand(worker, source, rects.name)
+          rescueBand = { canvas: source, rect: rects.name }
           if (bandText !== '') {
             const rescued = nicknameFromBandText(bandText)
             if (rescued !== null) {
@@ -719,6 +730,68 @@ export async function readBasicProfile(
       }
     }
 
+    // Nickname second opinion (owner report 2026-10-26: the "☆★RAIZA★☆"
+    // print read as "SXRAIZAK 2" — the Latin whitelist has no class for the
+    // decoration, so it forces each star into its nearest letter). ONE
+    // full-charset re-read of the SAME label-anchored name band exposes the
+    // decoration as symbols; the pure reconciliation decides whether that read
+    // is trustworthy (decoration trim, or a same-length native re-read of a
+    // one-glyph confusion). Anything else leaves the whitelist read as-is
+    // (D-03: never guess an identity). The band is deliberately the GENEROUS
+    // label-anchored one, not a tight crop of the name word: a tight crop
+    // re-decodes the stars as letters ("Aryahxx" -> "Aryahxr", measured on the
+    // harness fixture), while the wider band keeps them as symbols.
+    let secondOpinionBand: { canvas: HTMLCanvasElement; rect: Rect } | null = rescueBand
+    if (secondOpinionBand === null && nickname !== null) {
+      const label = classLabelWord(words)
+      if (label !== null) {
+        // Read the band in the space with the larger glyphs: the source when
+        // the canonical pass downscaled a big capture (the mobile-rescue
+        // lesson: native glyphs read exact), the canonical canvas when it
+        // upscaled a small one.
+        const scale = source.width / canvas.width
+        const readCanvas = scale >= 1 ? source : canvas
+        const readLabel: OcrWord =
+          scale >= 1
+            ? {
+                text: label.text,
+                x0: label.x0 * scale,
+                y0: label.y0 * scale,
+                x1: label.x1 * scale,
+                y1: label.y1 * scale,
+              }
+            : label
+        secondOpinionBand = {
+          canvas: readCanvas,
+          rect: identityRescueRects(readLabel, readCanvas.width, readCanvas.height).name,
+        }
+      }
+    }
+    if (nickname !== null && secondOpinionBand !== null) {
+      const bandText = await ocrIdentityBandFree(
+        worker,
+        secondOpinionBand.canvas,
+        secondOpinionBand.rect,
+      )
+      if (bandText !== '') {
+        if (import.meta.env?.DEV) {
+          console.debug('[ocr] identity band (full charset):', JSON.stringify(bandText))
+        }
+        const reconciled = reconcileBandNickname(nickname, bandText)
+        if (reconciled !== null) {
+          if (import.meta.env?.DEV) {
+            console.debug(
+              '[ocr] identity nickname reconciled:',
+              JSON.stringify(nickname),
+              '->',
+              JSON.stringify(reconciled),
+            )
+          }
+          nickname = reconciled
+        }
+      }
+    }
+
     return { nickname, char_id, char_class, raw_text: raw }
   } finally {
     // Restore the wizard's block segmentation; ocrRect sets its own whitelist
@@ -743,6 +816,28 @@ async function ocrIdentityBand(
   await worker.setParameters({
     tessedit_pageseg_mode: PSM.SINGLE_LINE,
     tessedit_char_whitelist: PROFILE_WHITELIST,
+  })
+  const { data } = await worker.recognize(cropped)
+  return data.text || ''
+}
+
+/**
+ * One raw SINGLE_LINE read of the nickname band with the FULL charset — the
+ * decoration detector for the nickname second opinion. The Latin whitelist
+ * cannot express "☆"/"★" (eng.traineddata has no such class), so it force-maps
+ * them into letters; without the whitelist the SAME glyphs surface as the
+ * symbols they are, which is the evidence the pure reconciliation needs.
+ * Same PSM juggle contract as ocrIdentityBand.
+ */
+async function ocrIdentityBandFree(
+  worker: Worker,
+  source: HTMLCanvasElement,
+  rect: { left: number; top: number; width: number; height: number },
+): Promise<string> {
+  const cropped = toCanvas(cropCanvas(source, rect))
+  await worker.setParameters({
+    tessedit_pageseg_mode: PSM.SINGLE_LINE,
+    tessedit_char_whitelist: '',
   })
   const { data } = await worker.recognize(cropped)
   return data.text || ''

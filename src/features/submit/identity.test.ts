@@ -11,6 +11,7 @@ import {
   nicknameFromBandText,
   nicknameFromLayout,
   parseBasicProfileText,
+  reconcileBandNickname,
   validateIdentity,
   validateIdentityDraft,
   type OcrWord,
@@ -309,7 +310,7 @@ describe('nicknameFromLayout — the name is the band left-aligned above the cla
       at('1D', 476, 73, 498, 91),
       at('39943Z', 505, 66, 607, 93),
     ]
-    expect(nicknameFromLayout(words, 725)).toEqual({ anchored: true, nickname: 'Aryah' })
+    expect(nicknameFromLayout(words, 725)).toMatchObject({ anchored: true, nickname: 'Aryah' })
   })
 
   // Same capture cropped to the card header: SPARSE_TEXT split the name into
@@ -324,7 +325,7 @@ describe('nicknameFromLayout — the name is the band left-aligned above the cla
       at('Sumo', 277, 73, 332, 90),
       at('Sacerdote', 338, 72, 432, 90),
     ]
-    expect(nicknameFromLayout(words, 725)).toEqual({ anchored: true, nickname: 'Aryah' })
+    expect(nicknameFromLayout(words, 725)).toMatchObject({ anchored: true, nickname: 'Aryah' })
   })
 
   // Samplebasicptbr.png (707x345): the copy/edit badge prints as "SN" right
@@ -337,7 +338,7 @@ describe('nicknameFromLayout — the name is the band left-aligned above the cla
       at('Sumo', 275, 80, 330, 97),
       at('Sacerdote', 336, 79, 430, 97),
     ]
-    expect(nicknameFromLayout(words, 707)).toEqual({ anchored: true, nickname: 'Ahrya' })
+    expect(nicknameFromLayout(words, 707)).toMatchObject({ anchored: true, nickname: 'Ahrya' })
   })
 
   // sampbasicideal.png (691x416) — the English "Job" label.
@@ -348,14 +349,14 @@ describe('nicknameFromLayout — the name is the band left-aligned above the cla
       at('Job', 157, 150, 197, 176),
       at('Gypsy', 266, 152, 334, 178),
     ]
-    expect(nicknameFromLayout(words, 691)).toEqual({ anchored: true, nickname: 'Ahrya' })
+    expect(nicknameFromLayout(words, 691)).toMatchObject({ anchored: true, nickname: 'Ahrya' })
   })
 
   it('never prefills a fragment of a name the crop cut open', () => {
     // Only the tail of the name survived and the class band is out of frame:
     // there is nothing to anchor on, so the text parser must stay silent
     // (strict shape: 3 letters, capitalised when unanchored).
-    expect(nicknameFromLayout([at('ryah', 0, 25, 55, 56)], 140)).toEqual({
+    expect(nicknameFromLayout([at('ryah', 0, 25, 55, 56)], 140)).toMatchObject({
       anchored: false,
       nickname: null,
     })
@@ -365,7 +366,7 @@ describe('nicknameFromLayout — the name is the band left-aligned above the cla
     // Same fragment WITH the class band: the name no longer starts where the
     // label starts, so the layout refuses it instead of prefilling "ryah".
     const cut = [at('ryah', 20, 25, 75, 56), at('Classe', 0, 71, 75, 93)]
-    expect(nicknameFromLayout(cut, 140)).toEqual({ anchored: true, nickname: null })
+    expect(nicknameFromLayout(cut, 140)).toMatchObject({ anchored: true, nickname: null })
   })
 
   it('keeps a two-word nickname apart and refuses OCR noise', () => {
@@ -374,10 +375,10 @@ describe('nicknameFromLayout — the name is the band left-aligned above the cla
       at('Knight', 108, 20, 190, 50),
       at('Classe', 30, 66, 130, 88),
     ]
-    expect(nicknameFromLayout(words, 300)).toEqual({ anchored: true, nickname: 'Dark Knight' })
+    expect(nicknameFromLayout(words, 300)).toMatchObject({ anchored: true, nickname: 'Dark Knight' })
 
     const noise = [at('y Arvah /', 20, 20, 120, 50), at('Classe', 20, 66, 90, 88)]
-    expect(nicknameFromLayout(noise, 300)).toEqual({ anchored: true, nickname: null })
+    expect(nicknameFromLayout(noise, 300)).toMatchObject({ anchored: true, nickname: null })
   })
 })
 
@@ -605,6 +606,54 @@ describe('nicknameFromBandText — exactly one strict candidate (D-03)', () => {
 
   it('never takes a class name as the nickname', () => {
     expect(nicknameFromBandText('Invocador #')).toBeNull()
+  })
+})
+
+// Owner report 2026-10-26: the print "☆★RAIZA★☆" read as "SXRAIZAK 2" — the
+// Latin whitelist has no class for the decoration, so each star was forced
+// into its nearest letter. The full-charset band re-read exposes the
+// decoration as symbols; the real name is the part both reads contain.
+describe('reconcileBandNickname — decoration trim + native re-read (D-03)', () => {
+  it('trims Unicode decoration forced into letters (measured "SXRAIZAK 2")', () => {
+    expect(reconcileBandNickname('SXRAIZAK 2', '☆★RAIZA★☆')).toBe('RAIZA')
+    expect(reconcileBandNickname('SXRAIZAK 2', '*RAIZA*')).toBe('RAIZA')
+    expect(reconcileBandNickname('SXRAIZAK 2', '*RAIZAx /')).toBe('RAIZA')
+  })
+
+  it('trims the copy/pencil badge symbol without touching a clean name', () => {
+    expect(reconcileBandNickname('Aryah', 'Aryah ✎')).toBe('Aryah')
+    expect(reconcileBandNickname('SoldierHellz', 'SoldierHellz ⧉')).toBe('SoldierHellz')
+  })
+
+  it('drops the frame/badge noise a tight band picks up (fixture: "k Aryah * 3%")', () => {
+    expect(reconcileBandNickname('Aryahxx', 'k Aryah * 3%')).toBe('Aryah')
+  })
+
+  it('keeps the whitelist read when there is no decoration evidence', () => {
+    expect(reconcileBandNickname('Ahrya', 'Ahrya')).toBeNull()
+    // A LONGER read is badge glue ("Aryahrd"): never adopted.
+    expect(reconcileBandNickname('Aryah', 'Aryahrd')).toBeNull()
+    // A SHORTER read is a crop fragment: never adopted.
+    expect(reconcileBandNickname('Yurilr', 'Yuri')).toBeNull()
+  })
+
+  it('adopts a same-length native re-read of a one-glyph confusion ("Yurilr" → "YuriJr")', () => {
+    expect(reconcileBandNickname('Yurilr', 'YuriJr')).toBe('YuriJr')
+  })
+
+  it('refuses a fragment left by a split word (never half-prefill, D-03)', () => {
+    expect(reconcileBandNickname('Aryahxx', 'Ar yah *')).toBeNull()
+  })
+
+  it('refuses an ambiguous multi-word band (a real short word and a stray letter look alike)', () => {
+    expect(reconcileBandNickname('SXAhrya ZK 2', '☆★Ahrya Z★☆')).toBeNull()
+    expect(reconcileBandNickname('SXRAIZAK 2', '☆★RAIZA 2★☆')).toBeNull()
+  })
+
+  it('refuses empty or junk-only reads', () => {
+    expect(reconcileBandNickname('', '☆★RAIZA★☆')).toBeNull()
+    expect(reconcileBandNickname('RAIZA', '')).toBeNull()
+    expect(reconcileBandNickname('RAIZA', '☆★')).toBeNull()
   })
 })
 

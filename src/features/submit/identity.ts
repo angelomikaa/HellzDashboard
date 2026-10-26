@@ -648,12 +648,19 @@ export function identityRescueRects(
     }
   }
   const pad = 0.6 * labelH
+  // The name band stops just above the label row — measured, not just
+  // proportional: a tall label box (35px on the Aryah card, where the corpus
+  // calibration is 26px) makes 2.8*labelH go NEGATIVE at the canvas top, and
+  // clamping only the top then let the band run 30px into the class row — the
+  // single-line re-read picked "Classe Sumo Sacerdote" instead of the name.
+  const nameTop = Math.max(0, label.y0 - 2.8 * labelH)
+  const nameBottom = Math.max(nameTop + 1, label.y0 - 0.15 * labelH)
   return {
     name: clamp({
       left: label.x0 - pad,
-      top: label.y0 - 2.8 * labelH,
+      top: nameTop,
       width: pad + 4 * labelW,
-      height: 2.65 * labelH,
+      height: nameBottom - nameTop,
     }),
     classRow: clamp({
       left: label.x0 - pad,
@@ -678,6 +685,117 @@ export function nicknameFromBandText(text: string): string | null {
   }
   if (candidates.length !== 1) return null
   return candidates[0]
+}
+
+// ---------------------------------------------------------------------------
+// Decorated nicknames (owner report 2026-10-26: the "☆★RAIZA★☆" print read as
+// "SXRAIZAK 2")
+// ---------------------------------------------------------------------------
+//
+// RO Origin nicknames carry decorative Unicode (stars, crowns, hearts) that the
+// Latin whitelist CANNOT express: eng.traineddata has no class for "☆"/"★", so
+// `tessedit_char_whitelist` forces each decoration glyph into its nearest
+// Latin letter — the measured failure is "☆★RAIZA★☆" -> "SXRAIZAK 2" (the
+// leading pair became S,X and the trailing pair K,2). The letters in between
+// read correctly. A second read of the SAME band with the FULL charset exposes
+// the decoration as the symbols it is ("*", "/", "☆"...), and the real name is
+// the letter run the two reads agree on.
+//
+// The owner's ruling (2026-10-26): void the Unicode decoration — the login key
+// is the plain nickname ("RAIZA"). Preserving the stars is not possible with
+// the current OCR engine and is not wanted.
+//
+// Everything here is deliberately conservative (D-03: never guess an identity):
+// no decoration evidence or no clean agreement leaves the whitelist read as-is.
+
+const NICKNAME_JUNK = /[^\sA-Za-zÀ-ÿ0-9]/
+
+/** Longest common contiguous run of two strings ("" when none). */
+function longestCommonSubstring(a: string, b: string): string {
+  if (a.length === 0 || b.length === 0) return ''
+  let bestStart = 0
+  let bestLength = 0
+  let previous = new Array<number>(b.length + 1).fill(0)
+  for (let i = 1; i <= a.length; i++) {
+    const current = new Array<number>(b.length + 1).fill(0)
+    for (let j = 1; j <= b.length; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        current[j] = previous[j - 1] + 1
+        if (current[j] > bestLength) {
+          bestLength = current[j]
+          bestStart = i - bestLength
+        }
+      }
+    }
+    previous = current
+  }
+  return a.slice(bestStart, bestStart + bestLength)
+}
+
+/**
+ * Reconcile the whitelisted nickname read with a full-charset read of the same
+ * band. Returns the nickname to use, or null when the whitelist read stands.
+ *
+ * Two independent signals:
+ *
+ * 1. DECORATION — the full-charset read carries symbol glyphs the Latin
+ *    whitelist had to force into letters. Each word it reads is trimmed to the
+ *    part the whitelist read also contains ("*RAIZA*" vs "SXRAIZAK 2" ->
+ *    "RAIZA"); frame/badge tokens the whitelist read never saw are dropped.
+ * 2. SINGLE-GLYPH RE-READ — no decoration, but the native-resolution band read
+ *    disagrees with the canonical one at the SAME length. That is the classic
+ *    one-glyph confusion (measured: "YuriJr" read as "Yurilr"), so the
+ *    native-resolution read wins. A longer read is badge glue and a shorter
+ *    one is a crop fragment: both are refused (D-03).
+ */
+export function reconcileBandNickname(latinRead: string, freeRead: string): string | null {
+  const latin = String(latinRead ?? '').trim()
+  const free = String(freeRead ?? '').trim()
+  if (latin === '' || free === '') return null
+  const latinWords = latin.split(/\s+/).filter((word) => word !== '')
+  const latinCompact = latinWords.join('')
+  const freeCompact = free.replace(/\s+/g, '')
+
+  if (NICKNAME_JUNK.test(free)) {
+    // Decoration evidence. Each whitespace token is reduced to its letters; a
+    // token the whitelist read does not contain AT ALL is frame/badge junk and
+    // is dropped. What remains must explain every word the whitelist read saw
+    // (the forced decoration letters are trimmed off each word).
+    const latinWordsLong = latinWords.filter((word) => word.length >= 3).length
+    const explained: string[] = []
+    for (const token of free.split(/\s+/)) {
+      const stripped = token.replace(/[^A-Za-zÀ-ÿ0-9]/g, '')
+      if (stripped.length === 0) continue
+      if (longestCommonSubstring(latinCompact, stripped).length === 0) continue
+      explained.push(stripped)
+    }
+    // A missing word (a split/fragment) or an extra one (a multi-word name the
+    // whitelist read could not express) is an ambiguity, never a guess (D-03).
+    if (explained.length === 0 || explained.length !== latinWordsLong) return null
+    const words: string[] = []
+    for (const stripped of explained) {
+      const common = longestCommonSubstring(latinCompact, stripped)
+      if (common.length < 3) return null
+      const touchesEdge =
+        common === stripped || stripped.startsWith(common) || stripped.endsWith(common)
+      if (!touchesEdge) return null
+      words.push(common)
+    }
+    // A trim that keeps less than half the whitelist read is not a decoration
+    // trim any more — it is a fragment ("yah" out of "Aryahxx").
+    if (words.join('').length < 0.5 * latinCompact.length) return null
+    return nicknameCandidate(words.join(' '), true)
+  }
+
+  // No decoration: only a same-length re-read is trusted (a single-glyph
+  // confusion, the measured "Yurilr" -> "YuriJr"). A longer read is badge
+  // glue and a shorter one is a crop fragment: both keep the whitelist read.
+  if (freeCompact === latinCompact) return null
+  if (freeCompact.length !== latinCompact.length) return null
+  // A case-only difference is not a glyph confusion — keep the whitelist
+  // read's casing.
+  if (freeCompact.toLowerCase() === latinCompact.toLowerCase()) return null
+  return nicknameCandidate(freeCompact, true)
 }
 
 /**
