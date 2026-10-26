@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1–6 (shipped 2026-10-13) — full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
-- 🚧 **v1.1 Home, Whitelist & Fine Ranks** — Phases 7–10.1 (in progress)
+- 🚧 **v1.1 Home, Whitelist & Fine Ranks** — Phases 7–11 (in progress; Phase 11 Verified Access inserted 2026-10-26)
 
 ## Phases
 
@@ -20,7 +20,7 @@
 </details>
 
 <details open>
-<summary>🚧 v1.1 Home, Whitelist & Fine Ranks (Phases 7–10) — IN PROGRESS</summary>
+<summary>🚧 v1.1 Home, Whitelist & Fine Ranks (Phases 7–11) — IN PROGRESS</summary>
 
 - [x] Phase 7: Dummy-Data Seed & Catalog Alignment — owner-roster seed ships FIRST (owner decision 7: see how v1.0 wraps around data while v1.1 is developed), build-role vocabulary (ROLE-05) + official job-tree catalog (ROLE-12) aligned so dummies carry correct roles from day one (4/4 plans) — completed 2026-10-14
 - [ ] Phase 8: Whitelist Lifecycle, Self-Request & Character Identity — handle-only registration, player-picked PIN on first login, owner PIN reset, reactivation, two self-request loops, per-submission identity (6 plans created)
@@ -28,6 +28,7 @@
 - [x] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0018; renumbered: Phase 7 took 0012, Phase 07.2 takes 0013, Phase 8 takes 0014, Phase 8 gap closure consumed 0015, Phase 08.1 took 0016, Phase 08.1 step-up consumed 0017): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (5/5 plans, 09-06 env-gated) — completed 2026-10-22
 - [ ] Phase 9.1: Hidden Raw Defenses (RPDEF/RMDEF) — two tooltip OCR captures inside the Especial step; raw defense computed read-only from Equipment DEF / (1 + DEF%); transient equipment values; `rpdef`/`rmdef` remap all `pdef`/`mdef` key positions preserving order; migration 0019 after 0018 (2 plans)
 - [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (3/3 plans)
+- [ ] Phase 11: Verified Access — Claim Authorization & Discord OAuth — 0032 stopgap SHIPPED (officer-authorized claims); then the Discord OAuth end state: one-time officer-confirmed Discord↔character link, server-side bot-token role check, custom access token hook keeping every RLS policy intact, device-binding re-decision, PIN retirement path (INSERTED 2026-10-26)
 
 </details>
 
@@ -200,10 +201,28 @@ Plans:
 Cross-cutting constraints: no router library — `'inicio'` joins the existing `App.tsx` Tab union pattern; no date library — epoch-diff arithmetic on the ISO string; no client-side points recomputation (AGENTS.md non-negotiable); the slider is CSS scroll-snap only (no new npm dependency, no autoplay — 07.1 D-05 static-only rule); the public showcase is server-enforced (anon grant on one closed-field RPC + one storage predicate) — never UI-only gating.
 **UI hint**: yes
 
+### Phase 11: Verified Access — Claim Authorization & Discord OAuth (INSERTED)
+
+**Goal**: Access is bound to something the attacker cannot steal from a Discord post: first, the 0032 stopgap makes every first-access claim an officer-authorized act (the print is public data and never an identity anchor); then the end state replaces print-trust with Discord-trust — a one-time, officer-confirmed Discord↔character link per member, Discord OAuth as the login, a server-side guild-role check with the guild bot token, and session continuity that keeps every existing RLS policy working unchanged.
+
+**Why now**: Owner report 2026-10-26 — a Basic-screen print (and the nickname/char ID on it) is public data, so the pre-0032 first-access flow let anyone holding a stolen card claim an unclaimed row before its owner and take over the account. The guild bot has roster/roles ONLY (owner-confirmed), so OAuth alone cannot resolve which character a Discord user plays: the Discord↔character link must be created once per member with human confirmation, after which it becomes the unspoofable anchor.
+
+**Depends on**: Phase 8/08.1 (whitelist + identity machinery shipped), the 0032 stopgap (shipped in this phase's Wave 0)
+**Requirements**: DSCD-01..DSCD-06 (see REQUIREMENTS.md "Verified Access — Claim Authorization & Discord OAuth")
+**Success Criteria** (what must be TRUE):
+  1. [SHIPPED, 0032] No unclaimed registry row is claimable without an officer/owner authorization — `claim_pin_by_nickname` raises `claim_not_authorized`, the lookup answers `claim_review`/`claim_pending`, officer Confirmar authorizes, a refusal keeps the registry row active, registration approvals pre-authorize, staff PIN resets keep working
+  2. A member row carries a unique `discord_user_id` link created once with officer confirmation (link request → officer verifies against the registry handle in Discord → link set); link changes/unbinds are staff-only and audited; a pending link request grants zero data access
+  3. Discord OAuth login (Supabase Auth Discord provider, `identify` scope only) resolves the member BY `discord_user_id` and the guild-role check runs server-side with the bot token; an unlinked/roleless Discord account never mints a session
+  4. All `auth.jwt()->>'member_id'` RLS policies and RPC gates keep working through a custom access token hook that injects `member_id`/`member_role` — zero policy rewrites; the 0024 `assert_device_bound` discipline is explicitly migrated or superseded (never silently broken); `members.discord_handle` remains the staff-facing contact field
+  5. The OCR print is evidence/typo-prevention only (stats/class/ID read + officer review queue); no code path or copy treats the print as proof of ownership
+  6. The PIN retirement path is staged and decided at planning time (hard removal vs. recovery-only), with outstanding hand-minted JWTs handled (short expiry/forced re-login) and `NEFOOT_JWT_SECRET` rotation planned if the custom mint retires
+**Plans:** 0 created — plan via `/gsd-plan-phase 11` (Wave 0 stopgap already executed; design brief: `.planning/research/DISCORD-OAUTH-DESIGN.md`)
+**UI hint**: yes
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`)
+Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; 11 builds on 8/08.1 + the shipped 0032 stopgap)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|------------|
@@ -219,6 +238,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 (8 is independent 
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 5/5 | Complete | 2026-10-22 |
 | 9.1. Hidden Raw Defenses (RPDEF/RMDEF) | v1.1 | 2/2 | Complete    | 2026-10-24 |
 | 10. Personalized Home Landing Tab | v1.1 | 3/3 | Planned | - |
+| 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? (Wave 0 stopgap executed) | Planned | - |
 
 ---
 *Roadmap created: 2026-10-07 · v1.0 archived 2026-10-13 · v1.1 roadmap created 2026-10-13 · revised 2026-10-22 (added Phase 9.1 Hidden Raw Defenses — 5 phases, DEF-01..DEF-06 requirements)*

@@ -106,6 +106,17 @@ Added 2026-10-23 when Phase 08.1 gap-closure planning found that three of the ph
 - [ ] **SEC-05**: The live smoke harness contains no production credential — credentials come from `SMOKE_*` env vars or per-run throwaway fixtures with a random 4-digit PIN
 - [ ] **SEC-06**: Every 08.1 security claim is re-verified against the live deployment in one battery run and recorded in `08.1-VERIFICATION.md`, with an owner walk for the behaviours no script can judge
 
+### Verified Access — Claim Authorization & Discord OAuth (Phase 11)
+
+Added 2026-10-26 after the owner report that a Basic-screen print can never prove account ownership: the print, the nickname and the char ID are all public (cards are posted in Discord daily), so the pre-0032 first-access flow let anyone holding a stolen card claim an unclaimed row before its owner. The stopgap (DSCD-01) shipped immediately; the rest is the Discord OAuth end state decided with the owner the same day (the guild bot has roster/roles ONLY — no Discord↔character mapping — so the mapping itself must be created once per member with human confirmation).
+
+- [x] **DSCD-01** (stopgap, shipped 2026-10-26 as migration 0032): An unclaimed registry row is claimable ONLY after an officer/owner authorization (`members.claim_authorized_at/by`) — never on the print alone. Enforced server-side in `claim_pin_by_nickname` (`claim_not_authorized`), the first-access lookup answers `claim_review`/`claim_pending` instead of auto-`ready`, the claim print is queued for officer review (`create_claim_proof`) where Confirmar authorizes and a refusal keeps the registry row active (a hijack attempt must never deactivate the real player's row). A registration approval sets the authorization (no double review); staff PIN resets keep working (the stamp set at first claim is never cleared).
+- [ ] **DSCD-02**: Every member row carries an optional, unique Discord identity link (`discord_user_id`, `discord_verified_at`) that is created exactly ONCE per member with officer confirmation — the one-time human-verified Discord↔character mapping (the bot has no such mapping, and OAuth alone proves only control of a Discord account). Link changes/unbinds are staff-only and recorded.
+- [ ] **DSCD-03**: Login accepts Discord OAuth through the Supabase Auth Discord provider (scope `identify` only): the Edge Function/server resolves the registry row BY `discord_user_id`, and the guild-membership/role check runs SERVER-side with the guild bot token (never a client-claimed role, never the client's guild list). A member whose Discord account is not linked gets the claim/link flow, not a session.
+- [ ] **DSCD-04**: RLS continuity is preserved by construction: a Supabase custom access token hook injects `member_id`/`member_role` into the Auth session JWT so every existing `auth.jwt()->>'member_id'` policy and RPC gate keeps working unchanged. The 0024 device-binding discipline is re-decided explicitly (migrate `assert_device_bound` to the new session shape, or replace it with step-up only) — it must never silently break or silently vanish.
+- [ ] **DSCD-05**: The PIN retirement path is decided and staged: once OAuth is mandatory for members, the nickname+PIN login is deprecated in the same phase it stops being the only factor (owner decision at planning time: hard removal vs. recovery-only), outstanding hand-minted JWTs are handled (short expiry or forced re-login), and `NEFOOT_JWT_SECRET` rotation is planned if the custom mint is retired.
+- [ ] **DSCD-06**: The OCR print keeps its real job only: reading stats/class/ID to avoid typos and giving officers evidence on the unknown/claim paths. It is never again the identity anchor anywhere in the codebase or copy.
+
 ## v2 Requirements
 
 Deferred to a future release. Tracked but not in the v1.1 roadmap.
@@ -221,8 +232,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DEF-04 | Phase 9.1 — Hidden Raw Defenses | Complete |
 | DEF-05 | Phase 9.1 — Hidden Raw Defenses | Complete |
 | DEF-06 | Phase 9.1 — Hidden Raw Defenses | Complete |
+| DSCD-01 | Phase 11 — Verified Access (stopgap) | Complete (0032, 2026-10-26) |
+| DSCD-02 | Phase 11 — Verified Access (Discord OAuth) | Planned |
+| DSCD-03 | Phase 11 — Verified Access (Discord OAuth) | Planned |
+| DSCD-04 | Phase 11 — Verified Access (Discord OAuth) | Planned |
+| DSCD-05 | Phase 11 — Verified Access (Discord OAuth) | Planned |
+| DSCD-06 | Phase 11 — Verified Access (Discord OAuth) | Planned |
 
 **Coverage:**
-- v1.1 requirements: 43 total
-- Mapped to phases: 43 ✓
+- v1.1 requirements: 49 total
+- Mapped to phases: 49 ✓
 - Unmapped: 0 ✓
