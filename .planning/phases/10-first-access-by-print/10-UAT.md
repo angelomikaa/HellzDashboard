@@ -515,6 +515,50 @@ verification: 0030 applied live via the Management API path + bookkeeping
   green.
 status: fixed — live-verified end to end
 
+### G-11 (round 9 rework): no notifications despite pending work — the badge missed a whole queue
+
+report: "on the owner view - no notifications have appeared despite
+  submissions being made - the notification system needs work"
+
+root_cause: |
+  MEASURED, not guessed: the live DB held TWO pending membership requests
+  (Solicitações) at report time — but 0030's count RPC only covered
+  submissions + identity proofs. The Validações tab adjudicates THREE
+  queues (Envios / Solicitações / Identidades) and a pending request could
+  never light the badge. Secondary UX gaps: the 60s poll felt dead when
+  testing against a just-made submission, a silent count change is easy to
+  miss, and nothing at all reads while the browser tab is parked in the
+  background (where browsers throttle timers to ~1/min anyway).
+
+fix: |
+  - Migration 0031 (supersedes 0030's body, append-only): the RPC now
+    returns {submissions, identity_proofs, requests} — membership_requests
+    mirrors staff_requests' cohort exactly. Applied live + bookkeeping row.
+  - The poll halved to 30s (still payload-free: three integers).
+  - The "ping" is now literal: when a poll INCREASES the total from a known
+    baseline, a TOAST fires (portal, aria-live, "N novas validações
+    pendentes" with the DELTA not the total, Ver button jumps to the tab,
+    auto-dismiss 8s). The first poll baselines silently — opening the app
+    never toasts about old rows. The stale-closure trap is covered: the
+    baseline lives in a ref read inside the poll, not in effect-closure
+    state.
+  - The document title carries "(N) " while anything is pending — the only
+    affordance that reads while the tab is backgrounded.
+  - 8 unit locks: pingDelta (baseline-silent, increase-only, no ping on
+    decrease or queue-switch), pendingTotal (three queues, null-safe).
+
+verification: 0031 applied live; parity probes match the three queue RPC
+  cohorts. Live E2E with the elevated smoke fixture (reverted after):
+  badge reads the two REAL pending requests (it read zero before 0031);
+  title shows "(N) Hellz — Painel Geral"; with a live-watched insert the
+  toast fired on the interval tick reading "1 Nova validação pendente"
+  (delta-exact) with the Ver button and auto-dismissed after 8s; the badge
+  tracked 8→10 across inserts. Unit tests 8/8; tsc/oxlint/build green.
+  Note: real officers were adjudicating test rows DURING the verification
+  (rows vanished between polls) — the queue is actively watched, which is
+  also why short-lived submissions may never badge between 30s polls.
+status: fixed — live-verified end to end
+
 ## Scope correction (owner, 2026-10-24)
 
 report: "the original planning messed up things. Destaques and Inicio were

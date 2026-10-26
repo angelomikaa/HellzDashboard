@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import hellzMark from './assets/hellz-mark.svg'
 import { clearSession, type NeoFootSession } from './features/auth/session'
 import { RequireAuth } from './features/auth/RequireAuth'
@@ -10,7 +11,7 @@ import { SubmitPage } from './features/submit/SubmitPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { InicioPage } from './features/dashboard/InicioPage'
 import { PageErrorBoundary } from './features/shell/PageErrorBoundary'
-import { usePendingValidations } from './features/shell/usePendingValidations'
+import { pendingTotal, usePendingValidations } from './features/shell/usePendingValidations'
 import { fetchMyIdentity } from './lib/api'
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
@@ -266,11 +267,19 @@ function App() {
  * 2026-10-25: officers "need to blindly check the tab to see if something
  * new arrived"). A component (not inline JSX) so the polling hook lives in
  * a proper component context; only mounted for staff sessions, so the poll
- * never runs for members. The pill is the count of BOTH pending queues
- * (submissions + identity proofs, 0030) — animate-pulse is the "ping", and
- * the global prefers-reduced-motion kill-switch freezes it. The pill itself
- * is aria-hidden: the button's aria-label carries the number for screen
- * readers.
+ * never runs for members. The nav button is always mounted for staff on
+ * EVERY tab, which makes it the right home for the whole notification
+ * surface:
+ *
+ *   - the BADGE pill: all three pending queues summed (submissions +
+ *     identity proofs + requests — 0031), animate-pulse is the "ping"
+ *     (killed by prefers-reduced-motion), count in the aria-label, 9+ cap;
+ *   - the TOAST (portal to body): fires when a poll INCREASES the total —
+ *     "ping officers", the owner's words — with a Ver button that jumps to
+ *     Validações; auto-dismisses after 8s;
+ *   - the TAB TITLE count "(N) " — the only affordance that reads while
+ *     the browser tab is parked in the background (where the browser
+ *     throttles the poll to ~1/min anyway).
  */
 function ValidacoesTab({
   session,
@@ -281,30 +290,83 @@ function ValidacoesTab({
   active: boolean
   onSelect: () => void
 }) {
-  const counts = usePendingValidations(session, true)
-  const total = counts === null ? 0 : counts.submissions + counts.identity_proofs
+  const { counts, ping, clearPing } = usePendingValidations(session, true)
+  const total = pendingTotal(counts)
+
+  // (N) title prefix while anything is pending — restored to the app's own
+  // title at zero (and by the cleanup on unmount/logout).
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\)\s*/, '')
+    document.title = total > 0 ? `(${total}) ${base}` : base
+    return () => {
+      document.title = base
+    }
+  }, [total])
+
+  // Auto-dismiss the toast; the Ver button clears early.
+  useEffect(() => {
+    if (ping === null) return
+    const timer = window.setTimeout(clearPing, 8_000)
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [ping, clearPing])
+
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-current={active ? 'page' : undefined}
-      aria-label={
-        total > 0 ? `Validações — ${total} pendente${total === 1 ? '' : 's'}` : 'Validações'
-      }
-      className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-        active ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
-      }`}
-    >
-      Validações
-      {total > 0 && (
-        <span
-          aria-hidden="true"
-          className="ml-1.5 inline-flex h-5 min-w-5 animate-pulse items-center justify-center rounded-full bg-accent px-1 align-middle text-xs font-bold leading-none text-accent-foreground"
-        >
-          {total > 9 ? '9+' : total}
-        </span>
-      )}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-current={active ? 'page' : undefined}
+        aria-label={
+          total > 0 ? `Validações — ${total} pendente${total === 1 ? '' : 's'}` : 'Validações'
+        }
+        className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+          active ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
+        }`}
+      >
+        Validações
+        {total > 0 && (
+          <span
+            aria-hidden="true"
+            className="ml-1.5 inline-flex h-5 min-w-5 animate-pulse items-center justify-center rounded-full bg-accent px-1 align-middle text-xs font-bold leading-none text-accent-foreground"
+          >
+            {total > 9 ? '9+' : total}
+          </span>
+        )}
+      </button>
+      {ping !== null &&
+        createPortal(
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3 shadow-lg"
+          >
+            <span
+              aria-hidden="true"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
+            >
+              {ping > 9 ? '9+' : ping}
+            </span>
+            <p className="text-sm text-content">
+              {ping === 1
+                ? 'Nova validação pendente'
+                : `${ping} novas validações pendentes`}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                clearPing()
+                onSelect()
+              }}
+              className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Ver
+            </button>
+          </div>,
+          document.body,
+        )}
+    </>
   )
 }
 

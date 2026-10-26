@@ -403,15 +403,17 @@ export async function setSubmissionStatus(
   return parseBody<number>(res)
 }
 
-// --- Round 9 (owner 2026-10-25): the Validações tab badge counts both
-// pending queues without dragging their payloads. ---
+// --- Round 9 (owner 2026-10-25): the Validações tab badge counts all THREE
+//     pending queues without dragging their payloads. 0031 added `requests`
+//     after the owner reported requests never lit the badge. ---
 
 export interface PendingValidationCount {
   submissions: number
   identity_proofs: number
+  requests: number
 }
 
-/** Two integers from pending_validation_count (0030). Any failure resolves
+/** Three integers from pending_validation_count (0031). Any failure resolves
  *  null — a member session raises 'forbidden' (the badge hides, never
  *  errors), and a network hiccup keeps the last known state instead of
  *  blanking the badge. Server gate: officer/owner + active (never UI-only). */
@@ -427,11 +429,16 @@ export async function fetchPendingValidationCount(
     if (
       body === null ||
       typeof body.submissions !== 'number' ||
-      typeof body.identity_proofs !== 'number'
+      typeof body.identity_proofs !== 'number' ||
+      typeof body.requests !== 'number'
     ) {
       return null
     }
-    return { submissions: body.submissions, identity_proofs: body.identity_proofs }
+    return {
+      submissions: body.submissions,
+      identity_proofs: body.identity_proofs,
+      requests: body.requests,
+    }
   } catch {
     return null
   }
