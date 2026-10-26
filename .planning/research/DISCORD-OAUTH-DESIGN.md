@@ -2,7 +2,18 @@
 
 **Written:** 2026-10-26 · **Status:** pre-planning brief for `/gsd-plan-phase 11`
 **Requirements:** DSCD-01..DSCD-06 (REQUIREMENTS.md "Verified Access — Claim Authorization & Discord OAuth")
-**Wave 0 (stopgap):** SHIPPED as migration **0032** + Edge/client changes, commit `50b1332` — see "What 0032 already changed" below.
+
+> **⚠ SUPERSEDED SAME DAY:** the Wave 0 stopgap described in §2 (migration 0032) was REVERTED by
+> **0033_one_go_registration.sql** at the owner's call — "registration in one go, manual validation
+> still on for the time being". The claim path answers `ready` again (immediate PIN setter) and
+> registration requests carry the PIN so the officer approval activates it. §2 is kept below as
+> history of what shipped and why; the 0032 machinery (columns, `create_claim_proof`, the
+> `claim_not_authorized` gate, the claim-review board states) no longer exists live and lives only
+> in git history, re-introducible in one migration if a real hijack changes the owner's mind.
+> **Consequence: the stolen-print claim window is OPEN until Phase 11 lands** — the interim manual
+> validations are the officer approval on registrations and the post-claim D-05 identity review
+> (reject = deactivate + unclaim). This makes Phase 11 the security-critical phase, not a
+> convenience phase.
 
 ---
 
@@ -16,7 +27,7 @@ A Basic-screen print proves *the character exists* — never *that the person ho
 2. Discord OAuth = proof of control of a Discord account. Strong, but proves nothing about *which character* that account plays.
 3. The **Discord↔character link** = the real trust root. The guild bot has **roster/roles only** (owner-confirmed) — no mapping exists — so the link must be created **once per member with human confirmation**, after which it is the unspoofable anchor.
 
-## 2. What 0032 already changed (shipped Wave 0)
+## 2. What 0032 changed — shipped 2026-10-26, REVERTED same day by 0033 (kept as history)
 
 - `members.claim_authorized_at` / `claim_authorized_by` — the officer authorization stamp.
 - `claim_pin_by_nickname` v2 raises `claim_not_authorized` (the server-side choke point — the PIN setter cannot be opened by a forged/stale client).
