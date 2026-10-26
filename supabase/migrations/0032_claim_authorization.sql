@@ -527,3 +527,11 @@ grant execute on function public.review_identity(uuid, boolean) to authenticated
 
 revoke execute on function public.staff_identity_queue() from public, anon;
 grant execute on function public.staff_identity_queue() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 8. Bookkeeping (0028/0029 pattern): recorded so a future CLI push never
+--    re-runs this migration against the live project.
+-- ---------------------------------------------------------------------------
+insert into supabase_migrations.schema_migrations (version, name, statements)
+values ('0032', 'claim_authorization', null)
+on conflict (version) do nothing;
