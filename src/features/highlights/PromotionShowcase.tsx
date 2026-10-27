@@ -29,9 +29,13 @@
 // UAT round 6 (owner, rebuilt from a failed draft): ONE Impecável class holds
 // the showcase at a time, rotating to the next every AUTO_ADVANCE_MS. The
 // rotation state machine lives HERE, above the per-class carousel remount:
-//   - pause reasons stack (explicit button + pointer hover + keyboard focus)
-//     — WCAG 2.2.2, auto-updating content must be pausable, and a carousel
-//     must never rotate away from someone mid-interaction;
+//   - pause reasons stack (pointer hover on web + keyboard/touch focus on
+//     mobile) — WCAG 2.2.2, auto-updating content must be pausable, and a
+//     carousel must never rotate away from someone mid-interaction. The
+//     explicit ‖/▶ control was REMOVED (owner 2026-10-26: "the pause control
+//     in the home status must be removed and replaced by pause on hover (web)
+//     and pause on focus (mobile)") — the hover/focus reasons are the only
+//     pause surface now;
 //   - the remaining wall-clock time is captured at the pause instant, so
 //     resume continues the window instead of restarting it (the CSS drain bar
 //     freezes via animation-play-state and stays in sync);
@@ -198,11 +202,10 @@ function ClassRotation({ sections }: { sections: PromotionSection[] }) {
   const total = sections.length
   const [activeIndex, setActiveIndex] = useState(0)
   const [pauseReasons, setPauseReasons] = useState({
-    button: false,
     pointer: false,
     focus: false,
   })
-  const rotationPaused = pauseReasons.button || pauseReasons.pointer || pauseReasons.focus
+  const rotationPaused = pauseReasons.pointer || pauseReasons.focus
 
   // The armed window. remainingRef carries the wall-clock left in the
   // current class's slot across pause/resume; windowRef lets the pause
@@ -217,7 +220,7 @@ function ClassRotation({ sections }: { sections: PromotionSection[] }) {
   /** Pause/resume one reason. Reasons stack; the first one ON captures the
    *  remaining time (windowRef is nulled while paused, so a second reason
    *  arriving can't re-capture), and the last one OFF re-arms the timer. */
-  const setPause = useCallback((reason: 'button' | 'pointer' | 'focus', paused: boolean) => {
+  const setPause = useCallback((reason: 'pointer' | 'focus', paused: boolean) => {
     if (paused) {
       const armed = windowRef.current
       if (armed) {
@@ -311,7 +314,6 @@ function ClassRotation({ sections }: { sections: PromotionSection[] }) {
         totalClasses={total}
         rotationPaused={rotationPaused}
         onClassStep={stepClass}
-        onTogglePause={() => setPause('button', !pauseReasons.button)}
         onUserInteraction={restartWindow}
         autoAdvanceMs={AUTO_ADVANCE_MS}
       />

@@ -52,12 +52,12 @@
 // per class, so pause state would not survive in here); this component only
 // renders the chrome and reports user interaction so the parent can re-arm
 // the window (browsing a class's cards must defer the rotation, not yank it).
-// Controls, right of the card arrows: ‹ n/N › steps classes, ‖/▶ pauses the
-// rotation (WCAG 2.2.2 — auto-updating content must be pausable; hover and
-// keyboard focus pause it too), and the class-progress bar drains the current
-// window in CSS (no interval, no re-renders, killed by the reduced-motion
-// rule). Card navigation itself stays user-driven — never autoplay (07.1
-// D-05).
+// Controls, right of the card arrows: ‹ n/N › steps classes, and the
+// class-progress bar drains the current window in CSS (no interval, no
+// re-renders, killed by the reduced-motion rule). Rotation pausing lives in
+// the parent (hover on web, focus on mobile) — there is deliberately no ‖/▶
+// control here any more (owner 2026-10-26). Card navigation itself stays
+// user-driven — never autoplay (07.1 D-05).
 //
 // Data contract unchanged: cards render in SERVER order (highest OVR first),
 // never re-sorted here. Pure presentation — no points math in TS.
@@ -84,7 +84,6 @@ export function HighlightsCarousel({
   totalClasses,
   rotationPaused = false,
   onClassStep,
-  onTogglePause,
   onUserInteraction,
   autoAdvanceMs = AUTO_ADVANCE_MS,
 }: {
@@ -95,7 +94,6 @@ export function HighlightsCarousel({
   totalClasses?: number
   rotationPaused?: boolean
   onClassStep?: (delta: 1 | -1) => void
-  onTogglePause?: () => void
   onUserInteraction?: () => void
   autoAdvanceMs?: number
 }) {
@@ -306,10 +304,11 @@ export function HighlightsCarousel({
             <span aria-hidden="true">→</span>
           </button>
         </div>
-        {/* Class rotation (round 6): ‹ n/N › steps classes (wrapping), ‖/▶
-            pauses the rotation. The count is aria-hidden — the sr-only live
-            region in PromotionShowcase announces position+class on change,
-            so screen readers never rely on this decoration. */}
+        {/* Class rotation (round 6): ‹ n/N › steps classes (wrapping). The
+            count is aria-hidden — the sr-only live region in PromotionShowcase
+            announces position+class on change, so screen readers never rely
+            on this decoration. Pausing is hover/focus (parent state) and the
+            drain bar below freezes through data-paused. */}
         {totalClasses !== undefined && totalClasses > 1 && classIndex !== undefined && (
           <>
             <span aria-hidden="true" className="hidden h-6 w-px bg-line sm:block" />
@@ -338,15 +337,6 @@ export function HighlightsCarousel({
                 className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface text-lg text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <span aria-hidden="true">›</span>
-              </button>
-              <button
-                type="button"
-                onClick={onTogglePause}
-                aria-pressed={rotationPaused}
-                aria-label={rotationPaused ? 'Retomar rotação de classes' : 'Pausar rotação de classes'}
-                className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface text-lg text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                <span aria-hidden="true">{rotationPaused ? '▶' : '‖'}</span>
               </button>
               {/* Draining window (see .class-progress in index.css): the
                   element remounts with the carousel per class, which is
