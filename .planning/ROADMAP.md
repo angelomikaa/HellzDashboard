@@ -217,9 +217,9 @@ Cross-cutting constraints: no router library — `'inicio'` joins the existing `
   4. A runnable parity gate locks the contract: the smoke-card UNIFY probes (red since 0018) pass again and extend to `role_rank` and `my_report`; a read-only parity audit shows zero cross-surface OVR divergence for every OVR-capable member; both run green against live and are recorded in `10.1-VERIFICATION.md` (UNIF-04)
   5. Zero payload-shape changes — the client renders server values verbatim and ships no change; `get_promotion`/`get_promotion_public` bodies are byte-untouched (already canonical)
 
-**Plans:** 2/2 created (see `.planning/phases/10.1-universal-rating-unification/`)
+**Plans:** 1/2 plans executed
 Plans:
-- [ ] 10.1-01-PLAN.md — Migration 0036: role_rank/my_card/staff_requests value-proportional rebases + selection_order<=6 everywhere + my_report/class_top5 cohort alignment + bookkeeping + pgrst reload notify — Wave 1 — UNIF-01/02/03
+- [x] 10.1-01-PLAN.md — Migration 0036: role_rank/my_card/staff_requests value-proportional rebases + selection_order<=6 everywhere + my_report/class_top5 cohort alignment + bookkeeping + pgrst reload notify — Wave 1 — UNIF-01/02/03
 - [ ] 10.1-02-PLAN.md — Parity re-lock + live apply + verification: rpc-ovr-parity-audit.mjs, smoke-card UNIFY 10d/10e, apply-seed.mjs live apply, 10.1-VERIFICATION.md — Wave 2 — UNIF-04
 
 Cross-cutting constraints: append-only (0001–0035 never edited, `create or replace` exact signatures only, zero `drop function`); the value-proportional expression is copied verbatim from the 0028 shapes — never re-derived; the permanent anti-refork guard is the parity smoke, not a helper refactor (considered and deferred, D-10.1-05); migration + bookkeeping row + `notify pgrst, 'reload schema'` land together (0035 lesson); live apply via apply-seed.mjs only (no `supabase db push` in this environment); the two sanctioned smoke-fixture members stay until second order (D-10.1-08) — the pre-release purge gate is unchanged; no new npm dependencies.
@@ -262,7 +262,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 11 (8
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 5/5 | Complete | 2026-10-22 |
 | 9.1. Hidden Raw Defenses (RPDEF/RMDEF) | v1.1 | 2/2 | Complete    | 2026-10-24 |
 | 10. Personalized Home Landing Tab | v1.1 | 3/3 | Planned | - |
-| 10.1 Universal Rating Unification (urgent fix, inserted) | v1.1 | 0/2 | Planned | - |
+| 10.1 Universal Rating Unification (urgent fix, inserted) | v1.1 | 1/2 | In Progress|  |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: executing
-last_updated: "2026-10-27T05:33:15.732Z"
-last_activity: 2026-10-27 -- Phase 10.1 execution started
+last_updated: "2026-10-27T06:50:06.340Z"
+last_activity: 2026-10-27
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 45
-  completed_plans: 43
-  percent: 96
+  completed_plans: 44
+  percent: 98
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 ## Current Position
 
 Phase: 10.1 (universal-rating-unification) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 10.1
-Last activity: 2026-10-27 -- Phase 10.1 execution started
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-10-27
 
 ## Accumulated Context
 
@@ -127,6 +127,10 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Live bug 2026-10-26 - errorMessage collapsed every RPC token to "[object Object]"]: first access answered `{"error":"server_error"}` for a plain unknown nickname on the freshly deployed 0034 stack. Root cause: `_shared/session.ts#errorMessage` only handled `Error` instances, but supabase-js RPC errors are PLAIN OBJECTS ({message,details,hint,code}), so `String(err)` produced "[object Object]" and every `msg.includes('<token>')` mapping fell through to 500 - the RPC itself was correct (`not_registered`, verified by calling it directly). Fix: read `.message` from object-shaped errors before String(). This was latent in request-access too (same helper), so request-access was redeployed with the fix. Second live finding: the Management API Run Query endpoint does not emit PostgREST's schema-reload NOTIFY, so a just-created RPC can answer "no function matches" until the next DDL - 0035 ends with `notify pgrst, 'reload schema'` and future migrations should too. Also 0035 drops the 0020 five-arg `create_registration_request` overload that 0034 left behind (create-or-replace only targets an exact signature).
 - [Polish round 2026-10-26 (post-deploy, owner: "it works - now we work in minor polishments")]: four UI/copy fixes, one commit each. (1) firstAccess.ts `statusMessage('unknown')` now reads "Não encontramos este personagem na lista da guilda. Será necessário a autorização de um oficial para concluir esse cadastro." (the old line implied the player could finish alone); (2) the Validações nav badge was vertical-align:middle inside a non-flex button and read below the label's optical center - the button is inline-flex items-center gap-1.5 now and the badge dropped align-middle/ml-1.5; (3) the Início showcase pause button is GONE (owner: pause on hover for web, pause on focus for mobile) - pauseReasons keeps pointer+focus only, wall-clock capture, frozen drain bar and the sr-only announcement unchanged; (4) Especial step "Defesas ocultas": the RPDEF formula was inline in the sentence and read cramped against the card (owner: "trying to stay in the same row when it should wrap and the tip text should go below") - the formula is its own wrapping block and the tooltip tip column uses flex-wrap + basis-48 so it drops below the example when the card is narrow. 697 tests / tsc / lint / build green.
 - [Rating split-brain 2026-10-27 — INVESTIGATION COMPLETE, Phase 10.1 planned (URGENT, before 11)]: owner report "OVR from the cards inconsistent with the Ranking tab" — root-caused by read-only live audit (Management API, zero writes) + migration archaeology, NOT guessed. The ratings engine runs TWO formulas: my_report/class_top5/get_promotion(_public) hold the Phase 9 value-proportional formula (correct per SCALE-01/rankMath.ts); role_rank (Ranking tab), my_card (Painel card) and staff_requests (Solicitações) still hold the pre-Phase-9 rank-percentile formula — 0018's plan scoped the swap to a "tripod" of 3 RPCs but SIX produce OVR, silently re-breaking the 07.2 round-8 unification ("Ratings are an universal measurement"). Stacked defects: role_rank + staff_requests lack 0028's selection_order <= 6 (High Priest/suporte 10 rows, High Wizard/mdps 9 rows -> count(*)=6 never holds -> Ranking-tab OVR NULL for Ahrya/AhryaME/AhryaPVE while their cards show 98.25/96.25/96.55); staff_requests ALSO reads the key set by class_name only (0018 backfill = 18 rows/class -> EVERY applicant OVR on Solicitações null since 2026-10-22, statically proven — queue empty at audit time so not live-witnessed); my_report/class_top5 read status <> 'rejected' (includes discarded) and no active filter (latent re-fork: one inactive Assassin Cross with 57 stats sits in my_report cohorts today). MEASURED: 6/6 OVR-capable members diverge (Biochemist deltas -12 to -43.19; with n=3 the rank formula emits only 0/49.5/99 while value-proportional emits value distance — AhryaPVE MDMG.R 0.00 vs 93.29). WHY UNCAUGHT: smoke-card's round-8 UNIFY probes 10a-10c have been RED SINCE 0018 but nothing runs them; smoke-rank covers only the three rewritten RPCs. FIX = Phase 10.1 (2 plans, ROADMAP inserted before 11): migration 0036 rebases role_rank/my_card/staff_requests onto the value-proportional shapes copied verbatim from 0028 + adds both missing filters + aligns my_report/class_top5 cohorts (active + non-discarded) + bookkeeping row + notify pgrst 'reload schema' (0035 lesson); plan 10.1-02 adds scripts/rpc-ovr-parity-audit.mjs (read-only) + smoke-card probes 10d/10e (role_rank + my_report parity) + live apply via apply-seed.mjs + 10.1-VERIFICATION.md. Decisions: value-proportional is canonical (rebase forward, never revert SCALE-01); get_promotion/get_promotion_public byte-untouched (already the yardstick); shared-SQL-helper refactor considered and DEFERRED — the parity smoke is the permanent anti-refork guard; smoke fixtures Smoke Criador Um/Dois STAY (owner-sanctioned, read-only parity subjects); tier bands (D-01/D-02) flagged for a post-phase owner re-look because unification RAISES several OVRs (a 51 Painel card becomes ~94).
+- [Phase 10.1]: 0036 rebases role_rank/my_card/staff_requests onto the Phase 9 value-proportional formula - the least(greatest(round(case stat_direction ...))) expressions are the 0028 shapes copied verbatim, never re-derived (D-10.1-01); every OVR gate and key-stat read filters selection_order <= 6, and staff_requests gains the missing ks.char_function = r.char_function filter that nulled every applicant OVR since the 0018 backfill (D-10.1-02/03)
+- [Phase 10.1]: my_report and class_top5 join the ONE cohort definition (latest value per member+stat over status not in ('rejected','discarded') over ACTIVE members); get_promotion/get_promotion_public stay byte-untouched - already canonical per 0029 (D-10.1-02/04)
+- [Phase 10.1]: the 0028 class_top5 body's dead cmp CTE is dropped in 0036 - unreferenced since 0028 swapped the OVR lateral to the value-proportional shape (an unreferenced CTE never executes), forced by the plan's zero-rank-leftover static gate; behavior-neutral, documented in the migration's section 5 comment
+- [Phase 10.1]: 0036 ends with its schema_migrations bookkeeping row (on conflict (version) do nothing) + notify pgrst 'reload schema' as the final statement inside the begin/commit wrapper (0035 lesson); every body section was mechanically diffed against its source migration so only the planned lines differ - byte-faithfulness proven, not asserted; live apply + parity smoke are plan 10.1-02 (UNIF-04)
 
 ### Blockers/Concerns (open — carry to next milestone)
 
@@ -149,8 +153,8 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-24T06:19:44.637Z
-Resume file: .planning/phases/10-first-access-by-print/10-CONTEXT.md
+Last session: 2026-10-27T06:50:06.298Z
+Resume file: .planning/phases/10.1-universal-rating-unification/10.1-02-PLAN.md
 
 ## Performance Metrics
 
@@ -177,3 +181,4 @@ Resume file: .planning/phases/10-first-access-by-print/10-CONTEXT.md
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*
+| Phase 10.1 P10.1-01 | ~37 min | 6 tasks | 1 files |
