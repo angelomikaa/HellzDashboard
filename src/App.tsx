@@ -321,7 +321,7 @@ function ValidacoesTab({
         aria-label={
           total > 0 ? `Validações — ${total} pendente${total === 1 ? '' : 's'}` : 'Validações'
         }
-        className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+        className={`inline-flex h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
           active ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
         }`}
       >
@@ -329,7 +329,7 @@ function ValidacoesTab({
         {total > 0 && (
           <span
             aria-hidden="true"
-            className="ml-1.5 inline-flex h-5 min-w-5 animate-pulse items-center justify-center rounded-full bg-accent px-1 align-middle text-xs font-bold leading-none text-accent-foreground"
+            className="inline-flex h-5 min-w-5 animate-pulse items-center justify-center rounded-full bg-accent px-1 text-xs font-bold leading-none text-accent-foreground"
           >
             {total > 9 ? '9+' : total}
           </span>
