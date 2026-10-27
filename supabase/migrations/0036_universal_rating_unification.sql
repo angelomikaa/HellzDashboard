@@ -317,3 +317,131 @@ comment on function public.my_card() is
 
 revoke execute on function public.my_card() from public, anon;
 grant  execute on function public.my_card() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 3. staff_requests — Solicitações board rebase: value-proportional applicant
+--    OVR + BOTH missing key-set filters (10.1-CONTEXT §4 defects #1 + #5).
+--    Byte-faithful supersession of the 0014 body: agg gains max_v/min_v; the
+--    OVR lateral's p becomes the 0028 value-proportional CASE over the
+--    applicant's own membership_request_stats value (joins stat_catalog for
+--    stat_direction) and the key-set read gains BOTH missing predicates:
+--    ks.char_function = r.char_function (the 0018-era omission that nulled
+--    every applicant OVR — class-only read x 18 backfilled rows could never
+--    satisfy count(*) = 6) AND ks.selection_order <= 6 (0028 owner rule).
+--    Cohort discipline unchanged: ACTIVE members of the applicant's
+--    class+function; applicant stats never join it (D-14). Payload shape
+--    (identity, proof_path, stats list, data_sufficient) unchanged.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.staff_requests()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if coalesce(auth.jwt()->>'member_role', '') not in ('officer', 'owner')
+     or not exists (
+       select 1 from members m
+       where m.id::text = auth.jwt()->>'member_id' and m.active
+     ) then
+    raise exception 'forbidden';
+  end if;
+
+  return coalesce((
+    with latest as (
+      select distinct on (sub.member_id, ss.stat_key)
+             sub.member_id, ss.stat_key, ss.value
+      from submission_stats ss
+      join submissions sub on sub.id = ss.submission_id
+      where sub.status not in ('rejected','discarded')
+      order by sub.member_id, ss.stat_key, sub.submitted_at desc
+    ),
+    cohort as (
+      select l.member_id, l.stat_key, l.value, m.char_class, m.char_function
+      from latest l
+      join members m on m.id = l.member_id
+      where m.active and m.char_class is not null
+    ),
+    agg as (
+      select char_class, char_function, stat_key, count(*) as n,
+             max(value) as max_v, min(value) as min_v
+      from cohort
+      group by char_class, char_function, stat_key
+    )
+    select jsonb_agg(
+      jsonb_build_object(
+        'request_id', r.id,
+        'discord_handle', r.discord_handle,
+        'request_type', r.request_type,
+        'char_id', r.char_id,
+        'nickname', r.nickname,
+        'char_class', r.char_class,
+        'char_function', r.char_function,
+        'proof_path', r.proof_path,
+        'created_at', r.created_at,
+        'member_id', r.member_id,
+        'ovr', o.ovr,
+        'data_sufficient', (o.ovr is not null),
+        'stats', (
+          select coalesce(jsonb_agg(
+            jsonb_build_object(
+              'stat_key', sc.stat_key,
+              'label', sc.label,
+              'label_short', sc.label_short,
+              'value_type', sc.value_type,
+              'group_name', sc.group_name,
+              'value', rs.value
+            )
+            order by sc.group_name, sc.label
+          ), '[]'::jsonb)
+          from stat_catalog sc
+          left join membership_request_stats rs
+            on rs.request_id = r.id and rs.stat_key = sc.stat_key
+        )
+      )
+      order by r.created_at desc
+    )
+    from membership_requests r
+    cross join lateral (
+      -- 0036 unified OVR semantics: exactly-6 key stats read by the
+      -- applicant's own class+function with selection_order <= 6, the
+      -- applicant holds all 6, each cohort n >= 3, Phase 9 value-proportional
+      -- points (SCALE-01). Cohort = ACTIVE members of the SAME class+function;
+      -- the applicant's own stats never join it (D-14).
+      select case
+        when count(*) = 6 and count(p) = 6 then 51 + avg(p) * 48.0/99
+      end as ovr
+      from (
+        select case
+          when coalesce(a.n, 0) >= 3 and rq.value is not null then
+            least(greatest(round(
+              case sc.stat_direction
+                when 'lower' then rq.value / nullif(a.min_v, 0)
+                else rq.value / nullif(a.max_v, 0)
+              end * 99, 2), 0), 99)
+        end as p
+        from class_key_stats ks
+        join stat_catalog sc on sc.stat_key = ks.stat_key
+        left join membership_request_stats rq
+          on rq.request_id = r.id and rq.stat_key = ks.stat_key
+        left join agg a
+          on a.stat_key = ks.stat_key
+         and a.char_class = r.char_class
+         and a.char_function = r.char_function
+        where ks.class_name = r.char_class
+          and ks.char_function = r.char_function
+          and ks.selection_order <= 6
+      ) kp
+    ) o
+    where r.status = 'pending'
+  ), '[]'::jsonb);
+end;
+$$;
+
+comment on function public.staff_requests() is
+  'Staff-only Solicitations board (WHIT-09, D-14). Pending requests newest-first with identity, proof_path, full stats and a server-computed applicant OVR + data_sufficient. OVR uses the Phase 9 value-proportional formula (0036 unified, SCALE-01) over the live same-class+function ACTIVE cohort: exactly-6 key stats read by the applicant''s own class+function with selection_order <= 6, applicant holds all 6, n>=3 per stat, floor-51 rescale — applicant data NEVER joins the cohort. Internal gate: member_role in (officer,owner) AND caller active.';
+
+revoke execute on function public.staff_requests() from public, anon;
+grant  execute on function public.staff_requests() to authenticated;
