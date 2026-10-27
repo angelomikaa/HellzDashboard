@@ -11,6 +11,7 @@ import {
   PIN_MISMATCH,
   REQUEST_ALREADY_PENDING,
   REQUEST_SENT,
+  SERVER_REFUSED,
   STATUS_ERROR,
   canRequestClaim,
   canRequestRegistration,
@@ -186,6 +187,27 @@ describe('submitFirstAccessRequest — officer-validated paths', () => {
       REQUEST_ALREADY_PENDING,
     )
     expect(requestErrorCopy(new FunctionError(0, 'network', 'x'))).toBe(NETWORK_ERROR)
+  })
+
+  // A pre-0034 backend refuses every printless request with invalid_proof
+  // before it reaches the registry (owner report 2026-10-26). That is a deploy
+  // mismatch, not a player error: the copy must never dead-end, and an unknown
+  // nickname must still be submittable — the officer is the check.
+  it('keeps the unknown-name path submittable and every backend failure actionable', () => {
+    expect(firstAccessProblem(UNKNOWN)).toBe(null)
+    expect(requestErrorCopy(new FunctionError(400, 'invalid_proof', 'x'))).toBe(SERVER_REFUSED)
+    expect(requestErrorCopy(new FunctionError(500, 'server_error', 'x'))).toBe(SERVER_REFUSED)
+    expect(requestErrorCopy(new FunctionError(500, 'server_misconfigured', 'x'))).toBe(
+      SERVER_REFUSED,
+    )
+    expect(requestErrorCopy(new FunctionError(418, 'never_seen', 'x'))).toBe(SERVER_REFUSED)
+    expect(SERVER_REFUSED).toContain('avise um oficial')
+    // Nothing internal leaks into the player-facing copy.
+    for (const code of ['invalid_proof', 'server_error', 'never_seen']) {
+      expect(requestErrorCopy(new FunctionError(500, code, 'internal detail'))).not.toContain(
+        'internal detail',
+      )
+    }
   })
 
   it('a failed submit keeps the player on the page (no session)', async () => {

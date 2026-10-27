@@ -132,6 +132,10 @@ export const REQUEST_SENT =
   'Solicitação enviada. Após a aprovação de um oficial, entre com o nick e o PIN definidos aqui.'
 export const REQUEST_ALREADY_PENDING =
   'Já existe uma solicitação aguardando análise para este personagem ou Discord.'
+/** Unmapped/backend failures (incl. a stale server still demanding a print).
+ *  Never a dead end: the player is told to retry and to reach an officer. */
+export const SERVER_REFUSED =
+  'Não foi possível enviar a solicitação agora. Tente novamente. Se o problema continuar, avise um oficial.'
 
 export type RequestOutcome =
   | { ok: true; duplicate: boolean }
@@ -211,7 +215,14 @@ export function requestErrorCopy(error: FunctionError): string {
       return 'Não foi possível enviar a solicitação. Revise os dados e tente novamente.'
     case 'network':
       return NETWORK_ERROR
+    // 'invalid_proof' comes from a pre-0034 backend that still demands the
+    // print: the request is refused before it ever reaches the registry. The
+    // player cannot fix that — tell them to retry and to reach an officer.
+    case 'invalid_proof':
+    case 'server_error':
+    case 'server_misconfigured':
+      return SERVER_REFUSED
     default:
-      return 'Não foi possível enviar a solicitação. Tente novamente.'
+      return SERVER_REFUSED
   }
 }

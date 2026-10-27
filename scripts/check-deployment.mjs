@@ -171,6 +171,53 @@ async function main() {
       su.status === 401 || su.status === 403,
       `HTTP ${su.status}`,
     )
+    // 0034 manual first access (owner report 2026-10-26: the printless request
+    // was refused live with invalid_proof). A claim probe for an unknown
+    // character reaches the RPC on the 0034 contract and answers 404
+    // not_registered; the retired print-era function answers 400
+    // invalid_request (unknown action). Write-free: create_claim_request
+    // raises not_registered before any insert.
+    const fa = await fetchText(`${SUPABASE_URL}/functions/v1/first-access`, {
+      method: 'POST',
+      headers: {
+        apikey: ANON_KEY,
+        Authorization: `Bearer ${ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: {
+        action: 'claim',
+        discord_handle: '__deploy_gate_probe__',
+        nickname: '__deploy_gate_probe__',
+        char_id: '1',
+        char_class: 'Gypsy',
+        pin: '0000',
+        confirm_pin: '0000',
+      },
+    })
+    const faBody = (() => {
+      try { return JSON.parse(fa.text) } catch { return {} }
+    })()
+    check(
+      'first-access claim probe -> 404 not_registered (0034 contract, print retired)',
+      fa.status === 404 && faBody.error === 'not_registered',
+      `HTTP ${fa.status} body=${fa.text.slice(0, 120)} — deploy 0034 + the 0034 first-access function`,
+    )
+    // The auto-claim Edge function is retired: a deployed copy means the
+    // delete step of the 0034 rollout was skipped.
+    const sp = await fetchText(`${SUPABASE_URL}/functions/v1/setup-pin`, {
+      method: 'POST',
+      headers: {
+        apikey: ANON_KEY,
+        Authorization: `Bearer ${ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: {},
+    })
+    check(
+      'setup-pin retired -> 404 (0034 deploy deletes the function)',
+      sp.status === 404,
+      `HTTP ${sp.status} — run: supabase functions delete setup-pin`,
+    )
     console.log(`anon key present (len=${ANON_KEY.length})`)
   } else {
     check('anon key present for function probes', false, 'VITE_SUPABASE_ANON_KEY / SUPABASE_ANON_KEY not set')
