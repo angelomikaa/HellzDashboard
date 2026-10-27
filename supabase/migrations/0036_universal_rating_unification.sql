@@ -40,7 +40,7 @@
 -- the next DDL (0035 lesson, live owner report 2026-10-26).
 --
 -- Append-only: 0001-0035 are never edited in place; create or replace only,
--- exact signatures, zero drop function.
+-- exact signatures, no function is dropped.
 -- Apply (plan 10.1-02): node scripts/apply-seed.mjs supabase/migrations/0036_universal_rating_unification.sql
 
 begin;
@@ -698,3 +698,20 @@ comment on function public.class_top5(p_class text) is
 
 revoke execute on function public.class_top5(p_class text) from public, anon;
 grant  execute on function public.class_top5(p_class text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 6. Bookkeeping: record 0036 so a future CLI push never re-runs it
+--    (0012/0028/0029 pattern), then reload the PostgREST schema cache.
+--    The Management API Run Query endpoint never emits the reload NOTIFY
+--    itself (0035 lesson): without this, a just-replaced RPC answers
+--    "no function matches" until the next DDL. Grants per body above are
+--    unchanged — revoke from public/anon, grant to authenticated, no widening.
+-- ---------------------------------------------------------------------------
+
+insert into supabase_migrations.schema_migrations (version, name, statements)
+values ('0036', 'universal_rating_unification', null)
+on conflict (version) do nothing;
+
+notify pgrst, 'reload schema';
+
+commit;
