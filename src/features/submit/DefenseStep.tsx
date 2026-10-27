@@ -107,10 +107,17 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
   return (
     <section className="mt-8 rounded-lg border border-line bg-surface p-6">
       <h3 className="mb-4 text-lg font-semibold text-content">Defesas ocultas</h3>
-      <p className="mb-5 text-sm text-muted">
+      {/* Owner report 2026-10-26: the formula used to be INLINE in the
+          sentence, so it fought the text for the same row and read cramped
+          against the card edge. The instruction and the formula are separate
+          blocks now — the formula drops below and wraps on its own line at
+          every width. */}
+      <p className="mb-2 text-sm text-muted">
         Capturas de tooltip do equipamento. O valor bruto é calculado e somente leitura:
-        <code className="text-xs font-mono text-accent">RPDEF = ⌊Equip. PDEF ÷ (1 + Equip. PDEF %)⌋</code>
       </p>
+      <code className="mb-5 block w-full break-words rounded-md border border-line/60 bg-card px-3 py-2 font-mono text-xs text-accent">
+        RPDEF = ⌊Equip. PDEF ÷ (1 + Equip. PDEF %)⌋
+      </code>
       <div className="grid gap-5 sm:grid-cols-2">
         {CARDS.map((card) => {
           const equipRaw = inputs[card.equipmentKey] ?? ''
@@ -124,7 +131,7 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
               key={card.rawKey}
               className="rounded-lg border border-line bg-card p-4"
             >
-              <div className="flex items-start gap-3 mb-3">
+              <div className="mb-3 flex flex-wrap items-start gap-3">
                 <a
                   href={card.example}
                   target="_blank"
@@ -145,7 +152,11 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
                     loading="lazy"
                   />
                 </a>
-                <div className="min-w-0">
+                {/* Owner report 2026-10-26: the tip text used to be pinned
+                    beside the 160px example and read cramped against the card
+                    box. basis-48 + flex-wrap drops it BELOW the example (full
+                    width) whenever the card is too narrow to hold both. */}
+                <div className="min-w-0 flex-1 basis-48">
                   <h4 className="text-sm font-semibold text-content">{card.title}</h4>
                   <p className="text-xs text-muted">
                     Anexe a captura do tooltip do {card.label} do equipamento.
