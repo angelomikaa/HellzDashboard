@@ -27,6 +27,12 @@
  *            points + OVR for the same member, ALL 6 key stats (exact
  *            equality — the class+function cohort is the single source of
  *            truth on both paths)
+ *            10d/10e (10.1-02 UNIF-04) extend the parity contract to the
+ *            remaining surfaces: role_rank OVR ≡ my_card OVR (Ranking tab
+ *            ≡ Painel card) and my_report OVR ≡ my_card OVR (Painel OVR hero
+ *            ≡ card) — the 0036 unification locked in a runnable gate; a
+ *            future partial rewrite (the 0018 failure mode) turns 10a-10e
+ *            red the day it ships
  *   Cleanup  fixture members/submissions/class/key/relevant/pin_login_
  *            attempts removed in finally; zero-residue census asserted
  *
@@ -715,6 +721,39 @@ async function main() {
       '10c. my_card ovr.value === get_promotion ovr (same member, same cohort math — exact equality)',
       ovrParity,
       `mine=${pCard.ovr?.value} promo=${pCardRow?.ovr}`,
+    )
+
+    // ---- Probes 10d/10e (10.1-02 UNIF-04): the rest of the parity contract --
+    // 0036 unified ALL six OVR surfaces onto the Phase 9 value-proportional
+    // formula; 10a-10c lock my_card ≡ get_promotion. 10d locks the Ranking
+    // tab basis (role_rank — the 0024 fork surface), 10e locks the Painel
+    // OVR hero basis (my_report). Exact number equality, same fixture member.
+    const unifyRank = await callRpc('role_rank', ownerToken, {
+      p_function: ROLES[HANDLES.a][1],
+      p_class: CLASS,
+    })
+    const unifyRows = Array.isArray(unifyRank.json) ? unifyRank.json : []
+    const unifyRowA = unifyRows.find((r) => r.display_name === DISPLAY[HANDLES.a])
+    check(
+      '10d. role_rank ovr === my_card ovr.value for member a (Ranking tab ≡ Painel card — exact equality)',
+      unifyRank.ok &&
+        !!unifyRowA &&
+        unifyRowA.ovr !== null &&
+        unifyRowA.ovr !== undefined &&
+        Number(unifyRowA.ovr) === Number(pCard.ovr?.value),
+      unifyRowA
+        ? `rank=${unifyRowA.ovr} card=${pCard.ovr?.value}`
+        : `HTTP ${unifyRank.status}, member a row missing from the fixture board`,
+    )
+    const unifyReport = await callRpc('my_report', memberToken, {})
+    const unifyReportOvr = unifyReport.json?.ovr?.value
+    check(
+      '10e. my_report ovr.value === my_card ovr.value for member a (Painel OVR hero ≡ card — exact equality)',
+      unifyReport.ok &&
+        unifyReportOvr !== null &&
+        unifyReportOvr !== undefined &&
+        Number(unifyReportOvr) === Number(pCard.ovr?.value),
+      `report=${unifyReportOvr} card=${pCard.ovr?.value}`,
     )
 
     // ---- Probe 9: rank engine regression (set_key_stat supersession) ------
