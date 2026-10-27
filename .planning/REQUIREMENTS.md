@@ -124,7 +124,7 @@ Added 2026-10-27 after the owner reported the card OVRs inconsistent with the Ra
 - [x] **UNIF-01**: ONE points formula in every OVR-producing RPC (`my_report`, `my_card`, `class_top5`, `get_promotion`, `get_promotion_public`, `role_rank`, `staff_requests`): the Phase 9 value-proportional formula (own/best × 99, stat_direction-aware best, clamped [0,99], n≥3 gate; OVR `51 + mean × 48/99`, floor 51, all-6-or-nothing) — the same member+stat never yields two different points/OVR numbers across surfaces, and the pre-Phase-9 rank-percentile formula exists in no production RPC
 - [x] **UNIF-02**: ONE key-set rule in every OVR gate and key-stat list read: `class_key_stats` rows with `selection_order <= 6` AND the member's own (class, build-role) — relevants at positions 7+ never count as keys anywhere (`role_rank` and `staff_requests` join the 0028 owner rule; `staff_requests` also gains the 0018-era missing `char_function` filter that nulled every applicant OVR)
 - [x] **UNIF-03**: ONE cohort definition in all six RPCs: latest value per (member, stat) over submissions `status not in ('rejected','discarded')`, over ACTIVE members of the same class+build-role — `my_report` and `class_top5` drop the status-only / active-less reads (latent re-fork: an inactive or discarded-submission member must never shift a live member's rating)
-- [ ] **UNIF-04**: The parity contract is locked in a runnable gate: the smoke-card UNIFY probes (red since 0018) pass again and extend to `role_rank` (staff OVR ≡ `my_card`) and `my_report` (`ovr.value` ≡ `my_card`); a read-only cross-RPC parity audit shows zero OVR divergence for every OVR-capable member; both run green against live and are recorded in `10.1-VERIFICATION.md` — a future partial rewrite (the 0018 failure mode) goes red the day it ships
+- [x] **UNIF-04**: The parity contract is locked in a runnable gate: the smoke-card UNIFY probes (red since 0018) pass again and extend to `role_rank` (staff OVR ≡ `my_card`) and `my_report` (`ovr.value` ≡ `my_card`); a read-only cross-RPC parity audit shows zero OVR divergence for every OVR-capable member; both run green against live and are recorded in `10.1-VERIFICATION.md` — a future partial rewrite (the 0018 failure mode) goes red the day it ships
 
 ## v2 Requirements
 
@@ -250,7 +250,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UNIF-01 | Phase 10.1 — Universal Rating Unification (urgent fix) | Complete (10.1-01) |
 | UNIF-02 | Phase 10.1 — Universal Rating Unification (urgent fix) | Complete (10.1-01) |
 | UNIF-03 | Phase 10.1 — Universal Rating Unification (urgent fix) | Complete (10.1-01) |
-| UNIF-04 | Phase 10.1 — Universal Rating Unification (urgent fix) | Planned (10.1-02) |
+| UNIF-04 | Phase 10.1 — Universal Rating Unification (urgent fix) | Complete (10.1-02) |
 
 **Coverage:**
 - v1.1 requirements: 53 total

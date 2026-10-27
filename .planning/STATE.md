@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
-status: executing
-last_updated: "2026-10-27T06:50:06.340Z"
+status: verifying
+last_updated: "2026-10-27T16:54:06.512Z"
 last_activity: 2026-10-27
 progress:
   total_phases: 11
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 45
-  completed_plans: 44
-  percent: 98
+  completed_plans: 45
+  percent: 100
 ---
 
 # Project State
@@ -24,9 +24,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 ## Current Position
 
-Phase: 10.1 (universal-rating-unification) — EXECUTING
+Phase: 10.1 (universal-rating-unification) — COMPLETE
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-27
 
 ## Accumulated Context
@@ -131,6 +131,10 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 - [Phase 10.1]: my_report and class_top5 join the ONE cohort definition (latest value per member+stat over status not in ('rejected','discarded') over ACTIVE members); get_promotion/get_promotion_public stay byte-untouched - already canonical per 0029 (D-10.1-02/04)
 - [Phase 10.1]: the 0028 class_top5 body's dead cmp CTE is dropped in 0036 - unreferenced since 0028 swapped the OVR lateral to the value-proportional shape (an unreferenced CTE never executes), forced by the plan's zero-rank-leftover static gate; behavior-neutral, documented in the migration's section 5 comment
 - [Phase 10.1]: 0036 ends with its schema_migrations bookkeeping row (on conflict (version) do nothing) + notify pgrst 'reload schema' as the final statement inside the begin/commit wrapper (0035 lesson); every body section was mechanically diffed against its source migration so only the planned lines differ - byte-faithfulness proven, not asserted; live apply + parity smoke are plan 10.1-02 (UNIF-04)
+- [Phase 10.1]: 0036 applied to LIVE via apply-seed.mjs (bookkeeping row recorded, PostgREST reload verified) - the six-RPC rating split-brain is closed in production — sanctioned Management API live-write path (0012/0028/0029 precedent, no supabase db push in this environment); pgrst reload proven by live 200s, never 'no function matches' (0035 lesson)
+- [Phase 10.1]: Parity gate shipped as TWO runnable gates: scripts/rpc-ovr-parity-audit.mjs (read-only, exit 0 = zero cross-surface OVR divergence) + smoke-card UNIFY probes 10d/10e - all six OVR surfaces locked — the permanent anti-refork guard is the runnable gate, not prose (D-10.1-05); a future partial rewrite goes red the day it ships
+- [Phase 10.1]: Owner browser walk CONFIRMED 2026-10-27: 'Confirmed - 98 everywhere' for Ahrya across Ranking row, Inicio card, Painel card + OVR hero - all five 10.1 verification gates PASS — gate 4 (cross-surface equality, owner-confirmed) was the last open gate; server-side proof (audit exit 0 + REST spot checks + smoke 55/55 x2) already complete
+- [Phase 10.1]: smoke-card battery probes stale since 0018 re-targeted to the live set_key_stat_v2 contract (Rule 3) - probe intents preserved, never deleted — pre-0018 set_key_stat/set_relevant_stat probes sat red since 2026-10-22 and blocked the full-battery gate; the UNIFY probes were untouched
 
 ### Blockers/Concerns (open — carry to next milestone)
 
@@ -153,8 +157,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-27T06:50:06.298Z
-Resume file: .planning/phases/10.1-universal-rating-unification/10.1-02-PLAN.md
+Last session: 2026-10-27T16:54:06.423Z
+Stopped At: Completed 10.1-02-PLAN.md (phase 10.1 both plans done - owner verdict recorded, all gates PASS; ready for /gsd-verify-work + /gsd-transition)
+Resume file: None
 
 ## Performance Metrics
 
@@ -178,7 +183,8 @@ Resume file: .planning/phases/10.1-universal-rating-unification/10.1-02-PLAN.md
 | 08.1 | 08.1-03 | ~25 min | 5 | 5 | 2026-10-22 |
 | 08.1 | 08.1-04 | ~5 min | 2 | 2 | 2026-10-22 |
 | 08.1 | 08.1-05 | ~20 min | 3 | 4 | 2026-10-22 |
+| 10.1 | 10.1-01 | ~37 min | 6 | 1 | 2026-10-27 |
+| 10.1 | 10.1-02 | multi-session (~55 min active + owner walk gate) | 5 | 3 | 2026-10-27 |
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*
-| Phase 10.1 P10.1-01 | ~37 min | 6 tasks | 1 files |
