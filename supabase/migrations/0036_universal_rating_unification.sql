@@ -583,3 +583,118 @@ comment on function public.my_report() is
 
 revoke execute on function public.my_report() from public, anon;
 grant  execute on function public.my_report() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 5. class_top5 — cohort alignment only (formula untouched). Byte-faithful
+--    supersession of the 0028 body with exactly two body changes
+--    (D-10.1-02, the ONE cohort definition): latest filters
+--    sub.status not in ('rejected','discarded') (was <> 'rejected') and
+--    class_members gains "and m.active". Third change forced by this
+--    migration's zero-rank-leftover gate: the 0028 body still carried a dead
+--    cmp CTE (pre-Phase-9 counting, never referenced since 0028 swapped the
+--    OVR lateral to the value-proportional shape) — dropped here; an
+--    unreferenced CTE is never executed, so behaviour is unchanged.
+--    Everything else — value-proportional OVR, top-5 ordering, payload shape,
+--    comment, grants — byte-identical to 0028.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.class_top5(p_class text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+
+declare
+  v_rows jsonb;
+begin
+  if coalesce(auth.jwt()->>'member_role', '') not in ('officer', 'owner')
+     or not exists (
+       select 1 from members m
+       where m.id::text = auth.jwt()->>'member_id' and m.active
+     ) then
+    raise exception 'forbidden';
+  end if;
+
+  if not exists (select 1 from classes where class_name = p_class) then
+    raise exception 'unknown_class';
+  end if;
+
+  with latest as (
+    select distinct on (sub.member_id, ss.stat_key)
+           sub.member_id, ss.stat_key, ss.value
+    from submission_stats ss
+    join submissions sub on sub.id = ss.submission_id
+    where sub.status not in ('rejected','discarded')
+    order by sub.member_id, ss.stat_key, sub.submitted_at desc
+  ),
+  class_members as (
+    select m.id, m.display_name, m.char_function
+    from members m
+    where m.char_class = p_class and m.active
+  ),
+  cohort as (
+    select l.member_id, l.stat_key, l.value, cm.char_function
+    from latest l
+    join class_members cm on cm.id = l.member_id
+  ),
+  agg as (
+    select stat_key,
+           count(*) as n,
+           max(value) as max_v,
+           min(value) as min_v
+    from cohort
+    group by stat_key
+  )
+  select coalesce((
+    select jsonb_agg(
+      jsonb_build_object(
+        'display_name', t.display_name,
+        'char_function', t.char_function,
+        'ovr', t.ovr
+      )
+      order by t.ovr desc nulls last, t.display_name
+    )
+    from (
+      select cm.display_name, cm.char_function, o.ovr
+      from class_members cm
+      cross join lateral (
+        select case
+          when count(*) = 6 and count(p) = 6 then 51 + avg(p) * 48.0/99
+        end as ovr
+        from (
+          select case
+            when ag.n >= 3 and o.value is not null then
+              least(greatest(
+                round(
+                  case c.stat_direction
+                    when 'lower' then o.value / nullif(ag.min_v, 0)
+                    else o.value / nullif(ag.max_v, 0)
+                  end * 99, 2),
+                0), 99)
+          end as p
+          from class_key_stats ks
+          join stat_catalog c on c.stat_key = ks.stat_key
+          left join latest o on o.stat_key = ks.stat_key and o.member_id = cm.id
+          left join agg ag on ag.stat_key = ks.stat_key
+          where ks.class_name = p_class
+            and ks.char_function = cm.char_function
+            and ks.selection_order <= 6
+        ) kp
+      ) o
+      order by o.ovr desc nulls last, cm.display_name
+      limit 5
+    ) t
+  ), '[]'::jsonb)
+  into v_rows;
+
+  return v_rows;
+end;
+$$;
+
+comment on function public.class_top5(p_class text) is
+  'Staff-only top-5-by-OVR preview for a class. 0028: the OVR gate reads the (class, role) key set as selection_order <= 6 ONLY — relevants (7+) never count as keys (owner rule 2026-10-24).';
+
+revoke execute on function public.class_top5(p_class text) from public, anon;
+grant  execute on function public.class_top5(p_class text) to authenticated;
