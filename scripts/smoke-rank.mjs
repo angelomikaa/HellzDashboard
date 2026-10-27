@@ -238,31 +238,6 @@ async function main() {
       )
     }
 
-    // KEYU ordered-set test: 7th selection succeeds (no key_stat_limit),
-    // becomes a relevant at selection_order 7; key set stays at 6.
-    const seventh = await rest('/rpc/set_key_stat_v2', {
-      method: 'POST',
-      token: officer.access_token,
-      body: { p_class: CLASS, p_function: 'dps', p_stat_key: 'hit', p_enabled: true },
-    })
-    check(
-      'KEYU: 7th selection succeeds as relevant (no key_stat_limit)',
-      seventh.ok && numEq(seventh.json, 6),
-      `HTTP ${seventh.status} body=${seventh.text}`,
-    )
-
-    // Deselect a key -> oldest relevant ('hit') promoted into the vacated slot.
-    const disable = await rest('/rpc/set_key_stat_v2', {
-      method: 'POST',
-      token: officer.access_token,
-      body: { p_class: CLASS, p_function: 'dps', p_stat_key: 'hp', p_enabled: false },
-    })
-    check(
-      'KEYU: deselect key hp -> count 6 (hp removed, hit promoted)',
-      disable.ok && numEq(disable.json, 6),
-      `HTTP ${disable.status} body=${disable.text}`,
-    )
-
     // ---- Assertions -------------------------------------------------------
 
     // 1. Member-denied write (D-03): members can never configure key stats.
@@ -311,7 +286,9 @@ async function main() {
       `HTTP ${memberTop5.status}`,
     )
 
-    // 6. Officer top-5 preview: exact OVR values, sorted desc.
+    // 6. Officer top-5 preview: exact OVR values, sorted desc. The officer
+    //    fixture (suporte, no submission, no suporte key config) rides the
+    //    board tail with OVR null — server order is ovr desc nulls last.
     const top5 = await rest('/rpc/class_top5', {
       method: 'POST',
       token: officer.access_token,
@@ -320,13 +297,15 @@ async function main() {
     const top5rows = Array.isArray(top5.json) ? top5.json : []
     const top5ovrs = top5rows.map((r) => Number(r.ovr))
     check(
-      'officer class_top5 -> 3 rows [c 99, b 91, a 75] desc',
+      'officer class_top5 -> 4 rows [c 99, b 91, a 75, officer null last] desc',
       top5.ok &&
-        top5rows.length === 3 &&
-        JSON.stringify(top5ovrs) === JSON.stringify([99, 91, 75]) &&
+        top5rows.length === 4 &&
+        JSON.stringify(top5ovrs.slice(0, 3)) === JSON.stringify([99, 91, 75]) &&
         top5rows[0].display_name === 'ZZ Rank C' &&
         top5rows[1].display_name === 'ZZ Rank B' &&
-        top5rows[2].display_name === 'ZZ Rank A',
+        top5rows[2].display_name === 'ZZ Rank A' &&
+        top5rows[3].display_name === 'SMOKE Rank Officer' &&
+        top5rows[3].ovr === null,
       `HTTP ${top5.status} ${top5.text.slice(0, 160)}`,
     )
 
@@ -463,8 +442,9 @@ async function main() {
     check('RNK-02 leak-probe: per-stat objects carry exactly the documented fields', onlyDocFields)
 
     // 12. Incomplete-config OVR (D-02) + 13. compute-on-read proof.
-    // Current key set after KEYU tests: sp, patk, pdef, matk, mdef, hit (hp
-    // was deselected and hit promoted). Disable mdef → 5 keys → OVR null.
+    // Canonical key set: hp, sp, patk, pdef, matk, mdef (the KEYU block
+    // runs AFTER these probes — it mutates the ordered set). Disable mdef
+    // → 5 keys → OVR null; re-enable → compute-on-read returns instantly.
     const disableMdef = await rest('/rpc/set_key_stat_v2', {
       method: 'POST',
       token: officer.access_token,
@@ -510,11 +490,51 @@ async function main() {
       JSON.stringify(reportA3.json && reportA3.json.ovr),
     )
 
-    // 14. last_validated_at present in my_report output (HOME-03).
+    // 14. last_validated_at present in my_report output (HOME-03). The
+    // fixture submissions are never validated in this suite, so the value
+    // is null — the contract is the FIELD's presence.
     check(
       'my_report(b) has last_validated_at field',
-      reportB.json && typeof reportB.json.last_validated_at === 'string',
+      reportB.json && 'last_validated_at' in reportB.json,
       `last_validated_at=${JSON.stringify(reportB.json && reportB.json.last_validated_at)}`,
+    )
+
+    // 15. KEYU ordered-set test — runs LAST because it mutates the key set:
+    // 7th selection succeeds (no key_stat_limit), becomes a relevant at
+    // selection_order 7; key set stays at 6.
+    const seventh = await rest('/rpc/set_key_stat_v2', {
+      method: 'POST',
+      token: officer.access_token,
+      body: { p_class: CLASS, p_function: 'dps', p_stat_key: 'hit', p_enabled: true },
+    })
+    check(
+      'KEYU: 7th selection succeeds as relevant (no key_stat_limit)',
+      seventh.ok && numEq(seventh.json, 6),
+      `HTTP ${seventh.status} body=${seventh.text}`,
+    )
+
+    // Deselect a key -> oldest relevant ('hit') promoted into the vacated slot.
+    const disable = await rest('/rpc/set_key_stat_v2', {
+      method: 'POST',
+      token: officer.access_token,
+      body: { p_class: CLASS, p_function: 'dps', p_stat_key: 'hp', p_enabled: false },
+    })
+    check(
+      'KEYU: deselect key hp -> count 6 (hp removed, hit promoted)',
+      disable.ok && numEq(disable.json, 6),
+      `HTTP ${disable.status} body=${disable.text}`,
+    )
+    // Promotion consequence, visible on the ordered set: hit is now a key
+    // (n=2 cohort -> OVR goes null for every member), hp is gone entirely.
+    const reportB2 = await rest('/rpc/my_report', {
+      method: 'POST',
+      token: sessions['zz-rank-b'].access_token,
+      body: {},
+    })
+    check(
+      'KEYU: promoted hit (n=2) in the key set -> ovr null (all-6-or-nothing gate)',
+      reportB2.ok && reportB2.json.ovr.value === null && reportB2.json.ovr.data_sufficient === false,
+      JSON.stringify(reportB2.json && reportB2.json.ovr),
     )
   } finally {
     // 14. Guaranteed cleanup — runs even when an assertion/setup threw mid-run.
