@@ -188,3 +188,132 @@ comment on function public.role_rank(text, text) is
 
 revoke execute on function public.role_rank(text, text) from public, anon;
 grant execute on function public.role_rank(text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 2. my_card — Painel card rebase: value-proportional OVR + key_stats points
+--    (formula swap only; the 0028 selection_order <= 6 key filter is already
+--    present). Byte-faithful supersession of the 0028 body: agg gains
+--    max_v/min_v; the OVR subquery's p and the key_stats points CASE become
+--    the 0028 my_report value-proportional shape (the OVR subquery gains the
+--    stat_catalog join for stat_direction); payload shape, key ordering
+--    (order by c.label), closed field list and relevant_stat_keys unchanged.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.my_card()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+
+declare
+  v_member uuid;
+  v_class text;
+  v_function text;
+begin
+  v_member := (auth.jwt()->>'member_id')::uuid;
+  if v_member is null then
+    raise exception 'no_member_claim';
+  end if;
+  if not exists (select 1 from members m where m.id = v_member and m.active) then
+    raise exception 'forbidden';
+  end if;
+
+  select m.char_class, m.char_function into v_class, v_function
+  from members m
+  where m.id = v_member;
+
+  return (
+    with latest as (
+      select distinct on (sub.member_id, ss.stat_key)
+             sub.member_id, ss.stat_key, ss.value
+      from submission_stats ss
+      join submissions sub on sub.id = ss.submission_id
+      where sub.status not in ('rejected','discarded')
+      order by sub.member_id, ss.stat_key, sub.submitted_at desc
+    ),
+    cohort as (
+      select l.member_id, l.stat_key, l.value
+      from latest l
+      join members m on m.id = l.member_id
+      where m.char_class = v_class and m.char_function = v_function and m.active
+    ),
+    agg as (
+      select stat_key, count(*) as n,
+             max(value) as max_v, min(value) as min_v
+      from cohort
+      group by stat_key
+    )
+    select jsonb_build_object(
+      'char_class', v_class,
+      'char_function', v_function,
+      'ovr', (
+        select jsonb_build_object(
+          'value', case
+            when count(*) = 6 and count(p) = 6 then 51 + avg(p) * 48.0/99
+          end,
+          'data_sufficient', count(*) = 6 and count(p) = 6
+        )
+        from (
+          select case
+            when coalesce(a.n, 0) >= 3 and o.value is not null then
+              least(greatest(round(
+                case c.stat_direction
+                  when 'lower' then o.value / nullif(a.min_v, 0)
+                  else o.value / nullif(a.max_v, 0)
+                end * 99, 2), 0), 99)
+          end as p
+          from class_key_stats ks
+          join stat_catalog c on c.stat_key = ks.stat_key
+          left join latest o on o.stat_key = ks.stat_key and o.member_id = v_member
+          left join agg a on a.stat_key = ks.stat_key
+          where ks.class_name = v_class
+            and ks.char_function = v_function
+            and ks.selection_order <= 6
+        ) kp
+      ),
+      'key_stats', (
+        select coalesce(jsonb_agg(
+          jsonb_build_object(
+            'stat_key', ks.stat_key,
+            'label', c.label,
+            'label_short', c.label_short,
+            'value_type', c.value_type,
+            'own_value', o.value,
+            'points', case
+              when coalesce(a.n, 0) >= 3 and o.value is not null then
+                least(greatest(round(
+                  case c.stat_direction
+                    when 'lower' then o.value / nullif(a.min_v, 0)
+                    else o.value / nullif(a.max_v, 0)
+                  end * 99, 2), 0), 99)
+            end
+          )
+          order by c.label
+        ), '[]'::jsonb)
+        from class_key_stats ks
+        join stat_catalog c on c.stat_key = ks.stat_key
+        left join latest o on o.stat_key = ks.stat_key and o.member_id = v_member
+        left join agg a on a.stat_key = ks.stat_key
+        where ks.class_name = v_class
+          and ks.char_function = v_function
+          and ks.selection_order <= 6
+      ),
+      'relevant_stat_keys', (
+        coalesce((
+          select jsonb_agg(rs.stat_key order by rs.stat_key)
+          from class_relevant_stats rs
+          where rs.class_name = v_class
+        ), '[]'::jsonb)
+      )
+    )
+  );
+end;
+$$;
+
+comment on function public.my_card() is
+  'Leak-safe member card payload: char_class/char_function from the JWT, OVR and key_stats points on the Phase 9 value-proportional formula (SCALE-01, 0036 unified with my_report/get_promotion), key_stats filtered to the caller''s own build-role config, relevant_stat_keys identity only. 0028: key_stats and the OVR gate read selection_order <= 6 ONLY — relevants (7+) never appear on the Painel strip nor count as keys (owner rule 2026-10-24). Key-stat CONFIG never serialised.';
+
+revoke execute on function public.my_card() from public, anon;
+grant  execute on function public.my_card() to authenticated;
