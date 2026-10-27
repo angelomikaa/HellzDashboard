@@ -445,3 +445,141 @@ comment on function public.staff_requests() is
 
 revoke execute on function public.staff_requests() from public, anon;
 grant  execute on function public.staff_requests() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 4. my_report — cohort alignment only (formula untouched). Byte-faithful
+--    supersession of the 0028 body with exactly two changes (D-10.1-02, the
+--    ONE cohort definition): latest filters
+--    sub.status not in ('rejected','discarded') (was <> 'rejected', which
+--    kept discarded submissions in the per-stat latest read) and cohort
+--    gains "and m.active" (inactive members no longer shift anyone's
+--    rating). Everything else — 57-stat list, last_validated_at,
+--    value-proportional points, OVR, payload shape — byte-identical to 0028.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.my_report()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+
+declare
+  v_member uuid;
+  v_class text;
+  v_function text;
+begin
+  v_member := (auth.jwt()->>'member_id')::uuid;
+  if v_member is null then
+    raise exception 'no_member_claim';
+  end if;
+  if not exists (select 1 from members m where m.id = v_member and m.active) then
+    raise exception 'forbidden';
+  end if;
+
+  select m.char_class, m.char_function into v_class, v_function
+  from members m
+  where m.id = v_member;
+
+  return (
+    with latest as (
+      select distinct on (sub.member_id, ss.stat_key)
+             sub.member_id, ss.stat_key, ss.value
+      from submission_stats ss
+      join submissions sub on sub.id = ss.submission_id
+      where sub.status not in ('rejected','discarded')
+      order by sub.member_id, ss.stat_key, sub.submitted_at desc
+    ),
+    cohort as (
+      select l.member_id, l.stat_key, l.value
+      from latest l
+      join members m on m.id = l.member_id
+      where m.char_class = v_class and m.char_function = v_function and m.active
+    ),
+    agg as (
+      select stat_key,
+             count(*) as n,
+             avg(value) as avg_v,
+             max(value) as max_v,
+             min(value) as min_v
+      from cohort
+      group by stat_key
+    )
+    select jsonb_build_object(
+      'char_class', v_class,
+      'char_function', v_function,
+      'stats', (
+        select jsonb_agg(
+          jsonb_build_object(
+            'stat_key', c.stat_key,
+            'label', c.label,
+            'group_name', c.group_name,
+            'value_type', c.value_type,
+            'own_value', o.value,
+            'class_average', a.avg_v,
+            'best',
+              case c.stat_direction
+                when 'lower' then a.min_v
+                else a.max_v
+              end,
+            'points', case
+              when coalesce(a.n, 0) >= 3 and o.value is not null then
+                least(greatest(
+                  round(
+                    case c.stat_direction
+                      when 'lower' then o.value / nullif(a.min_v, 0)
+                      else o.value / nullif(a.max_v, 0)
+                    end * 99, 2),
+                  0), 99)
+              end,
+            'data_sufficient', coalesce(a.n, 0) >= 3
+          )
+          order by c.group_name, c.label
+        )
+        from stat_catalog c
+        left join latest o on o.stat_key = c.stat_key and o.member_id = v_member
+        left join agg a on a.stat_key = c.stat_key
+      ),
+      'ovr', (
+        select jsonb_build_object(
+          'value', case
+            when count(*) = 6 and count(p) = 6 then 51 + avg(p) * 48.0/99
+          end,
+          'data_sufficient', count(*) = 6 and count(p) = 6
+        )
+        from (
+          select case
+            when coalesce(a.n, 0) >= 3 and o.value is not null then
+              least(greatest(
+                round(
+                  case c.stat_direction
+                    when 'lower' then o.value / nullif(a.min_v, 0)
+                    else o.value / nullif(a.max_v, 0)
+                  end * 99, 2),
+                0), 99)
+          end as p
+          from class_key_stats ks
+          join stat_catalog c on c.stat_key = ks.stat_key
+          left join latest o on o.stat_key = ks.stat_key and o.member_id = v_member
+          left join agg a on a.stat_key = ks.stat_key
+          where ks.class_name = v_class
+            and ks.char_function = v_function
+            and ks.selection_order <= 6
+        ) kp
+      ),
+      'last_validated_at', (
+        select max(sub.submitted_at)
+        from submissions sub
+        where sub.member_id = v_member and sub.status = 'validated'
+      )
+    )
+  );
+end;
+$$;
+
+comment on function public.my_report() is
+  'Member rank report (Phase 9): per-stat own value, class average, best (stat_direction-aware), value-proportional points, OVR (51 + mean(6 key-stat points) * 48/99, all-6-or-nothing) and last_validated_at. 0028: the key set is class_key_stats rows with selection_order <= 6 ONLY — relevants (7+) never count as keys (owner rule 2026-10-24); with fewer than 6 ordered rows configured OVR stays null. Key-stat identity NEVER serialised (RNK-02). Exceptions: no_member_claim/forbidden.';
+
+revoke execute on function public.my_report() from public, anon;
+grant  execute on function public.my_report() to authenticated;
