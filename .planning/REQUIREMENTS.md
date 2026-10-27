@@ -117,6 +117,15 @@ Added 2026-10-26 after the owner report that a Basic-screen print can never prov
 - [ ] **DSCD-05**: The PIN retirement path is decided and staged: once OAuth is mandatory for members, the nickname+PIN login is deprecated in the same phase it stops being the only factor (owner decision at planning time: hard removal vs. recovery-only), outstanding hand-minted JWTs are handled (short expiry or forced re-login), and `NEFOOT_JWT_SECRET` rotation is planned if the custom mint is retired.
 - [ ] **DSCD-06**: The OCR print keeps its real job only: reading stats/class/ID to avoid typos and giving officers evidence on the unknown/claim paths. It is never again the identity anchor anywhere in the codebase or copy.
 
+### Rating Unification (Phase 10.1 — URGENT, INSERTED 2026-10-27)
+
+Added 2026-10-27 after the owner reported the card OVRs inconsistent with the Ranking tab and the investigation proved the ratings engine split-brain: migration 0018 swapped the value-proportional formula into only 3 of the 6 OVR-producing RPCs (the other 3 kept the pre-Phase-9 rank-percentile formula), and 0028's `selection_order <= 6` rule missed `role_rank`/`staff_requests`. Live audit: 6/6 OVR-capable members diverged across surfaces, 3 Ranking-tab OVRs were null, every Solicitações applicant OVR null. Evidence: `.planning/phases/10.1-universal-rating-unification/10.1-CONTEXT.md`. Restates the round-8 owner ruling (2026-10-19): "Ratings are an universal measurement, once calculated they must be displayed equally."
+
+- [ ] **UNIF-01**: ONE points formula in every OVR-producing RPC (`my_report`, `my_card`, `class_top5`, `get_promotion`, `get_promotion_public`, `role_rank`, `staff_requests`): the Phase 9 value-proportional formula (own/best × 99, stat_direction-aware best, clamped [0,99], n≥3 gate; OVR `51 + mean × 48/99`, floor 51, all-6-or-nothing) — the same member+stat never yields two different points/OVR numbers across surfaces, and the pre-Phase-9 rank-percentile formula exists in no production RPC
+- [ ] **UNIF-02**: ONE key-set rule in every OVR gate and key-stat list read: `class_key_stats` rows with `selection_order <= 6` AND the member's own (class, build-role) — relevants at positions 7+ never count as keys anywhere (`role_rank` and `staff_requests` join the 0028 owner rule; `staff_requests` also gains the 0018-era missing `char_function` filter that nulled every applicant OVR)
+- [ ] **UNIF-03**: ONE cohort definition in all six RPCs: latest value per (member, stat) over submissions `status not in ('rejected','discarded')`, over ACTIVE members of the same class+build-role — `my_report` and `class_top5` drop the status-only / active-less reads (latent re-fork: an inactive or discarded-submission member must never shift a live member's rating)
+- [ ] **UNIF-04**: The parity contract is locked in a runnable gate: the smoke-card UNIFY probes (red since 0018) pass again and extend to `role_rank` (staff OVR ≡ `my_card`) and `my_report` (`ovr.value` ≡ `my_card`); a read-only cross-RPC parity audit shows zero OVR divergence for every OVR-capable member; both run green against live and are recorded in `10.1-VERIFICATION.md` — a future partial rewrite (the 0018 failure mode) goes red the day it ships
+
 ## v2 Requirements
 
 Deferred to a future release. Tracked but not in the v1.1 roadmap.
@@ -238,8 +247,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DSCD-04 | Phase 11 — Verified Access (Discord OAuth) | Planned |
 | DSCD-05 | Phase 11 — Verified Access (Discord OAuth) | Planned |
 | DSCD-06 | Phase 11 — Verified Access (Discord OAuth) | Planned |
+| UNIF-01 | Phase 10.1 — Universal Rating Unification (urgent fix) | Planned (10.1-01) |
+| UNIF-02 | Phase 10.1 — Universal Rating Unification (urgent fix) | Planned (10.1-01) |
+| UNIF-03 | Phase 10.1 — Universal Rating Unification (urgent fix) | Planned (10.1-01) |
+| UNIF-04 | Phase 10.1 — Universal Rating Unification (urgent fix) | Planned (10.1-02) |
 
 **Coverage:**
-- v1.1 requirements: 49 total
-- Mapped to phases: 49 ✓
+- v1.1 requirements: 53 total
+- Mapped to phases: 53 ✓
 - Unmapped: 0 ✓

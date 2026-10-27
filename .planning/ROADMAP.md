@@ -28,6 +28,7 @@
 - [x] Phase 9: Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats — ONE migration (0018; renumbered: Phase 7 took 0012, Phase 07.2 takes 0013, Phase 8 takes 0014, Phase 8 gap closure consumed 0015, Phase 08.1 took 0016, Phase 08.1 step-up consumed 0017): formula swap + `class_key_stats` PK rebuild + backfill + `set_key_stat` v2 + role-scoped OVR/cohorts + `last_validated_at`; ONE tripod re-lock; owner-calibrated bands; percentile phrase dropped (5/5 plans, 09-06 env-gated) — completed 2026-10-22
 - [ ] Phase 9.1: Hidden Raw Defenses (RPDEF/RMDEF) — two tooltip OCR captures inside the Especial step; raw defense computed read-only from Equipment DEF / (1 + DEF%); transient equipment values; `rpdef`/`rmdef` remap all `pdef`/`mdef` key positions preserving order; migration 0019 after 0018 (2 plans)
 - [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (3/3 plans)
+- [ ] Phase 10.1: Universal Rating Unification — URGENT FIX (INSERTED 2026-10-27, owner report "OVR from the cards is inconsistent with the Ranking tab"): migration 0036 rebases role_rank/my_card/staff_requests onto the Phase 9 value-proportional formula, adds the selection_order<=6 key filter everywhere (Ranking-tab OVR nulls gone), unifies the cohort definition (active + non-discarded), and locks the six-RPC parity contract behind a runnable smoke gate (2 plans)
 - [ ] Phase 11: Verified Access — Claim Authorization & Discord OAuth — first access is manual-fill and officer-validated since 0034 (DSCD-01 holds via claim/registration request approvals, no print anywhere); Phase 11 replaces the manual trust with the real anchor: one-time officer-confirmed Discord↔character link, server-side bot-token role check, custom access token hook keeping every RLS policy intact, device-binding re-decision, PIN retirement path (INSERTED 2026-10-26)
 
 </details>
@@ -201,6 +202,29 @@ Plans:
 Cross-cutting constraints: no router library — `'inicio'` joins the existing `App.tsx` Tab union pattern; no date library — epoch-diff arithmetic on the ISO string; no client-side points recomputation (AGENTS.md non-negotiable); the slider is CSS scroll-snap only (no new npm dependency, no autoplay — 07.1 D-05 static-only rule); the public showcase is server-enforced (anon grant on one closed-field RPC + one storage predicate) — never UI-only gating.
 **UI hint**: yes
 
+### Phase 10.1: Universal Rating Unification (URGENT FIX, INSERTED 2026-10-27)
+
+**Goal**: One rating everywhere — for the same member, the OVR on the Painel card, the Painel OVR hero, the Início/Destaques showcase cards and the Ranking tab is ONE number (round-8 owner ruling: "Ratings are an universal measurement, once calculated they must be displayed equally"), computed by the locked Phase 9 value-proportional formula, gated by exactly the 6 ordered keys, inside one cohort definition.
+
+**Why**: Owner report 2026-10-27 — the card OVRs disagree with the Ranking tab. Investigation (read-only live audit + migration archaeology) proved the ratings engine is split-brain: migration 0018 (Phase 9) swapped the formula in only 3 of the 6 OVR-producing RPCs, hotfixes 0023/0024 preserved the old formula in the other 3, and 0028's key filter missed `role_rank`/`staff_requests`. Live result: **6/6 OVR-capable members show different OVRs across surfaces; 3 (High Priest/suporte) show NULL on the Ranking tab while their cards show a number; every Solicitações applicant OVR has been null since 0018**. Full evidence: `.planning/phases/10.1-universal-rating-unification/10.1-CONTEXT.md`.
+
+**Depends on**: Phase 9 (0018's value-proportional formula is the canonical target), 0028/0029 bodies (the byte-faithful source shapes); executes BEFORE Phase 11 per owner call (urgent fix; no dependency on Phase 11)
+**Requirements**: UNIF-01, UNIF-02, UNIF-03, UNIF-04 (see REQUIREMENTS.md "Rating Unification (Phase 10.1)")
+**Success Criteria** (what must be TRUE):
+  1. `role_rank`, `my_card` and `staff_requests` compute per-stat points and OVR with the Phase 9 value-proportional formula (stat_direction-aware best, clamped [0,99], n≥3 gate, floor-51 OVR) — the pre-Phase-9 rank-percentile formula no longer exists in any production RPC (UNIF-01)
+  2. Every OVR gate and key-stat list read filters `selection_order <= 6`; `staff_requests` also reads the key set by (class, build-role) — the Ranking tab shows a non-null OVR for the High Priest/suporte members and the Solicitações board shows applicant OVRs again (UNIF-02)
+  3. All six OVR-producing RPCs share ONE cohort definition — latest value per (member, stat) over non-rejected AND non-discarded submissions, over ACTIVE members of the same class+build-role (UNIF-03)
+  4. A runnable parity gate locks the contract: the smoke-card UNIFY probes (red since 0018) pass again and extend to `role_rank` and `my_report`; a read-only parity audit shows zero cross-surface OVR divergence for every OVR-capable member; both run green against live and are recorded in `10.1-VERIFICATION.md` (UNIF-04)
+  5. Zero payload-shape changes — the client renders server values verbatim and ships no change; `get_promotion`/`get_promotion_public` bodies are byte-untouched (already canonical)
+
+**Plans:** 2/2 created (see `.planning/phases/10.1-universal-rating-unification/`)
+Plans:
+- [ ] 10.1-01-PLAN.md — Migration 0036: role_rank/my_card/staff_requests value-proportional rebases + selection_order<=6 everywhere + my_report/class_top5 cohort alignment + bookkeeping + pgrst reload notify — Wave 1 — UNIF-01/02/03
+- [ ] 10.1-02-PLAN.md — Parity re-lock + live apply + verification: rpc-ovr-parity-audit.mjs, smoke-card UNIFY 10d/10e, apply-seed.mjs live apply, 10.1-VERIFICATION.md — Wave 2 — UNIF-04
+
+Cross-cutting constraints: append-only (0001–0035 never edited, `create or replace` exact signatures only, zero `drop function`); the value-proportional expression is copied verbatim from the 0028 shapes — never re-derived; the permanent anti-refork guard is the parity smoke, not a helper refactor (considered and deferred, D-10.1-05); migration + bookkeeping row + `notify pgrst, 'reload schema'` land together (0035 lesson); live apply via apply-seed.mjs only (no `supabase db push` in this environment); the two sanctioned smoke-fixture members stay until second order (D-10.1-08) — the pre-release purge gate is unchanged; no new npm dependencies.
+**UI hint**: no (server-side values only; owners will SEE corrected numbers on existing surfaces)
+
 ### Phase 11: Verified Access — Claim Authorization & Discord OAuth (INSERTED)
 
 **Goal**: Access is bound to something the attacker cannot steal from a Discord post. The 0032 stopgap (officer-authorized claims) shipped 2026-10-26 and was reverted the same day by 0033 at the owner's call — registration is one-go again (immediate PIN setter; registration requests carry the PIN so the approval activates it) with manual validation staying on (officer approval + the post-claim D-05 identity review) — so Phase 11 carries the full identity load: a one-time, officer-confirmed Discord↔character link per member, Discord OAuth as the login, a server-side guild-role check with the guild bot token, and session continuity that keeps every existing RLS policy working unchanged.
@@ -222,7 +246,7 @@ Cross-cutting constraints: no router library — `'inicio'` joins the existing `
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; 11 builds on 8/08.1 + the shipped 0032 stopgap)
+Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|------------|
@@ -232,14 +256,15 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 11 (8 is indep
 | 4. Member Dashboard & Improvement Screen | v1.0 | 3/3 | Complete | 2026-10-11 |
 | 5. OCR Auto-Read Layer | v1.0 | 5/5 | Complete | 2026-10-12 |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | v1.0 | 7/7 | Complete | 2026-10-13 |
-| 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 4/4 | Complete    | 2026-10-15 |
+| 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 4/4 | Complete | 2026-10-15 |
 | 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 3/6 | In Progress|  |
 | 08.10. pt-BR OCR Identity (hotfix) | v1.1 | 1/1 | Complete | 2026-10-22 |
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 5/5 | Complete | 2026-10-22 |
 | 9.1. Hidden Raw Defenses (RPDEF/RMDEF) | v1.1 | 2/2 | Complete    | 2026-10-24 |
 | 10. Personalized Home Landing Tab | v1.1 | 3/3 | Planned | - |
+| 10.1 Universal Rating Unification (urgent fix, inserted) | v1.1 | 0/2 | Planned | - |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---
-*Roadmap created: 2026-10-07 · v1.0 archived 2026-10-13 · v1.1 roadmap created 2026-10-13 · revised 2026-10-22 (added Phase 9.1 Hidden Raw Defenses — 5 phases, DEF-01..DEF-06 requirements)*
+*Roadmap created: 2026-10-07 · v1.0 archived 2026-10-13 · v1.1 roadmap created 2026-10-13 · revised 2026-10-22 (added Phase 9.1 Hidden Raw Defenses — 5 phases, DEF-01..DEF-06 requirements) · revised 2026-10-27 (inserted Phase 10.1 Universal Rating Unification as an URGENT fix before Phase 11 — owner report of cross-surface OVR inconsistency; investigation in `.planning/phases/10.1-universal-rating-unification/10.1-CONTEXT.md`; UNIF-01..04 requirements)*
 
