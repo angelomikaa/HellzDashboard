@@ -100,7 +100,9 @@ describe('registry status gates the flow', () => {
     expect(statusMessage('pin_set')).toContain('já tem PIN')
     expect(statusMessage('handle_claimed')).toContain('Discord já tem personagem com PIN')
     expect(statusMessage('pending')).toContain('Aguarde a decisão')
-    expect(statusMessage('unknown')).toContain('lista da guilda')
+    expect(statusMessage('unknown')).toContain(
+      'Será necessário a autorização de um oficial para concluir esse cadastro.',
+    )
     expect(statusMessage('identity_mismatch')).toContain('não confere')
     expect(statusMessage('ambiguous_identity')).toContain('Mais de um cadastro')
     expect(statusMessage('ready')).toContain('um oficial vai confirmar')

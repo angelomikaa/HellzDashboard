@@ -55,7 +55,7 @@ export function statusMessage(status: FirstAccessStatus): string {
     case 'pending':
       return 'Solicitação enviada. Aguarde a decisão de um oficial.'
     case 'unknown':
-      return 'Não encontramos este personagem na lista da guilda. Envie a solicitação para um oficial cadastrar.'
+      return 'Não encontramos este personagem na lista da guilda. Será necessário a autorização de um oficial para concluir esse cadastro.'
     case 'handle_registered':
       return 'Este Discord já está cadastrado, mas o nick não confere. Fale com um oficial.'
     case 'identity_mismatch':
