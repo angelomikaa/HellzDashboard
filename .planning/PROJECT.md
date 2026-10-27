@@ -48,7 +48,7 @@ v1.1 milestone scope (defined 2026-10-13):
 - [x] Class catalog aligned to the official job tree (transcendent names, currently-released jobs only: Sniper not Ranger, Summoner, Rebellion; Super Novice/Dancer removed) + build-role vocabulary (dps/mdps/suporte, 'tank' retired) — Validated in Phase 7: ROLE-05/12, migration 0012 live with OVR parity, 5/5 smokes green
 - [ ] Whitelist control: officers and owner can add players to the whitelist (handle-only registration); player picks own PIN on first login
 - [ ] Personalized home: player's own status (OVR + best stats) as the landing view, with a stale-data CTA after 7 days without a validated submission
-- [ ] Value-proportional 99 scale: top-end cuts at 98/97/96/95 based on value distance to the best, per stat — **live-data caveat:** Fixed CT %, Global CD %, Variable CT % are negative in real submissions (lower-is-better); the scale formula must invert these (recorded 2026-10-14 from the Phase 7 live value report)
+- [x] Value-proportional 99 scale: top-end cuts at 98/97/96/95 based on value distance to the best, per stat — Validated in Phase 9 (0018 formula) + Phase 10.1 (unification: all six OVR-producing RPCs now compute the same value-proportional points/OVR, locked behind the rpc-ovr-parity audit + smoke-card UNIFY 10a-10e gates; owner browser-walk confirmed one number across Ranking/Início/Painel) — **live-data caveat resolved:** stat_direction-aware inversion ships in the formula (lower-is-better stats divide by min, negative ranges preserved unclamped)
 - [ ] Role-differentiated key stats: key-stat config per (class, build-role) with migration backfill — cohort semantics class+build-role confirmed by owner
 - [ ] Phase 07.2 (inserted 2026-10-16 from the 07.1 visual gate): premium showcase & game-grounding — EAFC-style downloadable JPEG cards, key-stat-only member cards (leak-safe server design required), bolder Destaques showcase, ROO game assets (roocamer.gnjoy.game), desktop layout pass, officials-only rank view, "relevant" stat tier
 
@@ -71,7 +71,7 @@ v1.1 milestone scope (defined 2026-10-13):
 ## Context
 
 - Game: Ragnarok Origin (mobile, Ragnarok-family stat layout)
-- **Current state (Phase 7 complete, 2026-10-14):** v1.1 in progress — migration 0012 live (15 transcendent classes, dps/mdps/suporte vocabulary, OVR continuity proven), 73-dummy roster resident live (21/21 cohorts, starvation cases render data-insufficient), 12 migrations, 5 live smoke matrices green, 284 tests green; the dummy purge is a recorded hard pre-release gate (STATE.md)
+- **Current state (Phase 10.1 complete, 2026-10-27):** v1.1 in progress — migrations through 0036 live; the rating engine is ONE formula (Phase 9 value-proportional), ONE key set (selection_order <= 6 + class+build-role), ONE cohort (non-rejected/non-discarded + active) across all six OVR-producing RPCs (role_rank, my_card, staff_requests, my_report, class_top5, get_promotion/_public), locked behind a runnable parity gate (scripts/rpc-ovr-parity-audit.mjs + smoke-card UNIFY probes 10a-10e); first-access v2 + officer notification badge live; 697 tests green; owner walk confirmed one OVR everywhere (98 for Ahrya)
 - **Known tech debt / advisories:** 06-REVIEW WR-01..04 (misleading "Salvo." feedback, Shift+Tab trap in ConfirmDialog, non-unique React key on HighlightsPage, one duplicate officer smoke probe) — advisory only, no must-have impacted; pre-launch owner actions: rotate Supabase deploy token + placeholder whitelist PINs, replace `public/examples/*.svg` with real screenshots before inviting real members
 - Stat structure from screenshots:
   - **General Stats**: HP, SP, PATK, PDEF, MATK, MDEF, Refine PATK/PDEF/MATK/MDEF, HP recover, SP Recovery, HIT, FLEE
@@ -130,4 +130,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-16 - Phase 07.1 complete (Hellz visual identity live, owner gate approved; Phase 07.2 inserted for premium showcase & game-grounding)*
+*Last updated: 2026-10-27 - Phase 10.1 complete (universal rating unification live on all six OVR RPCs, parity-gated, owner-confirmed one number everywhere)*
