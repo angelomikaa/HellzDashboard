@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
-status: planning
-last_updated: "2026-10-27T00:00:00.000Z"
-last_activity: 2026-10-27
+status: executing
+last_updated: "2026-10-27T05:33:15.732Z"
+last_activity: 2026-10-27 -- Phase 10.1 execution started
 progress:
   total_phases: 11
-  completed_phases: 7
-  total_plans: 48
-  completed_plans: 40
-  percent: 83
+  completed_phases: 8
+  total_plans: 45
+  completed_plans: 43
+  percent: 96
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 **Core value:** Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
-**Current focus:** Phase 09.1 — hidden-raw-defenses-rpdef-rmdef
+**Current focus:** Phase 10.1 — universal-rating-unification
 
 ## Current Position
 
-Phase: 10
-Plan: 10-01 + 10-02 + 10-03 complete + 10-04 owner-correction rework (Início absorbs Destaques; public landing via 0029) + G-3 looping carousel + G-4 panel-less landing with the Phase 10 motion/skeleton layer + G-5 exact 3-up row and "Os Impecáveis da Hellz" as the landing title + G-6 class header inside the carousel + G-7 one-class-at-a-time rotation (30s, pausable, rebuilt from a failed draft) + G-8 head-safe top-anchored card photo fit + G-9 measured head-to-thigh photo framing with the H-mark planned-exception ruling + G-10 Início personal blocks removed / Início leftmost with Painel default / officer Validações badge (migration 0030 live) + smoke-bio fixtures (SoldierHellz-based) making the rotation visitor-visible
-Status: UAT in progress - tests 1 and 7-8/10-14 pass; tests 2-6 SUPERSEDED (G-10 removed the Início personal blocks); test 9 (slider swipe, touch device) pending; G-3..G-10 live-verified. Deploy note: Vercel TS18047 fixed (aliased-condition narrowing removed from InicioPage, commit 683fdbb). PUSH ACCESS FIXED 2026-10-27: this environment's git slot held `agmikadev` (NOT a collaborator -> 403); repo-local `credential.https://github.com.username = angelomikaa` now makes GCM use a second stored credential (`git:https://angelomikaa@github.com`, owner completed the GCM browser sign-in) for THIS repo only — every other repo keeps agmikadev; write verified live (temp branch `_push_probe` created + deleted, `git push` from this shell works). IDENTITY 2026-10-26 (three rounds same day): 0032 stopgap -> 0033 one-go -> **0034 manual first access (current)**. LIVE DEPLOY DONE 2026-10-26: DB had 0032/0033 never applied (was at 0031) -> applied 0034 + 0035 via the Management API Run Query endpoint; first-access v2 deployed (npx supabase functions deploy --use-api, no local CLI/Docker needed); setup-pin DELETED; request-access redeployed with the shared errorMessage fix. Verified live: lookup unknown -> 200, claim probe -> 404 not_registered, setup-pin -> 404, transactional claim on a real unclaimed row (Caladoh) inserted a linked 'claim' request with PIN hash then rolled back, `check-deployment.mjs` = DEPLOY GATE PASSED. RESOLVED 2026-10-27: the `marcoslessa` register now reads display_name `RAIZA` (High Wizard, char 174412, active, PIN not yet set — the player still has to run Primeiro acesso) and the pending-requests queue is EMPTY; polish round bundle live on Vercel (`index-BX8jzHQF.js`). Remaining: scripts/smoke-identity.mjs still needs its rework pass (probes the retired setup-pin/claim_pin)
-Last activity: 2026-10-26
+Phase: 10.1 (universal-rating-unification) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 10.1
+Last activity: 2026-10-27 -- Phase 10.1 execution started
 
 ## Accumulated Context
 
