@@ -262,7 +262,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 11 (8
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 5/5 | Complete | 2026-10-22 |
 | 9.1. Hidden Raw Defenses (RPDEF/RMDEF) | v1.1 | 2/2 | Complete    | 2026-10-24 |
 | 10. Personalized Home Landing Tab | v1.1 | 3/3 | Planned | - |
-| 10.1 Universal Rating Unification (urgent fix, inserted) | v1.1 | 2/2 | Complete   | 2026-10-27 |
+| 10.1 Universal Rating Unification (urgent fix, inserted) | v1.1 | 2/2 | Complete    | 2026-10-27 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---
