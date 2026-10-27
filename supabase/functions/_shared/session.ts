@@ -154,6 +154,18 @@ export function decodeProof(
   return { bytes, mime: 'image/jpeg' }
 }
 
+/** Message from anything the runtime or supabase-js throws.
+ *
+ *  PostgREST/RPC errors are PLAIN OBJECTS ({ message, details, hint, code }),
+ *  not Error instances, so String(err) collapses every server token into
+ *  "[object Object]" and every mapping below falls through to 500 — the exact
+ *  failure that made first-access answer server_error for a not_registered
+ *  claim (owner report 2026-10-26). Read `.message` first. */
 export function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
+  if (err instanceof Error) return err.message
+  if (err !== null && typeof err === 'object') {
+    const message = (err as { message?: unknown }).message
+    if (typeof message === 'string' && message.length > 0) return message
+  }
+  return String(err)
 }
