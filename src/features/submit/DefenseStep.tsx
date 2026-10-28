@@ -183,7 +183,7 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
                   onRunStateChange={(runningNow) => handleRunState(card, runningNow)}
                 />
                 <label className="flex flex-col gap-1 text-sm font-semibold text-content">
-                  Equipment {card.label} (valor)
+                  Equip. {card.label} (valor)
                   <input
                     type="text"
                     value={equipRaw}

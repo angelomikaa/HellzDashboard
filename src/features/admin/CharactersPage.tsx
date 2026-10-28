@@ -71,6 +71,16 @@ const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   owner: 'Proprietário',
 }
 
+/** Origin of an identity snapshot, rendered in the member's history list.
+ *  The server enum (IdentityHistoryRow['source']) stays English — only the
+ *  label the officer reads is pt-BR. */
+const IDENTITY_SOURCE_LABELS: Record<IdentityHistoryRow['source'], string> = {
+  submission: 'envio validado',
+  correction: 'ajuste de oficial',
+  claim: 'reivindicação de PIN',
+  request: 'solicitação aprovada',
+}
+
 // In-edit draft for one member row (REG-01). charClass '' is the display-only
 // '—' option: saving is blocked client-side — a character must have a class.
 interface Draft {
@@ -546,7 +556,7 @@ export function CharactersPage({
           >
             <div className="flex flex-1 flex-col gap-2">
               <label htmlFor="add-handle" className="text-sm font-semibold text-content">
-                Discord handle
+                Usuário do Discord
               </label>
               <input
                 id="add-handle"
@@ -1043,7 +1053,7 @@ export function CharactersPage({
                                   <option value="">—</option>
                                   {OFFICIAL_CLASSES.map((c) => (
                                     <option key={c} value={c}>
-                                      {c}
+                                      {classLabel(c)}
                                     </option>
                                   ))}
                                 </select>
@@ -1106,8 +1116,10 @@ export function CharactersPage({
                                 <ul className="mt-2 space-y-1">
                                   {identityHistory.map((h) => (
                                     <li key={h.id} className="text-sm text-muted">
-                                      <span className="font-mono">{h.char_id}</span> — {h.nickname} — {h.char_class} —{' '}
-                                      {h.char_function} — {h.source}
+                                      <span className="font-mono">{h.char_id}</span> — {h.nickname} —{' '}
+                                      {classLabel(h.char_class)} —{' '}
+                                      {h.char_function === null ? '—' : FUNCTION_LABELS[h.char_function]} —{' '}
+                                      {IDENTITY_SOURCE_LABELS[h.source]}
                                     </li>
                                   ))}
                                 </ul>

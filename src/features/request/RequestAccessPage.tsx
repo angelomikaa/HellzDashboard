@@ -13,6 +13,8 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { firstAccessIdentify, requestAccess, type RequestType } from '../../lib/api'
 import { ProofField } from '../identity/ProofField'
+import { classLabel } from '../../lib/classLabels'
+import { FUNCTION_LABELS } from '../../lib/groups'
 import type { BasicProfileFields, CharFunction } from '../submit/identity'
 import { PinBoxes } from '../auth/PinBoxes'
 import {
@@ -539,7 +541,7 @@ export function RequestAccessPage({
               <option value="">Selecione a classe</option>
               {REQUEST_CLASS_OPTIONS.map((name) => (
                 <option key={name} value={name}>
-                  {name}
+                  {classLabel(name)}
                 </option>
               ))}
             </select>
@@ -559,7 +561,7 @@ export function RequestAccessPage({
               <option value="">Selecione a função</option>
               {REQUEST_FUNCTION_OPTIONS.map((name) => (
                 <option key={name} value={name}>
-                  {name === 'dps' ? 'DPS' : name === 'mdps' ? 'M-DPS' : 'Suporte'}
+                  {FUNCTION_LABELS[name]}
                 </option>
               ))}
             </select>
