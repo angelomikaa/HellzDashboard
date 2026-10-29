@@ -55,6 +55,13 @@
 // data) never reach this component. A class with several meta cohorts keeps ONE
 // section with up to 3 cards per cohort, ordered by OVR desc.
 //
+// 10.2 client half (owner request 2026-10-29): instead of mixing that class's
+// builds into a single scroller, the showcase splits them by function —
+// ONE CAROUSEL PER META BUILD (Summoner has 3, High Priest has 1). Non-viable
+// builds are already gone from the payload, and a build with no cards
+// produces no scroller, so the number of scrollers under a class is exactly
+// the number of its meta builds that currently have Impecáveis.
+//
 // Owner gate round 2 (07.1-02): the showcase is the premium register — only
 // Impecável (top-band) cards appear. Display-layer tier filter over the
 // fetched payload, server order preserved (filter, never sort), sections left
@@ -64,6 +71,7 @@
 // what it has).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ApiError, fetchPromotionPublic, type PromotionSection } from '../../lib/api'
+import { groupCardsByBuild, mergeCohortSections } from './buildGroups'
 import { tierForOvr } from '../dashboard/presentation'
 import { classLabel } from '../../lib/classLabels'
 import { HighlightsCarousel } from './HighlightsCarousel'
@@ -173,7 +181,17 @@ export function PromotionShowcase() {
     )
   }
 
-  const impecavelSections = sections.flatMap((section) => {
+  // 10.2: normalise the payload into ONE section per CLASS before anything
+  // else. The live RPC ranks each meta cohort separately, so a multi-build
+  // class (Summoner) arrives as TWO sections sharing one class_name — without
+  // this merge the rotation would treat each build as its own class index
+  // (the owner's "10th index just for the magic damage role of the summoner
+  // class"). Merging first means the class stays ONE rotation slot and its
+  // builds become the rows INSIDE it (groupCardsByBuild, below). With a body
+  // that already answers one section per class this is a pass-through.
+  const classSections = mergeCohortSections(sections)
+
+  const impecavelSections = classSections.flatMap((section) => {
     const cards = section.cards.filter(
       (card) => tierForOvr(Math.round(card.ovr)) === 'platinum',
     )
@@ -206,7 +224,14 @@ export function PromotionShowcase() {
  *  Impecável section, so `sections` is never empty and the hooks below never
  *  sit behind a conditional. Owns the whole rotation state machine — it must
  *  live ABOVE the per-class carousel remount, or a pause would reset on every
- *  class switch. */
+ *  class switch.
+ *
+ * 10.2: one class at a time, but each class shows one scroller PER BUILD.
+ * A build row carries its own label chip and its own card arrows, and any
+ * interaction in ANY row re-arms the window (browsing this class defers the
+ * rotation). Class rotation controls only live on the FIRST row — the class
+ * is the rotation unit, so a three-build class must not carry three
+ * steppers/drain bars. */
 function ClassRotation({ sections }: { sections: PromotionSection[] }) {
   const total = sections.length
   const [activeIndex, setActiveIndex] = useState(0)
@@ -286,6 +311,12 @@ function ClassRotation({ sections }: { sections: PromotionSection[] }) {
   const clampedIndex = clampClassIndex(activeIndex, total)
   const section = sections[clampedIndex]
   if (section === undefined) return null
+  // 10.2: the class's Impecável cards, split by build (function). Summoner →
+  // 3 groups (3 scrollers), High Priest → 1, and a build with no Impecáveis
+  // produces no group at all — never an empty scroller. groupCardsByBuild is
+  // pure grouping of an already-ranked payload: every card keeps its exact
+  // server position inside its own build.
+  const builds = groupCardsByBuild(section.cards)
 
   return (
     <div
@@ -314,18 +345,30 @@ function ClassRotation({ sections }: { sections: PromotionSection[] }) {
           {`Classe ${clampedIndex + 1} de ${total}: ${classLabel(section.class_name)}`}
         </span>
       )}
-      <HighlightsCarousel
-        key={section.class_name}
-        cards={section.cards}
-        charClass={section.class_name}
-        label={`${classLabel(section.class_name)} — cartazes impecáveis`}
-        classIndex={clampedIndex}
-        totalClasses={total}
-        rotationPaused={rotationPaused}
-        onClassStep={stepClass}
-        onUserInteraction={restartWindow}
-        autoAdvanceMs={AUTO_ADVANCE_MS}
-      />
+      {/* One class, one or more build rows — each is a fully independent
+          carousel (own ref/spotlight). `key` on the row set is the class: a
+          class switch remounts every row, which restarts the reveal stagger
+          and the drain window exactly as before. The intra-class gap is
+          deliberately tighter than the outer one (the scrollers' own padding
+          already separates the cards): rows of ONE class read as a group,
+          while classes stay far apart. */}
+      <div key={section.class_name} className="flex flex-col gap-6 sm:gap-8">
+        {builds.map((build, row) => (
+          <HighlightsCarousel
+            key={build.fn}
+            cards={build.cards}
+            charClass={section.class_name}
+            label={`${classLabel(section.class_name)} — ${build.label} — cartazes impecáveis`}
+            buildLabel={build.label}
+            classIndex={row === 0 ? clampedIndex : undefined}
+            totalClasses={row === 0 ? total : undefined}
+            rotationPaused={rotationPaused}
+            onClassStep={row === 0 ? stepClass : undefined}
+            onUserInteraction={restartWindow}
+            autoAdvanceMs={AUTO_ADVANCE_MS}
+          />
+        ))}
+      </div>
     </div>
   )
 }

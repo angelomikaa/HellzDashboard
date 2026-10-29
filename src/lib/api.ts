@@ -557,6 +557,12 @@ export interface PromotionCardRow {
 
 export interface PromotionSection {
   class_name: string
+  // The build this section carries. Present on the body currently deployed
+  // live (one section per meta cohort, verified 2026-10-29); the repo's 0037
+  // body (one section per class) omits it — so it stays OPTIONAL and the
+  // client never depends on it (builds are derived from the CARDS, which
+  // always carry char_function). See highlights/buildGroups.mergeCohortSections.
+  char_function?: 'dps' | 'mdps' | 'suporte'
   // 0037 (owner decision 2026-10-28): the TOP 3 by OVR of each META
   // (class, function) cohort — non-viable cohorts never appear, and a class
   // with several meta cohorts (e.g. Assassin Cross dps + mdps) keeps ONE
@@ -564,6 +570,12 @@ export interface PromotionSection {
   // with insufficient data are OMITTED server-side (D-13). The client still
   // drops non-platinum cards (tierForOvr), so Início only ever shows the
   // "Impecáveis".
+  //
+  // 10.2 client half: the section's cards are split by `char_function` at
+  // render time (highlights/buildGroups.groupCardsByBuild) so each build owns
+  // its own carousel. That grouping is DISPLAY-ONLY over a field the payload
+  // already carries — the wire shape, the card order and the closed field
+  // list are unchanged, so no RPC change rides along with this split.
   cards: PromotionCardRow[]
 }
 

@@ -61,6 +61,15 @@
 //
 // Data contract unchanged: cards render in SERVER order (highest OVR first),
 // never re-sorted here. Pure presentation — no points math in TS.
+//
+// Phase 10.2 (owner request 2026-10-29): the showcase shows ONE scroller PER
+// META BUILD, so a multi-build class (Summoner dps/mdps/suporte) now renders
+// this component three times — once per function — with `buildLabel` naming
+// the row's build. Each instance is fully self-contained (own ref, own
+// spotlight index, own chip), which is exactly what made the per-section
+// ref fix necessary in the first place; the class identity repeats by design,
+// so every scroller stays readable on its own instead of inheriting context
+// from a sibling.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PromotionCardRow } from '../../lib/api'
 import { classLabel } from '../../lib/classLabels'
@@ -80,6 +89,7 @@ export function HighlightsCarousel({
   cards,
   charClass,
   label,
+  buildLabel,
   classIndex,
   totalClasses,
   rotationPaused = false,
@@ -90,6 +100,10 @@ export function HighlightsCarousel({
   cards: PromotionCardRow[]
   charClass: string
   label: string
+  /** The build/function this scroller carries (pt-BR, FUNCTION_LABELS —
+   *  "Dano Físico" / "Dano Mágico" / "Suporte"). Absent renders the bare
+   *  class bar, which is the whole behavior for single-build classes. */
+  buildLabel?: string
   classIndex?: number
   totalClasses?: number
   rotationPaused?: boolean
@@ -278,6 +292,19 @@ export function HighlightsCarousel({
         <h2 className="font-display text-xl font-semibold text-content sm:text-2xl">
           {classLabel(charClass)}
         </h2>
+        {/* 10.2: one scroller per META BUILD, so the bar names the build it
+            carries — a multi-build class (Summoner) renders this component
+            once per function and the rows must stay distinguishable at a
+            glance. Single-build classes (High Priest) keep the plain bar
+            (own h2, own crest) — unchanged from before. The chip stays on
+            EVERY breakpoint: the card's job line prints the class only, so
+            this is the one place the build is named — mobile must not lose
+            it. The bar already wraps below sm instead of squeezing. */}
+        {buildLabel !== undefined && (
+          <span className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-sm font-semibold text-muted">
+            {buildLabel}
+          </span>
+        )}
         <span
           aria-hidden="true"
           className="hidden h-px flex-1 bg-gradient-to-r from-accent/40 via-line to-transparent sm:block"
