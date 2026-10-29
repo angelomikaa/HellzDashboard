@@ -33,7 +33,7 @@ function loadEnvFile() {
 }
 
 const envFile = loadEnvFile()
-const MGMT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || envFile.SUPABASE_ACESS_TOKEN
+const MGMT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || envFile.SUPABASE_ACCESS_TOKEN || envFile.SUPABASE_ACESS_TOKEN
 const PROJECT_REF = process.env.SUPABASE_PROJECT_REF
 const APPLY = process.argv.includes('--apply')
 
@@ -142,7 +142,8 @@ async function main() {
       (select id from membership_requests
         where ${SMOKE} or member_id in (select id from _smoke));
     delete from membership_requests
-      where ${SMOKE} or member_id in (select id from _smoke);
+      where ${SMOKE} or member_id in (select id from _smoke)
+         or decided_by in (select id from _smoke);
     delete from members where id in (select id from _smoke);
     commit;
   `)
