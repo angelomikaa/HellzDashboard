@@ -1,22 +1,30 @@
 #!/usr/bin/env node
 /**
- * NeoFoot smoke fixtures: TWO cohort primers per (class, function) combo that
- * has key stats configured — owner request 2026-10-28.
+ * NeoFoot smoke fixtures: TWO cohort primers per META (class, function) combo —
+ * owner decision 2026-10-28.
+ *
+ * Which combos: the persisted split in public.class_cohorts (migration 0037) is
+ * the ONE authority. `meta = true` = a currently playable build (23 combos) and
+ * the only ones this script seeds; `meta = false` = keyed-but-non-viable builds
+ * the owner forgot "until second order" — they get no primers and their existing
+ * primers are wiped by the namespace clean at the top of every run. A meta combo
+ * also needs its 6 usable keys (selection_order <= 6) or its OVR could never
+ * compute, so that stays a hard requirement.
  *
  * Why: an OVR needs n >= 3 submitters per (class, function) cohort. Real data
  * only exists in a handful of cohorts, so a real player who signs in for any
- * other combo gets a data-insufficient card (no overall). Two primers raise an
- * empty cohort to n=2, so the FIRST real player who submits reaches n=3 and
+ * other meta combo gets a data-insufficient card (no overall). Two primers raise
+ * an empty cohort to n=2, so the FIRST real player who submits reaches n=3 and
  * immediately sees their own OVR. Combos that already have >= 3 validated
- * submitters are skipped (already primed by their own dedicated fixtures) —
- * pass --all to include them anyway.
+ * submitters are skipped (already primed by their own dedicated fixtures or by
+ * real players) — pass --all to include them anyway.
  *
  * Owner decisions (2026-10-28):
  *   - exactly TWO primers per target combo (the third member is meant to be a
  *     REAL player);
  *   - primers are the "worse" half of the ladder (factors 0.950 / 0.900), so a
  *     real submitter lands on top of their own cohort;
- *   - combos without key stats are out of scope for now.
+ *   - non-meta combos are out of scope (no keys and/or not viable).
  *
  * Stat base per combo (never invented per class):
  *   - ANCHORED combo (real validated submitters exist): the per-stat MINIMUM
@@ -38,12 +46,12 @@
  *     ALL catalog stats, percentual rounded to 1 decimal, flat to integer;
  *   - pin_hash = bcrypt(FIXTURE_PIN, shared smoke-config) — never printed.
  *
- * Verification built in: key-config census, per-fixture stat counts, a guard
- * that every KEY stat base is > 0 (a 0 denominator would keep every OVR null
- * forever), cohort census before/after, OVR reads for the anchored cohorts, and
- * ONE self-cleaning probe on an empty cohort that proves the claim behind the
- * whole script: with a third submitter present the cohort becomes
- * data-sufficient and the report carries a real OVR.
+ * Verification built in: the meta split read back from class_cohorts, key-config
+ * census, per-fixture stat counts, a guard that every KEY stat base is > 0 (a 0
+ * denominator would keep every OVR null forever), cohort census before/after,
+ * OVR reads for the anchored cohorts, and ONE self-cleaning probe on an empty
+ * cohort that proves the claim behind the whole script: with a third submitter
+ * present the cohort becomes data-sufficient and the report carries a real OVR.
  *
  * Owner: fixtures MAY STAY LIVE until second order. Pre-release purge:
  *   node scripts/smoke-matrix-fixtures.mjs --purge
@@ -203,8 +211,9 @@ delete from submissions where member_id in (select id from members where discord
 delete from members where discord_handle like '${SENTINEL}-%';
 `
 
-// Combos that have exactly six usable keys, plus their live census and the
-// real anchor (newest validated submitter) when one exists.
+// META combos (class_cohorts.meta = true, migration 0037) that also have
+// exactly six usable keys, plus their live census and the real anchor (newest
+// validated submitter) when one exists.
 //
 // Two different filters matter here:
 //   - the SKIP count ignores this script's own namespace (smoke-mtx-%) so a
@@ -215,10 +224,17 @@ delete from members where discord_handle like '${SENTINEL}-%';
 //     derived from a REAL player's submission, never from another primer.
 const TARGETS_SQL = `
 with combo as (
-  select ks.class_name, ks.char_function
-  from class_key_stats ks
-  group by 1, 2
-  having count(*) filter (where ks.selection_order <= 6) = 6
+  select cc.class_name, cc.char_function
+  from class_cohorts cc
+  where cc.meta
+    and exists (
+      select 1 from class_key_stats ks
+      where ks.class_name = cc.class_name
+        and ks.char_function = cc.char_function
+        and ks.selection_order <= 6
+      group by ks.class_name, ks.char_function
+      having count(*) = 6
+    )
 ),
 census as (
   select c.class_name, c.char_function,
@@ -406,6 +422,25 @@ group by 1, 2, 3
 order by 1;
 `
 
+const META_SPLIT_SQL = `
+select count(*) filter (where meta)::int as meta,
+       count(*) filter (where not meta)::int as dark
+from class_cohorts;
+`
+
+// After a run, every primer must belong to a META cohort: the namespace clean
+// at the top of each seed removes the old set, so a non-meta row here means a
+// target list and a seed disagree — a real regression, not a warning.
+const NON_META_PRIMERS_SQL = `
+select m.discord_handle, m.char_class, m.char_function
+from members m
+left join class_cohorts cc
+  on cc.class_name = m.char_class and cc.char_function = m.char_function
+where m.discord_handle like '${SENTINEL}-%'
+  and coalesce(cc.meta, false) = false
+order by 1;
+`
+
 const CENSUS_SQL = `
 select m.char_class as class_name, m.char_function,
        count(distinct m.id) filter (where m.active) as active_members,
@@ -477,9 +512,15 @@ async function main() {
   const catalogCount = Number((await mgmtQuery(CATALOG_COUNT_SQL))[0].n)
   console.log(`[smoke-matrix] catalog: ${catalogCount} stats`)
 
+  const split = (await mgmtQuery(META_SPLIT_SQL))[0]
+  console.log(
+    `[smoke-matrix] class_cohorts split: ${split.meta} meta / ${split.dark} non-viable ` +
+      `(only meta combos are primed)`,
+  )
+
   const targets = (await mgmtQuery(TARGETS_SQL)) ?? []
-  if (targets.length === 0) throw new Error('no (class, function) combo has 6 key stats configured')
-  console.log(`[smoke-matrix] keyed combos: ${targets.length}`)
+  if (targets.length === 0) throw new Error('no meta (class, function) combo has 6 key stats configured')
+  console.log(`[smoke-matrix] meta combos with 6 usable keys: ${targets.length}`)
 
   const skipped = targets.filter((t) => Number(t.validators) >= 3 && !INCLUDE_PRIMED)
   const selected = targets.filter((t) => Number(t.validators) < 3 || INCLUDE_PRIMED)
@@ -541,6 +582,17 @@ async function main() {
       (wrong.length ? ` — ${wrong.length} with a wrong stat count` : ''),
   )
   if (counts.length !== fixtures.length || wrong.length) process.exitCode = 1
+
+  const offMeta = (await mgmtQuery(NON_META_PRIMERS_SQL)) ?? []
+  if (offMeta.length) {
+    console.log(
+      `[smoke-matrix] FAIL — ${offMeta.length} primer(s) outside the meta split: ` +
+        offMeta.map((r) => `${r.char_class}/${r.char_function}`).join(', '),
+    )
+    process.exitCode = 1
+  } else {
+    console.log('[smoke-matrix] every primer sits in a meta cohort (and only meta was seeded)')
+  }
 
   const after = new Map(
     ((await mgmtQuery(CENSUS_SQL)) ?? []).map((r) => [`${r.class_name}/${r.char_function}`, r]),

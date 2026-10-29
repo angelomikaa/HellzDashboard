@@ -557,7 +557,14 @@ export interface PromotionCardRow {
 
 export interface PromotionSection {
   class_name: string
-  cards: PromotionCardRow[] // top-5 by OVR; classes with insufficient data are OMITTED server-side (D-13)
+  // 0037 (owner decision 2026-10-28): the TOP 3 by OVR of each META
+  // (class, function) cohort — non-viable cohorts never appear, and a class
+  // with several meta cohorts (e.g. Assassin Cross dps + mdps) keeps ONE
+  // section carrying up to 3 cards per cohort, ordered by OVR desc. Classes
+  // with insufficient data are OMITTED server-side (D-13). The client still
+  // drops non-platinum cards (tierForOvr), so Início only ever shows the
+  // "Impecáveis".
+  cards: PromotionCardRow[]
 }
 
 export async function fetchPromotion(session: NeoFootSession): Promise<PromotionSection[]> {
@@ -572,12 +579,15 @@ export async function fetchPromotion(session: NeoFootSession): Promise<Promotion
 }
 
 /**
- * Public landing showcase (0029, owner decision 2026-10-24): the anon-callable
- * twin of get_promotion — Início is the guild's landing page, visible to
- * visitors before login. Same closed payload (display_name, char_function,
- * ovr, photo_path, the 6 key stats with stat_key/label/label_short/value_type/
- * value/points); key-stat CONFIG is still never serialised. No session, no
- * member JWT — the anon key is the only credential.
+ * Public landing showcase (0029, owner decision 2026-10-24; 0037 2026-10-28):
+ * the anon-callable twin of get_promotion — Início is the guild's landing page,
+ * visible to visitors before login. The server ranks the TOP 3 by OVR of each
+ * META (class, function) cohort only (class_cohorts.meta; non-viable combos and
+ * classes without enough data never appear). Same closed payload (display_name,
+ * char_function, ovr, photo_path, the 6 key stats with stat_key/label/
+ * label_short/value_type/value/points); key-stat CONFIG and the cohort flags are
+ * still never serialised. No session, no member JWT — the anon key is the only
+ * credential.
  */
 export async function fetchPromotionPublic(): Promise<PromotionSection[]> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL

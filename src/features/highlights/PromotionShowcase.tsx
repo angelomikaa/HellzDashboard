@@ -49,10 +49,19 @@
 // through here, so the exact same tree renders before and after login. The
 // payload is rendered verbatim: no rank computation in TS (T-06-13).
 //
+// 0037 (owner decision 2026-10-28): the server now ranks the TOP 3 by OVR of
+// each META (class, function) cohort only — the meta / non-viable split lives
+// in public.class_cohorts, so non-viable builds (and classes without enough
+// data) never reach this component. A class with several meta cohorts keeps ONE
+// section with up to 3 cards per cohort, ordered by OVR desc.
+//
 // Owner gate round 2 (07.1-02): the showcase is the premium register — only
 // Impecável (top-band) cards appear. Display-layer tier filter over the
 // fetched payload, server order preserved (filter, never sort), sections left
-// empty are dropped. tierForOvr is the unit-locked banding function.
+// empty are dropped. tierForOvr is the unit-locked banding function. Because
+// the server takes the top 3 by OVR first, this filter yields exactly the top 3
+// platinum cards of each meta cohort (a cohort with fewer than 3 platinum shows
+// what it has).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ApiError, fetchPromotionPublic, type PromotionSection } from '../../lib/api'
 import { tierForOvr } from '../dashboard/presentation'

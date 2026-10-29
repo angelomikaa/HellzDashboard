@@ -6,8 +6,10 @@
  * against the value-proportional scale + role-differentiated key stats:
  *
  *   T-06-06  anon get_promotion denied
- *   SHWC-02  member-invocable: jsonb array of class sections, ≤5 cards per
- *            section, card shape {display_name, char_function, ovr, highlights}
+ *   SHWC-02  member-invocable: jsonb array of class sections, ≤3 cards per
+ *            META (class, function) cohort (0037: class_cohorts.meta gate;
+ *            was ≤5 per class), card shape {display_name, char_function, ovr,
+ *            highlights}
  *   RNK-02   KEY-STAT LEAK PROOF: no is_key/key_stat/contributes_to_ovr
  *            marker anywhere; highlights carry exactly the class key set
  *   D-13     insufficient-data class (no OVR-capable member) => section
@@ -97,6 +99,16 @@ const MEMBERS = [
 
 const failures = []
 const total = { expected: 0 }
+
+/** Numeric equality for jsonb scalars returned by the RPCs (Number/jsonb
+ *  parity, same helper shape as scripts/smoke-rank.mjs). */
+function numEq(actual, expected) {
+  if (typeof actual === 'number') return actual === expected
+  if (typeof actual === 'string') return Number(actual) === expected
+  if (actual && typeof actual === 'object') return Number(actual.value) === expected
+  return false
+}
+
 function check(name, cond, detail = '') {
   total.expected += 1
   if (cond) {
@@ -116,7 +128,7 @@ async function login(handle) {
       Authorization: `Bearer ${ANON_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ discord_handle: handle, pin: PIN }),
+    body: JSON.stringify({ discord_handle: handle, pin: FIXTURE_PIN }),
   })
   if (!res.ok) {
     throw new Error(`login failed for ${handle}: HTTP ${res.status} ${await res.text()}`)
@@ -202,6 +214,11 @@ async function cleanup() {
   await mgmtQuery(
     `delete from class_key_stats where class_name in ('${PROMO_CLASS}', '${SPARE_CLASS}');`,
   )
+  // 0037: the showcase only ranks META cohorts, so the battery registers its
+  // throwaway class as meta at setup and removes the row here.
+  await mgmtQuery(
+    `delete from class_cohorts where class_name in ('${PROMO_CLASS}', '${SPARE_CLASS}');`,
+  )
   await mgmtQuery(
     `delete from classes where class_name in ('${PROMO_CLASS}', '${SPARE_CLASS}');`,
   )
@@ -223,6 +240,12 @@ async function main() {
     // validated submissions through the real RPCs.
     await mgmtQuery(
       `insert into classes (class_name) values ('${PROMO_CLASS}'), ('${SPARE_CLASS}');`,
+    )
+    // 0037: get_promotion ranks META cohorts only (class_cohorts.meta). The
+    // promo class is registered as meta so the battery still exercises the card
+    // pipeline; SPARE_CLASS stays unregistered AND has no keys (D-13 absent).
+    await mgmtQuery(
+      `insert into class_cohorts (class_name, char_function, meta) values ('${PROMO_CLASS}', 'dps', true);`,
     )
     // Provision a throwaway officer fixture (role officer) BEFORE the key-stat
     // setup loop, which authenticates as this officer. This script no longer
@@ -338,7 +361,7 @@ async function main() {
     const anonPromo = await rest('/rpc/get_promotion', { method: 'POST', body: {} })
     check('1. anon POST /rpc/get_promotion -> non-2xx', !anonPromo.ok, `HTTP ${anonPromo.status}`)
 
-    // ---- Probe 2 (SHWC-02): member-invocable, section + <=5 cards ---------
+    // ---- Probe 2 (SHWC-02): member-invocable, section + <=3 cards per cohort
     const memberPromo = await rest('/rpc/get_promotion', {
       method: 'POST',
       token: sessions[HANDLES.a].access_token,
@@ -353,7 +376,7 @@ async function main() {
     const promoSection = sections.find((s) => s.class_name === PROMO_CLASS)
     const promoCards = promoSection && Array.isArray(promoSection.cards) ? promoSection.cards : []
     check(
-      '2b. smoke_promo_cls section present with <=5 cards (3 fixture cards)',
+      '2b. smoke_promo_cls section present with <=3 cards for its meta cohort (3 fixture cards)',
       !!promoSection && promoCards.length === 3,
       `cards=${promoCards.length}`,
     )
@@ -527,7 +550,7 @@ async function main() {
     // Guaranteed cleanup — runs even when an assertion/setup threw mid-run.
     try {
       await cleanup()
-      console.log('PASS: cleanup removed submissions, members, key stats, classes, login-attempt rows')
+      console.log('PASS: cleanup removed submissions, members, key stats, classes, cohort rows, login-attempt rows')
     } catch (err) {
       console.error(`CLEANUP FAILED (manual residue removal needed): ${err?.message || err}`)
       process.exitCode = 1
