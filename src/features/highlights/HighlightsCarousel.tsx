@@ -303,7 +303,11 @@ export function HighlightsCarousel({
         {/* The build tokens: one per META build of the class. Pressing one
             shows that build's three best cards. Named on every breakpoint —
             the card's job line prints the class only, so this is where the
-            build is named. The bar wraps below sm instead of squeezing. */}
+            build is named. The bar wraps below sm instead of squeezing.
+            Owner 2026-10-30: these are OUTLINE buttons, never a solid fill —
+            the pressed one is marked by the same rotating neon ring + red glow
+            as the "Os Impecáveis da Hellz" title, so the token row reads as a
+            quiet selector instead of competing with the cards. */}
         {builds.length > 0 && (
           <div role="group" aria-label="Função" className="flex flex-wrap items-center gap-2">
             {builds.map((build) => {
@@ -314,10 +318,10 @@ export function HighlightsCarousel({
                   type="button"
                   aria-pressed={pressed}
                   onClick={() => onSelectBuild(build.fn)}
-                  className={`h-11 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  className={`h-11 rounded-full border border-line bg-surface px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                     pressed
-                      ? 'border-accent bg-accent text-accent-foreground'
-                      : 'border-line bg-surface text-muted hover-control hover:text-content'
+                      ? 'neon-ring glow-accent text-accent-bright'
+                      : 'text-muted hover-control hover:text-content'
                   }`}
                 >
                   {build.label}
