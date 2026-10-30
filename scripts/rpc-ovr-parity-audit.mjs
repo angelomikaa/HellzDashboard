@@ -146,11 +146,16 @@ for (const [name, contract] of Object.entries(BODY_CONTRACT)) {
     continue
   }
   if (contract.segment) {
+    // The segment ENDS at the showcase cap CTE. 0037 (Phase 10.2) renamed it
+    // top5 -> top3 (top 3 per cohort), so accept either name; the START marker
+    // is unchanged. The intent is the same: only the OVR lateral is gated.
     const start = src.indexOf('ovr_rows as (')
-    const end = start >= 0 ? src.indexOf('top5 as (', start) : -1
+    const top3 = start >= 0 ? src.indexOf('top3 as (', start) : -1
+    const top5 = start >= 0 ? src.indexOf('top5 as (', start) : -1
+    const end = top3 >= 0 ? top3 : top5
     if (start < 0 || end < 0) {
-      console.log(`  ${name.padEnd(22)} NO ovr_rows/top5 SEGMENT — not the 0029 shape`)
-      bodyFailures.push(`${name}: ovr_rows segment not found (0029 shape gone)`)
+      console.log(`  ${name.padEnd(22)} NO ovr_rows/top3 SEGMENT — not the showcase shape`)
+      bodyFailures.push(`${name}: ovr_rows segment not found (showcase cap CTE gone)`)
       continue
     }
     const seg = src.slice(start, end)
