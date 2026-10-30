@@ -222,6 +222,10 @@ async function cleanup() {
   // belt-and-braces for class_relevant_stats too (0013 cascades it).
   await mgmtQuery(`delete from class_key_stats where class_name = '${CLASS}';`)
   await mgmtQuery(`delete from class_relevant_stats where class_name = '${CLASS}';`)
+  // class_cohorts (0037) holds the meta gate get_promotion(_public) applies; the
+  // fixture class owns a row while the probes run, so it must go before the
+  // class itself (FK on class_name).
+  await mgmtQuery(`delete from class_cohorts where class_name = '${CLASS}';`)
   await mgmtQuery(`delete from classes where class_name = '${CLASS}';`)
   await mgmtQuery(
     `delete from pin_login_attempts where discord_handle in (${ALL_HANDLES.map((h) => `'${h}'`).join(',')});`,
@@ -238,6 +242,7 @@ async function zeroResidueCensus() {
        (select count(*) from classes where class_name = '${CLASS}') as classes,
        (select count(*) from class_key_stats where class_name = '${CLASS}') as key_rows,
        (select count(*) from class_relevant_stats where class_name = '${CLASS}') as relevant_rows,
+       (select count(*) from class_cohorts where class_name = '${CLASS}') as cohort_rows,
        (select count(*) from pin_login_attempts where discord_handle in (${handleList})) as attempts;`,
   )
   const row = Array.isArray(census) ? census[0] : null
@@ -251,6 +256,7 @@ async function zeroResidueCensus() {
     Number(row.relevant_rows) === 0,
     `relevant=${row.relevant_rows}`,
   )
+  check('census: zero fixture class_cohorts rows', Number(row.cohort_rows) === 0, `cohort=${row.cohort_rows}`)
   check('census: zero fixture pin_login_attempts rows', Number(row.attempts) === 0, `attempts=${row.attempts}`)
 }
 
@@ -269,6 +275,11 @@ async function main() {
     // default-0 fixture rows predate v2 and would collide with its
     // max(selection_order)+1 append).
     await mgmtQuery(`insert into classes (class_name) values ('${CLASS}');`)
+    // 0037: the showcase only ships META cohorts, so the fixture cohort must be
+    // marked meta or probes 7/10 would read an empty payload (cards=0).
+    await mgmtQuery(
+      `insert into class_cohorts (class_name, char_function, meta) values ('${CLASS}', 'dps', true);`,
+    )
     await mgmtQuery(
       `insert into class_key_stats (class_name, char_function, stat_key, selection_order) values ` +
         KEY_STATS.map((k, i) => `('${CLASS}', 'dps', '${k}', ${i + 1})`).join(', ') +
