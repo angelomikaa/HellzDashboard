@@ -468,12 +468,17 @@ function SlotPicker({
                 type="button"
                 disabled={saving || isCurrent}
                 onClick={() => onPick(member.member_id)}
-                className="flex h-11 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-content hover-control disabled:opacity-60"
+                className="flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-content hover-control disabled:opacity-60"
               >
-                <span className="flex-1 truncate">{member.display_name}</span>
-                <span className="text-xs text-muted">{classLabel(member.char_class)}</span>
+                {/* Two-line label: the name keeps the remaining width and never
+                    collapses to a single letter when the class + move badge are
+                    long (owner report 2026-10-30: "Ahrya" rendered as "A…"). */}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-semibold">{member.display_name}</span>
+                  <span className="truncate text-xs text-muted">{classLabel(member.char_class)}</span>
+                </span>
                 {assignment !== null && (
-                  <span className="whitespace-nowrap rounded border border-line px-1.5 text-xs text-amber-400">
+                  <span className="shrink-0 whitespace-nowrap rounded border border-line px-1.5 text-xs text-amber-400">
                     {assignmentBadge(assignment)} · mover
                   </span>
                 )}
