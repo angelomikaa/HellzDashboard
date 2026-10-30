@@ -274,25 +274,25 @@ export function RankPage({ session }: { session: NeoFootSession }) {
 
                               TABULAR view (owner feedback): the flex row this
                               replaces pushed "Média / valor / pontos" to the
-                              far edge of a very wide cell, leaving an empty
-                              middle that made each label ambiguous about which
-                              numbers it owned. One auto-width table keeps every
-                              value in its own column under its own header,
-                              hugging the label instead of stretching across the
-                              shell. */}
-                          <table className="mt-1 text-sm">
+                              far edge of a very wide cell with nothing tying
+                              them to the label. The table spans the detail
+                              width (no dead space on desktop) and every value
+                              keeps its own column under its own header, while
+                              the per-row rule runs the full width and carries
+                              the label ↔ value association across the gap. */}
+                          <table className="mt-1 w-full border-collapse text-sm">
                             <thead>
                               <tr className="border-b border-line">
-                                <th scope="col" className="py-1.5 pr-8 text-left font-medium text-muted">
+                                <th scope="col" className="w-full py-1.5 pr-8 text-left font-medium text-muted">
                                   Stat
                                 </th>
-                                <th scope="col" className="px-3 py-1.5 text-right font-medium text-muted">
+                                <th scope="col" className="w-28 px-3 py-1.5 text-right font-medium text-muted">
                                   Média
                                 </th>
-                                <th scope="col" className="px-3 py-1.5 text-right font-medium text-muted">
+                                <th scope="col" className="w-28 px-3 py-1.5 text-right font-medium text-muted">
                                   Valor
                                 </th>
-                                <th scope="col" className="py-1.5 pl-3 text-right font-medium text-muted">
+                                <th scope="col" className="w-24 py-1.5 pl-3 text-right font-medium text-muted">
                                   Pontos
                                 </th>
                               </tr>
@@ -319,7 +319,7 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                                       return (
                                         <tr
                                           key={stat.stat_key}
-                                          className="border-b border-line/50 last:border-b-0"
+                                          className="border-b border-line last:border-b-0"
                                         >
                                           <th scope="row" className="whitespace-nowrap py-1.5 pr-8 text-left font-semibold text-content">
                                             {stat.label}
