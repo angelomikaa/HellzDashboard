@@ -37,7 +37,12 @@ export const SESSION_SECONDS = 7 * 24 * 60 * 60 // D-06: 7-day session
 
 // Device fingerprint + claim live in ./device.ts (single source of truth, 08.1-08).
 // Re-exported here so every importer keeps working unchanged.
-export { DEVICE_FP_CLAIM, computeDeviceFingerprint } from './device.ts'
+// DEVICE_FP_CLAIM is IMPORTED as well as re-exported: mintSession below writes
+// claims[DEVICE_FP_CLAIM], and a bare `export ... from` creates no local binding
+// (08.1-08 regression — every login threw ReferenceError at mint time).
+import { DEVICE_FP_CLAIM } from './device.ts'
+
+export { DEVICE_FP_CLAIM, computeDeviceFingerprint, deviceFingerprintFromRequest } from './device.ts'
 
 export interface EnvConfig {
   supabaseUrl: string
