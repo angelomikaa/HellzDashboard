@@ -332,14 +332,16 @@ describe('photoDestRect — subject art (the class-portrait framing, round 8)', 
     const dest = photoDestRect(1197, 1309, HP_BOUNDS, WIN)
     // The frame is height-constrained for this art, so the frame top == the
     // window top; the subject's own headroom (88 image px) scaled into the
-    // window is the margin the owner asked for.
+    // window is the margin the owner asked for. The whole-figure framing
+    // (bodyFraction 1.0, 2026-10-30) scales the art down, so this margin is
+    // ~7% of the window: still clear of the top border, without the zoom.
     const scale = dest.h / 1309
     const subjectTopInWindow = 88 * scale
-    expect(subjectTopInWindow / WIN.h).toBeGreaterThan(0.08)
+    expect(subjectTopInWindow / WIN.h).toBeGreaterThan(0.05)
     expect(subjectTopInWindow / WIN.h).toBeLessThan(0.16)
   })
 
-  it('cuts at the thigh line, not the knee: the visible band ends at bodyFraction of the figure', () => {
+  it('ends the visible band at bodyFraction of the figure (no cut past the feet)', () => {
     const dest = photoDestRect(1197, 1309, HP_BOUNDS, WIN)
     const scale = dest.h / 1309
     // Window bottom maps to this image row:
@@ -403,8 +405,8 @@ describe('photoDestRect — opaque screenshots (round-7 head-safe anchor, unchan
 })
 
 describe('PHOTO_FRAME tuning (calibrated 2026-10-25)', () => {
-  it('keeps the owner-requested thigh cut and margins', () => {
-    expect(PHOTO_FRAME.bodyFraction).toBe(0.58)
+  it('shows the whole figure (owner 2026-10-30: the thigh crop was too zoomed in)', () => {
+    expect(PHOTO_FRAME.bodyFraction).toBe(1.0)
     expect(PHOTO_FRAME.headMargin).toBe(0.1)
     expect(PHOTO_FRAME.sideMargin).toBe(0.05)
   })

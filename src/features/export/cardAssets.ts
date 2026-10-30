@@ -868,9 +868,10 @@ export interface PhotoSubjectBounds {
  * 92-99.3%). Fractions are of the measured FIGURE height (bottom - top).
  */
 export const PHOTO_FRAME = {
-  /** How much of the figure the frame keeps below the head: 0.58 cuts at
-   *  about mid-thigh (the owner's "shot from the thighs and above"). */
-  bodyFraction: 0.58,
+  /** How much of the figure the frame keeps below the head. 1.0 keeps the
+   *  whole figure: owner 2026-10-30 found the earlier 0.58 (mid-thigh) crop
+   *  too zoomed in, so the portrait now shows head to feet. */
+  bodyFraction: 1.0,
   /** Breathing room above the subject's topmost opaque pixel. */
   headMargin: 0.1,
   /** Breathing room either side of the figure (of the figure height). */
