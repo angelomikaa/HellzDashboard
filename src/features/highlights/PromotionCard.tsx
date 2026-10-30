@@ -46,6 +46,12 @@ import { cardFilename, downloadCard, type CardExportData } from '../export/cardE
 // Enumeration-safe pt-BR copy: never expose HTTP codes or internals.
 const DOWNLOAD_ERROR = 'Não foi possível gerar o card. Tente novamente.'
 
+/** The card's third stat line (the raw own_value) is CREDENTIAL-GATED (owner
+ *  2026-10-30): an unauthenticated viewer sees only this placeholder. It is
+ *  also what a null server value renders as — the RPC omits values for
+ *  anonymous callers, so the gate holds even without the client-side flag. */
+const HIDDEN_STAT_VALUE = '—'
+
 // One object URL per showcase photo path for the page's lifetime. The carousel
 // mounts every card three times (loop copies) and every class rotates through,
 // so a URL per mount would re-create and re-measure the same photo endlessly.
@@ -69,10 +75,17 @@ export function PromotionCard({
   card,
   charClass,
   spotlight = false,
+  showRealStats = false,
 }: {
   card: PromotionCardRow
   charClass: string
   spotlight?: boolean
+  /** Owner 2026-10-30: only a viewer with a valid credential sees the real
+   *  stats (the third line of each stat column). Visitors — and any future
+   *  caller that forgets to opt in — get '—'. Deny-by-default on purpose.
+   *  The SAME value feeds the PNG export, so a downloaded card can never leak
+   *  more than the card on screen. */
+  showRealStats?: boolean
 }) {
   // CardSvg derives the tier palette from the unit-locked tierForOvr
   // banding; ovr is ALWAYS non-null on a card (the RPC omits OVR-incapable
@@ -119,13 +132,16 @@ export function PromotionCard({
       ovr: Math.round(card.ovr),
       stats: card.highlights.map((h) => ({
         label_short: h.label_short,
-        value: formatStatValue(h.value, h.value_type),
+        value:
+          showRealStats && h.value !== null
+            ? formatStatValue(h.value, h.value_type)
+            : HIDDEN_STAT_VALUE,
         points: h.points,
       })),
       photoSrc: photoUrl ?? portraitSrcFor(ownClass),
       monogramLetter: jobLabel.charAt(0).toUpperCase(),
     }
-  }, [card, ownClass, photoUrl])
+  }, [card, ownClass, photoUrl, showRealStats])
 
   async function handleDownload(): Promise<void> {
     setGenerating(true)

@@ -277,7 +277,10 @@ function App() {
                         ) : showLineup ? (
                           <LineupPage session={session} />
                         ) : showInicio ? (
-                          <InicioPage />
+                          // The live session travels into the showcase: the
+                          // cards' raw stat values are credential-gated
+                          // (owner 2026-10-30), and the member view keeps them.
+                          <InicioPage session={session} />
                         ) : (
                           <DashboardPage
                             session={session}

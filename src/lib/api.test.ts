@@ -16,6 +16,7 @@ import {
   fetchKeyStats,
   fetchMyReport,
   fetchMySubmissions,
+  fetchPromotionPublic,
   fetchStaffMembers,
   fetchStaffRequests,
   asLineupsPayload,
@@ -547,6 +548,25 @@ describe('lineup RPC wrappers (phase 10.4, LNUP-01..03)', () => {
       asLineupsPayload({ battlefields: [{ battlefield: 'mars', parties: [] }], roster: [] }),
     ).toThrow(ApiError)
     expect(asLineupsPayload(lineupPayload).roster).toHaveLength(1)
+  })
+})
+
+describe('public promotion showcase — credential-gated stat values (owner 2026-10-30)', () => {
+  it('calls anonymously without a session (anon bearer) and with the member JWT when signed in', async () => {
+    nextResponse = () => res(200, '[]')
+    await fetchPromotionPublic()
+    expect(calls[0].url).toBe(
+      'https://test-project.supabase.co/rest/v1/rpc/get_promotion_public',
+    )
+    expect(
+      (calls[0].init.headers as Record<string, string>).Authorization,
+    ).toBe('Bearer test-anon-key')
+
+    await fetchPromotionPublic(session)
+    expect(
+      (calls[1].init.headers as Record<string, string>).Authorization,
+    ).toBe('Bearer test-token')
+    expect((calls[1].init.headers as Record<string, string>).apikey).toBe('test-anon-key')
   })
 })
 

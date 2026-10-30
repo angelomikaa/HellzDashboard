@@ -498,7 +498,10 @@ export interface PromotionHighlight {
   label: string
   label_short: string // D-11 3-letter pt-BR label (07.2-01 supersession, D-13)
   value_type: 'flat' | 'percentual'
-  value: number
+  // The raw own_value is CREDENTIAL-GATED (owner 2026-10-30): the server only
+  // serialises it for an authenticated active member. Anonymous callers get
+  // null and the card's value line renders '—' (never a guess, never a 0).
+  value: number | null
   points: number
 }
 
@@ -553,17 +556,25 @@ export interface PromotionSection {
 }
 
 /**
- * Public landing showcase (0029, owner decision 2026-10-24; 0037 2026-10-28):
- * the anon-callable twin of get_promotion — Início is the guild's landing page,
- * visible to visitors before login. The server ranks the TOP 3 by OVR of each
- * META (class, function) cohort only (class_cohorts.meta; non-viable combos and
- * classes without enough data never appear). Same closed payload (display_name,
+ * Public landing showcase (0029, owner decision 2026-10-24; 0037 2026-10-28;
+ * credential-gated stats 2026-10-30): the anon-callable twin of
+ * get_promotion — Início is the guild's landing page, visible to visitors
+ * before login. The server ranks the TOP 3 by OVR of each META (class,
+ * function) cohort only (class_cohorts.meta; non-viable combos and classes
+ * without enough data never appear). Same closed payload (display_name,
  * char_function, ovr, photo_path, the 6 key stats with stat_key/label/
- * label_short/value_type/value/points); key-stat CONFIG and the cohort flags are
- * still never serialised. No session, no member JWT — the anon key is the only
- * credential.
+ * label_short/value_type/value/points); key-stat CONFIG and the cohort flags
+ * are still never serialised.
+ *
+ * The RAW stat values (`value`) are only serialised to a caller holding a
+ * valid member JWT — an anonymous request receives `value: null` and the card
+ * renders '—' (owner 2026-10-30). So the app passes the live session when the
+ * viewer is signed in (same RPC, member Authorization header) and passes
+ * nothing on the public landing (anon key only).
  */
-export async function fetchPromotionPublic(): Promise<PromotionSection[]> {
+export async function fetchPromotionPublic(
+  session?: NeoFootSession,
+): Promise<PromotionSection[]> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
   if (!supabaseUrl || !anonKey) {
@@ -575,7 +586,7 @@ export async function fetchPromotionPublic(): Promise<PromotionSection[]> {
       method: 'POST',
       headers: {
         apikey: anonKey,
-        Authorization: `Bearer ${anonKey}`,
+        Authorization: `Bearer ${session?.access_token ?? anonKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({}),

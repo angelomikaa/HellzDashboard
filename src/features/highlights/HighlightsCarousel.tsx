@@ -96,6 +96,7 @@ export function HighlightsCarousel({
   onClassStep,
   onUserInteraction,
   autoAdvanceMs = AUTO_ADVANCE_MS,
+  showRealStats = false,
 }: {
   cards: PromotionCardRow[]
   charClass: string
@@ -114,6 +115,9 @@ export function HighlightsCarousel({
   onClassStep?: (delta: 1 | -1) => void
   onUserInteraction?: () => void
   autoAdvanceMs?: number
+  /** Owner 2026-10-30: the cards' real stat values render only for a viewer
+   *  with a valid credential; everyone else sees '—' (deny-by-default). */
+  showRealStats?: boolean
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const looping = cards.length > 1
@@ -436,7 +440,12 @@ export function HighlightsCarousel({
                   className="showcase-reveal"
                   style={{ animationDelay: `${logical * 70}ms` }}
                 >
-                  <PromotionCard card={card} charClass={charClass} spotlight={spotlight} />
+                  <PromotionCard
+                    card={card}
+                    charClass={charClass}
+                    spotlight={spotlight}
+                    showRealStats={showRealStats}
+                  />
                 </div>
               </li>
             )

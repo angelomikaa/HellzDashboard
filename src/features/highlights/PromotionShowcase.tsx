@@ -70,6 +70,7 @@
 // platinum cards of each meta cohort (a cohort with fewer than 3 platinum shows
 // what it has).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import type { NeoFootSession } from '../auth/session'
 import { ApiError, fetchPromotionPublic, type PromotionSection } from '../../lib/api'
 import { groupCardsByBuild, mergeCohortSections } from './buildGroups'
 import { tierForOvr } from '../dashboard/presentation'
@@ -140,13 +141,20 @@ function ShowcaseSkeleton() {
   )
 }
 
-export function PromotionShowcase() {
+export function PromotionShowcase({ session }: { session?: NeoFootSession }) {
   const [sections, setSections] = useState<PromotionSection[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Owner 2026-10-30: the raw stat values are credential-gated. A signed-in
+  // member calls the very same RPC with their JWT so the server serialises the
+  // real values; the public landing (no session) stays anonymous and receives
+  // null values, rendered as '—'. Presence of a session is also what enables
+  // the third line below — the two gates agree by construction.
+  const showRealStats = session !== undefined
+
   useEffect(() => {
     let cancelled = false
-    fetchPromotionPublic()
+    fetchPromotionPublic(session)
       .then((data) => {
         if (!cancelled) setSections(data)
       })
@@ -157,7 +165,10 @@ export function PromotionShowcase() {
     return () => {
       cancelled = true
     }
-  }, [])
+    // The session object is stable for the shell's lifetime (React state in
+    // App), so this fetches once per session — a logout/login swap remounts
+    // the shell and refetches with the new credential.
+  }, [session])
 
   if (error !== null) {
     return (
@@ -215,7 +226,7 @@ export function PromotionShowcase() {
           arrows) and the cards float directly on the page's neon grid.
           Round 6: one class holds the showcase at a time, rotating
           (ClassRotation below). Server order preserved (no client re-sort). */}
-      <ClassRotation sections={impecavelSections} />
+      <ClassRotation sections={impecavelSections} showRealStats={showRealStats} />
     </ShowcaseShell>
   )
 }
@@ -232,7 +243,13 @@ export function PromotionShowcase() {
  * class defers the rotation), and the class stepper lives on the one carousel
  * — the class is the rotation unit, so a multi-build class never carries
  * several steppers or drain bars. */
-function ClassRotation({ sections }: { sections: PromotionSection[] }) {
+function ClassRotation({
+  sections,
+  showRealStats,
+}: {
+  sections: PromotionSection[]
+  showRealStats: boolean
+}) {
   const total = sections.length
   const [activeIndex, setActiveIndex] = useState(0)
   const [pauseReasons, setPauseReasons] = useState({
@@ -377,6 +394,7 @@ function ClassRotation({ sections }: { sections: PromotionSection[] }) {
           onClassStep={stepClass}
           onUserInteraction={restartWindow}
           autoAdvanceMs={AUTO_ADVANCE_MS}
+          showRealStats={showRealStats}
         />
       </div>
     </div>

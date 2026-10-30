@@ -14,11 +14,17 @@
 // The showcase is not duplicated: the exact same PromotionShowcase tree
 // renders for visitors (via PublicLanding's shell, anon-callable
 // get_promotion_public RPC — 0029) and for members (this component inside
-// the app shell). What a visitor previews is what a member sees. Points and
-// OVR arrive opaque from the RPCs — never recomputed client-side
+// the app shell). What a visitor previews is what a member sees — EXCEPT the
+// raw stat values (owner 2026-10-30): those are credential-gated server-side,
+// and an unauthenticated viewer's card renders '—' on the third line. Points
+// and OVR arrive opaque from the RPCs — never recomputed client-side
 // (AGENTS.md).
+import type { NeoFootSession } from '../auth/session'
 import { PromotionShowcase } from '../highlights/PromotionShowcase'
 
-export function InicioPage() {
-  return <PromotionShowcase />
+export function InicioPage({ session }: { session?: NeoFootSession }) {
+  // No session = the public landing: the cards' real stat values stay hidden
+  // ('—') and the RPC is called anonymously. A signed-in member passes the
+  // live session so the same page keeps showing the real stats.
+  return <PromotionShowcase session={session} />
 }
