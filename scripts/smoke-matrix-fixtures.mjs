@@ -19,13 +19,25 @@
  * submitters are skipped (already primed by their own dedicated fixtures or by
  * real players) — pass --all to include them anyway.
  *
- * Owner decisions (2026-10-28):
- *   - exactly TWO primers per target combo (the third member is meant to be a
- *     REAL player);
+ * Owner decisions:
+ *   - 2026-10-28: TWO primers per target combo where real players exist (the
+ *     third member is meant to be a REAL player);
+ *   - 2026-10-29 ("you can create smokes for cohorts that are meta but have no
+ *     members registered yet"): a meta cohort with NO real member — the census
+ *     of 2026-10-29 found ten of them (Assassin Cross dps/mdps, Biochemist dps,
+ *     Champion dps, High Wizard suporte, Lord Knight dps, Mastersmith dps,
+ *     Paladin suporte, Stalker dps, Summoner suporte — all sitting at n=2 with
+ *     nothing but primers) — gets a THIRD primer, so the cohort reaches n=3 on
+ *     its own: a real OVR, a tier, and its own row on the Início showcase
+ *     (383/0037: one carousel per meta build). It deliberately does NOT touch a
+ *     cohort that has real members registered-but-not-yet-submitting (Bard
+ *     suporte, Biochemist mdps, Professor suporte) — those players are the
+ *     intended third.
  *   - primers are a BASIS, never competitors: each primer must sit at or BELOW
- *     the cohort's WORST real player on every stat, pushed a further 5% / 10%
- *     down (owner 2026-10-28: "they must now be lower than the lowest member of
- *     the cohort, as they are just a basis and are not meant to be competitive");
+ *     the cohort's WORST real player on every stat, pushed a further 5% / 10% /
+ *     15% down (owner 2026-10-28: "they must now be lower than the lowest member
+ *     of the cohort, as they are just a basis and are not meant to be
+ *     competitive");
  *   - non-meta combos are out of scope (no keys and/or not viable).
  *
  * Stat base per combo (never invented per class):
@@ -143,11 +155,12 @@ const CLASS_LABELS = {
 }
 const FUNCTION_LABELS = { dps: 'Físico', mdps: 'Mágico', suporte: 'Suporte' }
 // Distance BELOW the cohort's worst real value, as a fraction of that value.
-// Primer 1 sits 5% further down, primer 2 10%, so the pair is ordered and both
-// stay strictly under every real player (owner 2026-10-28: primers are a basis,
-// not competitors).
-const GAPS = [0.05, 0.1]
-const SUFFIXES = ['Um', 'Dois']
+// Primer 1 sits 5% further down, primer 2 10%, primer 3 (owner 2026-10-29, only
+// for a cohort with NO real member) 15% — so the trio is ordered and every one
+// of them stays strictly under every real player (owner 2026-10-28: primers are
+// a basis, not competitors).
+const GAPS = [0.05, 0.1, 0.15]
+const SUFFIXES = ['Um', 'Dois', 'Três']
 
 function classLabel(name) {
   return CLASS_LABELS[name] ?? name
@@ -229,13 +242,17 @@ delete from members where discord_handle like '${SENTINEL}-%';
 // exactly six usable keys, plus their live census and the real anchor (newest
 // validated submitter) when one exists.
 //
-// Two different filters matter here:
+// Three different filters matter here, and they answer three different
+// questions:
 //   - the SKIP count ignores this script's own namespace (smoke-mtx-%) so a
 //     re-run never mistakes a previous primer for real coverage, while still
 //     honouring the dedicated per-class fixture scripts (smoke-bio-, smoke-hp-,
 //     smoke-sum-) as coverage;
 //   - the ANCHOR ignores every smoke fixture (smoke%) — a primer must always be
-//     derived from a REAL player's submission, never from another primer.
+//     derived from a REAL player's submission, never from another primer;
+//   - real_members (owner 2026-10-29) counts active members of the cohort that
+//     are NOT any kind of smoke fixture: 0 means the cohort has no member
+//     registered yet, which is what earns the combo a THIRD primer.
 const TARGETS_SQL = `
 with combo as (
   select cc.class_name, cc.char_function
@@ -260,6 +277,12 @@ census as (
              and m.active
              and s.status = 'validated'
              and m.discord_handle not like '${SENTINEL}-%') as validators,
+         (select count(distinct m.id)
+            from members m
+           where m.char_class = c.class_name
+             and m.char_function = c.char_function
+             and m.active
+             and m.discord_handle not like 'smoke%') as real_members,
          a.anchor_id, a.anchor_display
   from combo c
   left join lateral (
@@ -274,6 +297,7 @@ census as (
   ) a on true
 )
 select class_name, char_function, coalesce(validators, 0) as validators,
+       coalesce(real_members, 0) as real_members,
        anchor_id, anchor_display
 from census
 order by class_name, char_function;
@@ -635,9 +659,17 @@ async function main() {
     )
   }
 
+  // Owner 2026-10-29: a cohort with no real member registered yet earns a THIRD
+  // primer (n=3 on its own → a real OVR → its own Início row). Cohorts that
+  // DO have real members keep TWO — the third slot stays reserved for a real
+  // player (registered-but-not-submitting players already cover it semantically).
+  const primerCount = (t) => (Number(t.real_members) === 0 ? GAPS.length : GAPS.length - 1)
+  const empty = selected.filter((t) => Number(t.real_members) === 0)
+
   const fixtures = []
   for (const t of selected) {
-    for (let i = 0; i < GAPS.length; i += 1) {
+    const count = primerCount(t)
+    for (let i = 0; i < count; i += 1) {
       fixtures.push({
         handle: `${SENTINEL}-${classSlug(t.class_name)}-${t.char_function}-0${i + 1}`,
         display: `Smoke ${classLabel(t.class_name)} ${FUNCTION_LABELS[t.char_function]} ${SUFFIXES[i]}`,
@@ -659,6 +691,12 @@ async function main() {
       `${anchored} under a real cohort's worst member, ${selected.length - anchored} under the guild floor ` +
       `(gaps ${GAPS.map((g) => `${(g * 100).toFixed(0)}%`).join(' / ')} below the floor)`,
   )
+  if (empty.length) {
+    console.log(
+      `[smoke-matrix] no real member registered yet → THIRD primer for ${empty.length} combo(s): ` +
+        empty.map((t) => `${t.class_name}/${t.char_function}`).join(', '),
+    )
+  }
 
   // Census before: the coverage that persists between runs (this script's own
   // primers excluded) — the same number the skip rule uses.
@@ -757,37 +795,31 @@ async function main() {
     if (!ok) process.exitCode = 1
   }
 
-  // Empty combos: prove the objective with one self-cleaning third submitter.
-  const emptyCombo = selected.find((t) => !t.anchor_id)
+  // Owner 2026-10-29 objective, proved on the ROWS THAT ARE NOW LIVE: a cohort
+  // that had no member registered yet must answer a real OVR by itself, because
+  // it now carries its third primer. The old self-cleaning "third submitter"
+  // probe is gone — that state is now permanent and verified, not simulated.
+  const emptyCombo = empty.find((t) => selected.includes(t))
   if (emptyCombo) {
     const comboKey = `${emptyCombo.class_name}/${emptyCombo.char_function}`
-    const probe = {
-      handle: `${PROBE_HANDLE}-01`,
-      display: `Smoke ${classLabel(emptyCombo.class_name)} ${FUNCTION_LABELS[emptyCombo.char_function]} Probe`,
-      className: emptyCombo.class_name,
-      charFunction: emptyCombo.char_function,
-    }
-    try {
-      await mgmtQuery(probeSql(probe))
-      const report = await myReport(await login(probe.display))
-      const ok =
-        report?.ovr?.data_sufficient === true &&
-        typeof report.ovr.value === 'number' &&
-        report.ovr.value >= 51
-      console.log(
-        `[smoke-matrix] completion probe on ${comboKey} (3rd submitter): ovr=${report?.ovr?.value} ` +
-          `data_sufficient=${report?.ovr?.data_sufficient} -> ${ok ? 'THIRD SUBMITTER UNLOCKS THE OVR' : 'PROBE FAILED'}`,
-      )
-      if (!ok) process.exitCode = 1
-    } finally {
-      await mgmtQuery(PROBE_PURGE_SQL)
-      console.log('[smoke-matrix] completion probe purged (zero residue)')
-    }
+    const fixture = fixtures.find(
+      (f) => f.className === emptyCombo.class_name && f.charFunction === emptyCombo.char_function,
+    )
+    const report = await myReport(await login(fixture.display))
+    const ok =
+      report?.ovr?.data_sufficient === true &&
+      typeof report.ovr.value === 'number' &&
+      report.ovr.value >= 51
+    console.log(
+      `[smoke-matrix] third-primer probe ${comboKey} (${fixture.display}): ovr=${report?.ovr?.value} ` +
+        `data_sufficient=${report?.ovr?.data_sufficient} -> ${ok ? 'NO-MEMBER COHORT ANSWERS ITS OWN OVR' : 'PROBE FAILED'}`,
+    )
+    if (!ok) process.exitCode = 1
   }
 
   console.log(
     `[smoke-matrix] combos data-sufficient now: ${sufficient}/${selected.length} ` +
-      `(the rest need one real submitter each)`,
+      `(${empty.length} of them answered by their own third primer; the rest need one real submitter each)`,
   )
 }
 
