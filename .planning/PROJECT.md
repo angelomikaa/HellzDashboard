@@ -130,4 +130,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-27 - Phase 10.1 complete (universal rating unification live on all six OVR RPCs, parity-gated, owner-confirmed one number everywhere)*
+*Last updated: 2026-10-30 - Phase 10.4 complete (Vigrid Field / Ruinscape lineups live for members with officer editing and per-battlefield JPG export; 80-player roster pre-registered; XAVENTAL folded into Slader; device binding repaired in production)*
