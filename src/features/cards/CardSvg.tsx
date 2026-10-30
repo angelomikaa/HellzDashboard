@@ -54,7 +54,7 @@
 // Text lives INSIDE the <svg viewBox> coordinate space, so the fitted
 // composition scales with the card at any width.
 import { useEffect, useId, useMemo, useState } from 'react'
-import { measurePhotoSubject, photoDestRect, tierPlateColor, type CardRect } from '../export/cardAssets'
+import { measurePhotoSubject, photoDestRect, tierPlateFadeStops, type CardRect } from '../export/cardAssets'
 import {
   buildCardPlan,
   CARD_PLATE_GRADIENT_LINE,
@@ -234,8 +234,9 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         {/* Stats contrast plate gradient (owner 2026-10-29 "tier-color"): the
             plate behind the six stat columns, painted over the photo so the
             stat text reads against any screenshot. Geometry + FADE come from
-            the file; the COLOR is the TIER's own (tierPlateColor) — the SVG's
-            ramp is the reference for how it fades, never what it paints. */}
+            the file; the COLOR is the TIER's own ramp, reduced to 3 points
+            (tierPlateFadeStops) — the SVG's ramp is the reference for how it
+            fades, never what it paints. */}
         {plan.card.statsPlate !== undefined && (
           <linearGradient
             id={statsPlateGradId}
@@ -245,8 +246,8 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
             x2={plan.card.statsPlate.line.x2}
             y2={plan.card.statsPlate.line.y2}
           >
-            {plan.card.statsPlate.fades.map((fade, i) => (
-              <stop key={i} offset={fade.offset} stopColor={tierPlateColor(plan.palette)} stopOpacity={fade.opacity} />
+            {tierPlateFadeStops(plan.palette, plan.card.statsPlate.fades).map((stop, i) => (
+              <stop key={i} offset={stop.offset} stopColor={stop.color} stopOpacity={stop.opacity} />
             ))}
           </linearGradient>
         )}

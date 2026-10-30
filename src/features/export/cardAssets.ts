@@ -148,16 +148,80 @@ export interface CardStatsPlate {
   fades: { offset: number; opacity: number }[]
 }
 
-/** The tier's plate color: the palette's gradient when the tier declares one
- *  (pristine), otherwise its solid plateFill. Shared by both surfaces so the
- *  plate and the stats plate can never disagree on the tier's color. */
-export function tierPlateColor(palette: TierPalette): string {
+/** The tier's plate ramp, REDUCED TO THREE POINTS. Owner 2026-10-29: "the
+ *  platinum tier is using green, not rainbow — the rainbow doesn't necessarily
+ *  have to be the 5-point we have on the project, it can be reduced to 3 to
+ *  better fit the 3-point gradient of the stats plate."
+ *
+ *  So a tier that declares `plateStops` (platinum/pristine) samples its own
+ *  ramp at 0 / 0.5 / 1 — a true rainbow, just coarser — and a solid tier
+ *  collapses to its `plateFill` at every point. This is the ONLY place the
+ *  stats plate takes its colors from, so the canvas export and the SVG twin
+ *  can never disagree. */
+export function tierPlateRamp(palette: TierPalette): { offset: number; color: string }[] {
   const stops = palette.plateStops
-  if (stops === undefined) return palette.plateFill
-  // A mid stop reads as the tier's color most faithfully on the small plate.
-  const mid = stops.reduce((best, s) =>
-    Math.abs(s.offset - 0.5) < Math.abs(best.offset - 0.5) ? s : best, stops[0])
-  return mid.color
+  if (stops === undefined) return [{ offset: 0, color: palette.plateFill }]
+  return [0, 0.5, 1].map((offset) => ({ offset, color: sampleRamp(stops, offset) }))
+}
+
+/** The stats plate's paint stops: the FILE's fade (offsets + opacities, the
+ *  contrast layer) tinted with the TIER's 3-point ramp. One stop per authored
+ *  fade, so the plate keeps exactly the falloff the owner drew while the color
+ *  rides the tier. */
+export function tierPlateFadeStops(
+  palette: TierPalette,
+  fades: { offset: number; opacity: number }[],
+): { offset: number; color: string; opacity: number }[] {
+  const ramp = tierPlateRamp(palette)
+  return fades.map((fade) => ({
+    offset: fade.offset,
+    color: sampleRamp(ramp, fade.offset),
+    opacity: fade.opacity,
+  }))
+}
+
+/** Linear sample of a stop list at `offset` (sRGB lerp). Non-hex colors fall
+ *  back to the nearest stop, so a keyword in a future file never yields NaN. */
+function sampleRamp(stops: { offset: number; color: string }[], offset: number): string {
+  if (stops.length === 0) return '#000000'
+  const o = Math.min(1, Math.max(0, offset))
+  if (o <= stops[0].offset) return stops[0].color
+  const last = stops[stops.length - 1]
+  if (o >= last.offset) return last.color
+  for (let i = 1; i < stops.length; i += 1) {
+    const hi = stops[i]
+    const lo = stops[i - 1]
+    if (o <= hi.offset) {
+      const span = hi.offset - lo.offset
+      const t = span <= 0 ? 0 : (o - lo.offset) / span
+      return mixHex(lo.color, hi.color, t)
+    }
+  }
+  return last.color
+}
+
+function mixHex(a: string, b: string, t: number): string {
+  const ca = parseHex(a)
+  const cb = parseHex(b)
+  if (ca === null || cb === null) return t < 0.5 ? a : b
+  const ch = (i: number) => Math.round(ca[i] + (cb[i] - ca[i]) * t)
+  return `#${[ch(0), ch(1), ch(2)].map((v) => v.toString(16).padStart(2, '0')).join('')}`
+}
+
+function parseHex(color: string): [number, number, number] | null {
+  const hex = color.trim()
+  const short = hex.match(/^#([0-9a-f]{3})$/i)
+  if (short !== null) {
+    const [r, g, b] = short[1].split('').map((c) => parseInt(c + c, 16))
+    return [r, g, b]
+  }
+  const long = hex.match(/^#([0-9a-f]{6})$/i)
+  if (long === null) return null
+  return [
+    parseInt(long[1].slice(0, 2), 16),
+    parseInt(long[1].slice(2, 4), 16),
+    parseInt(long[1].slice(4, 6), 16),
+  ]
 }
 
 export interface CardGeometry {

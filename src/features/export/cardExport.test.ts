@@ -50,7 +50,7 @@ import {
   type CardExportData,
   type TextMeasurer,
 } from './cardExport'
-import { contrastRatio, resolveCardTextFill, tierPlateColor } from './cardAssets'
+import { contrastRatio, resolveCardTextFill, tierPlateFadeStops, tierPlateRamp } from './cardAssets'
 
 const data: CardExportData = {
   name: 'Maria Silva',
@@ -313,17 +313,48 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     }
   })
 
-  it('paints the plate in the TIER color, not the SVG ramp (owner tier-color contract)', () => {
+  it('paints the plate in the TIER ramp, not the SVG ramp (owner tier-color contract)', () => {
     // Owner 2026-10-29: "the fills must follow tier colors, not the color in
-    // the svg". Every tier resolves a color from its OWN palette, and the four
-    // tiers are distinguishable — the purple ramp in the file must never leak.
+    // the svg". Every tier resolves from its OWN palette, and the four tiers are
+    // distinguishable — the purple ramp in the file must never leak.
     const colors = (['bronze', 'silver', 'gold', 'platinum'] as const).map(
-      (tier) => tierPlateColor(TIER_PALETTE[tier]),
+      (tier) => tierPlateRamp(TIER_PALETTE[tier])[0].color,
     )
     expect(new Set(colors).size).toBe(4)
     for (const color of colors) {
-      expect(color).toMatch(/^#[0-9a-f]{3,6}$/i)
+      expect(color).toMatch(/^#[0-9a-f]{6}$/i)
       expect(color.toLowerCase()).not.toBe('#662d91')
+    }
+  })
+
+  it('rides the 3-point tier ramp on the plate, never a single flat color (platinum rainbow)', () => {
+    // Owner 2026-10-29: "the platinum tier is using green, not rainbow — the
+    // rainbow ... can be reduced to 3 to better fit the 3-point gradient of the
+    // status plate." Platinum therefore paints red → … → silver across the
+    // authored fades; a single flat green was the bug.
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    const plate = plan.card.statsPlate
+    expect(plate).toBeDefined()
+    if (plate === undefined) return
+
+    const platinum = tierPlateFadeStops(TIER_PALETTE.platinum, plate.fades)
+    expect(platinum.map((s) => s.offset)).toEqual(plate.fades.map((f) => f.offset))
+    // The authored fade's opacities are preserved verbatim (contrast layer).
+    expect(platinum.map((s) => s.opacity)).toEqual(plate.fades.map((f) => f.opacity))
+
+    const colors = platinum.map((s) => s.color.toLowerCase())
+    // Not one flat fill (the reported bug), and the ramp's ends are the tier's
+    // own stops: red at 0, silver at 1.
+    expect(new Set(colors).size).toBeGreaterThan(1)
+    expect(colors[0]).toBe('#f26d6f')
+    expect(colors[colors.length - 1]).toBe('#b8c0cc')
+    // The file's purple must never leak into the plate.
+    expect(colors).not.toContain('#662d91')
+
+    // Solid tiers collapse to their plateFill, uniformly.
+    for (const tier of ['bronze', 'silver', 'gold'] as const) {
+      const stops = tierPlateFadeStops(TIER_PALETTE[tier], plate.fades)
+      expect(new Set(stops.map((s) => s.color))).toEqual(new Set([TIER_PALETTE[tier].plateFill]))
     }
   })
 

@@ -74,7 +74,7 @@ import {
   resolveCardTextFill,
   scalePath,
   scaleRect,
-  tierPlateColor,
+  tierPlateFadeStops,
   type CardGeometry,
   type CardRect,
   type TierPalette,
@@ -670,17 +670,18 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   if (statsPlateLayer !== undefined) {
     // TIER-COLOR CONTRACT (owner 2026-10-29): the plate's geometry and FADE
     // come from the file, its COLOR comes from the tier — the SVG's purple ramp
-    // is the reference for how it fades, never the color it paints.
+    // is the reference for how it fades, never the color it paints. The tier
+    // contributes a 3-point ramp (tierPlateFadeStops), so platinum carries the
+    // whole rainbow instead of collapsing to its green midpoint.
     const platePath2D = new Path2D(scalePath(statsPlateLayer.path, s))
     const grad = ctx.createLinearGradient(
       statsPlateLayer.line.x1 * s, statsPlateLayer.line.y1 * s,
       statsPlateLayer.line.x2 * s, statsPlateLayer.line.y2 * s,
     )
-    const tierColor = tierPlateColor(plan.palette)
-    for (const fade of statsPlateLayer.fades) {
+    for (const stop of tierPlateFadeStops(plan.palette, statsPlateLayer.fades)) {
       grad.addColorStop(
-        Math.min(1, Math.max(0, fade.offset)),
-        fade.opacity >= 1 ? tierColor : rgbaWithAlpha(tierColor, fade.opacity),
+        Math.min(1, Math.max(0, stop.offset)),
+        stop.opacity >= 1 ? stop.color : rgbaWithAlpha(stop.color, stop.opacity),
       )
     }
     ctx.save()

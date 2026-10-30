@@ -22,6 +22,8 @@ import {
   photoDestRect,
   scalePath,
   scaleRect,
+  tierPlateFadeStops,
+  tierPlateRamp,
 } from './cardAssets'
 
 describe('cardAssets — card.svg parses completely (fail-fast contract)', () => {
@@ -236,6 +238,53 @@ describe('cardAssets — tier palettes (the round-4 per-tier SVG colors, now cod
     for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
       expect(TIER_PALETTE[tier].textFill.toLowerCase()).not.toBe('#e6e6e6')
     }
+  })
+})
+
+describe('cardAssets — 3-point tier ramp for the stats plate (owner 2026-10-29)', () => {
+  it('reduces the 5-point rainbow tier to 3 points, red at 0 and silver at 1', () => {
+    // "the rainbow doesn't necessarily have to be the 5-point we have on the
+    // project, it can reduced to 3 to better fit the 3 point gradient of the
+    // status plate".
+    const ramp = tierPlateRamp(TIER_PALETTE.platinum)
+    expect(ramp.map((s) => s.offset)).toEqual([0, 0.5, 1])
+    expect(ramp[0].color).toBe('#f26d6f')
+    expect(ramp[2].color).toBe('#b8c0cc')
+    // The middle point is sampled off the tier ramp (the 5-stop midpoint).
+    expect(ramp[1].color).toBe('#3fb950')
+    // Not the flat magenta plateFill — that was the bug.
+    expect(ramp.map((s) => s.color)).not.toContain('#cf1a87')
+  })
+
+  it('collapses a solid tier to its plateFill at every ramp point', () => {
+    for (const tier of ['bronze', 'silver', 'gold'] as const) {
+      const ramp = tierPlateRamp(TIER_PALETTE[tier])
+      expect(ramp).toEqual([{ offset: 0, color: TIER_PALETTE[tier].plateFill }])
+    }
+  })
+
+  it('tints the FILE fade with the TIER ramp: offsets/opacities verbatim, one color per fade', () => {
+    const fades = [
+      { offset: 0, opacity: 1 },
+      { offset: 0.5, opacity: 1 },
+      { offset: 1, opacity: 0 },
+    ]
+    const stops = tierPlateFadeStops(TIER_PALETTE.platinum, fades)
+    expect(stops.map((s) => s.offset)).toEqual([0, 0.5, 1])
+    expect(stops.map((s) => s.opacity)).toEqual([1, 1, 0])
+    expect(stops.map((s) => s.color)).toEqual(['#f26d6f', '#3fb950', '#b8c0cc'])
+  })
+
+  it('samples between ramp points so no fade ever lands on a hard, unblended color', () => {
+    const stops = tierPlateFadeStops(TIER_PALETTE.platinum, [
+      { offset: 0.25, opacity: 1 },
+      { offset: 0.75, opacity: 1 },
+    ])
+    expect(stops[0].color).not.toBe('#f26d6f')
+    expect(stops[0].color).not.toBe('#3fb950')
+    expect(stops[1].color).not.toBe('#3fb950')
+    expect(stops[1].color).not.toBe('#b8c0cc')
+    for (const stop of stops) expect(stop.color).toMatch(/^#[0-9a-f]{6}$/)
   })
 })
 
