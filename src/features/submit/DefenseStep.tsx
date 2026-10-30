@@ -12,7 +12,7 @@
 // Pure presentational: the parent owns inputs + verification; this component
 // reports equipment edits and its own OCR state.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { GroupInputs } from './wizard'
 import { OcrCapture } from './OcrCapture'
 import type { OcrFieldOutcome } from './ocr/recognize'
@@ -53,7 +53,7 @@ const CARDS: RawDefenseCard[] = [
 ]
 
 export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStepProps) {
-  const derived = withDerivedDefenses(inputs)
+  const derived = useMemo(() => withDerivedDefenses(inputs), [inputs])
 
   // Per-capture OCR state — local so one tooltip read never blanks the other.
   const [failed, setFailed] = useState<ReadonlySet<string>>(new Set())

@@ -341,8 +341,6 @@ export function RankPage({ session }: { session: NeoFootSession }) {
 // Pure helpers over a RoleRankRow so node-env tests can assert the identity
 // display contract without a DOM: char_id is rendered in monospace when
 // present and omitted entirely for null/empty (legacy) rows.
-export type RankRowLike = RoleRankRow
-
 export function rankCharId(input: RoleRankRow | string | null | undefined): string | null {
   if (input == null) return null
   if (typeof input === 'string') return input === '' ? null : input
@@ -360,19 +358,3 @@ export function formatRankCharId(input: RoleRankRow | string | null | undefined)
 export function rankIdentityLine(input: RoleRankRow | string | null | undefined): string {
   return formatRankCharId(input)
 }
-
-export function rankRowCharId(input: RoleRankRow | string | null | undefined): string | null {
-  return rankCharId(input)
-}
-
-export function rankRowHasCharId(input: RoleRankRow | string | null | undefined): boolean {
-  return hasRankCharId(input)
-}
-
-// aliases
-export const rankCharIdText = formatRankCharId
-export const rankCharIdLabel = formatRankCharId
-export const formatCharId = formatRankCharId
-export const charIdForRankRow = rankCharId
-export const rankRowIdentity = rankCharId
-export const rankIdentity = rankCharId

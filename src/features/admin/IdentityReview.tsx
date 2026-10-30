@@ -6,13 +6,13 @@ import {
   ApiError,
   deleteIdentityProof,
   fetchIdentityQueue,
-  identityProofUrl,
   reviewIdentity,
   type IdentityQueueRow,
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { classLabel } from '../../lib/classLabels'
 import { ConfirmDialog } from './ConfirmDialog'
+import { ProofImage } from './ProofImage'
 
 const NETWORK_ERROR =
   'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
@@ -29,7 +29,6 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rejectTarget, setRejectTarget] = useState<IdentityQueueRow | null>(null)
   const [lastSuccess, setLastSuccess] = useState<string | null>(null)
-  const [failedProofs, setFailedProofs] = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     const queue = await fetchIdentityQueue(session)
@@ -128,8 +127,6 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
         <p className="text-center text-base text-muted">{EMPTY_MESSAGE}</p>
       ) : (
         rows.map((row) => {
-          const failed = failedProofs.has(row.proof_id)
-          const url = identityProofUrl(session, row.proof_path)
           return (
             <div key={row.proof_id} className="rounded-md border border-line bg-surface p-4">
               <div className="flex flex-col gap-2">
@@ -140,22 +137,7 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
                   #{row.char_id} · {row.nickname}
                   {row.char_class ? ` · ${classLabel(row.char_class)}` : ''}
                 </p>
-                {failed ? (
-                  <p className="text-sm text-muted">Comprovante indisponível.</p>
-                ) : (
-                  <img
-                    src={url}
-                    alt="Comprovante de identidade"
-                    onError={() =>
-                      setFailedProofs((prev) => {
-                        const next = new Set(prev)
-                        next.add(row.proof_id)
-                        return next
-                      })
-                    }
-                    className="max-h-64 w-full object-contain"
-                  />
-                )}
+                <ProofImage session={session} path={row.proof_path} />
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -198,30 +180,3 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
     </div>
   )
 }
-
-// ---- helpers ----
-export function identityReviewEmptyMessage(): string {
-  return 'Nenhuma identidade aguardando revisão.'
-}
-
-export function identityReviewErrorFor(error: unknown): string {
-  const message =
-    typeof (error as { message?: unknown })?.message === 'string'
-      ? (error as { message: string }).message
-      : String(error ?? '')
-  if (message.includes('not_pending')) return STALE_ROW_ERROR
-  if (error instanceof ApiError && (error.kind === 'unauthorized' || message.includes('forbidden')))
-    return SESSION_ERROR
-  return SAVE_ERROR
-}
-
-export const identityEmptyMessage = identityReviewEmptyMessage
-export const identityReviewEmpty = identityReviewEmptyMessage
-export const EMPTY_IDENTITY_MESSAGE = identityReviewEmptyMessage()
-export const mapIdentityReviewError = identityReviewErrorFor
-export const identityReviewErrorMessage = identityReviewErrorFor
-export const emptyMessage = identityReviewEmptyMessage
-export const identityErrorFor = identityReviewErrorFor
-export const mapIdentityError = identityReviewErrorFor
-export const identityErrorMessage = identityReviewErrorFor
-export const rejectConfirmCopy = () => 'Rejeitar esta identidade? O membro perderá o acesso até falar com um oficial.'

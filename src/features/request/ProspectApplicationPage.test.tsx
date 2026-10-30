@@ -316,13 +316,19 @@ describe('RequireAuth — application handoff', () => {
     expect(html).not.toContain('Aplicação iniciada')
   })
 
-  it('returns to the request success panel with the submitted protocol', () => {
+  it('returns to the request success panel with the submitted protocol', async () => {
     stubStorage()
-    const html = renderToStaticMarkup(
-      <RequireAuth initialView={{ kind: 'request', handle: 'ahrya', requestId: 'req-1' }}>
-        {() => null}
-      </RequireAuth>,
-    )
+    // RequestAccessPage is code-split (lazy): the first render starts the
+    // module load and shows the fallback, so wait until the real view renders.
+    const html = await vi.waitFor(() => {
+      const markup = renderToStaticMarkup(
+        <RequireAuth initialView={{ kind: 'request', handle: 'ahrya', requestId: 'req-1' }}>
+          {() => null}
+        </RequireAuth>,
+      )
+      if (markup.includes('Carregando…')) throw new Error('request view still loading')
+      return markup
+    })
     expect(html).toContain('Solicitação enviada')
     expect(html).toContain('req-1')
   })

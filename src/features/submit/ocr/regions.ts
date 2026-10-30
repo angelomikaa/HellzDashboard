@@ -21,8 +21,6 @@ export type CaptureKey =
   | 'pdef_tooltip'
   | 'mdef_tooltip'
 
-export const GAME_UI_VERSION = 'ro-origin-ui-2026-10'
-
 export interface CaptureMap {
   aspect: number
 }

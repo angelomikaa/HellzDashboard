@@ -7,7 +7,6 @@ import {
   approveRequest,
   deleteIdentityProof,
   fetchStaffRequests,
-  identityProofUrl,
   rejectRequest,
   type StaffRequestRow,
 } from '../../lib/api'
@@ -15,6 +14,7 @@ import type { NeoFootSession } from '../auth/session'
 import { FUNCTION_LABELS } from '../../lib/groups'
 import { classLabel } from '../../lib/classLabels'
 import { ConfirmDialog } from './ConfirmDialog'
+import { ProofImage } from './ProofImage'
 
 const NETWORK_ERROR =
   'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
@@ -42,7 +42,6 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
   const [approveFunction, setApproveFunction] = useState<'dps' | 'mdps' | 'suporte'>('dps')
   const [rejectTarget, setRejectTarget] = useState<StaffRequestRow | null>(null)
   const [lastSuccess, setLastSuccess] = useState<string | null>(null)
-  const [failedProofs, setFailedProofs] = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     const queue = await fetchStaffRequests(session)
@@ -152,8 +151,6 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
       ) : (
         rows.map((row) => {
           const isExpanded = expandedId === row.request_id
-          const failed = failedProofs.has(row.request_id)
-          const url = row.proof_path === null ? '' : identityProofUrl(session, row.proof_path)
           const insufficient = !row.data_sufficient || row.ovr === null
           const typeBadge = requestTypeBadge(row.request_type)
           return (
@@ -205,22 +202,7 @@ export function RequestReview({ session }: { session: NeoFootSession }) {
                   ) : (
                     <>
                       <p className="text-sm text-muted">Prova de identidade:</p>
-                      {failed ? (
-                        <p className="text-sm text-muted">Comprovante indisponível.</p>
-                      ) : (
-                        <img
-                          src={url}
-                          alt="Comprovante de identidade"
-                          onError={() =>
-                            setFailedProofs((prev) => {
-                              const next = new Set(prev)
-                              next.add(row.request_id)
-                              return next
-                            })
-                          }
-                          className="max-h-64 w-full object-contain"
-                        />
-                      )}
+                      <ProofImage session={session} path={row.proof_path} />
                     </>
                   )}
                   {row.request_type === 'claim' ? (
@@ -337,29 +319,9 @@ export function requestTypeBadge(requestType: StaffRequestRow['request_type']): 
   return 'Novo no clã'
 }
 
-export function requestTypeLabel(requestType: StaffRequestRow['request_type']): string {
-  return requestTypeBadge(requestType)
-}
-
 export function formatRequestOvr(ovr: number | null, dataSufficient: boolean): string {
   if (!dataSufficient || ovr === null) return '—'
   return ovr.toFixed(1)
-}
-
-export function requestOvrLabel(ovr: number | null, dataSufficient: boolean): string {
-  return formatRequestOvr(ovr, dataSufficient)
-}
-
-export function requestOvrInsufficient(ovr: number | null, dataSufficient: boolean): boolean {
-  return !dataSufficient || ovr === null
-}
-
-export function requestRowTitle(charId: string, nickname: string): string {
-  return `#${charId} · ${nickname}`
-}
-
-export function requestRowSubtitle(charClass: string, charFunction: StaffRequestRow['char_function']): string {
-  return `${classLabel(charClass)} · ${FUNCTION_LABELS[charFunction]}`
 }
 
 export function requestEmptyMessage(): string {
@@ -385,46 +347,3 @@ export function requestApproveErrorFor(error: unknown): string {
   return SAVE_ERROR
 }
 
-export function requestRejectErrorFor(error: unknown): string {
-  const message =
-    typeof (error as { message?: unknown })?.message === 'string'
-      ? (error as { message: string }).message
-      : String(error ?? '')
-  if (message.includes('not_pending')) return STALE_ROW_ERROR
-  if (error instanceof ApiError && (error.kind === 'unauthorized' || message.includes('forbidden')))
-    return SESSION_ERROR
-  return SAVE_ERROR
-}
-
-export function requestInsufficientOvrCopy(): string {
-  return INSUFFICIENT_OVR_COPY
-}
-
-// aliases
-export const requestBadge = requestTypeBadge
-export const requestTypeText = requestTypeBadge
-export const requestOvrText = formatRequestOvr
-export const requestOvr = formatRequestOvr
-export const requestEmpty = requestEmptyMessage
-export const REQUEST_EMPTY_MESSAGE = requestEmptyMessage()
-export const APPROVE_DIALOG_COPY_EXPORT = APPROVE_DIALOG_COPY
-export const requestApproveDialogCopy = () => APPROVE_DIALOG_COPY
-export const requestRejectConfirmCopy = () => REJECT_CONFIRM_COPY
-export const requestApproveCopy = APPROVE_DIALOG_COPY
-export const requestRejectCopy = REJECT_CONFIRM_COPY
-export const mapRequestApproveError = requestApproveErrorFor
-export const mapRequestRejectError = requestRejectErrorFor
-export const requestApproveErrorMessage = requestApproveErrorFor
-export const requestRejectErrorMessage = requestRejectErrorFor
-export const requestBadgeLabel = requestTypeBadge
-export const requestOvrValue = formatRequestOvr
-export const insufficientOvrCopy = requestInsufficientOvrCopy
-export const insufficientCopy = requestInsufficientOvrCopy
-export const approveErrorFor = requestApproveErrorFor
-export const rejectErrorFor = requestRejectErrorFor
-export const mapApproveError = requestApproveErrorFor
-export const mapRejectError = requestRejectErrorFor
-export const approveErrorMessage = requestApproveErrorFor
-export const rejectErrorMessage = requestRejectErrorFor
-export const approveDialogCopy = APPROVE_DIALOG_COPY
-export const rejectConfirmCopy = REJECT_CONFIRM_COPY

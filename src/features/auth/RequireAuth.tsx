@@ -1,10 +1,24 @@
-import { useState, type ReactNode } from 'react'
-import { RequestAccessPage, type ProspectDraft } from '../request/RequestAccessPage'
-import { ProspectApplicationPage } from '../request/ProspectApplicationPage'
+import { lazy, Suspense, useState, type ReactNode } from 'react'
+import type { ProspectDraft } from '../request/RequestAccessPage'
 import { PublicLanding } from '../shell/PublicLanding'
-import { FirstAccessPage } from './FirstAccessPage'
 import { LoginPage } from './LoginPage'
 import { clearSession, isExpired, loadSession, type NeoFootSession } from './session'
+
+// The request and first-access flows are code-split: a returning member logs
+// in and never needs them, so their modules load on first use.
+const FirstAccessPage = lazy(() =>
+  import('./FirstAccessPage').then((m) => ({ default: m.FirstAccessPage })),
+)
+const RequestAccessPage = lazy(() =>
+  import('../request/RequestAccessPage').then((m) => ({ default: m.RequestAccessPage })),
+)
+const ProspectApplicationPage = lazy(() =>
+  import('../request/ProspectApplicationPage').then((m) => ({
+    default: m.ProspectApplicationPage,
+  })),
+)
+
+const VIEW_LOADING = <p className="p-6 text-center text-base text-muted">Carregando…</p>
 
 export interface AuthContext {
   session: NeoFootSession
@@ -75,30 +89,38 @@ export function RequireAuth({ children, initialView }: RequireAuthProps) {
   }
 
   if (view.kind === 'first-access') {
-    return <FirstAccessPage initialHandle={view.handle} onBack={() => setView({ kind: 'login' })} />
+    return (
+      <Suspense fallback={VIEW_LOADING}>
+        <FirstAccessPage initialHandle={view.handle} onBack={() => setView({ kind: 'login' })} />
+      </Suspense>
+    )
   }
 
   if (view.kind === 'application') {
     return (
-      <ProspectApplicationPage
-        draft={view.draft}
-        onBack={() => setView({ kind: 'request', handle: view.draft.handle })}
-        onSubmitted={(requestId) =>
-          setView({ kind: 'request', handle: view.draft.handle, requestId })
-        }
-      />
+      <Suspense fallback={VIEW_LOADING}>
+        <ProspectApplicationPage
+          draft={view.draft}
+          onBack={() => setView({ kind: 'request', handle: view.draft.handle })}
+          onSubmitted={(requestId) =>
+            setView({ kind: 'request', handle: view.draft.handle, requestId })
+          }
+        />
+      </Suspense>
     )
   }
 
   if (view.kind === 'request') {
     return (
-      <RequestAccessPage
-        initialHandle={view.handle}
-        initialRequestId={view.requestId}
-        onBack={() => setView({ kind: 'landing' })}
-        onStartApplication={(draft) => setView({ kind: 'application', draft })}
-        onFirstAccess={(handle) => setView({ kind: 'first-access', handle })}
-      />
+      <Suspense fallback={VIEW_LOADING}>
+        <RequestAccessPage
+          initialHandle={view.handle}
+          initialRequestId={view.requestId}
+          onBack={() => setView({ kind: 'landing' })}
+          onStartApplication={(draft) => setView({ kind: 'application', draft })}
+          onFirstAccess={(handle) => setView({ kind: 'first-access', handle })}
+        />
+      </Suspense>
     )
   }
 

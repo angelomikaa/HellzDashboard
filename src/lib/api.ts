@@ -148,30 +148,11 @@ export async function fetchClasses(session: NeoFootSession): Promise<string[]> {
   return (rows ?? []).map((r) => r.class_name)
 }
 
-// fetchMe/fetchMembers use the EXPLICIT column projection below — NEVER a
-// star select: pin_hash is ungranted (migration 0005 column-level security),
-// so expanding to all columns is permission-denied BY DESIGN. The projection
-// is the complete set of client-visible member columns (role included).
-// `active` was added in Phase 6 for the owner Remover/Reativar controls
-// (granted for SELECT in 0005; consumed by setMemberActive flows, AUTH-04).
-
 export interface MyIdentity {
   display_name: string
   char_id: string | null
   char_class: string | null
   char_function: 'dps' | 'mdps' | 'suporte'
-}
-
-export async function fetchMe(session: NeoFootSession): Promise<MemberRow> {
-  // RLS: returns only the caller's own row (member_select_own).
-  const res = await restFetch(
-    session,
-    '/members?select=id,discord_handle,display_name,role,active,char_class,char_function&limit=1',
-  )
-  const rows = await parseBody<MemberRow[]>(res)
-  const row = rows?.[0]
-  if (!row) throw new ApiError(401, 'unauthorized', 'no member row visible')
-  return row
 }
 
 export async function fetchMyIdentity(session: NeoFootSession): Promise<MyIdentity> {
@@ -184,15 +165,6 @@ export async function fetchMyIdentity(session: NeoFootSession): Promise<MyIdenti
     throw new ApiError(0, 'server', 'malformed my_identity response')
   }
   return identity
-}
-
-export async function fetchMembers(session: NeoFootSession): Promise<MemberRow[]> {
-  // RLS: staff-only (staff_select_all_members); members get just their own row.
-  const res = await restFetch(
-    session,
-    '/members?select=id,discord_handle,display_name,role,active,char_class,char_function',
-  )
-  return (await parseBody<MemberRow[]>(res)) ?? []
 }
 
 export async function updateCharacter(
@@ -209,12 +181,6 @@ export async function updateCharacter(
     method: 'PATCH',
     body: JSON.stringify(patch),
   })
-}
-
-export async function createClass(session: NeoFootSession, className: string): Promise<void> {
-  // RLS: owner-only insert (staff_insert_classes, 0011) — structural changes
-  // are owner territory (D-09); officers are refused server-side.
-  await restFetch(session, '/classes', { method: 'POST', body: JSON.stringify({ class_name: className }) })
 }
 
 export async function createSubmission(
@@ -537,6 +503,11 @@ export interface PromotionHighlight {
 export interface PromotionCardRow {
   display_name: string
   char_function: 'dps' | 'mdps' | 'suporte'
+  // 0039: the member's OWN registry class (catalog key). A merged group section
+  // (Artista) carries Bard and Gypsy cards, so each card names its class for the
+  // job line and the class-art fallback. Optional: a payload from before 0039
+  // omits it, and the card falls back to the section's class.
+  char_class?: string
   ovr: number // floor-51 value; tier band derived client-side via tierForOvr
   // 07.2 D-13 supersession: highlights are the class's KEY STATS (same set as
   // the member's Painel card strip, ordered by label) — no longer top-6-by-
@@ -577,17 +548,6 @@ export interface PromotionSection {
   // already carries — the wire shape, the card order and the closed field
   // list are unchanged, so no RPC change rides along with this split.
   cards: PromotionCardRow[]
-}
-
-export async function fetchPromotion(session: NeoFootSession): Promise<PromotionSection[]> {
-  // SECURITY DEFINER RPC (0011; 0013 D-13 supersession): member-invocable (any
-  // active member) — the ONE sanctioned view of top players' individual values
-  // (CMP-03 exception). Highlights are the class's KEY STATS per 07.2 D-13
-  // (the sanctioned key reveal; RNK-02 re-baselined), fields exactly
-  // stat_key/label/label_short/value_type/value/points — key-stat CONFIG
-  // (weights/toggles) is never serialised (smoke-card.mjs probe 7d locks the census).
-  const res = await restFetch(session, '/rpc/get_promotion', { method: 'POST', body: JSON.stringify({}) })
-  return (await parseBody<PromotionSection[]>(res)) ?? []
 }
 
 /**
@@ -723,22 +683,6 @@ export async function fetchRoleRank(
   return (await parseBody<RoleRankRow[]>(res)) ?? []
 }
 
-export async function fetchKeyRelevantStats(
-  session: NeoFootSession,
-  className: string,
-): Promise<string[]> {
-  // RLS: staff-only read (staff_select_relevant_stats, 0013) — a member JWT
-  // gets [] from the policy filter, which is NOT an error. LEGACY surface:
-  // class_relevant_stats was never re-keyed per build role (0018 kept it
-  // class-level for rollback safety), so there is NO char_function column —
-  // never add a `char_function=eq.` filter here (PostgREST 400s). Phase 9
-  // KEYU reads relevants from class_key_stats positions 7+ instead.
-  const path = `/class_relevant_stats?class_name=eq.${encodeURIComponent(className)}&select=stat_key`
-  const res = await restFetch(session, path)
-  const rows = await parseBody<{ stat_key: string }[]>(res)
-  return (rows ?? []).map((r) => r.stat_key)
-}
-
 // ---------------------------------------------------------------------------
 // Phase 8 staff surfaces (08-05) — the staff operating layer built on
 // screenshot — clipped into the photo-crop layer of their crest card.
@@ -836,30 +780,6 @@ function isSafeCardPhotoPath(path: string): boolean {
   )
 }
 
-/** ANOTHER member's card photo, by the STORAGE PATH the get_promotion RPC
- *  composes (07.2-05 round 7 photo consistency). Same blob discipline as
- *  fetchCardPhoto (T-072-13): the blob becomes an object URL in the UI, so
- *  the canvas export can never be tainted. The bucket RLS grants ACTIVE
- *  members read (showcase visibility IS the feature — card-photos-storage
- *  seed); a 404 is the designed no-photo state. ANY failure resolves null —
- *  showcase cards degrade to the class portrait, never break the page.
- *  Defense in depth: the path arrives server-composed from the SECURITY
- *  DEFINER RPC, but only bucket-internal single-segment keys pass through —
- *  anything else (foreign bucket, traversal, query junk) resolves null. */
-export async function fetchCardPhotoByPath(
-  session: NeoFootSession,
-  path: string,
-): Promise<Blob | null> {
-  if (!isSafeCardPhotoPath(path)) return null
-  try {
-    const res = await storageFetch(session, path)
-    if (!res.ok) return null
-    return await res.blob()
-  } catch {
-    return null
-  }
-}
-
 /** In-flight/settled photo requests, keyed by storage path. The looping
  *  showcase (UAT round 2) renders each logical card three times, so without
  *  this every card would download its photo 3×. Sharing the promise keeps one
@@ -867,7 +787,7 @@ export async function fetchCardPhotoByPath(
  *  A null result is evicted so a transient failure can retry on remount. */
 const publicCardPhotoCache = new Map<string, Promise<Blob | null>>()
 
-/** Public landing variant of fetchCardPhotoByPath (0029): the anon key is the
+/** Public landing photo fetch by storage path (0029): the anon key is the
  *  only credential, so the showcase renders for visitors and members alike.
  *  Migration 0029 grants anon SELECT on card-photos objects whose folder is an
  *  ACTIVE member id — exactly the path the showcase payload carries. Same
@@ -1543,25 +1463,10 @@ function proofStorageKey(path: string): string | null {
 }
 
 /**
- * Authenticated object URL for one proof (private bucket download route).
- * NOTE: an <img> tag cannot send the gateway/apikey/Authorization headers, so
- * the review panels fetch the bytes with fetchIdentityProof below (blob ->
- * object URL) instead of pointing src at this string.
- */
-export function identityProofUrl(_session: NeoFootSession, path: string): string {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-  if (!supabaseUrl) {
-    throw new ApiError(0, 'network', 'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
-  }
-  const key = proofStorageKey(path)
-  if (key === null) return ''
-  return `${supabaseUrl}/storage/v1/object/authenticated/${IDENTITY_PROOF_BUCKET}/${key}`
-}
-
-/**
- * Proof bytes for the staff preview (staff-only object route, T-08-33). Any
- * failure resolves null: the card degrades to the claimed-fields text instead
- * of breaking the queue. Blob discipline matches fetchCardPhotoByPath.
+ * Proof bytes for the staff preview (staff-only object route, T-08-33). An
+ * <img> tag cannot send the gateway/apikey/Authorization headers, so the bytes
+ * are fetched here and shown as an object URL. Any failure resolves null: the
+ * card degrades to the claimed-fields text instead of breaking the queue.
  */
 export async function fetchIdentityProof(
   session: NeoFootSession,

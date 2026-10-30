@@ -87,13 +87,6 @@ export function portraitSrcFor(charClass: string): string | null {
   return PORTRAIT_SRC.get(charClass) ?? null
 }
 
-/** Same-origin crest URL for canvas export (cardExport crestSrc), resolved by
- *  the SAME manifest lookup ClassCrest renders — null means the export draws
- *  the D-16 monogram tile instead. Never returns an http(s) URL (T-072-13). */
-export function crestSrcFor(charClass: string): string | null {
-  return ICON_SRC.get(charClass) ?? null
-}
-
 const TILE_SIZES = {
   sm: 'h-8 w-8 rounded-md text-sm',
   md: 'h-12 w-12 rounded-lg text-lg',

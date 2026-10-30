@@ -54,7 +54,13 @@
 // Text lives INSIDE the <svg viewBox> coordinate space, so the fitted
 // composition scales with the card at any width.
 import { useEffect, useId, useMemo, useState } from 'react'
-import { measurePhotoSubject, photoDestRect, tierPlateFadeStops, type CardRect } from '../export/cardAssets'
+import {
+  measurePhotoSubject,
+  photoDestRect,
+  tierPlateFadeStops,
+  type CardRect,
+  type PhotoSubjectBounds,
+} from '../export/cardAssets'
 import {
   buildCardPlan,
   CARD_PLATE_GRADIENT_LINE,
@@ -68,29 +74,73 @@ import {
   type TextMeasurer,
 } from '../export/cardExport'
 
+// Card fonts are loaded ONCE per page, not once per mounted card: the showcase
+// mounts every card three times (the loop copies) and rotates through every
+// class, so per-instance loads would repeat the same font requests endlessly.
+// Real-metric fitting needs the loaded fonts (before that, measureText
+// measures the narrower fallback and under-fits). Bebas Neue everywhere except
+// the player name (Orbitron). Progressive enhancement: a failed load still
+// resolves, and the fit uses whatever measurer is available.
+let cardFontsReady = false
+let cardFontsRequest: Promise<void> | null = null
+
+function loadCardFontsOnce(): Promise<void> {
+  cardFontsRequest ??= Promise.all([
+    document.fonts.load('400 48px Bebas Neue'),
+    document.fonts.load('400 128px Bebas Neue'),
+    document.fonts.load('700 48px Orbitron'),
+  ])
+    .then(() => document.fonts.ready)
+    .catch(() => undefined)
+    .then(() => {
+      cardFontsReady = true
+    })
+  return cardFontsRequest
+}
+
+// The photo's measured framing input (natural size + opaque subject bounds),
+// cached per source: the decode + alpha scan runs once per photo per page
+// instead of once per mounted card. A failed load is evicted so a transient
+// failure can retry on the next mount.
+interface PhotoMeasure {
+  width: number
+  height: number
+  subject: PhotoSubjectBounds | null
+}
+const photoMeasureCache = new Map<string, Promise<PhotoMeasure | null>>()
+
+function measurePhotoOnce(src: string): Promise<PhotoMeasure | null> {
+  const cached = photoMeasureCache.get(src)
+  if (cached !== undefined) return cached
+  const request = new Promise<PhotoMeasure | null>((resolve) => {
+    const probe = new Image()
+    probe.onload = () => {
+      if (probe.naturalWidth <= 0 || probe.naturalHeight <= 0) return resolve(null)
+      resolve({
+        width: probe.naturalWidth,
+        height: probe.naturalHeight,
+        subject: measurePhotoSubject(probe),
+      })
+    }
+    probe.onerror = () => resolve(null)
+    probe.src = src
+  })
+  photoMeasureCache.set(src, request)
+  void request.then((measure) => {
+    if (measure === null && photoMeasureCache.get(src) === request) photoMeasureCache.delete(src)
+  })
+  return request
+}
+
 export function CardSvg({ data, className }: { data: CardExportData; className?: string }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
-  // Real-metric fitting needs the loaded fonts (before that, measureText
-  // measures the narrower fallback and under-fits). Gate the measurers on
-  // the exact card weights + document.fonts.ready; until ready, the
-  // conservative estimates squeeze early rather than overflowing during
-  // the flash. Bebas Neue everywhere except the player name (Orbitron).
-  const [fontsReady, setFontsReady] = useState(false)
+  const [fontsReady, setFontsReady] = useState(cardFontsReady)
   useEffect(() => {
+    if (cardFontsReady) return
     let alive = true
-    Promise.all([
-      document.fonts.load('400 48px Bebas Neue'),
-      document.fonts.load('400 128px Bebas Neue'),
-      document.fonts.load('700 48px Orbitron'),
-    ])
-      .then(() => document.fonts.ready)
-      .then(() => {
-        if (alive) setFontsReady(true)
-      })
-      .catch(() => {
-        // Progressive enhancement: fit with whatever measurer is available.
-        if (alive) setFontsReady(true)
-      })
+    void loadCardFontsOnce().then(() => {
+      if (alive) setFontsReady(true)
+    })
     return () => {
       alive = false
     }
@@ -142,37 +192,41 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
   // fit never applies) and until it lands the image renders with the
   // round-7 head-safe top-anchored cover (xMidYMin slice over the crop
   // bbox).
-  const [photoFit, setPhotoFit] = useState<{ src: string; dest: CardRect } | null>(null)
+  const [photoMeasure, setPhotoMeasure] = useState<{ src: string; measure: PhotoMeasure } | null>(
+    null,
+  )
   const photoSrc = plan.photo.kind === 'image' ? plan.photo.src : null
   useEffect(() => {
     if (photoSrc === null) {
-      setPhotoFit(null)
+      setPhotoMeasure(null)
       return
     }
     let alive = true
-    const probe = new Image()
-    probe.onload = () => {
-      if (!alive || probe.naturalWidth <= 0 || probe.naturalHeight <= 0) return
-      setPhotoFit({
-        src: photoSrc,
-        dest: photoDestRect(
-          probe.naturalWidth,
-          probe.naturalHeight,
-          measurePhotoSubject(probe),
-          b,
-        ),
-      })
-    }
-    probe.onerror = () => {
-      if (alive) setPhotoFit(null)
-    }
-    probe.src = photoSrc
+    void measurePhotoOnce(photoSrc).then((measure) => {
+      if (alive && measure !== null) setPhotoMeasure({ src: photoSrc, measure })
+    })
     return () => {
       alive = false
     }
-  }, [photoSrc, b])
-  const measuredFit =
-    photoFit !== null && photoFit.src === photoSrc ? photoFit.dest : null
+  }, [photoSrc])
+  // Keyed on the window's primitives, not the plan's bbox object: the plan is
+  // rebuilt when the fonts land, and that must not re-derive the photo frame.
+  const frame = useMemo<CardRect>(
+    () => ({ x: b.x, y: b.y, w: b.w, h: b.h }),
+    [b.x, b.y, b.w, b.h],
+  )
+  const measuredFit = useMemo<CardRect | null>(
+    () =>
+      photoMeasure !== null && photoMeasure.src === photoSrc
+        ? photoDestRect(
+            photoMeasure.measure.width,
+            photoMeasure.measure.height,
+            photoMeasure.measure.subject,
+            frame,
+          )
+        : null,
+    [photoMeasure, photoSrc, frame],
+  )
 
   return (
     <svg

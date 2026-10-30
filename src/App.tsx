@@ -1,18 +1,32 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import hellzMark from './assets/hellz-mark.svg'
 import { clearSession, type NeoFootSession } from './features/auth/session'
 import { RequireAuth } from './features/auth/RequireAuth'
-import { CharactersPage } from './features/admin/CharactersPage'
-import { KeyStatsPage } from './features/admin/KeyStatsPage'
-import { ValidacoesPage } from './features/admin/ValidacoesPage'
-import { RankPage } from './features/rank/RankPage'
-import { SubmitPage } from './features/submit/SubmitPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { InicioPage } from './features/dashboard/InicioPage'
 import { PageErrorBoundary } from './features/shell/PageErrorBoundary'
 import { pendingTotal, usePendingValidations } from './features/shell/usePendingValidations'
 import { fetchMyIdentity } from './lib/api'
+
+// Tabs other than the landing Painel/Início are code-split: a member who only
+// reads their own stats never downloads the staff panels, the submit wizard or
+// the ranking board. Each page module is loaded the first time its tab opens.
+const CharactersPage = lazy(() =>
+  import('./features/admin/CharactersPage').then((m) => ({ default: m.CharactersPage })),
+)
+const KeyStatsPage = lazy(() =>
+  import('./features/admin/KeyStatsPage').then((m) => ({ default: m.KeyStatsPage })),
+)
+const ValidacoesPage = lazy(() =>
+  import('./features/admin/ValidacoesPage').then((m) => ({ default: m.ValidacoesPage })),
+)
+const RankPage = lazy(() =>
+  import('./features/rank/RankPage').then((m) => ({ default: m.RankPage })),
+)
+const SubmitPage = lazy(() =>
+  import('./features/submit/SubmitPage').then((m) => ({ default: m.SubmitPage })),
+)
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   member: 'Membro',
@@ -228,28 +242,30 @@ function App() {
                         shell (blank screen, no nav). Keyed by tab so switching
                         tabs (or "Tentar novamente") resets it. */}
                     <PageErrorBoundary key={tab}>
-                      {showValidacoes ? (
-                        <ValidacoesPage session={session} />
-                      ) : showCharacters ? (
-                        <CharactersPage session={session} />
-                      ) : showKeyStats ? (
-                        <KeyStatsPage session={session} />
-                      ) : showRanking ? (
-                        // Content re-check: showRanking re-evaluates isStaff, so a
-                        // lingering staff tab across a logout/login switch renders
-                        // nothing for a member (App-stays-mounted lesson).
-                        <RankPage session={session} />
-                      ) : showSubmit ? (
-                        <SubmitPage session={session} />
-                      ) : showInicio ? (
-                        <InicioPage />
-                      ) : (
-                        <DashboardPage
-                          session={session}
-                          onNavigate={setTab}
-                          identityName={identityName}
-                        />
-                      )}
+                      <Suspense fallback={<p className="text-base text-muted">Carregando…</p>}>
+                        {showValidacoes ? (
+                          <ValidacoesPage session={session} />
+                        ) : showCharacters ? (
+                          <CharactersPage session={session} />
+                        ) : showKeyStats ? (
+                          <KeyStatsPage session={session} />
+                        ) : showRanking ? (
+                          // Content re-check: showRanking re-evaluates isStaff, so a
+                          // lingering staff tab across a logout/login switch renders
+                          // nothing for a member (App-stays-mounted lesson).
+                          <RankPage session={session} />
+                        ) : showSubmit ? (
+                          <SubmitPage session={session} />
+                        ) : showInicio ? (
+                          <InicioPage />
+                        ) : (
+                          <DashboardPage
+                            session={session}
+                            onNavigate={setTab}
+                            identityName={identityName}
+                          />
+                        )}
+                      </Suspense>
                     </PageErrorBoundary>
                   </div>
                 </main>

@@ -17,7 +17,7 @@
 // classless inserts, but Phase 3 rank RPCs compute per class, so there is
 // nothing meaningful to ingest for an unregistered character (P2D in
 // 02-RESEARCH; T-02-17 accepted with the Phase 3 guard).
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ApiError,
   createSubmission,
@@ -187,7 +187,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
   // Effective inputs = manual inputs + computed read-only raw defenses
   // (Phase 9.1 DEF-03). rpdef/rmdef are merged here so groupComplete,
   // ReviewStep and buildStatsPayload always see consistent raw values.
-  const effectiveInputs = withDerivedDefenses(inputs)
+  const effectiveInputs = useMemo(() => withDerivedDefenses(inputs), [inputs])
 
   // Editable identity (08-04, IDEN-01/02): mandatory on every submission.
   // Classe/Função prefill from the member row; ID/Nick start blank and are

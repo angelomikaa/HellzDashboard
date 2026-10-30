@@ -46,6 +46,25 @@ import { cardFilename, downloadCard, type CardExportData } from '../export/cardE
 // Enumeration-safe pt-BR copy: never expose HTTP codes or internals.
 const DOWNLOAD_ERROR = 'Não foi possível gerar o card. Tente novamente.'
 
+// One object URL per showcase photo path for the page's lifetime. The carousel
+// mounts every card three times (loop copies) and every class rotates through,
+// so a URL per mount would re-create and re-measure the same photo endlessly.
+// Bounded by the number of photos on the landing; a failed fetch is evicted.
+const publicPhotoUrls = new Map<string, Promise<string | null>>()
+
+function publicPhotoUrl(path: string): Promise<string | null> {
+  const cached = publicPhotoUrls.get(path)
+  if (cached !== undefined) return cached
+  const request = fetchCardPhotoByPathPublic(path).then((blob) =>
+    blob === null ? null : URL.createObjectURL(blob),
+  )
+  publicPhotoUrls.set(path, request)
+  void request.then((url) => {
+    if (url === null && publicPhotoUrls.get(path) === request) publicPhotoUrls.delete(path)
+  })
+  return request
+}
+
 export function PromotionCard({
   card,
   charClass,
@@ -62,28 +81,20 @@ export function PromotionCard({
   // Round 7 photo consistency: fetch the member's submitted photo (the
   // payload's storage path) as a BLOB → object URL; null until it lands,
   // then the class portrait shows through (the fallback chain's middle rung)
-  // and the card re-renders with the real photo. The object URL is revoked
-  // on unmount/re-fetch. 0029: this uses the ANON storage path so the very
-  // same card renders on the public landing (no session) and inside the app.
+  // and the card re-renders with the real photo. 0029: this uses the ANON
+  // storage path so the very same card renders on the public landing (no
+  // session) and inside the app.
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   useEffect(() => {
     let alive = true
-    let objectUrl: string | null = null
     const path = typeof card.photo_path === 'string' ? card.photo_path : ''
     if (path !== '') {
-      fetchCardPhotoByPathPublic(path)
-        .then((blob) => {
-          if (!alive || blob === null) return
-          objectUrl = URL.createObjectURL(blob)
-          setPhotoUrl(objectUrl)
-        })
-        .catch(() => {
-          /* unreachable (fetchCardPhotoByPathPublic resolves null) — degrade to portrait */
-        })
+      void publicPhotoUrl(path).then((url) => {
+        if (alive && url !== null) setPhotoUrl(url)
+      })
     }
     return () => {
       alive = false
-      if (objectUrl !== null) URL.revokeObjectURL(objectUrl)
     }
   }, [card.photo_path])
 
@@ -98,8 +109,9 @@ export function PromotionCard({
   // line prints the pt-BR label (classLabels, owner decision 2026-10-23)
   // while the KEY keeps driving the asset lookups; the monogram follows the
   // label so the fallback letter always matches the printed name.
+  const ownClass = card.char_class ?? charClass
   const exportData: CardExportData = useMemo(() => {
-    const jobLabel = classLabel(charClass)
+    const jobLabel = classLabel(ownClass)
     return {
       name: card.display_name,
       charClass: jobLabel,
@@ -110,10 +122,10 @@ export function PromotionCard({
         value: formatStatValue(h.value, h.value_type),
         points: h.points,
       })),
-      photoSrc: photoUrl ?? portraitSrcFor(charClass),
+      photoSrc: photoUrl ?? portraitSrcFor(ownClass),
       monogramLetter: jobLabel.charAt(0).toUpperCase(),
     }
-  }, [card, charClass, photoUrl])
+  }, [card, ownClass, photoUrl])
 
   async function handleDownload(): Promise<void> {
     setGenerating(true)
@@ -130,7 +142,7 @@ export function PromotionCard({
   return (
     <div className="flex flex-col gap-2">
       <article
-        aria-label={`${card.display_name} — ${classLabel(charClass)}`}
+        aria-label={`${card.display_name} — ${classLabel(ownClass)}`}
         className="w-full"
       >
         {/* Round 5: the owner's card.svg IS the card — portrait 27:40 (its

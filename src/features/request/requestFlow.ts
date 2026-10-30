@@ -134,19 +134,6 @@ export function requestProblemMessage(problem: RequestProblem): string {
   }
 }
 
-/** Normalize an OCR read into the form's editable identity fields. */
-export function identityFromProfile(profile: BasicProfileFields | null): {
-  char_id: string
-  nickname: string
-  char_class: string
-} {
-  return {
-    char_id: profile?.char_id ?? '',
-    nickname: profile?.nickname ?? '',
-    char_class: profile?.char_class ?? '',
-  }
-}
-
 export type IdentityField = 'char_id' | 'nickname' | 'char_class'
 export type TouchedFields = Partial<Record<IdentityField, boolean>>
 

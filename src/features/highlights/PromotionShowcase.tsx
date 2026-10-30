@@ -226,12 +226,12 @@ export function PromotionShowcase() {
  *  live ABOVE the per-class carousel remount, or a pause would reset on every
  *  class switch.
  *
- * 10.2: one class at a time, but each class shows one scroller PER BUILD.
- * A build row carries its own label chip and its own card arrows, and any
- * interaction in ANY row re-arms the window (browsing this class defers the
- * rotation). Class rotation controls only live on the FIRST row — the class
- * is the rotation unit, so a three-build class must not carry three
- * steppers/drain bars. */
+ * One class at a time; each class shows ONE carousel, and its META builds are
+ * tokens in the bar (Dano Físico / Dano Mágico / Suporte). A token shows that
+ * build's three best cards. Any interaction re-arms the window (browsing this
+ * class defers the rotation), and the class stepper lives on the one carousel
+ * — the class is the rotation unit, so a multi-build class never carries
+ * several steppers or drain bars. */
 function ClassRotation({ sections }: { sections: PromotionSection[] }) {
   const total = sections.length
   const [activeIndex, setActiveIndex] = useState(0)
@@ -240,6 +240,11 @@ function ClassRotation({ sections }: { sections: PromotionSection[] }) {
     focus: false,
   })
   const rotationPaused = pauseReasons.pointer || pauseReasons.focus
+
+  // The pressed build token. It is scoped to the class it was pressed on, so
+  // rotating to another class falls back to that class's first build without
+  // an effect (the stale choice simply stops matching).
+  const [buildChoice, setBuildChoice] = useState<{ classIndex: number; fn: string } | null>(null)
 
   // The armed window. remainingRef carries the wall-clock left in the
   // current class's slot across pause/resume; windowRef lets the pause
@@ -311,12 +316,21 @@ function ClassRotation({ sections }: { sections: PromotionSection[] }) {
   const clampedIndex = clampClassIndex(activeIndex, total)
   const section = sections[clampedIndex]
   if (section === undefined) return null
-  // 10.2: the class's Impecável cards, split by build (function). Summoner →
-  // 3 groups (3 scrollers), High Priest → 1, and a build with no Impecáveis
-  // produces no group at all — never an empty scroller. groupCardsByBuild is
-  // pure grouping of an already-ranked payload: every card keeps its exact
-  // server position inside its own build.
+  // 10.2: the class's Impecável cards, split by META build (function). The
+  // builds are the class's tokens; the carousel shows the pressed one (the
+  // first by default). A build with no Impecáveis produces no token at all, and
+  // groupCardsByBuild keeps every card in its exact server position.
   const builds = groupCardsByBuild(section.cards)
+  const pressedFn = buildChoice?.classIndex === clampedIndex ? buildChoice.fn : undefined
+  const active = builds.find((build) => build.fn === pressedFn) ?? builds[0]
+  if (active === undefined) return null
+
+  /** A token press browses this class: it shows that build's three cards and
+   *  re-arms the rotation window, exactly like the card arrows do. */
+  function pressBuild(fn: string): void {
+    setBuildChoice({ classIndex: clampedIndex, fn })
+    restartWindow()
+  }
 
   return (
     <div
@@ -345,29 +359,25 @@ function ClassRotation({ sections }: { sections: PromotionSection[] }) {
           {`Classe ${clampedIndex + 1} de ${total}: ${classLabel(section.class_name)}`}
         </span>
       )}
-      {/* One class, one or more build rows — each is a fully independent
-          carousel (own ref/spotlight). `key` on the row set is the class: a
-          class switch remounts every row, which restarts the reveal stagger
-          and the drain window exactly as before. The intra-class gap is
-          deliberately tighter than the outer one (the scrollers' own padding
-          already separates the cards): rows of ONE class read as a group,
-          while classes stay far apart. */}
+      {/* One carousel per class, showing the pressed build. The class key
+          remounts the carousel on a class switch (restarting the reveal stagger
+          and the drain window); the build key remounts it on a token press. */}
       <div key={section.class_name} className="flex flex-col gap-6 sm:gap-8">
-        {builds.map((build, row) => (
-          <HighlightsCarousel
-            key={build.fn}
-            cards={build.cards}
-            charClass={section.class_name}
-            label={`${classLabel(section.class_name)} — ${build.label} — cartazes impecáveis`}
-            buildLabel={build.label}
-            classIndex={row === 0 ? clampedIndex : undefined}
-            totalClasses={row === 0 ? total : undefined}
-            rotationPaused={rotationPaused}
-            onClassStep={row === 0 ? stepClass : undefined}
-            onUserInteraction={restartWindow}
-            autoAdvanceMs={AUTO_ADVANCE_MS}
-          />
-        ))}
+        <HighlightsCarousel
+          key={active.fn}
+          cards={active.cards}
+          charClass={section.class_name}
+          label={`${classLabel(section.class_name)} — ${active.label} — cartazes impecáveis`}
+          builds={builds.map(({ fn, label }) => ({ fn, label }))}
+          selectedFn={active.fn}
+          onSelectBuild={pressBuild}
+          classIndex={clampedIndex}
+          totalClasses={total}
+          rotationPaused={rotationPaused}
+          onClassStep={stepClass}
+          onUserInteraction={restartWindow}
+          autoAdvanceMs={AUTO_ADVANCE_MS}
+        />
       </div>
     </div>
   )

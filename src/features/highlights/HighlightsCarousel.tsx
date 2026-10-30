@@ -62,14 +62,12 @@
 // Data contract unchanged: cards render in SERVER order (highest OVR first),
 // never re-sorted here. Pure presentation — no points math in TS.
 //
-// Phase 10.2 (owner request 2026-10-29): the showcase shows ONE scroller PER
-// META BUILD, so a multi-build class (Summoner dps/mdps/suporte) now renders
-// this component three times — once per function — with `buildLabel` naming
-// the row's build. Each instance is fully self-contained (own ref, own
-// spotlight index, own chip), which is exactly what made the per-section
-// ref fix necessary in the first place; the class identity repeats by design,
-// so every scroller stays readable on its own instead of inheriting context
-// from a sibling.
+// Phase 10.2 (owner request 2026-10-29) → token pass (2026-10-30): a class
+// shows ONE carousel at a time; its META builds are tokens in the bar
+// (`builds` / `selectedFn` / `onSelectBuild`), and the carousel carries the
+// selected build's three best cards. Only one instance is mounted per class,
+// so the scroller keeps its own ref and spotlight index and simply remounts
+// (keyed by build) when a token is pressed.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PromotionCardRow } from '../../lib/api'
 import { classLabel } from '../../lib/classLabels'
@@ -89,7 +87,9 @@ export function HighlightsCarousel({
   cards,
   charClass,
   label,
-  buildLabel,
+  builds,
+  selectedFn,
+  onSelectBuild,
   classIndex,
   totalClasses,
   rotationPaused = false,
@@ -100,10 +100,14 @@ export function HighlightsCarousel({
   cards: PromotionCardRow[]
   charClass: string
   label: string
-  /** The build/function this scroller carries (pt-BR, FUNCTION_LABELS —
-   *  "Dano Físico" / "Dano Mágico" / "Suporte"). Absent renders the bare
-   *  class bar, which is the whole behavior for single-build classes. */
-  buildLabel?: string
+  /** The class's META builds that have Impecáveis, in canonical order. Each
+   *  one is a token (pt-BR, FUNCTION_LABELS) that picks which build's three
+   *  cards the carousel shows. Built from the payload, so non-viable builds
+   *  never become tokens. */
+  builds: readonly { fn: string; label: string }[]
+  /** The build whose cards `cards` carries — the pressed token. */
+  selectedFn: string
+  onSelectBuild: (fn: string) => void
   classIndex?: number
   totalClasses?: number
   rotationPaused?: boolean
@@ -292,18 +296,31 @@ export function HighlightsCarousel({
         <h2 className="font-display text-xl font-semibold text-content sm:text-2xl">
           {classLabel(charClass)}
         </h2>
-        {/* 10.2: one scroller per META BUILD, so the bar names the build it
-            carries — a multi-build class (Summoner) renders this component
-            once per function and the rows must stay distinguishable at a
-            glance. Single-build classes (High Priest) keep the plain bar
-            (own h2, own crest) — unchanged from before. The chip stays on
-            EVERY breakpoint: the card's job line prints the class only, so
-            this is the one place the build is named — mobile must not lose
-            it. The bar already wraps below sm instead of squeezing. */}
-        {buildLabel !== undefined && (
-          <span className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-sm font-semibold text-muted">
-            {buildLabel}
-          </span>
+        {/* The build tokens: one per META build of the class. Pressing one
+            shows that build's three best cards. Named on every breakpoint —
+            the card's job line prints the class only, so this is where the
+            build is named. The bar wraps below sm instead of squeezing. */}
+        {builds.length > 0 && (
+          <div role="group" aria-label="Função" className="flex flex-wrap items-center gap-2">
+            {builds.map((build) => {
+              const pressed = build.fn === selectedFn
+              return (
+                <button
+                  key={build.fn}
+                  type="button"
+                  aria-pressed={pressed}
+                  onClick={() => onSelectBuild(build.fn)}
+                  className={`h-11 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    pressed
+                      ? 'border-accent bg-accent text-accent-foreground'
+                      : 'border-line bg-surface text-muted hover-control hover:text-content'
+                  }`}
+                >
+                  {build.label}
+                </button>
+              )
+            })}
+          </div>
         )}
         <span
           aria-hidden="true"

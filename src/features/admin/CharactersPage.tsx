@@ -1251,10 +1251,6 @@ export function pinBadgeLabel(pin_set: boolean): string {
   return pin_set ? 'PIN ativo' : 'PIN pendente'
 }
 
-export function pinBadgeTone(pin_set: boolean): 'amber' | 'muted' {
-  return pin_set ? 'muted' : 'amber'
-}
-
 export function canResetPin(session: NeoFootSession, member: MemberRow): boolean {
   // 0021: the owner resets members and officers; an officer resets members only.
   // The owner account is never resettable (D-08).
@@ -1267,12 +1263,6 @@ export function filterMembersByPin(members: StaffMember[], filter: PinFilter): S
   return members.filter((member) =>
     filter === 'all' ? true : filter === 'pending' ? !member.pin_set : member.pin_set,
   )
-}
-
-export function pinFilterEmptyMessage(filter: PinFilter): string {
-  if (filter === 'pending') return 'Nenhum membro com PIN pendente.'
-  if (filter === 'active') return 'Nenhum membro com PIN ativo.'
-  return 'Nenhum membro com esses filtros.'
 }
 
 export function addMemberErrorFor(error: unknown): string {
@@ -1305,22 +1295,3 @@ export function sortIdentityHistory(rows: IdentityHistoryRow[]): IdentityHistory
   )
 }
 
-export function resetPinConfirm(name: string): { title: string; body: string } {
-  return {
-    title: `Redefinir o PIN de ${name}?`,
-    body: 'O membro vai criar um novo PIN no proximo acesso.',
-  }
-}
-
-// aliases
-export const mapAddMemberError = addMemberErrorFor
-export const addMemberErrorMessage = addMemberErrorFor
-export const addMemberError = addMemberErrorFor
-export const pinBadge = pinBadgeLabel
-export const pinStatusBadge = pinBadgeLabel
-export const pinBadgeText = pinBadgeLabel
-export const filterByPin = filterMembersByPin
-export const applyPinFilter = filterMembersByPin
-export const pinEmptyMessage = pinFilterEmptyMessage
-export const mapIdentityError = identityErrorFor
-export const identityErrorMessage = identityErrorFor

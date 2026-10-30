@@ -5,7 +5,6 @@ import {
   addMember,
   approveRequest,
   correctIdentity,
-  createClass,
   createSubmission,
   deleteIdentityProof,
   fetchCatalog,
@@ -15,13 +14,10 @@ import {
   fetchIdentityProof,
   fetchIdentityQueue,
   fetchKeyStats,
-  fetchMe,
-  fetchMembers,
   fetchMyReport,
   fetchMySubmissions,
   fetchStaffMembers,
   fetchStaffRequests,
-  identityProofUrl,
   rejectRequest,
   resetMemberPin,
   reviewIdentity,
@@ -68,19 +64,15 @@ afterEach(() => {
 
 describe('REST client gateway contract (both headers, every call)', () => {
   it('sends apikey AND Authorization: Bearer <session.access_token> on every call', async () => {
-    // fetchMe requires its own row; everything else accepts '[]' or the row body.
     nextResponse = () =>
       res(200, JSON.stringify([{ class_name: 'Assassin' }]))
     await fetchCatalog(session)
     await fetchClasses(session)
-    await fetchMe(session)
-    await fetchMembers(session)
     await fetchMySubmissions(session)
-    await createClass(session, 'Ninja')
     await createSubmission(session, [{ stat_key: 'crit', value: 16 }])
     await updateCharacter(session, session.member_id, { char_class: 'Assassin' })
 
-    expect(calls.length).toBe(8)
+    expect(calls.length).toBe(5)
     for (const call of calls) {
       const headers = call.init.headers as Record<string, string>
       expect(headers.apikey).toBe('test-anon-key')
@@ -151,7 +143,7 @@ describe('REST client error handling', () => {
 
   it('marks 401 as kind unauthorized', async () => {
     nextResponse = () => res(401, 'unauthorized')
-    const err = await fetchMe(session).catch((e) => e)
+    const err = await fetchMyReport(session).catch((e) => e)
     expect(err).toBeInstanceOf(ApiError)
     expect(err.status).toBe(401)
     expect(err.kind).toBe('unauthorized')
@@ -161,7 +153,7 @@ describe('REST client error handling', () => {
     vi.stubGlobal('fetch', async () => {
       throw new TypeError('fetch failed')
     })
-    const err = await fetchMembers(session).catch((e) => e)
+    const err = await fetchMySubmissions(session).catch((e) => e)
     expect(err).toBeInstanceOf(ApiError)
     expect(err.kind).toBe('network')
   })
@@ -477,16 +469,7 @@ describe('Phase 8 staff API wrappers (0014 RPC census)', () => {
 })
 
 describe('identity proof storage helpers (private bucket, staff-only)', () => {
-  it('identityProofUrl builds the authenticated object route and rejects traversal', () => {
-    expect(identityProofUrl(session, 'claims/abc/1.jpg')).toBe(
-      'https://test-project.supabase.co/storage/v1/object/authenticated/identity-proofs/claims/abc/1.jpg',
-    )
-    expect(identityProofUrl(session, '../members')).toBe('')
-    expect(identityProofUrl(session, '/card-photos/x.jpg')).toBe('')
-    expect(identityProofUrl(session, 'claims/abc/1.jpg?token=x')).toBe('')
-  })
-
-  it('fetchIdentityProof returns a blob and degrades to null on any failure', async () => {
+  it('fetchIdentityProof reads the authenticated object route and degrades to null on any failure', async () => {
     vi.stubGlobal('fetch', async () => ({
       ok: true,
       status: 200,

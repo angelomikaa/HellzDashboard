@@ -21,6 +21,7 @@
 // for display; the color comes from tierForPoints via the literal TIER_TEXT
 // map. The accent-red heading is one of the four reserved accent uses
 // (interaction red #DC3538 — a different token from tier gold #E9B44C).
+import { useMemo } from 'react'
 import type { MyReportStat } from '../../lib/api'
 import type { GroupKey } from '../../lib/groups'
 import { MiniStatTile } from './MiniStatTile'
@@ -35,7 +36,7 @@ export function FocusStrip({
   priorityKeys: ReadonlySet<string>
   onJump: (statKey: string, group: GroupKey) => void
 }) {
-  const focus = improvementFocus(stats, priorityKeys)
+  const focus = useMemo(() => improvementFocus(stats, priorityKeys), [stats, priorityKeys])
   if (focus.length === 0) return null
 
   return (

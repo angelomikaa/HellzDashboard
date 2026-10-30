@@ -24,7 +24,7 @@
 //
 // The Tab type is imported TYPE-ONLY from App (erased at build time — no
 // runtime cycle with App's value import of this module).
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ApiError,
   fetchCardPhoto,
@@ -83,18 +83,36 @@ export function DashboardPage({
   const [openGroups, setOpenGroups] = useState<Record<GroupKey, boolean>>({ general: true, quasi: false, special: false })
 
   // The member's own screenshot (07.2-05 round 7 photo consistency): an
-  // object URL over the stored blob feeds the D-08 download's photo area —
-  // same fallback chain as the on-page CardPhotoUpload preview (member
-  // screenshot → class portrait → ASST-01 monogram).
+  // object URL over the stored blob feeds BOTH the on-page own-card preview
+  // and the D-08 download's photo area — same fallback chain as before
+  // (member screenshot → class portrait → ASST-01 monogram). DashboardPage is
+  // the only owner of this URL: it is created in replacePhoto and revoked when
+  // replaced or when the page unmounts.
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [photoLoadFailed, setPhotoLoadFailed] = useState(false)
+  const photoUrlRef = useRef<string | null>(null)
+
+  const replacePhoto = useCallback((photo: Blob | null) => {
+    const next = photo === null ? null : URL.createObjectURL(photo)
+    if (photoUrlRef.current !== null) URL.revokeObjectURL(photoUrlRef.current)
+    photoUrlRef.current = next
+    setPhotoUrl(next)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (photoUrlRef.current !== null) URL.revokeObjectURL(photoUrlRef.current)
+    }
+  }, [])
 
   // Mount-only fetches with a cancelled flag (KeyStatsPage pattern): the
   // three reads are independent surfaces, so a my_card or photo failure is
   // caught into null (the page still renders) while ONLY an unauthorized
   // my_report/my_card session error kills the page with SESSION_ERROR.
+  // The card and photo are fetched ONCE here and shared with CardPhotoUpload
+  // (it used to re-fetch both on its own mount).
   useEffect(() => {
     let cancelled = false
-    let photoObjectUrl: string | null = null
     Promise.all([
       fetchMyReport(session),
       // 07.2 D-08: the member's own card data (sanctioned D-03 reveal).
@@ -102,20 +120,20 @@ export function DashboardPage({
         if (err instanceof ApiError && err.kind === 'unauthorized') throw err
         return null
       }),
-      // The member's stored screenshot for the download's photo area —
-      // BLOB → object URL (T-072-13: never a cross-origin URL, the export
-      // canvas can never be tainted). Any failure degrades to the class
-      // portrait via portraitSrcFor.
-      fetchCardPhoto(session).catch(() => null),
+      // The member's stored screenshot — BLOB, never a cross-origin URL
+      // (T-072-13). A 404 is the designed no-photo state (null); any other
+      // failure is flagged so the upload card can say so.
+      fetchCardPhoto(session).then(
+        (blob) => ({ blob, failed: false }),
+        () => ({ blob: null, failed: true }),
+      ),
     ])
-      .then(([r, card, photoBlob]) => {
+      .then(([r, card, photo]) => {
         if (cancelled) return
         setReport(r)
         setMyCard(card)
-        if (photoBlob !== null) {
-          photoObjectUrl = URL.createObjectURL(photoBlob)
-          setPhotoUrl(photoObjectUrl)
-        }
+        setPhotoLoadFailed(photo.failed)
+        if (!photo.failed) replacePhoto(photo.blob)
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -125,9 +143,8 @@ export function DashboardPage({
       })
     return () => {
       cancelled = true
-      if (photoObjectUrl !== null) URL.revokeObjectURL(photoObjectUrl)
     }
-  }, [session])
+  }, [session, replacePhoto])
 
   function toggleGroup(g: GroupKey) {
     setOpenGroups((prev) => ({ ...prev, [g]: !prev[g] }))
@@ -198,6 +215,7 @@ export function DashboardPage({
   // The strip state machine (keyStatStrip.ts, unit-locked): hidden /
   // explainer / cards-in-server-order.
   const strip = keyStatStripModel(myCard)
+  const priorityKeys = useMemo(() => priorityKeySet(myCard), [myCard])
 
   // Owner checkpoint round 4 (LAYOUT): OVR + the key-stat mini cards are ONE
   // wide strip, and the strip carries the OVR tier color. The tier helper is
@@ -245,11 +263,13 @@ export function DashboardPage({
               {/* Owner checkpoint round 7: the own-card preview is now sized
                   like a Destaques card (≈a third of the content column) and
                   the actions joined it as an icon strip over the photo area
-                  (CardPhotoUpload owns the hover overlay and its data calls). */}
+                  (CardPhotoUpload owns the hover overlay; the card and photo data live here). */}
               <CardPhotoUpload
                 session={session}
-                // Same coalesced name as the export path above (08-08).
-                displayName={ownName}
+                preview={exportData}
+                photoUrl={photoUrl}
+                photoLoadFailed={photoLoadFailed}
+                onPhotoChange={replacePhoto}
                 className="mx-auto w-40 shrink-0 sm:w-48 lg:mx-0 lg:w-64 xl:w-72"
                 onDownload={
                   exportData === null
@@ -270,7 +290,6 @@ export function DashboardPage({
                   displayName={ownName}
                   charClass={report.char_class}
                   charFunction={report.char_function}
-                  layout="strip"
                 />
                 {/* Round 13 (owner checkpoint): the key-stat row gets the
                     same micro-heading as "Foco de melhoria" — one divider +
@@ -299,7 +318,7 @@ export function DashboardPage({
                     returns [] and the strip self-hides). */}
                 <FocusStrip
                   stats={report.stats}
-                  priorityKeys={priorityKeySet(myCard)}
+                  priorityKeys={priorityKeys}
                   onJump={handleFocusJump}
                 />
               </div>

@@ -183,7 +183,8 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
         })}
       </div>
 
-      <div className={tab === 'envios' ? 'mt-6' : 'mt-6 hidden'} role="tabpanel">
+      {tab === 'envios' && (
+      <div className="mt-6" role="tabpanel">
       {error !== null ? (
         <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-error">
           {error}
@@ -342,14 +343,19 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
         </>
       )}
       </div>
+      )}
 
-      <div className={tab === 'solicitacoes' ? 'mt-6' : 'mt-6 hidden'} role="tabpanel">
-        <RequestReview session={session} />
-      </div>
+      {tab === 'solicitacoes' && (
+        <div className="mt-6" role="tabpanel">
+          <RequestReview session={session} />
+        </div>
+      )}
 
-      <div className={tab === 'identidades' ? 'mt-6' : 'mt-6 hidden'} role="tabpanel">
-        <IdentityReview session={session} />
-      </div>
+      {tab === 'identidades' && (
+        <div className="mt-6" role="tabpanel">
+          <IdentityReview session={session} />
+        </div>
+      )}
 
       {/* Destructive confirm: locked copy, destructive-styled confirm button. */}
       <ConfirmDialog
@@ -373,62 +379,9 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
 }
 
 // ---- Testable helpers (node env) ----
-export type ValidacoesTabAlias = ValidacoesTab
 export function validacoesTabLabel(tab: ValidacoesTab): string {
   if (tab === 'envios') return 'Envios'
   if (tab === 'solicitacoes') return 'Solicitações'
   return 'Identidades'
 }
-export const VALIDACOES_TABS = ['envios', 'solicitacoes', 'identidades'] as const
-export const DEFAULT_VALIDACOES_TAB: ValidacoesTab = 'envios'
-export const validacoesEmptyEnvios = () => 'Nenhuma submissao aguardando validacao.'
-export const enviosEmptyMessage = validacoesEmptyEnvios
-
-// ---- Testable helpers (node env) ----
-// Pure helpers over an OfficerQueueRow so node-env tests can assert the envios
-// identity display contract: nickname/char_id/char_class are rendered (in that
-// order) only when present; legacy rows (all null) render the old line
-// unchanged (helper returns null/empty).
-export function enviosIdentityLine(row: OfficerQueueRow): string | null {
-  const parts: string[] = []
-  if (row.nickname !== null && row.nickname !== undefined && row.nickname !== '') parts.push(row.nickname)
-  if (row.char_id !== null && row.char_id !== undefined && row.char_id !== '') parts.push(row.char_id)
-  if (row.char_class !== null && row.char_class !== undefined && row.char_class !== '')
-    parts.push(classLabel(row.char_class))
-  return parts.length > 0 ? parts.join(' · ') : null
-}
-
-export function hasEnviosIdentity(row: OfficerQueueRow): boolean {
-  return enviosIdentityLine(row) !== null
-}
-
-export function formatEnviosIdentity(row: OfficerQueueRow): string {
-  return enviosIdentityLine(row) ?? ''
-}
-
-export function enviosIdentityText(row: OfficerQueueRow): string {
-  return formatEnviosIdentity(row)
-}
-
-export function officerQueueIdentityLine(row: OfficerQueueRow): string | null {
-  return enviosIdentityLine(row)
-}
-
-export function officerQueueIdentity(row: OfficerQueueRow): string | null {
-  return enviosIdentityLine(row)
-}
-
-export function formatOfficerQueueIdentity(row: OfficerQueueRow): string {
-  return formatEnviosIdentity(row)
-}
-
-export function queueIdentityLine(row: OfficerQueueRow): string | null {
-  return enviosIdentityLine(row)
-}
-
-// aliases
-export const enviosIdentity = enviosIdentityLine
-export const identityLineForEnvios = enviosIdentityLine
-export const enviosIdentityValue = formatEnviosIdentity
-export const hasEnviosIdentityLine = hasEnviosIdentity
 

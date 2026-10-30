@@ -9,7 +9,6 @@ type LoginStatus =
   | { kind: 'needs-setup' }
   | { kind: 'error'; message: string }
   | { kind: 'locked'; message: string }
-  | { kind: 'device-mismatch' }
 
 export interface LoginPageProps {
   onLogin: (session: NeoFootSession) => void

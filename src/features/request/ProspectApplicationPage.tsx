@@ -11,7 +11,7 @@
 // applyOcrOutcomes + wizard rules are the exact member-wizard components.
 // Only the shell differs: read-only identity summary (no second proof), the
 // anonymous catalog, and the prospect submit path.
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   fetchPublicCatalog,
   requestAccess,
@@ -75,7 +75,7 @@ export function ProspectApplicationPage({
 
   // Effective inputs = manual inputs + computed read-only raw defenses
   // (Phase 9.1 DEF-03).
-  const effectiveInputs = withDerivedDefenses(inputs)
+  const effectiveInputs = useMemo(() => withDerivedDefenses(inputs), [inputs])
   const [ocrRunningStep, setOcrRunningStep] = useState<1 | 2 | 3 | 4 | null>(null)
   const [failedFields, setFailedFields] = useState(emptyClaims)
   const [ocrFilledFields, setOcrFilledFields] = useState(emptyClaims)
