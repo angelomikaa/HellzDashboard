@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
-status: in_progress
+status: ready_to_plan
 last_updated: "2026-10-29T00:00:00.000Z"
 last_activity: 2026-10-29
 progress:
   total_phases: 11
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 45
   completed_plans: 45
-  percent: 91
+  percent: 100
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 **Core value:** Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
-**Current focus:** Phase 10.3 — Artista merged cohort (Menestrel + Cigana), the 2026-10-29 card.svg tier-color re-export, and third primers for zero-member meta cohorts
+**Current focus:** Phase 10.4 — Battlefield Lineups & Roster Sync (Vigrid Field / Raid 1 & Ruinscape / Raid 2 lineups, 80-player roster pre-registration in Personagens, and Hellz dark/neon JPG export)
 
 ## Current Position
 
-Phase: 10.3 (Artista cohort merge + card.svg tier-color re-export + zero-member meta primers)
-Plan: 0038 APPLIED LIVE 2026-10-29; client + card + smoke work committed
-Status: Live and verified (merge, OVR parity 0 divergences, card smoke 56/56, Inicio shows Artista)
-Last activity: 2026-10-29
+Phase: 11
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-30
 
 ## Accumulated Context
 

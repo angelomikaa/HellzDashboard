@@ -30,7 +30,8 @@
 - [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (3/3 plans)
 - [x] Phase 10.1: Universal Rating Unification — URGENT FIX (INSERTED 2026-10-27, owner report "OVR from the cards is inconsistent with the Ranking tab"): migration 0036 rebases role_rank/my_card/staff_requests onto the Phase 9 value-proportional formula, adds the selection_order<=6 key filter everywhere (Ranking-tab OVR nulls gone), unifies the cohort definition (active + non-discarded), and locks the six-RPC parity contract behind a runnable smoke gate (2/2 plans) — completed 2026-10-27
 - [ ] Phase 10.2: Meta vs Non-Viable Cohorts (INSERTED 2026-10-28) — the 39 keyed (class, function) combos split into 23 playable (meta) and 16 non-viable, persisted in `class_cohorts` (migration 0037); Início shows one carousel per meta build (client half 2026-10-29) — completed 2026-10-29
-- [ ] Phase 10.3: Artista Merged Cohort (INSERTED 2026-10-29) — Menestrel and Cigana are one cohort for stats (exception only; every other tab unchanged), ONE shared 6-key config per owner, members keep their own class on card/registry; migration 0038 APPLIED LIVE 2026-10-29 (22 meta / 14 non-viable, OVR parity 0 divergences). Ships with the card.svg tier-color re-export (no border, stats contrast plate) and third primers for the ten meta cohorts with zero real members
+- [x] Phase 10.3: Artista Merged Cohort (INSERTED 2026-10-29) — Menestrel and Cigana are one cohort for stats (exception only; every other tab unchanged), ONE shared 6-key config per owner, members keep their own class on card/registry; migration 0038 APPLIED LIVE 2026-10-29 (22 meta / 14 non-viable, OVR parity 0 divergences). Ships with the card.svg tier-color re-export (no border, stats contrast plate) and third primers for the ten meta cohorts with zero real members
+- [ ] Phase 10.4: Battlefield Lineups & Roster Sync (INSERTED 2026-10-30) — Lineup tab for **Vigrid Field (Raid 1)** and **Ruinscape (Raid 2)** (8 parties `G1`–`G8` × 5 slots, slot 1 = Party Leader, editable party assignment labels, `N/5` counters, smoke-excluded); members view & download JPG, officers/owner edit lineups at will; pre-registers all new real nicknames from the owner's Raid 1/2 lineups into `Personagens` without guessing ambiguous classes; generates Hellz dark/neon JPG per battlefield (3 plans)
 - [ ] Phase 11: Verified Access — Claim Authorization & Discord OAuth — first access is manual-fill and officer-validated since 0034 (DSCD-01 holds via claim/registration request approvals, no print anywhere); Phase 11 replaces the manual trust with the real anchor: one-time officer-confirmed Discord↔character link, server-side bot-token role check, custom access token hook keeping every RLS policy intact, device-binding re-decision, PIN retirement path (INSERTED 2026-10-26)
 
 </details>
@@ -227,6 +228,28 @@ Plans:
 Cross-cutting constraints: append-only (0001–0035 never edited, `create or replace` exact signatures only, zero `drop function`); the value-proportional expression is copied verbatim from the 0028 shapes — never re-derived; the permanent anti-refork guard is the parity smoke, not a helper refactor (considered and deferred, D-10.1-05); migration + bookkeeping row + `notify pgrst, 'reload schema'` land together (0035 lesson); live apply via apply-seed.mjs only (no `supabase db push` in this environment); the two sanctioned smoke-fixture members stay until second order (D-10.1-08) — the pre-release purge gate is unchanged; no new npm dependencies.
 **UI hint**: no (server-side values only; owners will SEE corrected numbers on existing surfaces)
 
+### Phase 10.4: Battlefield Lineups & Roster Sync (INSERTED 2026-10-30)
+
+**Goal**: Officers manage and members view the guild's 8×5 party lineups for **Vigrid Field (Raid 1)** and **Ruinscape (Raid 2)**, with all 80 real players from the owner's current lineups pre-registered in `Personagens` (without forcing ambiguous classes) and a 1-click **JPG export** for each battlefield styled in the Hellz dark/neon visual system with class icons and class color accents.
+
+**Depends on**: Phase 8/10 (`members` registry, `member_identity_history`, `ClassCrest` ROOCDB icons, Canvas 2D export pattern)
+**Requirements**: LNUP-01, LNUP-02, LNUP-03, LNUP-04, LNUP-05
+**Success Criteria** (what must be TRUE):
+  1. Two battlefields (`vigrid_field` = "Vigrid Field — Raid 1", `ruinscape` = "Ruinscape — Raid 2") each hold 8 parties (`G1`–`G8`) of up to 5 slots (`1`–`5`, slot 1 = Party Leader) with an officer-editable party role label (seeded with `MOBS CIMA/BAIXO` on Raid 1 G5 & Raid 2 G3, and `MOBS DIREITA/ESQUERDA` on Raid 1 G6 & Raid 2 G4) and a live `N/5` counter per party (LNUP-01)
+  2. Every active logged-in member sees the `Lineup` tab in read-only mode (highlighting their own party/slot if assigned) and can download the battlefield JPGs; only active officers and the owner can assign/clear slots or edit party labels, enforced server-side in SECURITY DEFINER RPCs with `assert_device_bound()` (LNUP-02)
+  3. Smoke/dummy rows (`discord_handle like 'smoke%'` or `'dummy-%'`) and inactive rows are excluded from the assignable roster and rejected server-side; assigning a member already in another slot atomically moves them so a player can never occupy two slots at once (LNUP-03)
+  4. All new real nicknames from the owner's Raid 1 and Raid 2 reference images are pre-registered into `members` (`active = true`, `pin_hash = null`, `char_class = null` — no guessed classes) and linked into the default seeded lineups alongside existing active members (reactivating `XAVENTAL`), so `Personagens` immediately lists the full 80-player guild roster (LNUP-04)
+  5. Clicking "Baixar JPG (Vigrid Field)", "Baixar JPG (Ruinscape)", or "Baixar ambas (JPG)" renders a crisp 1920×1080 landscape `image/jpeg` via Canvas 2D in the Hellz dark/neon theme (`#141414`/`#1E1E1E`, red neon accents, Orbitron/Bebas Neue, Hellz mark, `G1`–`G8` columns, party assignment badges, leader crown/bold on slot 1, class icon + class color bar per slot, `N/5` footer) with zero canvas taint and zero new npm dependencies (LNUP-05)
+
+**Plans**: 3 plans created (see `.planning/phases/10.4-battlefield-lineups/`)
+Plans:
+- [x] 10.4-01-PLAN.md — Migration 0040: `lineup_parties` & `lineup_slots` schema + RLS + `get_lineups` / `set_lineup_slot` / `set_lineup_party_label` RPCs + 80-player roster pre-registration & default Raid 1/2 seed — Wave 1 — LNUP-01/02/03/04
+- [x] 10.4-02-PLAN.md — Client API + `LineupPage` UI: `App.tsx` tab wiring, Battlefield switcher, 8-party grid, member read-only view with "Minha PT" highlight, officer slot combobox/swap + editable party labels — Wave 2 — LNUP-01/02/03
+- [x] 10.4-03-PLAN.md — Canvas 2D JPG generator (`lineupExport.ts`): Hellz dark/neon 1920×1080 board, class color/icon rendering, single & dual battlefield JPG download + unit/render tests — Wave 3 — LNUP-05
+
+Cross-cutting constraints: append-only migration (`0040_battlefield_lineups.sql`), applied live via `scripts/apply-seed.mjs` with `schema_migrations` bookkeeping + `notify pgrst, 'reload schema'`; `get_lineups` returns ONLY `{member_id, display_name, char_class, char_function}` per occupant (never stats/OVR/key-stat config — RNK-02 / CMP-03 discipline); smoke fixtures (`smoke%`, `dummy-%`) never enter lineups; zero new npm dependencies.
+**UI hint**: yes
+
 ### Phase 11: Verified Access — Claim Authorization & Discord OAuth (INSERTED)
 
 **Goal**: Access is bound to something the attacker cannot steal from a Discord post. The 0032 stopgap (officer-authorized claims) shipped 2026-10-26 and was reverted the same day by 0033 at the owner's call — registration is one-go again (immediate PIN setter; registration requests carry the PIN so the approval activates it) with manual validation staying on (officer approval + the post-claim D-05 identity review) — so Phase 11 carries the full identity load: a one-time, officer-confirmed Discord↔character link per member, Discord OAuth as the login, a server-side guild-role check with the guild bot token, and session continuity that keeps every existing RLS policy working unchanged.
@@ -242,7 +265,7 @@ Cross-cutting constraints: append-only (0001–0035 never edited, `create or rep
   4. All `auth.jwt()->>'member_id'` RLS policies and RPC gates keep working through a custom access token hook that injects `member_id`/`member_role` — zero policy rewrites; the 0024 `assert_device_bound` discipline is explicitly migrated or superseded (never silently broken); `members.discord_handle` remains the staff-facing contact field
   5. The OCR print is evidence/typo-prevention only (stats/class/ID read + officer review queue); no code path or copy treats the print as proof of ownership
   6. The PIN retirement path is staged and decided at planning time (hard removal vs. recovery-only), with outstanding hand-minted JWTs handled (short expiry/forced re-login) and `NEFOOT_JWT_SECRET` rotation planned if the custom mint retires
-**Plans:** 0 created — plan via `/gsd-plan-phase 11` (design brief: `.planning/research/DISCORD-OAUTH-DESIGN.md`; note: its §2 "What 0032 already changed" describes the reverted stopgap — see the 0033 supersession note)
+**Plans:** 3/3 plans complete
 **UI hint**: yes
 
 ## Progress
@@ -267,6 +290,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 11 (8
 | 10.1 Universal Rating Unification (urgent fix, inserted) | v1.1 | 2/2 | Complete    | 2026-10-27 |
 | 10.2 Meta vs Non-Viable Cohorts (inserted) | v1.1 | - | Complete | 2026-10-29 |
 | 10.3 Artista Merged Cohort (inserted) | v1.1 | - | Complete | 2026-10-29 |
+| 10.4 Battlefield Lineups & Roster Sync (inserted) | v1.1 | 3/3 | Complete    | 2026-10-30 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---

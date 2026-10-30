@@ -126,6 +126,16 @@ Added 2026-10-27 after the owner reported the card OVRs inconsistent with the Ra
 - [x] **UNIF-03**: ONE cohort definition in all six RPCs: latest value per (member, stat) over submissions `status not in ('rejected','discarded')`, over ACTIVE members of the same class+build-role — `my_report` and `class_top5` drop the status-only / active-less reads (latent re-fork: an inactive or discarded-submission member must never shift a live member's rating)
 - [x] **UNIF-04**: The parity contract is locked in a runnable gate: the smoke-card UNIFY probes (red since 0018) pass again and extend to `role_rank` (staff OVR ≡ `my_card`) and `my_report` (`ovr.value` ≡ `my_card`); a read-only cross-RPC parity audit shows zero OVR divergence for every OVR-capable member; both run green against live and are recorded in `10.1-VERIFICATION.md` — a future partial rewrite (the 0018 failure mode) goes red the day it ships
 
+### Battlefield Lineups & Roster Sync (Phase 10.4 — INSERTED 2026-10-30)
+
+Added 2026-10-30 to replace the external spreadsheet workflow for raid party management and image sharing, while enriching the `Personagens` registry with the real 80-player guild roster from the Raid 1 and Raid 2 lineups.
+
+- [x] **LNUP-01**: Two battlefields exist — **Vigrid Field (Raid 1)** and **Ruinscape (Raid 2)** — each structured as 8 parties (`G1`–`G8`) of up to 5 slots (`slot_index` 1–5, where slot 1 is automatically styled as the Party Leader) plus an optional per-party role/assignment label (e.g., `MOBS CIMA/BAIXO`, `MOBS DIREITA/ESQUERDA`) and a live `N/5` counter per party
+- [x] **LNUP-02**: Lineups are readable by all active authenticated members (`get_lineups` RPC returns only display-safe identity: `member_id`, `display_name`, `char_class`, `char_function` — never stats, points, OVR, or key-stat config) and editable at will by active officers and the owner (`set_lineup_slot`, `set_lineup_party_label` SECURITY DEFINER RPCs with server-side staff + device-binding checks)
+- [x] **LNUP-03**: Smoke and dummy fixtures (`discord_handle like 'smoke%'` or `'dummy-%'`) and inactive members are excluded from the assignable roster and rejected server-side if passed to `set_lineup_slot`; assigning a member who is already in another slot automatically moves them (no duplicate player across parties/battlefields)
+- [x] **LNUP-04**: All new real players present in the owner's Raid 1 / Raid 2 reference lineups are pre-registered into `members` as active unclaimed rows (`pin_hash = null`, `char_class = null` — no guessed classes on ambiguous spreadsheet colors) so they appear immediately in `Personagens` and populate the default seeded lineups for Vigrid Field and Ruinscape
+- [x] **LNUP-05**: Users can generate and download a high-resolution **JPG** (`image/jpeg`) per battlefield (`hellz-lineup-vigrid-field.jpg`, `hellz-lineup-ruinscape.jpg`, plus a "Baixar ambas" action) rendered via native Canvas 2D in the Hellz dark/neon visual system (`#141414`/`#1E1E1E`, red neon accents, Orbitron/Bebas Neue typography, Hellz mark, `G1`–`G8` columns, party assignment headers, leader highlight on slot 1, class icon + class color accent per slot, and `N/5` party counters)
+
 ## v2 Requirements
 
 Deferred to a future release. Tracked but not in the v1.1 roadmap.
@@ -251,8 +261,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UNIF-02 | Phase 10.1 — Universal Rating Unification (urgent fix) | Complete (10.1-01) |
 | UNIF-03 | Phase 10.1 — Universal Rating Unification (urgent fix) | Complete (10.1-01) |
 | UNIF-04 | Phase 10.1 — Universal Rating Unification (urgent fix) | Complete (10.1-02) |
+| LNUP-01 | Phase 10.4 — Battlefield Lineups & Roster Sync | Planned (10.4-01/02) |
+| LNUP-02 | Phase 10.4 — Battlefield Lineups & Roster Sync | Planned (10.4-01/02) |
+| LNUP-03 | Phase 10.4 — Battlefield Lineups & Roster Sync | Planned (10.4-01/02) |
+| LNUP-04 | Phase 10.4 — Battlefield Lineups & Roster Sync | Planned (10.4-01) |
+| LNUP-05 | Phase 10.4 — Battlefield Lineups & Roster Sync | Planned (10.4-03) |
 
 **Coverage:**
-- v1.1 requirements: 53 total
-- Mapped to phases: 53 ✓
+- v1.1 requirements: 58 total
+- Mapped to phases: 58 ✓
 - Unmapped: 0 ✓
