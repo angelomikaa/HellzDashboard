@@ -62,6 +62,15 @@ const ICON_SRC: ReadonlyMap<string, string> = new Map(
   }),
 )
 
+/** Same-origin icon URL for a class, resolved by the SAME manifest lookup
+ *  ClassCrest renders with (null → no icon; callers draw their monogram). The
+ *  lineup JPG export reads this so its canvas uses exactly the asset the grid
+ *  shows. Never returns an http(s) URL (T-072-13). */
+export function iconSrcFor(charClass: string | null): string | null {
+  if (charClass === null) return null
+  return ICON_SRC.get(charClass) ?? null
+}
+
 /** The card photo placeholder (2026-10-23 owner decision): the per-job
  *  full-body class art, gender picked by the manifest's placeholder_gender
  *  (female for every dual-gender class; Bard=male Menestrel art,
