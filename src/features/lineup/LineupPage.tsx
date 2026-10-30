@@ -19,6 +19,7 @@ import {
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { ClassCrest } from '../assets/ClassCrest'
+import { downloadLineupJpg } from './lineupExport'
 import { classLabel } from '../../lib/classLabels'
 import {
   assignmentCallout,
@@ -45,6 +46,12 @@ type Mutation = (
   session: NeoFootSession,
 ) => Promise<LineupsPayload>
 
+/** Which JPG button is busy: one battlefield, or both ("Baixar ambas"). */
+type ExportScope = BattlefieldId | 'both'
+
+/** Enumeration-safe copy for a failed JPG render/download (no internals). */
+const EXPORT_ERROR_COPY = 'Não foi possível gerar o JPG. Tente novamente.'
+
 export function LineupPage({ session }: { session: NeoFootSession }) {
   const isStaff = session.member_role === 'officer' || session.member_role === 'owner'
 
@@ -54,6 +61,8 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
   const [saving, setSaving] = useState(false)
   const [battlefield, setBattlefield] = useState<BattlefieldId>('vigrid_field')
   const [stacked, setStacked] = useState(false)
+  const [exporting, setExporting] = useState<ExportScope | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -78,6 +87,26 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
       setActionError(lineupErrorCopy(err))
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Sequential, not parallel: browsers block a burst of programmatic downloads.
+  async function exportJpgs(ids: BattlefieldId[]) {
+    if (payload === null) return
+    setExporting(ids.length === 1 ? ids[0] : 'both')
+    setExportError(null)
+    try {
+      for (const id of ids) {
+        const lineup = payload.battlefields.find((b) => b.battlefield === id) ?? {
+          battlefield: id,
+          parties: [],
+        }
+        await downloadLineupJpg(lineup)
+      }
+    } catch {
+      setExportError(EXPORT_ERROR_COPY)
+    } finally {
+      setExporting(null)
     }
   }
 
@@ -107,17 +136,39 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
           </p>
         )}
         <div role="group" aria-label="Baixar JPG" className="flex flex-wrap gap-2">
-          {/* JPG export is wired in plan 10.4-03; disabled until then. */}
-          <button type="button" disabled title="Exportação JPG disponível em breve" className="h-11 rounded-md border border-line px-3 text-sm text-muted disabled:opacity-60">
-            Baixar JPG — Vigrid Field
+          <button
+            type="button"
+            disabled={exporting !== null}
+            aria-busy={exporting === 'vigrid_field'}
+            onClick={() => void exportJpgs(['vigrid_field'])}
+            className="h-11 rounded-md border border-line px-3 text-sm text-content hover-control disabled:opacity-60"
+          >
+            {exporting === 'vigrid_field' ? 'Gerando JPG…' : 'Baixar JPG — Vigrid Field (Raid 1)'}
           </button>
-          <button type="button" disabled title="Exportação JPG disponível em breve" className="h-11 rounded-md border border-line px-3 text-sm text-muted disabled:opacity-60">
-            Baixar JPG — Ruinscape
+          <button
+            type="button"
+            disabled={exporting !== null}
+            aria-busy={exporting === 'ruinscape'}
+            onClick={() => void exportJpgs(['ruinscape'])}
+            className="h-11 rounded-md border border-line px-3 text-sm text-content hover-control disabled:opacity-60"
+          >
+            {exporting === 'ruinscape' ? 'Gerando JPG…' : 'Baixar JPG — Ruinscape (Raid 2)'}
           </button>
-          <button type="button" disabled title="Exportação JPG disponível em breve" className="h-11 rounded-md border border-line px-3 text-sm text-muted disabled:opacity-60">
-            Baixar ambas
+          <button
+            type="button"
+            disabled={exporting !== null}
+            aria-busy={exporting === 'both'}
+            onClick={() => void exportJpgs(['vigrid_field', 'ruinscape'])}
+            className="h-11 rounded-md border border-accent px-3 text-sm font-semibold text-content hover-control disabled:opacity-60"
+          >
+            {exporting === 'both' ? 'Gerando JPG…' : 'Baixar ambas (JPG)'}
           </button>
         </div>
+        {exportError !== null && (
+          <p role="alert" className="rounded-md border border-line bg-surface px-3 py-2 text-sm text-content">
+            {exportError}
+          </p>
+        )}
       </header>
 
       <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Campos de batalha">
