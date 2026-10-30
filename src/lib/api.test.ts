@@ -18,6 +18,10 @@ import {
   fetchMySubmissions,
   fetchStaffMembers,
   fetchStaffRequests,
+  asLineupsPayload,
+  fetchLineups,
+  setLineupPartyLabel,
+  setLineupSlot,
   rejectRequest,
   resetMemberPin,
   reviewIdentity,
@@ -465,6 +469,84 @@ describe('Phase 8 staff API wrappers (0014 RPC census)', () => {
       'https://test-project.supabase.co/rest/v1/rpc/staff_identity_history',
     )
     expect(JSON.parse(calls[0].init.body as string)).toEqual({ p_member: session.member_id })
+  })
+})
+
+const lineupPayload = {
+  battlefields: [
+    {
+      battlefield: 'vigrid_field',
+      parties: [
+        {
+          party_index: 1,
+          role_label: null,
+          filled: 1,
+          slots: [
+            { slot_index: 1, member_id: 'm1', display_name: 'Lanaya', char_class: 'Bard', char_function: 'dps' },
+            { slot_index: 2, member_id: null, display_name: null, char_class: null, char_function: null },
+          ],
+        },
+      ],
+    },
+    { battlefield: 'ruinscape', parties: [] },
+  ],
+  roster: [{ member_id: 'm1', display_name: 'Lanaya', char_class: 'Bard', char_function: 'dps' }],
+}
+
+describe('lineup RPC wrappers (phase 10.4, LNUP-01..03)', () => {
+  it('fetchLineups POSTs /rpc/get_lineups with both gateway headers and returns the validated payload', async () => {
+    nextResponse = () => res(200, JSON.stringify(lineupPayload))
+    const payload = await fetchLineups(session)
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/get_lineups')
+    expect(calls[0].init.method).toBe('POST')
+    const headers = calls[0].init.headers as Record<string, string>
+    expect(headers.apikey).toBe('test-anon-key')
+    expect(headers.Authorization).toBe('Bearer test-token')
+    expect(payload.battlefields[0].battlefield).toBe('vigrid_field')
+    expect(payload.roster[0].display_name).toBe('Lanaya')
+  })
+
+  it('setLineupSlot sends the p_* body and passes null through for a clear', async () => {
+    nextResponse = () => res(200, JSON.stringify(lineupPayload))
+    await setLineupSlot(session, 'vigrid_field', 3, 2, 'm1')
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/set_lineup_slot')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      p_battlefield: 'vigrid_field',
+      p_party: 3,
+      p_slot: 2,
+      p_member: 'm1',
+    })
+
+    await setLineupSlot(session, 'ruinscape', 1, 5, null)
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({
+      p_battlefield: 'ruinscape',
+      p_party: 1,
+      p_slot: 5,
+      p_member: null,
+    })
+  })
+
+  it('setLineupPartyLabel POSTs the label body and maps server errors to ApiError', async () => {
+    nextResponse = () => res(200, JSON.stringify(lineupPayload))
+    await setLineupPartyLabel(session, 'ruinscape', 4, 'MOBS CIMA/BAIXO')
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/set_lineup_party_label')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      p_battlefield: 'ruinscape',
+      p_party: 4,
+      p_label: 'MOBS CIMA/BAIXO',
+    })
+
+    nextResponse = () => res(500, 'invalid_lineup_label')
+    await expect(setLineupPartyLabel(session, 'ruinscape', 4, 'x')).rejects.toBeInstanceOf(ApiError)
+  })
+
+  it('asLineupsPayload rejects a malformed or unknown-battlefield payload', () => {
+    expect(() => asLineupsPayload(null)).toThrow(ApiError)
+    expect(() => asLineupsPayload({ battlefields: [], roster: 'no' })).toThrow(ApiError)
+    expect(() =>
+      asLineupsPayload({ battlefields: [{ battlefield: 'mars', parties: [] }], roster: [] }),
+    ).toThrow(ApiError)
+    expect(asLineupsPayload(lineupPayload).roster).toHaveLength(1)
   })
 })
 

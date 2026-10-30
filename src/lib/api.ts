@@ -1501,3 +1501,183 @@ export async function deleteIdentityProof(
   const kind = res.status === 401 ? 'unauthorized' : 'server'
   throw new ApiError(res.status, kind, `HTTP ${res.status} removing identity proof`)
 }
+
+// ---------------------------------------------------------------------------
+// Phase 10.4 (LNUP-01..03) — battlefield lineups. Three SECURITY DEFINER RPCs
+// from migration 0040 (get_lineups read; set_lineup_slot and
+// set_lineup_party_label officer/owner writes, device-bound). The server gates
+// everything; these wrappers add NO enforcement. The payload is a CLOSED field
+// list: display-only roster fields, never stats, points, OVR, key-stat config
+// or pin_hash. Each wrapper validates the shape so a broken deploy surfaces as
+// ApiError instead of a crash in the grid render path.
+// ---------------------------------------------------------------------------
+
+export type BattlefieldId = 'vigrid_field' | 'ruinscape'
+
+export interface LineupRosterMember {
+  member_id: string
+  display_name: string
+  char_class: string | null
+  char_function: 'dps' | 'mdps' | 'suporte'
+}
+
+export interface LineupSlot {
+  slot_index: number
+  member_id: string | null
+  display_name: string | null
+  char_class: string | null
+  char_function: 'dps' | 'mdps' | 'suporte' | null
+}
+
+export interface LineupParty {
+  party_index: number
+  role_label: string | null
+  filled: number
+  slots: LineupSlot[]
+}
+
+export interface BattlefieldLineup {
+  battlefield: BattlefieldId
+  parties: LineupParty[]
+}
+
+export interface LineupsPayload {
+  battlefields: BattlefieldLineup[]
+  roster: LineupRosterMember[]
+}
+
+const BATTLEFIELD_IDS: readonly BattlefieldId[] = ['vigrid_field', 'ruinscape']
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function nullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string'
+}
+
+function asLineupSlot(value: unknown): LineupSlot {
+  if (
+    !isRecord(value) ||
+    typeof value.slot_index !== 'number' ||
+    !nullableString(value.member_id) ||
+    !nullableString(value.display_name) ||
+    !nullableString(value.char_class)
+  ) {
+    throw new ApiError(0, 'server', 'malformed get_lineups slot')
+  }
+  return {
+    slot_index: value.slot_index,
+    member_id: value.member_id,
+    display_name: value.display_name,
+    char_class: value.char_class,
+    char_function: (value.char_function ?? null) as LineupSlot['char_function'],
+  }
+}
+
+function asLineupParty(value: unknown): LineupParty {
+  if (
+    !isRecord(value) ||
+    typeof value.party_index !== 'number' ||
+    typeof value.filled !== 'number' ||
+    !nullableString(value.role_label) ||
+    !Array.isArray(value.slots)
+  ) {
+    throw new ApiError(0, 'server', 'malformed get_lineups party')
+  }
+  return {
+    party_index: value.party_index,
+    role_label: value.role_label,
+    filled: value.filled,
+    slots: value.slots.map(asLineupSlot),
+  }
+}
+
+/** Narrow the get_lineups / set_* jsonb payload; anything else is a broken deploy. */
+export function asLineupsPayload(value: unknown): LineupsPayload {
+  if (!isRecord(value) || !Array.isArray(value.battlefields) || !Array.isArray(value.roster)) {
+    throw new ApiError(0, 'server', 'malformed lineups response')
+  }
+  const battlefields: BattlefieldLineup[] = value.battlefields.map((bf) => {
+    if (
+      !isRecord(bf) ||
+      typeof bf.battlefield !== 'string' ||
+      !BATTLEFIELD_IDS.includes(bf.battlefield as BattlefieldId) ||
+      !Array.isArray(bf.parties)
+    ) {
+      throw new ApiError(0, 'server', 'malformed get_lineups battlefield')
+    }
+    return {
+      battlefield: bf.battlefield as BattlefieldId,
+      parties: bf.parties.map(asLineupParty),
+    }
+  })
+  const roster: LineupRosterMember[] = value.roster.map((m) => {
+    if (
+      !isRecord(m) ||
+      typeof m.member_id !== 'string' ||
+      typeof m.display_name !== 'string' ||
+      !nullableString(m.char_class)
+    ) {
+      throw new ApiError(0, 'server', 'malformed get_lineups roster')
+    }
+    return {
+      member_id: m.member_id,
+      display_name: m.display_name,
+      char_class: m.char_class,
+      char_function: m.char_function as LineupRosterMember['char_function'],
+    }
+  })
+  return { battlefields, roster }
+}
+
+/** Read both battlefields + the assignable roster (any active member). */
+export async function fetchLineups(session: NeoFootSession): Promise<LineupsPayload> {
+  const res = await restFetch(session, '/rpc/get_lineups', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  return asLineupsPayload(await parseBody<unknown>(res))
+}
+
+/**
+ * Set or clear (memberId = null) one slot (officer/owner). The server moves a
+ * seated player out of their old slot and swaps when the target was occupied.
+ * Errors surface as ApiError: invalid_lineup_member, forbidden, device_mismatch.
+ */
+export async function setLineupSlot(
+  session: NeoFootSession,
+  battlefield: BattlefieldId,
+  partyIndex: number,
+  slotIndex: number,
+  memberId: string | null,
+): Promise<LineupsPayload> {
+  const res = await restFetch(session, '/rpc/set_lineup_slot', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_battlefield: battlefield,
+      p_party: partyIndex,
+      p_slot: slotIndex,
+      p_member: memberId,
+    }),
+  })
+  return asLineupsPayload(await parseBody<unknown>(res))
+}
+
+/** Edit or clear (roleLabel = null or blank) a party role label (officer/owner). */
+export async function setLineupPartyLabel(
+  session: NeoFootSession,
+  battlefield: BattlefieldId,
+  partyIndex: number,
+  roleLabel: string | null,
+): Promise<LineupsPayload> {
+  const res = await restFetch(session, '/rpc/set_lineup_party_label', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_battlefield: battlefield,
+      p_party: partyIndex,
+      p_label: roleLabel,
+    }),
+  })
+  return asLineupsPayload(await parseBody<unknown>(res))
+}
