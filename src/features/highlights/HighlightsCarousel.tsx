@@ -71,6 +71,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PromotionCardRow } from '../../lib/api'
 import { classLabel } from '../../lib/classLabels'
+import { isVirtualClassGroup } from '../../lib/classGroups'
 import { ClassCrest } from '../assets/ClassCrest'
 import { PromotionCard } from './PromotionCard'
 import { AUTO_ADVANCE_MS, clampIndex, loopIndex, nearestCardIndex } from './carousel'
@@ -287,6 +288,15 @@ export function HighlightsCarousel({
 
   if (cards.length === 0) return null
 
+  // A merged group (Artista) has no art of its own — the cohort stays ONE
+  // class, but its crest follows the SPOTLIGHT card (owner 2026-10-30): a
+  // Cigana in the center shows the Cigana icon, a Menestrel shows Menestrel.
+  // The card's own class rides the 0039 payload (char_class); a pre-0039
+  // payload falls back to the group key and its monogram tile. Scoped to the
+  // virtual groups only — a real class keeps its own crest.
+  const spotlightClass = cards[active]?.char_class
+  const crestClass = isVirtualClassGroup(charClass) ? (spotlightClass ?? null) : charClass
+
   return (
     <div>
       {/* One bar inside the carousel (round 5): class identity on the left,
@@ -296,7 +306,7 @@ export function HighlightsCarousel({
         {/* D-17: class imagery grounds the carousel in the game; D-16:
             classes without official art render the monogram tile — never a
             broken image. */}
-        <ClassCrest charClass={charClass} size="md" />
+        <ClassCrest charClass={crestClass} size="md" />
         <h2 className="font-display text-xl font-semibold text-content sm:text-2xl">
           {classLabel(charClass)}
         </h2>
@@ -318,7 +328,7 @@ export function HighlightsCarousel({
                   type="button"
                   aria-pressed={pressed}
                   onClick={() => onSelectBuild(build.fn)}
-                  className={`h-11 rounded-full border border-line bg-surface px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  className={`h-11 rounded-full border border-line bg-surface px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent [--neon-ring-thickness:1px] ${
                     pressed
                       ? 'neon-ring glow-accent text-accent-bright'
                       : 'text-muted hover-control hover:text-content'
