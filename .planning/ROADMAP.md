@@ -30,7 +30,7 @@
 - [ ] Phase 10: Personalized Home Landing Tab — Início tab with own OVR, top-3 best-stats strip, stale-data CTA (3/3 plans)
 - [x] Phase 10.1: Universal Rating Unification — URGENT FIX (INSERTED 2026-10-27, owner report "OVR from the cards is inconsistent with the Ranking tab"): migration 0036 rebases role_rank/my_card/staff_requests onto the Phase 9 value-proportional formula, adds the selection_order<=6 key filter everywhere (Ranking-tab OVR nulls gone), unifies the cohort definition (active + non-discarded), and locks the six-RPC parity contract behind a runnable smoke gate (2/2 plans) — completed 2026-10-27
 - [ ] Phase 10.2: Meta vs Non-Viable Cohorts (INSERTED 2026-10-28) — the 39 keyed (class, function) combos split into 23 playable (meta) and 16 non-viable, persisted in `class_cohorts` (migration 0037); Início shows one carousel per meta build (client half 2026-10-29) — completed 2026-10-29
-- [ ] Phase 10.3: Artista Merged Cohort (INSERTED 2026-10-29) — Menestrel and Cigana are one cohort for stats (exception only; every other tab unchanged), ONE shared 6-key config per owner, members keep their own class on card/registry; migration 0038 generated and rehearsed, awaiting live apply. Ships with the card.svg tier-color re-export (no border, stats contrast plate) and third primers for the ten meta cohorts with zero real members
+- [ ] Phase 10.3: Artista Merged Cohort (INSERTED 2026-10-29) — Menestrel and Cigana are one cohort for stats (exception only; every other tab unchanged), ONE shared 6-key config per owner, members keep their own class on card/registry; migration 0038 APPLIED LIVE 2026-10-29 (22 meta / 14 non-viable, OVR parity 0 divergences). Ships with the card.svg tier-color re-export (no border, stats contrast plate) and third primers for the ten meta cohorts with zero real members
 - [ ] Phase 11: Verified Access — Claim Authorization & Discord OAuth — first access is manual-fill and officer-validated since 0034 (DSCD-01 holds via claim/registration request approvals, no print anywhere); Phase 11 replaces the manual trust with the real anchor: one-time officer-confirmed Discord↔character link, server-side bot-token role check, custom access token hook keeping every RLS policy intact, device-binding re-decision, PIN retirement path (INSERTED 2026-10-26)
 
 </details>
@@ -266,7 +266,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 11 (8
 | 10. Personalized Home Landing Tab | v1.1 | 3/3 | Planned | - |
 | 10.1 Universal Rating Unification (urgent fix, inserted) | v1.1 | 2/2 | Complete    | 2026-10-27 |
 | 10.2 Meta vs Non-Viable Cohorts (inserted) | v1.1 | - | Complete | 2026-10-29 |
-| 10.3 Artista Merged Cohort (inserted) | v1.1 | - | In Progress (0038 not live) |  |
+| 10.3 Artista Merged Cohort (inserted) | v1.1 | - | Complete | 2026-10-29 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---
