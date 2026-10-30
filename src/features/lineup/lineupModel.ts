@@ -167,13 +167,22 @@ export function slotAt(
 const NETWORK_ERROR =
   'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 const SESSION_ERROR = 'Sua sessão expirou ou você não tem permissão. Entre novamente.'
-const GENERIC_ERROR = 'Não foi possível salvar a alteração. Tente novamente.'
+const SAVE_ERROR = 'Não foi possível salvar a alteração. Tente novamente.'
+const LOAD_ERROR = 'Não foi possível carregar a lineup. Tente novamente.'
 
-/** pt-BR copy for a failed lineup read/write (maps server tokens, never raw text). */
-export function lineupErrorCopy(err: unknown): string {
+/**
+ * pt-BR copy for a failed lineup read/write (maps server tokens, never raw
+ * text). `mode` distinguishes a failed LOAD from a failed SAVE so a read error
+ * never claims it could not save (10.4 code review WR-07).
+ */
+export function lineupErrorCopy(err: unknown, mode: 'read' | 'write' = 'write'): string {
   const message = err instanceof Error ? err.message : ''
   if (message.includes('device_mismatch')) return SESSION_ERROR
-  if (message.includes('forbidden')) return 'Você não tem permissão para alterar a lineup.'
+  if (message.includes('forbidden')) {
+    return mode === 'read'
+      ? 'Você não tem permissão para ver a lineup.'
+      : 'Você não tem permissão para alterar a lineup.'
+  }
   if (message.includes('invalid_lineup_member')) {
     return 'Este jogador não pode ser escalado (inativo ou fora da lista).'
   }
@@ -181,7 +190,8 @@ export function lineupErrorCopy(err: unknown): string {
     return `A função deve ter no máximo ${ROLE_LABEL_MAX} caracteres.`
   }
   if (err instanceof ApiError && err.kind === 'network') return NETWORK_ERROR
-  return GENERIC_ERROR
+  if (err instanceof ApiError && err.kind === 'unauthorized') return SESSION_ERROR
+  return mode === 'read' ? LOAD_ERROR : SAVE_ERROR
 }
 
 /** Officer role-label validation: trimmed, 1..40 chars, or null to clear. */

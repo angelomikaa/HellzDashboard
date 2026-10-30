@@ -60,6 +60,29 @@ export function isExpired(s: NeoFootSession): boolean {
   return s.expires_at * 1000 <= Date.now()
 }
 
+// Session-invalid notification (10.4 code review WR-06). clearSession() only
+// touches localStorage; the live session lives in RequireAuth's React state, so
+// clearing storage alone left the user inside a dead authenticated shell. The
+// guard registers here and drops back to the landing page when the API layer
+// invalidates a session (device_mismatch / expired token).
+type SessionInvalidListener = () => void
+let sessionInvalidListener: SessionInvalidListener | null = null
+
+/** Register the live-session invalidator. Returns an unsubscribe function. */
+export function onSessionInvalid(listener: SessionInvalidListener): () => void {
+  sessionInvalidListener = listener
+  return () => {
+    if (sessionInvalidListener === listener) sessionInvalidListener = null
+  }
+}
+
+/** Drop storage AND the live session. Safe to call when nothing is registered. */
+export function invalidateSession(): void {
+  clearSession()
+  sessionInvalidListener?.()
+}
+
+
 // D-17: client-side device fingerprint (SHA-256 of navigator.userAgent).
 // Must be byte-identical to the server counterpart:
 // supabase/functions/_shared/device.ts (computeDeviceFingerprint).

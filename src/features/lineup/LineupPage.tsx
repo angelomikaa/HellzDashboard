@@ -71,7 +71,7 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
         if (!cancelled) setPayload(data)
       })
       .catch((err: unknown) => {
-        if (!cancelled) setLoadError(lineupErrorCopy(err))
+        if (!cancelled) setLoadError(lineupErrorCopy(err, 'read'))
       })
     return () => {
       cancelled = true

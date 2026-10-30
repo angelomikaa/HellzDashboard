@@ -7,7 +7,7 @@
 // claims from this JWT). Missing Authorization -> empty results (RLS sees no
 // claims); missing apikey -> 401.
 import {
-  clearSession,
+  invalidateSession,
   type NeoFootSession,
 } from '../features/auth/session'
 import { computeDeviceFingerprintClient } from '../features/auth/session'
@@ -76,12 +76,14 @@ async function restFetch(session: NeoFootSession, path: string, init?: RequestIn
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    // A device-mismatched session will keep failing — discard it client-side
-    // so the user is bounced to login with the existing session-expired copy,
-    // instead of looping on failed saves. The server is the real enforcer
-    // (assert_device_bound, migration 0024).
+    // A device-mismatched session will keep failing — invalidate it client-side
+    // so the user lands back on the landing page instead of looping on failed
+    // saves. The server is the real enforcer (assert_device_bound, migration 0041).
     if (body.includes('device_mismatch')) {
-      clearSession()
+      // WR-06: drop storage AND the live session (RequireAuth's state), so the
+      // user actually lands back on the landing/login screen instead of a dead
+      // authenticated shell where every call keeps failing.
+      invalidateSession()
       throw new ApiError(401, 'unauthorized', 'device_mismatch')
     }
     const kind = res.status === 401 ? 'unauthorized' : 'server'

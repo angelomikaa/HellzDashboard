@@ -1,8 +1,14 @@
-import { lazy, Suspense, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import type { ProspectDraft } from '../request/RequestAccessPage'
 import { PublicLanding } from '../shell/PublicLanding'
 import { LoginPage } from './LoginPage'
-import { clearSession, isExpired, loadSession, type NeoFootSession } from './session'
+import {
+  clearSession,
+  isExpired,
+  loadSession,
+  onSessionInvalid,
+  type NeoFootSession,
+} from './session'
 
 // The request and first-access flows are code-split: a returning member logs
 // in and never needs them, so their modules load on first use.
@@ -76,6 +82,11 @@ export function RequireAuth({ children, initialView }: RequireAuthProps) {
     setView({ kind: 'landing' })
     setSession(null)
   }
+
+  // WR-06: the API layer invalidates a session it can no longer use
+  // (device_mismatch). Without this the guard kept rendering the shell with a
+  // dead token while every request failed.
+  useEffect(() => onSessionInvalid(invalidate), [])
 
   if (session) return <>{children({ session, invalidate })}</>
 
