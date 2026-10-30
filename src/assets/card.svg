@@ -1,68 +1,54 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1080 1600">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1080" height="1600" viewBox="0 0 1080 1600">
   <defs>
-    <style>
-      .cls-1{fill:#cf1a87}
-      .cls-2{fill:none}
-      .cls-3{fill:none;stroke:url(#Blue_to_Magenta);stroke-width:48;stroke-miterlimit:10}
-      .cls-4{font-family:&apos;Bebas Neue&apos;;font-size:6.992;fill:#e6e6e6}
-      .cls-5{font-family:&apos;Bebas Neue&apos;;font-size:72;fill:#e6e6e6}
-      .cls-6{font-family:Orbitron;font-size:109.72;fill:#e6e6e6}
-      .cls-7{font-family:&apos;Bebas Neue&apos;;font-size:56;fill:#e6e6e6}
-      .cls-8{font-family:&apos;Bebas Neue&apos;;font-size:148;fill:#e6e6e6}
-    </style>
-    <clipPath id="clip-path-1">
-      <path d="M432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.096 964.415 1005.352 1354.515 1005.352 1354.515 C931.514 1492.629 821.774 1398.682 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C268.204 1399.808 164.274 1506.502 73.61 1354.515 C73.61 1354.515 74.813 931.519 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 Z"/>
-    </clipPath>
-    <linearGradient id="Blue_to_Magenta" x1="61.61" y1="799.387" x2="1017.352" y2="799.387" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#f26d6f"/>
-      <stop offset="0.25" stop-color="#e9b44c"/>
-      <stop offset="0.5" stop-color="#3fb950"/>
-      <stop offset="0.75" stop-color="#58a6ff"/>
-      <stop offset="1" stop-color="#b8c0cc"/>
+    <linearGradient id="linear-gradient-1" x1="540.102" y1="1517.645" x2="536.666" y2="844.033" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#662d91"/>
+      <stop offset="0.6864" stop-color="#5a2880" data-vc-midpoint="0.87"/>
+      <stop offset="0.7889" stop-color="#4f2370"/>
+      <stop offset="0.8451" stop-color="#431d5f" stop-opacity="0.769" data-vc-midpoint="0.4712"/>
+      <stop offset="0.9082" stop-color="#37184e" stop-opacity="0.538"/>
+      <stop offset="0.9545" stop-color="#1b0c27" stop-opacity="0.269" data-vc-midpoint="0.5041"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
     </linearGradient>
   </defs>
-  <title>pristine.ai</title>
+  <title>card.svg</title>
   <g id="Card">
-    <path id="base-plate" d="M432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.096 964.415 1005.352 1354.515 1005.352 1354.515 C931.514 1492.629 821.774 1398.682 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C268.204 1399.808 164.274 1506.502 73.61 1354.515 C73.61 1354.515 74.813 931.519 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 Z" class="cls-1"/>
-    <path id="crop-path" d="M74.127 937.03 C74.127 937.03 74.094 515.49 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.86 520.928 1004.807 937.006 1004.807 937.006 Z" class="cls-2"/>
-    <g id="border-over">
-      <path d="M432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.096 964.415 1005.352 1354.515 1005.352 1354.515 C931.514 1492.629 821.774 1398.682 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C268.204 1399.808 164.274 1506.502 73.61 1354.515 C73.61 1354.515 74.813 931.519 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 Z" class="cls-3" clip-path="url(#clip-path-1)"/>
-    </g>
+    <path id="tier-color-plate" d="M432.744 104.102 C468.39 161.677 518.2 122.956 540.621 81.129 C566.673 126.744 611.457 155.142 649.268 102.336 C790.075 109.376 876.14 225.076 1005.352 235.844 C1004.279 858.497 1005.04 1233.938 1005.284 1329.94 C1005.326 1346.298 1005.857 1346.555 1003.867 1354.515 C1002.223 1361.091 998.151 1367.269 994.612 1372.623 C920.933 1484.09 812.699 1401.864 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C276.633 1402.755 173.72 1497.323 85.834 1373.356 C82 1367.948 78.369 1361.283 76.616 1354.515 C74.256 1345.403 73.637 1345.085 73.679 1326.431 C73.917 1221.384 74.632 827.095 73.61 235.844 C205.22 226.443 292.087 104.102 432.744 104.102 Z" fill="#cf1a87"/>
+    <path id="tier-color-plate-stats" d="M1004.794 842.449 C1004.794 842.449 1005.123 1266.581 1005.284 1329.94 C1005.339 1351.21 1006.538 1354.581 994.612 1372.623 C920.933 1484.09 812.699 1401.864 630.201 1465.853 C591.9 1479.283 540.102 1517.645 540.102 1517.645 C540.102 1517.645 487.867 1476.623 457.07 1465.853 C276.633 1402.755 173.72 1497.323 85.834 1373.356 C75.714 1359.082 73.63 1348.204 73.679 1326.431 C73.831 1259.368 74.144 844.641 74.144 844.641 Z" fill="url(#linear-gradient-1)"/>
     <g id="OVR">
-      <text id="OVR-2" data-name="OVR" transform="matrix(21.169 0 0 21.169 136.177 412.59)" x="0" y="0" xml:space="preserve" class="cls-4"><tspan x="0" y="0">99</tspan></text>
-      <text transform="matrix(1 0 0 1 136.177 487.48)" x="0" y="0" xml:space="preserve" class="cls-5"><tspan x="0" y="0">JOB CLASS</tspan></text>
+      <text id="OVR-2" data-name="OVR" transform="matrix(1 0 0 1 136.177 412.59)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="148.014" fill="#e6e6e6"><tspan x="0" y="0">99</tspan></text>
+      <text transform="matrix(1 0 0 1 136.177 473.794)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">atirador de elite</tspan></text>
     </g>
-    <text transform="matrix(0.656 0 0 0.656 246.528 1047.007)" x="0" y="0" xml:space="preserve" class="cls-6"><tspan x="0" y="0">PLAYERNAME</tspan></text>
+    <text transform="matrix(1 0 0 1 246.528 1044.007)" x="0" y="0" xml:space="preserve" font-family="Orbitron" font-size="71.976" fill="#e6e6e6"><tspan x="0" y="0">PLAYERNAME</tspan></text>
     <g id="KEY1">
-      <text id="LABEL" transform="matrix(1 0 0 1 132.431 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
-      <text id="RATING" transform="matrix(1 0 0 1 120.019 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text id="STAT" transform="matrix(1 0 0 1 123.219 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10000</tspan></text>
+      <text id="LABEL" transform="matrix(1 0 0 1 132.431 1141.317)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">MATK</tspan></text>
+      <text id="RATING" transform="matrix(1 0 0 1 120.019 1261.703)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="148" fill="#e6e6e6"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT" transform="matrix(1 0 0 1 123.219 1317.836)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">10000</tspan></text>
     </g>
     <g id="KEY2">
-      <text id="KEYLABEL" transform="matrix(1 0 0 1 252.373 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG.R</tspan></text>
-      <text id="RATING-2" data-name="RATING" transform="matrix(1 0 0 1 262.165 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text id="STAT-2" data-name="STAT" transform="matrix(1 0 0 1 260.101 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.77</tspan></text>
+      <text id="KEYLABEL" transform="matrix(1 0 0 1 252.373 1141.317)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">MDMG.R</tspan></text>
+      <text id="RATING-2" data-name="RATING" transform="matrix(1 0 0 1 262.165 1261.703)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="148" fill="#e6e6e6"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT-2" data-name="STAT" transform="matrix(1 0 0 1 260.101 1317.836)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">208.77</tspan></text>
     </g>
     <g id="KEY3">
-      <text id="LABEL-2" data-name="LABEL" transform="matrix(1 0 0 1 536.666 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG.R</tspan></text>
-      <text id="RATING-3" data-name="RATING" transform="matrix(1 0 0 1 546.458 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text id="STAT-3" data-name="STAT" transform="matrix(1 0 0 1 544.394 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.77</tspan></text>
+      <text id="LABEL-2" data-name="LABEL" transform="matrix(1 0 0 1 536.666 1141.317)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">MDMG.R</tspan></text>
+      <text id="RATING-3" data-name="RATING" transform="matrix(1 0 0 1 546.458 1261.703)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="148" fill="#e6e6e6"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT-3" data-name="STAT" transform="matrix(1 0 0 1 544.394 1317.836)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">208.77</tspan></text>
     </g>
     <g id="KEY4">
-      <text id="LABEL-3" data-name="LABEL" transform="matrix(1 0 0 1 416.724 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
-      <text id="RATING-4" data-name="RATING" transform="matrix(1 0 0 1 404.312 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text id="STAT-4" data-name="STAT" transform="matrix(1 0 0 1 407.512 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10000</tspan></text>
+      <text id="LABEL-3" data-name="LABEL" transform="matrix(1 0 0 1 416.724 1141.317)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">MATK</tspan></text>
+      <text id="RATING-4" data-name="RATING" transform="matrix(1 0 0 1 404.312 1261.703)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="148" fill="#e6e6e6"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT-4" data-name="STAT" transform="matrix(1 0 0 1 407.512 1317.836)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">10000</tspan></text>
     </g>
     <g id="KEY5">
-      <text id="LABEL-4" data-name="LABEL" transform="matrix(1 0 0 1 820.959 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MDMG.R</tspan></text>
-      <text id="RATING-5" data-name="RATING" transform="matrix(1 0 0 1 830.751 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text id="STAT-5" data-name="STAT" transform="matrix(1 0 0 1 828.687 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">208.77</tspan></text>
+      <text id="LABEL-4" data-name="LABEL" transform="matrix(1 0 0 1 820.959 1141.317)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">MDMG.R</tspan></text>
+      <text id="RATING-5" data-name="RATING" transform="matrix(1 0 0 1 830.751 1261.703)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="148" fill="#e6e6e6"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT-5" data-name="STAT" transform="matrix(1 0 0 1 828.687 1317.836)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">208.77</tspan></text>
     </g>
     <g id="KEY6">
-      <text id="LABEL-5" data-name="LABEL" transform="matrix(1 0 0 1 701.016 1141.317)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">MATK</tspan></text>
-      <text id="RATING-6" data-name="RATING" transform="matrix(1 0 0 1 688.604 1261.703)" x="0" y="0" xml:space="preserve" class="cls-8"><tspan x="0" y="0">99</tspan></text>
-      <text id="STAT-6" data-name="STAT" transform="matrix(1 0 0 1 691.804 1317.836)" x="0" y="0" xml:space="preserve" class="cls-7"><tspan x="0" y="0">10000</tspan></text>
+      <text id="LABEL-5" data-name="LABEL" transform="matrix(1 0 0 1 701.016 1141.317)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">MATK</tspan></text>
+      <text id="RATING-6" data-name="RATING" transform="matrix(1 0 0 1 688.604 1261.703)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="148" fill="#e6e6e6"><tspan x="0" y="0">99</tspan></text>
+      <text id="STAT-6" data-name="STAT" transform="matrix(1 0 0 1 691.804 1317.836)" x="0" y="0" xml:space="preserve" font-family="&apos;Bebas Neue&apos;" font-size="56" fill="#e6e6e6"><tspan x="0" y="0">10000</tspan></text>
     </g>
   </g>
 </svg>

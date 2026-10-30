@@ -423,8 +423,10 @@ function referenceCardSvg(
         `font-family="Orbitron, sans-serif" font-weight="700" font-size="${b.h * 0.2}" fill="${plan.colors.monogramText}">${photo.letter}</text>`
   const photoLayer = `<g clip-path="url(#rf-photo-clip)">${inner}` +
     `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${plan.scrim.y2 - plan.scrim.y1}" fill="url(#rf-scrim)"/></g>`
-  const plateEnd = svg.search(/<path id="base-plate"[^>]*\/>/)
-  if (plateEnd < 0) throw new Error('render-diff: base-plate path not found in card.svg')
+  // Insert after the backplate. The owner's current file names it
+  // `tier-color-plate`; `base-plate` is the earlier spelling.
+  const plateEnd = svg.search(/<path id="(?:tier-color-plate|base-plate)"[^>]*\/>/)
+  if (plateEnd < 0) throw new Error('render-diff: backplate path not found in card.svg')
   const insertAt = svg.indexOf('/>', plateEnd) + 2
   svg = svg.slice(0, insertAt) + photoLayer + svg.slice(insertAt)
   return svg

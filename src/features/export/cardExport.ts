@@ -1,15 +1,20 @@
 // cardExport.ts — the card PNG export (plan 07.2-05, CARD-03 / D-09 /
 // D-10 / D-12; checkpoint round 8, owner re-seed: ONE card.svg
 // [src/assets/card.svg] remains the source of truth for card design —
-// placeholder TEXT slots filled by code, crop-path photo area, Bebas Neue
-// everywhere except the player name (Orbitron), the border stroking the
-// PLATE silhouette over the photo (three-layer semantics — the crop itself
-// stays borderless), central column alignment, PNG export with NO
-// background (the shield plate paints; everything outside it is
-// transparent). Zero new npm dependencies (v1.1 invariant): native Canvas 2D
-// + Path2D + the self-hosted Orbitron woff2 + Bebas Neue (Google Fonts
-// @import in src/index.css — graceful fallback to Orbitron if it cannot
-// load) + brand mark.
+// placeholder TEXT slots filled by code, the photo clipped to the backplate,
+// the stats contrast plate, Bebas Neue everywhere except the player name
+// (Orbitron), central column alignment, PNG export with NO background (the
+// shield plate paints; everything outside it is transparent). Zero new npm
+// dependencies (v1.1 invariant): native Canvas 2D + Path2D + the self-hosted
+// Orbitron woff2 + Bebas Neue (Google Fonts @import in src/index.css —
+// graceful fallback to Orbitron if it cannot load) + brand mark.
+//
+// TIER-COLOR CONTRACT (owner 2026-10-29: "the fills must follow tier colors,
+// not the color in the svg"): every layer the owner names `tier-color-*`
+// (the backplate `tier-color-plate`, the stats plate `tier-color-plate-stats`)
+// is painted from TIER_PALETTE — its GEOMETRY and its fade structure come from
+// the file, its COLOR never does. The file's purple ramp is the reference for
+// how the plate fades, not what it paints.
 //
 // ROUND 7 (owner verdict on round 6: "the card is overflowing ... keep a
 // matching proportion and readability", then the new seeded card.svg):
@@ -69,6 +74,7 @@ import {
   resolveCardTextFill,
   scalePath,
   scaleRect,
+  tierPlateColor,
   type CardGeometry,
   type CardRect,
   type TierPalette,
@@ -549,6 +555,33 @@ function applyBorderGradient(
   return grad
 }
 
+/** The SOLID border color, for a file that strokes without a gradient (the
+ *  2026-10-29 re-export's plate-border). The tier still owns the color —
+ *  "largura do arquivo, cor por tier" (owner 2026-10-29): each tier paints the
+ *  palette's OWN first stop, so a bronze ring never reads as a gold one. */
+function resolveBorderSolid(palette: TierPalette): string {
+  const [first] = palette.borderStops
+  if (first === undefined) throw new Error('tier palette must carry at least one border stop')
+  return first.color
+}
+
+/** #rrggbb + alpha → rgba(), for canvas gradients whose stops carry their own
+ *  opacity (the stats plate's fade to transparent). Canvas has no
+ *  stop-opacity, so the alpha must ride the color. A non-hex color (the SVG
+ *  export could carry a keyword) passes through — only '#…' is normalized. */
+function rgbaWithAlpha(color: string, alpha: number): string {
+  const hex = color.trim()
+  const short = hex.match(/^#([0-9a-f]{3})$/i)
+  const long = hex.match(/^#([0-9a-f]{6})$/i)
+  if (short === null && long === null) return hex
+  const digits = (short === null ? hex.slice(1) : [...hex.slice(1)].map((c) => c + c).join(''))
+    .slice(0, 6)
+  const r = parseInt(digits.slice(0, 2), 16)
+  const g = parseInt(digits.slice(2, 4), 16)
+  const b = parseInt(digits.slice(4, 6), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
 /** The plate paint (round 10): pristine's prismatic gradient when the tier
  *  declares one, otherwise its solid plateFill. The SVG twin reads the same
  *  palette field, so the on-page card and the PNG cannot diverge. */
@@ -591,10 +624,13 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.fillStyle = platePaint(ctx, plan)
   ctx.fill(plate)
 
-  // --- Photo: the member screenshot (or fallback) CLIPPED TO THE CROP PATH
-  // (round 5) — the SAME path the on-page SVG clips with. The crop area is
-  // BORDERLESS (round 8 file semantics); the border paints AFTER the photo
-  // as a separate layer (plate → photo → scrim → border-over → texts).
+  // --- Photo: the member screenshot (or fallback) CLIPPED TO THE PHOTO AREA
+  // — the SAME path the on-page SVG clips with. In the round-8 file that was
+  // the crop path (the shield's top portion, borderless); in the 2026-10-29
+  // re-export the file carries no crop path, so the photo fills the WHOLE
+  // SHIELD (owner decision 2026-10-29) and the plate fill stays behind it.
+  // The border paints AFTER the photo as a separate layer
+  // (plate → photo → scrim → border → texts).
   const crop = new Path2D(scalePath(plan.card.cropPath, s))
   const b = plan.photoBBox
   ctx.save()
@@ -625,19 +661,57 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.fillRect(b.x, b.y, b.w, plan.scrim.y2 - plan.scrim.y1)
   ctx.restore()
 
-  // --- Detached border (round 8, THE FILE'S THREE-LAYER SEMANTICS): the
-  // tier gradient stroke ON THE PLATE SILHOUETTE (the cls-3 path's d — the
-  // border rings the WHOLE shield; the crop area itself stays borderless),
-  // painted OVER the photo — covering the shield's edges. CLIPPED to the
-  // plate silhouette (the owner's clip-path-1): the stroke's outer half is
-  // cut, the inner ≈24px band paints over the photo (top/sides) and the
-  // plate (bottom). After the photo, before ALL text.
-  ctx.save()
-  ctx.clip(new Path2D(scalePath(plan.card.borderStroke.clipPath, s)))
-  ctx.strokeStyle = applyBorderGradient(ctx, plan.palette, plan.card.borderStroke.line, s)
-  ctx.lineWidth = plan.card.borderStroke.width * s
-  ctx.stroke(new Path2D(scalePath(plan.card.borderStroke.strokePath, s)))
-  ctx.restore()
+  // --- STATS CONTRAST PLATE (owner re-export 2026-10-29): the plate behind
+  // the six stat columns, painted over the photo so the stat text reads
+  // against any screenshot. It is a LEGIBILITY layer, not a tier color, so
+  // its gradient is painted from THE FILE (the round-8 files have no such
+  // layer, and the first re-export had none either — the plate is optional).
+  const statsPlateLayer = plan.card.statsPlate
+  if (statsPlateLayer !== undefined) {
+    // TIER-COLOR CONTRACT (owner 2026-10-29): the plate's geometry and FADE
+    // come from the file, its COLOR comes from the tier — the SVG's purple ramp
+    // is the reference for how it fades, never the color it paints.
+    const platePath2D = new Path2D(scalePath(statsPlateLayer.path, s))
+    const grad = ctx.createLinearGradient(
+      statsPlateLayer.line.x1 * s, statsPlateLayer.line.y1 * s,
+      statsPlateLayer.line.x2 * s, statsPlateLayer.line.y2 * s,
+    )
+    const tierColor = tierPlateColor(plan.palette)
+    for (const fade of statsPlateLayer.fades) {
+      grad.addColorStop(
+        Math.min(1, Math.max(0, fade.offset)),
+        fade.opacity >= 1 ? tierColor : rgbaWithAlpha(tierColor, fade.opacity),
+      )
+    }
+    ctx.save()
+    ctx.fillStyle = grad
+    ctx.fill(platePath2D)
+    ctx.restore()
+  }
+
+  // --- Detached border, WHEN THE FILE DRAWS ONE (round 8 / first re-export):
+  // the tier stroke ON THE PLATE SILHOUETTE — the border rings the WHOLE
+  // shield; the photo area itself stays BORDERLESS — painted OVER the photo,
+  // covering the shield's edges. Round-8 file: the tier GRADIENT stroke
+  // clipped to the plate silhouette, so the outer half is cut and only the
+  // inner band paints over the photo/plate (the owner's clip-path-1). First
+  // re-export: plate-border declares NO clipPath and NO gradient — the stroke
+  // paints UNCLIPPED with the palette's solid color at the file's width. The
+  // owner's CURRENT file declares no border at all, so the layer is skipped.
+  const border = plan.card.borderStroke
+  if (border !== undefined) {
+    ctx.save()
+    if (border.clipPath !== undefined) {
+      ctx.clip(new Path2D(scalePath(border.clipPath, s)))
+    }
+    ctx.strokeStyle =
+      border.line !== undefined
+        ? applyBorderGradient(ctx, plan.palette, border.line, s)
+        : resolveBorderSolid(plan.palette)
+    ctx.lineWidth = border.width * s
+    ctx.stroke(new Path2D(scalePath(border.strokePath, s)))
+    ctx.restore()
+  }
 
   // --- OVR block (over the photo): big number + job name below, NO "OVR"
   // tag. White with a shadow — same legibility contract the SVG's

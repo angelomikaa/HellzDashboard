@@ -22,14 +22,18 @@
 //      is transparent around the shield, and the on-page card shows the
 //      page backdrop through it.
 //   2. The photo (member screenshot or class portrait) is CLIPPED TO THE
-//      parsed crop path (round 5 brought it back — no guideline rects,
-//      just the text to be edited).
-//   3. The detached border (gradient stroke, width 48) is painted ON THE
-//      PLATE SILHOUETTE — the file's three-layer background (round 8): the
-//      border rings the whole shield, covering the photo's edges, while the
-//      crop area itself stays BORDERLESS. CLIPPED to the plate silhouette
-//      (the owner's clip-path-1): the outer half of the stroke is cut, the
-//      inner band paints over the photo/plate edges.
+//      parsed photo area — the round-8 crop path (the shield's top portion),
+//      or, in the 2026-10-29 re-export that carries no crop path at all, THE
+//      WHOLE SHIELD (owner decision 2026-10-29: "o escudo inteiro"). The plate
+//      fill stays behind it as the no-photo fallback either way.
+//   3. The detached border is painted ON THE PLATE SILHOUETTE — the file's
+//      three-layer background (round 8): the border rings the whole shield,
+//      covering the photo's edges, while the photo area itself stays
+//      BORDERLESS. Round-8 file: a GRADIENT stroke CLIPPED to the plate
+//      silhouette (clip-path-1) — the outer half is cut, the inner band paints
+//      over the photo/plate edges. 2026-10-29 re-export (plate-border): a
+//      SOLID per-tier ring at the file's own width, UNCLIPPED, exactly as the
+//      file draws it ("largura do arquivo, cor por tier", owner 2026-10-29).
 //   4. The top scrim backs the over-photo OVR block. All text is Bebas Neue
 //      EXCEPT the player name (Orbitron). Every text slot shrinks-to-fit
 //      its column (real measured metrics) so labels 4–6 chars wide never
@@ -50,7 +54,7 @@
 // Text lives INSIDE the <svg viewBox> coordinate space, so the fitted
 // composition scales with the card at any width.
 import { useEffect, useId, useMemo, useState } from 'react'
-import { measurePhotoSubject, photoDestRect, type CardRect } from '../export/cardAssets'
+import { measurePhotoSubject, photoDestRect, tierPlateColor, type CardRect } from '../export/cardAssets'
 import {
   buildCardPlan,
   CARD_PLATE_GRADIENT_LINE,
@@ -125,6 +129,7 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
   const borderGradId = `card-border-grad-${uid}`
   const plateGradId = `card-plate-grad-${uid}`
   const scrimId = `card-scrim-${uid}`
+  const statsPlateGradId = `card-stats-plate-${uid}`
   const b = plan.photoBBox
 
   // Round-8 photo framing: the dest rect is computed from the image's own
@@ -177,19 +182,24 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
       focusable="false"
     >
       <defs>
-        {/* The tier border gradient (parsed geometry + palette stops). */}
-        <linearGradient
-          id={borderGradId}
-          gradientUnits="userSpaceOnUse"
-          x1={plan.card.borderStroke.line.x1}
-          y1={plan.card.borderStroke.line.y1}
-          x2={plan.card.borderStroke.line.x2}
-          y2={plan.card.borderStroke.line.y2}
-        >
-          {plan.palette.borderStops.map((s, i) => (
-            <stop key={i} offset={s.offset} stopColor={s.color} />
-          ))}
-        </linearGradient>
+        {/* The tier border gradient (parsed geometry + palette stops). Only a
+            border DECLARING a gradient line gets a def; the owner's current
+            file draws no border at all, and a url() to a missing gradient
+            would paint black — so the def and the reference both disappear. */}
+        {plan.card.borderStroke?.line !== undefined && (
+          <linearGradient
+            id={borderGradId}
+            gradientUnits="userSpaceOnUse"
+            x1={plan.card.borderStroke.line.x1}
+            y1={plan.card.borderStroke.line.y1}
+            x2={plan.card.borderStroke.line.x2}
+            y2={plan.card.borderStroke.line.y2}
+          >
+            {plan.palette.borderStops.map((s, i) => (
+              <stop key={i} offset={s.offset} stopColor={s.color} />
+            ))}
+          </linearGradient>
+        )}
         {/* Plate gradient (round 10): pristine paints the UI rainbow across
             the shield itself; other tiers keep the solid plateFill. */}
         {plan.palette.plateStops !== undefined && (
@@ -206,15 +216,40 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
             ))}
           </linearGradient>
         )}
-        {/* Photo clip: THE crop path from card.svg (round 5). */}
+        {/* Photo clip: the photo area from card.svg — the round-8 crop path or,
+            in the re-exports that carry none, the whole shield (the base
+            plate). */}
         <clipPath id={cropClipId}>
           <path d={plan.card.cropPath} />
         </clipPath>
-        {/* Border clip: the owner's clip-path-1 = the plate silhouette —
-            the border-over stroke's outer half is cut (round 7). */}
-        <clipPath id={borderClipId}>
-          <path d={plan.card.borderStroke.clipPath} />
-        </clipPath>
+        {/* Border clip: the owner's clip-path-1 = the plate silhouette — the
+            border-over stroke's outer half is cut (round 7). A file whose
+            border declares no clip leaves the stroke unclipped, and the def is
+            omitted entirely. */}
+        {plan.card.borderStroke?.clipPath !== undefined && (
+          <clipPath id={borderClipId}>
+            <path d={plan.card.borderStroke.clipPath} />
+          </clipPath>
+        )}
+        {/* Stats contrast plate gradient (owner 2026-10-29 "tier-color"): the
+            plate behind the six stat columns, painted over the photo so the
+            stat text reads against any screenshot. Geometry + FADE come from
+            the file; the COLOR is the TIER's own (tierPlateColor) — the SVG's
+            ramp is the reference for how it fades, never what it paints. */}
+        {plan.card.statsPlate !== undefined && (
+          <linearGradient
+            id={statsPlateGradId}
+            gradientUnits="userSpaceOnUse"
+            x1={plan.card.statsPlate.line.x1}
+            y1={plan.card.statsPlate.line.y1}
+            x2={plan.card.statsPlate.line.x2}
+            y2={plan.card.statsPlate.line.y2}
+          >
+            {plan.card.statsPlate.fades.map((fade, i) => (
+              <stop key={i} offset={fade.offset} stopColor={tierPlateColor(plan.palette)} stopOpacity={fade.opacity} />
+            ))}
+          </linearGradient>
+        )}
         {/* Top legibility scrim (backs the over-photo OVR block). */}
         <linearGradient id={scrimId} gradientUnits="userSpaceOnUse" x1="0" y1={plan.scrim.y1} x2="0" y2={plan.scrim.y2}>
           <stop offset="0" stopColor="#000000" stopOpacity={plan.scrim.alpha} />
@@ -275,20 +310,41 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         <rect x={b.x} y={b.y} width={b.w} height={plan.scrim.y2 - plan.scrim.y1} fill={`url(#${scrimId})`} />
       </g>
 
-      {/* Detached border (round 8 FILE SEMANTICS): the gradient stroke ON
-          THE PLATE SILHOUETTE — the border rings the WHOLE shield and
-          covers the photo's edges; the crop area itself stays BORDERLESS
-          (the owner's three-layer background: plate → photo → border →
-          text). CLIPPED to the plate silhouette (the owner's clip-path-1):
-          the stroke's outer half is cut, the inner ≈24px band paints over
-          the photo (top/sides) and the plate (bottom). */}
-      <path
-        d={plan.card.borderStroke.strokePath}
-        fill="none"
-        stroke={`url(#${borderGradId})`}
-        strokeWidth={plan.card.borderStroke.width}
-        clipPath={`url(#${borderClipId})`}
-      />
+      {/* Stats contrast plate (owner re-export 2026-10-29 "tier-color"): the
+          plate behind the six stat columns, painted over the photo so the stat
+          text reads against any screenshot. Painted BEFORE the text, AFTER the
+          photo and its scrim; the round-8 files have no such layer. Its fill is
+          the TIER's color (see the gradient def above), not the SVG's. */}
+      {plan.card.statsPlate !== undefined && (
+        <path
+          d={plan.card.statsPlate.path}
+          fill={`url(#${statsPlateGradId})`}
+        />
+      )}
+
+      {/* Detached border, WHEN THE FILE DRAWS ONE: the stroke ON THE PLATE
+          SILHOUETTE — the border rings the WHOLE shield and covers the photo's
+          edges; the photo area itself stays BORDERLESS (the owner's
+          three-layer background: plate → photo → border → text). Round-8 file:
+          the tier GRADIENT stroke, CLIPPED to the plate silhouette (clip-path-1)
+          — the stroke's outer half is cut, the inner ≈24px band paints over the
+          photo (top/sides) and the plate (bottom). First re-export: a SOLID
+          per-tier ring (the palette's own first border stop — "largura do
+          arquivo, cor por tier") at the file's width, UNCLIPPED. The owner's
+          CURRENT file declares no border, so this layer is omitted. */}
+      {plan.card.borderStroke !== undefined && (
+        <path
+          d={plan.card.borderStroke.strokePath}
+          fill="none"
+          stroke={
+            plan.card.borderStroke.line !== undefined
+              ? `url(#${borderGradId})`
+              : plan.palette.borderStops[0].color
+          }
+          strokeWidth={plan.card.borderStroke.width}
+          clipPath={plan.card.borderStroke.clipPath !== undefined ? `url(#${borderClipId})` : undefined}
+        />
+      )}
 
       {/* OVR block — big number + JOB NAME below, NO "OVR" tag, at the
           parsed slot positions over the photo. White + stroke (paint-order)

@@ -31,89 +31,118 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(CARD_DESIGN_WIDTH / CARD_DESIGN_HEIGHT).toBeCloseTo(0.675, 3)
   })
 
-  it('extracts the plate silhouette and the crop path (both real absolute-command paths)', () => {
+  it('extracts the plate silhouette and the photo area (both real absolute-command paths)', () => {
     expect(CARD_GEOMETRY.platePath.startsWith('M')).toBe(true)
     expect(CARD_GEOMETRY.platePath.length).toBeGreaterThan(100)
     expect(CARD_GEOMETRY.cropPath.startsWith('M')).toBe(true)
-    // The crop path is a DISTINCT path (the photo area top portion, not the
-    // full silhouette — it closes at ~y=937).
-    expect(CARD_GEOMETRY.cropPath).not.toBe(CARD_GEOMETRY.platePath)
+    expect(CARD_GEOMETRY.cropPath.length).toBeGreaterThan(100)
   })
 
-  it('resolves the crop-path bbox inside the design space (photo upper region, full width)', () => {
+  it('resolves the photo area inside the design space (whole shield in the re-export)', () => {
     const b = CARD_GEOMETRY.cropBBox
     expect(b.x).toBeGreaterThanOrEqual(0)
     expect(b.y).toBeGreaterThanOrEqual(0)
     expect(b.x + b.w).toBeLessThanOrEqual(CARD_DESIGN_WIDTH + 1)
     expect(b.y + b.h).toBeLessThanOrEqual(CARD_DESIGN_HEIGHT)
-    // The crop path spans essentially the full card width and the upper
-    // ~54% of the height (down to ~y=937 of 1600).
+    // Owner decision 2026-10-29: the re-export carries no crop-path, so the
+    // photo occupies THE WHOLE SHIELD — the bbox IS the plate's bbox.
+    expect(CARD_GEOMETRY.cropPath).toBe(CARD_GEOMETRY.platePath)
+    expect(CARD_GEOMETRY.cropBBox).toEqual(CARD_GEOMETRY.plateBBox)
     expect(b.w).toBeGreaterThan(CARD_DESIGN_WIDTH * 0.85)
-    expect(b.h).toBeGreaterThan(CARD_DESIGN_HEIGHT * 0.45)
-    expect(b.h).toBeLessThan(CARD_DESIGN_HEIGHT * 0.6)
+    expect(b.h).toBeGreaterThan(CARD_DESIGN_HEIGHT * 0.85)
   })
 
-  it('extracts the border stroke: width 48 + a userSpaceOnUse gradient line inside the design space', () => {
-    expect(CARD_GEOMETRY.borderStroke.width).toBe(48)
-    const line = CARD_GEOMETRY.borderStroke.line
-    expect(line.x1).toBeCloseTo(61.61, 1)
-    expect(line.x2).toBeCloseTo(1017.352, 1)
-    expect(line.x1).toBeGreaterThanOrEqual(0)
-    expect(line.x2).toBeLessThanOrEqual(CARD_DESIGN_WIDTH + 1)
-    expect(line.y1).toBeGreaterThanOrEqual(0)
-    expect(line.y2).toBeLessThanOrEqual(CARD_DESIGN_HEIGHT)
+  it('draws NO border in the owner\'s current file (the border is optional)', () => {
+    // Owner 2026-10-29: "new card svg: no more border". The layer must be
+    // OPTIONAL in the contract so the round-8 file (gradient ring, width 48,
+    // clipped) and the first re-export (solid ring, width 24, unclipped) still
+    // parse when the owner restores them — and so nothing throws or paints a
+    // phantom ring now.
+    expect(CARD_GEOMETRY.borderStroke).toBeUndefined()
   })
 
-  it('extracts the border STROKE PATH: the PLATE silhouette (round-8 three-layer semantics)', () => {
-    // The border-over layer strokes the plate silhouette — NOT the crop
-    // path. This is the owner's explicit round-8 ruling ("the current
-    // design on the app looks like the border is in the crop, which would
-    // be incorrect"): the border rings the WHOLE shield, the crop area
-    // stays borderless. If a future file edit decouples the stroked path
-    // from the plate, this lock forces a look.
-    expect(CARD_GEOMETRY.borderStroke.strokePath.startsWith('M')).toBe(true)
-    expect(CARD_GEOMETRY.borderStroke.strokePath).toBe(CARD_GEOMETRY.platePath)
-    expect(CARD_GEOMETRY.borderStroke.strokePath).not.toBe(CARD_GEOMETRY.cropPath)
+  it('extracts the STATS CONTRAST PLATE: its path, gradient line and FADE only', () => {
+    // Owner 2026-10-29: "the stats also have a plate that ensures contrast
+    // against the background", then: "the fills must follow tier colors, not
+    // the color in the svg". So the parse carries the plate's GEOMETRY (path +
+    // gradient line) and its FADE structure (offsets + opacities) — and NO
+    // color: the tier supplies that at paint time.
+    const plate = CARD_GEOMETRY.statsPlate
+    expect(plate).toBeDefined()
+    if (plate === undefined) return
+    expect(plate.path.startsWith('M')).toBe(true)
+    expect(plate.path).not.toBe(CARD_GEOMETRY.platePath)
+    expect(plate.line.x1).toBeCloseTo(540.102, 1)
+    expect(plate.line.x2).toBeCloseTo(536.666, 1)
+    expect(plate.line.y1).toBeCloseTo(1517.645, 1)
+    expect(plate.line.y2).toBeCloseTo(844.033, 1)
+    expect(plate.fades.length).toBeGreaterThanOrEqual(2)
+    for (const fade of plate.fades) {
+      expect(Object.keys(fade).sort()).toEqual(['offset', 'opacity'])
+      expect(fade.opacity).toBeGreaterThanOrEqual(0)
+      expect(fade.opacity).toBeLessThanOrEqual(1)
+    }
+    // The plate fades: opaque where the stats sit (bottom) and transparent
+    // toward the photo above them.
+    expect(plate.fades[0].opacity).toBeGreaterThan(plate.fades[plate.fades.length - 1].opacity)
   })
 
-  it('extracts the border CLIP: the plate silhouette (the owner clips border-over to the plate)', () => {
-    // The border-over group clips its stroke with clipPath#clip-path-1,
-    // whose single path IS the plate silhouette: the stroke's outer half is
-    // cut, the inner band paints over the photo/plate edges. If a future
-    // file edit decouples the clip from the plate, this lock forces a look.
-    expect(CARD_GEOMETRY.borderStroke.clipPath.startsWith('M')).toBe(true)
-    expect(CARD_GEOMETRY.borderStroke.clipPath).toBe(CARD_GEOMETRY.platePath)
+  it('covers the whole stats band with the plate (the stats must stay legible)', () => {
+    const plate = CARD_GEOMETRY.statsPlate
+    if (plate === undefined) throw new Error('the current file must carry the stats plate')
+    const b = cardPlateBBox(plate.path)
+    const firstStat = CARD_GEOMETRY.slots.stats[0]
+    const lastStat = CARD_GEOMETRY.slots.stats[5]
+    // Below the player name, above nothing: the plate spans the stat columns.
+    expect(b.y).toBeLessThan(firstStat.label.y)
+    expect(b.y + b.h).toBeGreaterThan(lastStat.value.y)
+    expect(b.w).toBeGreaterThan(CARD_DESIGN_WIDTH * 0.85)
+    expect(b.y + b.h).toBeLessThanOrEqual(CARD_DESIGN_HEIGHT + 1)
   })
 })
 
+/** Local bbox helper (pathBBox is not exported; the plate is a plain absolute
+ *  M/C path, so the numeric tokens are the coordinates in order). */
+function cardPlateBBox(d: string) {
+  const nums = (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number)
+  const xs = nums.filter((_, i) => i % 2 === 0)
+  const ys = nums.filter((_, i) => i % 2 === 1)
+  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }
+}
+
 describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes', () => {
-  it('resolves the OVR slot THROUGH its matrix hack: 6.992px × 21.169 ≈ 148px at (136.177, 412.59)', () => {
+  it('resolves the OVR slot: the BIGGEST text in the OVR group, ≈148px at (136.177, 412.59)', () => {
     const ovr = CARD_GEOMETRY.slots.ovr
     expect(ovr.x).toBeCloseTo(136.177, 1)
     expect(ovr.y).toBeCloseTo(412.59, 1)
-    expect(ovr.size).toBeCloseTo(6.992 * 21.169, 1)
+    // The re-export states the effective size inline (148.014px; the round-8
+    // file reached the same 148px through its 6.992×21.169 matrix hack).
+    expect(ovr.size).toBeCloseTo(148.014, 1)
     expect(ovr.size).toBeGreaterThan(140) // the number must be BIG (readability rounds 3-8)
     expect(ovr.size).toBeLessThan(160)
   })
 
-  it('resolves the job slot (72px Bebas) directly under the OVR number', () => {
+  it('resolves the job slot (the SMALLER OVR-group text, 56px Bebas) directly under the number', () => {
     const job = CARD_GEOMETRY.slots.job
     expect(job.x).toBeCloseTo(136.177, 1)
-    expect(job.y).toBeCloseTo(487.48, 1)
-    expect(job.size).toBe(72)
+    expect(job.y).toBeCloseTo(473.794, 1)
+    expect(job.size).toBe(56)
     expect(job.y).toBeGreaterThan(CARD_GEOMETRY.slots.ovr.y)
+    // The job line must stay smaller than the number it sits under.
+    expect(job.size).toBeLessThan(CARD_GEOMETRY.slots.ovr.size)
   })
 
-  it('resolves the PLAYERNAME slot (ORBITRON, ≈72px effective via its 0.656 matrix) on the plate between photo and stats', () => {
+  it('resolves the PLAYERNAME slot (the ONE Orbitron text, ≈72px) on the plate between photo and stats', () => {
     const name = CARD_GEOMETRY.slots.name
     expect(name.x).toBeCloseTo(246.528, 1)
-    expect(name.y).toBeCloseTo(1047.007, 1)
-    expect(name.size).toBeCloseTo(109.72 * 0.656, 1)
+    expect(name.y).toBeCloseTo(1044.007, 1)
+    expect(name.size).toBeCloseTo(71.976, 1)
     expect(name.size).toBeGreaterThan(60)
     expect(name.size).toBeLessThan(80)
-    // Between the crop area's bottom (~937) and the stats labels (~1273).
-    expect(name.y).toBeGreaterThan(CARD_GEOMETRY.cropBBox.y + CARD_GEOMETRY.cropBBox.h)
+    // Above the stats labels (the photo area now IS the whole shield, so the
+    // name is checked against the first stat column instead of the crop bbox).
     expect(name.y).toBeLessThan(CARD_GEOMETRY.slots.stats[0].label.y)
+    expect(name.y).toBeGreaterThan(CARD_GEOMETRY.slots.job.y)
   })
 
   it('resolves all SIX positional stat slots from the semantic KEY groups, left → right, on the ~142px center grid', () => {
@@ -132,13 +161,13 @@ describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes'
       expect(pitch).toBeGreaterThan(140)
       expect(pitch).toBeLessThan(144)
     }
-    // Per slot (round 8): label (56px, y≈1141.3) ABOVE the points rating
-    // (148px, y≈1261.7), value (56px, y≈1317.8) below. All three lines
-    // render CENTERED on the derived column center (round 7 central
-    // alignment — see buildCardPlan); the parsed x's are the owner's
-    // left-anchors for the PLACEHOLDER strings (different widths →
-    // different left anchors), so they only sanity-bound together (well
-    // within a column pitch), never serve as centers.
+    // Per slot: label (56px, y≈1141.3) ABOVE the points rating (148px,
+    // y≈1261.7), value (56px, y≈1317.8) below. All three lines render
+    // CENTERED on the derived column center (round 7 central alignment — see
+    // buildCardPlan); the parsed x's are the owner's left-anchors for the
+    // PLACEHOLDER strings (different widths → different left anchors), so
+    // they only sanity-bound together (well within a column pitch), never
+    // serve as centers.
     for (const s of stats) {
       expect(s.label.size).toBe(56)
       expect(s.points.size).toBe(148)
@@ -151,6 +180,18 @@ describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes'
       // Placeholder anchors stay near their column (sanity, not centering).
       const span = Math.max(s.label.x, s.points.x, s.value.x) - Math.min(s.label.x, s.points.x, s.value.x)
       expect(span).toBeLessThanOrEqual(20)
+    }
+  })
+
+  it('resolves the stat roles from SIZE, not ids or classes (the re-export carries neither)', () => {
+    // The 2026-10-29 re-export has no cls-* classes and drifting ids
+    // (LABEL / LABEL-2 / KEYLABEL, RATING-2 + data-name, STAT-3 + data-name),
+    // so roles MUST come from the group structure: the biggest text is the
+    // rating, the upper of the rest the label, the lower the value.
+    for (const s of CARD_GEOMETRY.slots.stats) {
+      expect(s.points.size).toBeGreaterThan(s.label.size)
+      expect(s.points.size).toBeGreaterThan(s.value.size)
+      expect(s.label.size).toBe(s.value.size)
     }
   })
 })

@@ -3,52 +3,55 @@
 // new alterations. read all layers carefully." → THE FILE IS THE SPEC).
 //
 // THE FILE: src/assets/card.svg (viewBox 1080×1600 — portrait 27:40), the
-// owner's ONE design for every tier. THREE-LAYER BACKGROUND (the owner's
-// explicit round-8 semantics, verified against the file):
-//   1. <path id="base-plate"> cls-1 — solid recolorable plate fill, the full
-//      shield silhouette. Painted FIRST; the area outside the shield stays
-//      transparent (PNG-transparent design).
-//   2. <path id="crop-path"> cls-2 — the PHOTO AREA: the top portion of the
-//      silhouette closed at ~y=937 (full width), fill:none — BORDERLESS by
-//      design. The photo is clipped to it and NOTHING strokes it: the
-//      round-7 "border over the crop" reading is DEAD (that was the app's
-//      divergence the owner flagged: "the border is in the crop, which would
-//      be incorrect").
-//   3. <g id="border-over"> — cls-3 stroke:url(#Blue_to_Magenta) WIDTH 48
-//      ON THE PLATE SILHOUETTE (the cls-3 path's d IS the base-plate d),
-//      clipped by clipPath#clip-path-1 (= the plate silhouette): the stroke's
-//      outer half is cut, the inner ≈24px band rings the WHOLE shield and
-//      covers the photo's top/side edges. The gradient line runs
-//      x1=61.61 → x2=1017.352 — extended past the plate edges. The file's
-//      stops are the UI's five-stop Impecável rainbow; the palette owns the
-//      live colors per tier. Paint order:
-//      plate → photo → border → texts.
+// owner's ONE design for every tier. The parser reads the file's LAYERS and
+// TEXT SLOTS structurally and tolerates the export shapes the owner has
+// shipped (fail-fast when none matches):
+//
+//   A) CURRENT FILE (owner re-export 2026-10-29, "no more border" + tier
+//      instructions) — INLINE attributes, no <style>, no classes:
+//        <path id="tier-color-plate"> — recolorable backplate, full shield;
+//          the photo stays CROPPED BY IT. The name says it paints the TIER's
+//          color, never the file's.
+//        <path id="tier-color-plate-stats" fill="url(#gradient)"> — the STATS
+//          CONTRAST PLATE behind the six stat columns: its GEOMETRY and FADE
+//          come from the file, its COLOR from the TIER (owner 2026-10-29:
+//          "the fills must follow tier colors, not the color in the svg")
+//        NO border layer at all
+//        no crop-path → the photo occupies the WHOLE SHIELD
+//        <text ... font-size="…"> per slot, transform="matrix(1 0 0 1 x y)"
+//   B) first re-export (2026-10-29, "largura do arquivo, cor por tier") —
+//      same as A but with <path id="plate-border">: a solid per-tier ring on
+//      the silhouette, no clip, width read from the file.
+//   C) round-8 file (retired, still parsed) — <style> + cls-* classes,
+//      crop-path photo area + border-over gradient stroke clipped by
+//      clip-path-1.
+//
+// PAINT ORDER: plate → photo → scrim → stats plate → border → texts.
 //   - Placeholder TEXT slots (Bebas Neue unless noted — family + fill are
-//     placeholders; code substitutes):
-//       · <g id="OVR"> — cls-4 Bebas Neue, 6.992px × matrix 21.169 → ≈148px
-//         effective at (136.177, 412.59), top-left over the photo
-//       · Job class — cls-5 Bebas Neue, 72px at (136.177, 487.48), under
-//         the number (no "OVR" tag, round 4 held)
-//       · PLAYERNAME — cls-6 ORBITRON, 109.72px × matrix 0.656 → ≈72px
-//         effective at (246.528, 1047.007). ORBITRON ONLY HERE: every other
-//         slot is Bebas Neue (round 7).
-//       · SIX SEMANTIC STAT GROUPS <g id="KEY1">…<g id="KEY6"> — each holds
-//         exactly three texts: LABEL (cls-7 Bebas 56, y≈1141.317 — ABOVE the
-//         rating), RATING (cls-8 Bebas 148, y≈1261.703) and STAT (cls-7
-//         Bebas 56, y≈1317.836). Ids drift per group (LABEL / LABEL-2…,
-//         KEYLABEL, RATING-2…, data-name attrs) — the parser resolves roles
-//         from the group's structure (class + vertical order), NEVER from
-//         exact id strings, and orders the columns left → right by the
-//         RATING anchor (the visual grid — the KEY ids are NOT the visual
-//         order: KEY3/KEY4 and KEY5/KEY6 sit swapped in the file). The
-//         rating anchors are evenly pitched at ≈142.15px (the owner CENTERED
-//         the '99' placeholders on the column grid — the parse locks that
-//         pitch); the column CENTER is derived at plan-build as the rating
-//         anchor + width('99')/2. Labels 4–6 chars (MATK / MDMG.R), points
-//         big hero number, value raw own_value.
+//     placeholders; code substitutes). Roles resolve from STRUCTURE, never
+//     exact id strings (the ids drift per export: OVR / OVR-2 + data-name,
+//     LABEL / LABEL-2 / KEYLABEL…):
+//       · <g id="OVR"> holds TWO texts — the BIGGEST is the OVR number, the
+//         other is the job-class line under it (re-export: 148.014px at
+//         (136.177, 412.59) over a 56px job line at (136.177, 473.794));
+//       · the single ORBITRON text outside the OVR/KEY groups is PLAYERNAME
+//         (≈72px, (246.528, 1044.007)) — Orbitron ONLY here (round 7);
+//       · SIX SEMANTIC STAT GROUPS <g id="KEY1">…<g id="KEY6">, each holding
+//         exactly three texts: the BIGGEST is the RATING/points (148px,
+//         y≈1261.703), the SMALLER-y of the other two the LABEL (56px,
+//         y≈1141.317) and the larger the STAT/value (56px, y≈1317.836).
+//         Columns are ordered LEFT → RIGHT by the RATING anchor (the KEY ids
+//         are NOT the visual order: KEY3/KEY4 and KEY5/KEY6 sit swapped).
+//         The parse locks the rating anchors' EVEN PITCH (≈142.15px in the
+//         current file) and the column CENTER is derived at plan-build as
+//         the rating anchor + width('99')/2 — the owner's placeholder
+//         centering. Labels 4–6 chars (MATK / MDMG.R), points big hero
+//         number, value raw own_value.
 //
 // TIER VARIANTS LIVE IN CODE: one TIER_PALETTE per tier (plate fill, border
-// gradient stops, text fill) applied over the SAME parsed geometry.
+// stops, text fill) applied over the SAME parsed geometry. The file's own
+// colors (#cf1a87 plate, #662d91 ring, #e6e6e6 text) are placeholders —
+// never parsed into the palettes.
 //
 // Parsed once at module load (pure string parsing — runs in node/vitest).
 // Fail-fast on missing/malformed layers.
@@ -103,21 +106,58 @@ export interface CardGradientLine {
 }
 
 export interface CardBorderStroke {
-  /** The gradient line (userSpaceOnUse geometry, scaled with everything). */
-  line: CardGradientLine
-  /** Stroke width — 48 in the owner's file (round 8). */
+  /** The gradient line (userSpaceOnUse geometry, scaled with everything).
+   *  OPTIONAL since the owner's 2026-10-29 re-export: the current file carries
+   *  a SOLID stroke (plate-border), so there is no gradient to paint — the
+   *  renderers fall back to the palette's solid border color. */
+  line?: CardGradientLine
+  /** Stroke width — read from the file (48 in the round-8 file, 24 in the
+   *  2026-10-29 re-export). */
   width: number
-  /** The STROKED path (the cls-3 path inside <g id="border-over">) — in the
-   *  owner's file this IS the plate silhouette (three-layer semantics: the
-   *  border rings the whole shield; the crop area stays borderless). Parsed
+  /** The STROKED path — in the owner's files this IS the plate silhouette
+   *  (three-layer semantics: the border rings the whole shield). Parsed
    *  separately from the clip so a future re-seed that decouples them stays
    *  faithful to the file. */
   strokePath: string
   /** The border's CLIP path (clipPath#clip-path-1 — the plate silhouette).
-   *  The owner clips the border-over stroke to the plate: its outer half is
-   *  cut, the inner half paints over the photo/plate edges (deliberate).
-   *  Both surfaces must apply this clip. */
-  clipPath: string
+   *  The owner's round-8 file clips the border-over stroke to the plate: its
+   *  outer half is cut, the inner half paints over the photo/plate edges
+   *  (deliberate). ABSENT in the 2026-10-29 re-export (no clipPath at all) —
+   *  when undefined, the stroke paints unclipped, which is what the file shows.
+   *  Both surfaces apply the clip only when it exists. */
+  clipPath?: string
+}
+
+/** The STATS CONTRAST PLATE: a path behind the six stat columns, painted over
+ *  the photo so the stat text reads against any screenshot.
+ *
+ *  OWNER CONTRACT (2026-10-29, "tier instructions have been updated — the fills
+ *  must follow tier colors, not the color in the svg"): the owner now names the
+ *  layers `tier-color-plate` and `tier-color-plate-stats`, which is the signal
+ *  that BOTH fills are TIER-DRIVEN. So the parse carries only the plate's
+ *  GEOMETRY (path + gradient line) and its FADE structure (offsets + opacities
+ *  as authored for contrast), and BOTH surfaces paint it in the tier's own
+ *  color. The SVG's purple ramp is the owner's reference for HOW it fades,
+ *  never the color it paints. */
+export interface CardStatsPlate {
+  path: string
+  line: CardGradientLine
+  /** The authored fade: each stop's OFFSET and OPACITY, in file order. The
+   *  COLOR is not parsed (see the tier-color contract above) — the renderers
+   *  supply the tier's own color at every stop. */
+  fades: { offset: number; opacity: number }[]
+}
+
+/** The tier's plate color: the palette's gradient when the tier declares one
+ *  (pristine), otherwise its solid plateFill. Shared by both surfaces so the
+ *  plate and the stats plate can never disagree on the tier's color. */
+export function tierPlateColor(palette: TierPalette): string {
+  const stops = palette.plateStops
+  if (stops === undefined) return palette.plateFill
+  // A mid stop reads as the tier's color most faithfully on the small plate.
+  const mid = stops.reduce((best, s) =>
+    Math.abs(s.offset - 0.5) < Math.abs(best.offset - 0.5) ? s : best, stops[0])
+  return mid.color
 }
 
 export interface CardGeometry {
@@ -127,17 +167,27 @@ export interface CardGeometry {
   /** Bounding box of the plate path (the name's center derives from its
    *  horizontal midline — see CardGeometry.slots.name). */
   plateBBox: CardRect
-  /** The PHOTO AREA path (id="crop-path"): top portion of the shield closed
-   *  at ~y=937. The screenshot is clipped to this path on BOTH surfaces,
-   *  and its geometry IS the detached border stroke painted over it. */
+  /** The PHOTO AREA path: the screenshot is clipped to this path on BOTH
+   *  surfaces. The round-8 file drew it as `id="crop-path"` (the shield's top
+   *  portion, closed at ~y=937); the 2026-10-29 re-exports carry no crop path,
+   *  so the photo falls back to the WHOLE SHIELD (owner decision
+   *  2026-10-29) — the backplate stays behind it as the no-photo fallback. */
   cropPath: string
   /** Bounding box of the crop path (cover-fit drawing bounds). */
   cropBBox: CardRect
-  /** Detached border: stroke width + gradient line + stroke path (the plate
-   *  silhouette — three-layer semantics) + the plate-silhouette clip,
-   *  painted over the photo. The clip cuts the stroke's outer half; the
-   *  inner ≈24px band rings the whole shield. */
-  borderStroke: CardBorderStroke
+  /** The detached border, when the file draws one. Round 8 painted a gradient
+   *  ring on the silhouette (clipped, width 48); the 2026-10-29 re-export
+   *  REPLACED IT with the stats contrast plate, so the owner's current file
+   *  declares NO border at all and this is undefined. Both surfaces skip the
+   *  border layer entirely in that case. */
+  borderStroke?: CardBorderStroke
+  /** The STATS CONTRAST PLATE behind the six stat columns
+   *  (tier-color-plate-stats), painted over the photo so the stat text reads
+   *  against any screenshot. Its geometry + fade are the file's; its color is
+   *  the TIER's (owner 2026-10-29). Absent in the round-8 file (its stats sat
+   *  on the solid plate) and in the first re-export; present in the current
+   *  file. */
+  statsPlate?: CardStatsPlate
   slots: {
     /** Big OVR number — top-left, OVER the photo. */
     ovr: CardTextSlot
@@ -279,17 +329,30 @@ function attributes(tag: string): Map<string, string> {
   return attrs
 }
 
-/** class → font-size from the file's <style> block (placeholder sizes — the
- *  SIZES are honored, the font family/fill are not). */
-function classFontSizes(svg: string): Map<string, number> {
-  const map = new Map<string, number>()
+/** class → font-size from the file's <style> block, when the file HAS one
+ *  (the retired round-8 shape). The 2026-10-29 re-export carries no <style>:
+ *  every text states its own font-size inline, so this map is simply empty
+ *  and the inline sizes win — the parser never throws for a missing block. */
+function styleFontSizes(svg: string): Map<string, number> {
+  const map = new Map<string, number>
   const style = svg.match(/<style>([\s\S]*?)<\/style>/)
-  if (!style) throw new Error('card.svg: no <style> block')
+  if (!style) return map
   for (const m of style[1].matchAll(/\.(\w[\w-]*)\{([^}]*)\}/g)) {
     const size = m[2].match(/font-size:(\d+(?:\.\d+)?)/)
     if (size) map.set(m[1], Number(size[1]))
   }
   return map
+}
+
+/** A text slot's own font-size: the INLINE font-size attribute (re-export),
+ *  else the size its <style> class declares (round-8 file). */
+function ownFontSize(attrs: Map<string, string>, sizes: Map<string, number>): number {
+  const inline = attrs.get('font-size')?.match(/^([\d.]+)/)
+  if (inline) return Number(inline[1])
+  const cls = attrs.get('class')
+  const styled = cls === undefined ? undefined : sizes.get(cls)
+  if (styled !== undefined) return styled
+  throw new Error(`card.svg: a text slot has no font-size (inline attribute nor <style> class ${cls ?? ''})`)
 }
 
 /** Resolve transform="matrix(a b c d e f)" → position (e,f) + uniform
@@ -308,47 +371,98 @@ function matrixTransform(transform: string | undefined): { x: number; y: number;
 }
 
 interface RawText {
-  cls: string
+  /** Ordinal position in the document — the ONLY stable identity across the
+   *  two parses (the whole file's <text> list and the per-group lists), since
+   *  ids and classes drift per export and object identity is per-parse. */
+  index: number
+  /** The slot's own font-size (inline attribute or <style> class). */
+  size: number
+  /** Font family (lowercased) — the OVR/job/stat slots are Bebas Neue and
+   *  ONLY the player name is Orbitron, which is how the name is identified
+   *  in a class-less export. */
+  family: string
   id: string | undefined
   x: number
   y: number
   scale: number
 }
 
-/** Every <text> in document order with its class + resolved transform. */
-function textSlots(svg: string): RawText[] {
+/** A document-order index for every <text>, so group membership can be
+ *  checked across independently parsed lists. */
+function textIndexes(svg: string): Map<string, number> {
+  const indexes = new Map<string, number>()
+  let ordinal = 0
+  for (const m of svg.matchAll(/<text\b([^>]*)>/g)) {
+    indexes.set(m[1], ordinal)
+    ordinal += 1
+  }
+  return indexes
+}
+
+function readText(
+  attrsText: string,
+  sizes: Map<string, number>,
+  indexes: Map<string, number>,
+): RawText {
+  const attrs = attributes(attrsText)
+  const { x, y, scale } = matrixTransform(attrs.get('transform'))
+  return {
+    index: indexes.get(attrsText) ?? -1,
+    size: ownFontSize(attrs, sizes),
+    family: (attrs.get('font-family') ?? '').toLowerCase(),
+    id: attrs.get('id'),
+    x,
+    y,
+    scale,
+  }
+}
+
+/** Every <text> in document order with its resolved size, family, transform. */
+function textSlots(svg: string, sizes: Map<string, number>): RawText[] {
+  const indexes = textIndexes(svg)
   const texts: RawText[] = []
   for (const m of svg.matchAll(/<text\b([^>]*)>/g)) {
-    const attrs = attributes(m[1])
-    const cls = attrs.get('class')
-    if (!cls) throw new Error('card.svg: every text slot must carry a class')
-    const { x, y, scale } = matrixTransform(attrs.get('transform'))
-    texts.push({ cls, id: attrs.get('id'), x, y, scale })
+    texts.push(readText(m[1], sizes, indexes))
   }
   return texts
 }
 
-function slotOf(t: RawText, fontSize: number): CardTextSlot {
-  return { x: t.x, y: t.y, size: fontSize * t.scale }
+function slotOf(t: RawText): CardTextSlot {
+  return { x: t.x, y: t.y, size: t.size * t.scale }
 }
 
-/** The plate path: the FIRST cls-1 path in the document (the file has
- *  exactly two identical silhouette paths — cls-1 solid fill + cls-2
- *  stroked crop path; cls-1 is the recolorable fill). */
+/** The plate path: the recolorable fill layer. The owner's current names it
+ *  `id="tier-color-plate"` (the tier-color contract); the first re-export used
+ *  `id="base-plate"` and the round-8 file `class="cls-1"`. Id wins. */
 function pickPlatePath(svg: string): string {
+  for (const id of ['tier-color-plate', 'base-plate']) {
+    for (const m of svg.matchAll(/<path\b([^>]*)>/g)) {
+      const attrs = attributes(m[1])
+      if (attrs.get('id') === id && attrs.get('d')) return attrs.get('d') as string
+    }
+  }
   for (const m of svg.matchAll(/<path\b([^>]*)>/g)) {
     const attrs = attributes(m[1])
     if (attrs.get('class') === 'cls-1' && attrs.get('d')) return attrs.get('d') as string
   }
-  throw new Error('card.svg: no cls-1 plate path found')
+  throw new Error('card.svg: no plate path found (id="tier-color-plate" / "base-plate" / class="cls-1")')
 }
 
+/** The PHOTO AREA. The round-8 file drew it as `id="crop-path"` (the top
+ *  portion of the shield); the 2026-10-29 re-export dropped it, and the owner
+ *  decided the photo then occupies THE WHOLE SHIELD — so the crop path falls
+ *  back to the plate silhouette (the plate fill stays behind as the no-photo
+ *  fallback, exactly as before). */
 function pickCropPath(svg: string): string {
   for (const m of svg.matchAll(/<path\b([^>]*)>/g)) {
     const attrs = attributes(m[1])
     if (attrs.get('id') === 'crop-path' && attrs.get('d')) return attrs.get('d') as string
   }
-  throw new Error('card.svg: no <path id="crop-path"> found — the photo area is required')
+  for (const m of svg.matchAll(/<path\b([^>]*)>/g)) {
+    const attrs = attributes(m[1])
+    if (attrs.get('class') === 'cls-2' && attrs.get('d')) return attrs.get('d') as string
+  }
+  return pickPlatePath(svg)
 }
 
 /** BBox of the crop path. The path uses ONLY absolute M/L/C/Z commands, so
@@ -374,9 +488,78 @@ function pathBBox(d: string, what: string): CardRect {
  *  decouple them). Only the GEOMETRY is taken (stroke path + line + width +
  *  clip path d) — the file's placeholder gradient stops stay in the file
  *  (pristine's live on in TIER_PALETTE). */
-function borderStroke(svg: string): CardBorderStroke {
+/** The border layer. TWO shapes:
+ *   A) 2026-10-29 re-export — <path id="plate-border"> with its own
+ *      stroke-width, stroking the plate silhouette, no gradient and no clip.
+ *   B) round-8 file — .cls-3{stroke:url(#gradient);stroke-width:48} on the
+ *      path inside <g id="border-over">, clipped by clipPath#clip-path-1.
+ *  Either way only the GEOMETRY is taken (stroke path + width, plus the line
+ *  and clip when the file declares them); the COLORS come from the tier
+ *  palette — the file's placeholder colors never reach the render. */
+/** The STATS CONTRAST PLATE: `<path id="tier-color-plate-stats" fill="url(#g)">`
+ *  plus that gradient's userSpaceOnUse LINE and the fade structure (offsets +
+ *  opacities). Returns undefined when the file has no such layer (the round-8
+ *  files and the first re-export). Colors are NOT read — the tier drives them. */
+function statsPlate(svg: string): CardStatsPlate | undefined {
+  const platePath = [...svg.matchAll(/<path\b([^>]*)>/g)]
+    .map((m) => attributes(m[1]))
+    // The owner's current name; `plate-stats` is the earlier spelling.
+    .find((a) => a.get('id') === 'tier-color-plate-stats' && a.get('d'))
+    ?? [...svg.matchAll(/<path\b([^>]*)>/g)]
+      .map((m) => attributes(m[1]))
+      .find((a) => a.get('id') === 'plate-stats' && a.get('d'))
+  if (!platePath) return undefined
+  const ref = platePath.get('fill')?.match(/url\(#([^)]+)\)/)
+  if (!ref) throw new Error('card.svg: the stats plate must fill with url(#gradient)')
+  const grad = svg.match(new RegExp('<linearGradient\\b[^>]*id="' + ref[1] + '"[^>]*>[\\s\\S]*?</linearGradient>'))
+  if (!grad) throw new Error(`card.svg: stats plate gradient "${ref[1]}" not found`)
+  const attrs = attributes(grad[0])
+  if (!attrs.get('x1') || !attrs.get('x2') || !attrs.get('y1') || !attrs.get('y2')) {
+    throw new Error(`card.svg: stats plate gradient "${ref[1]}" needs a userSpaceOnUse line`)
+  }
+  const fades = [...grad[0].matchAll(/<stop\b([^>]*)\/>/g)].map((s) => {
+    const a = attributes(s[1])
+    const offset = Number(a.get('offset'))
+    if (Number.isNaN(offset)) {
+      throw new Error(`card.svg: stats plate gradient "${ref[1]}" has a stop with no offset`)
+    }
+    const opacity = a.get('stop-opacity')
+    return { offset, opacity: opacity === undefined ? 1 : Number(opacity) }
+  })
+  if (fades.length < 2) {
+    throw new Error(`card.svg: stats plate gradient "${ref[1]}" needs at least two stops`)
+  }
+  return {
+    path: platePath.get('d') as string,
+    line: {
+      x1: Number(attrs.get('x1')),
+      y1: Number(attrs.get('y1')),
+      x2: Number(attrs.get('x2')),
+      y2: Number(attrs.get('y2')),
+    },
+    fades,
+  }
+}
+
+/** The detached border layer, when the file draws one. Returns undefined for
+ *  the owner's 2026-10-29 file, which replaced it with the stats plate. */
+function borderStroke(svg: string): CardBorderStroke | undefined {
+  const byId = [...svg.matchAll(/<path\b([^>]*)>/g)]
+    .map((m) => attributes(m[1]))
+    .find((a) => a.get('id') === 'plate-border' && a.get('d'))
+  if (byId) {
+    const width = byId.get('stroke-width')?.match(/^([\d.]+)/)
+    if (!width) throw new Error('card.svg: plate-border must declare a stroke-width')
+    return {
+      width: Number(width[1]),
+      strokePath: byId.get('d') as string,
+      // No gradient line and no clip in this export: the renderers paint a
+      // solid per-tier ring, unclipped, exactly as the file draws it.
+    }
+  }
+
   const cls3 = svg.match(/\.cls-3\{([^}]*)\}/)
-  if (!cls3) throw new Error('card.svg: no cls-3 border-over style found')
+  if (!cls3) return undefined
   const strokeRef = cls3[1].match(/stroke:url\(#([^)]+)\)/)
   const width = cls3[1].match(/stroke-width:(\d+(?:\.\d+)?)/)
   if (!strokeRef || !width) {
@@ -388,10 +571,6 @@ function borderStroke(svg: string): CardBorderStroke {
   if (!attrs.get('x1') || !attrs.get('x2')) {
     throw new Error(`card.svg: border gradient "${strokeRef[1]}" needs a userSpaceOnUse line`)
   }
-  // The border path: the cls-3 path inside <g id="border-over"> — its d IS
-  // the stroked geometry (the plate silhouette in the owner's file). The
-  // clip: the same path must reference a clipPath whose single <path> is
-  // the plate silhouette (the owner's clip-path-1).
   const borderPath = [...svg.matchAll(/<path\b([^>]*)>/g)]
     .map((m) => attributes(m[1]))
     .find((a) => a.get('class') === 'cls-3')
@@ -416,31 +595,21 @@ function borderStroke(svg: string): CardBorderStroke {
   }
 }
 
-function expectCount(texts: RawText[], cls: string, n: number): void {
-  const found = texts.filter((t) => t.cls === cls)
-  if (found.length !== n) {
-    throw new Error(`card.svg: expected exactly ${n} ${cls} text slot(s), found ${found.length}`)
-  }
-  return void found
-}
-
 /** The six SEMANTIC stat groups <g id="KEY1">…<g id="KEY6"> with their text
  *  slots. Roles resolve from the group's STRUCTURE, never exact id strings
- *  (the file drifts: LABEL / LABEL-2 / KEYLABEL, RATING-2 + data-name,
- *  STAT-3 + data-name): the single cls-8 text is the RATING; of the two
- *  cls-7 texts the SMALLER y is the LABEL (above the rating) and the LARGER
- *  y is the STAT/value line — the file's label-above-rating-above-value
- *  order, derived from the file on every parse. */
-function keyGroups(svg: string): { id: string; texts: RawText[] }[] {
+ *  (the file drifts per export: LABEL / LABEL-2 / KEYLABEL, RATING-2 +
+ *  data-name, STAT-3 + data-name, and the class-less re-export has none at
+ *  all): inside each group the BIGGEST font-size is the RATING/points, and
+ *  of the two remaining texts the SMALLER y is the LABEL (above the rating)
+ *  and the LARGER y the STAT/value line — the file's
+ *  label-above-rating-above-value order, derived on every parse. */
+function keyGroups(svg: string, sizes: Map<string, number>): { id: string; texts: RawText[] }[] {
   const groups: { id: string; texts: RawText[] }[] = []
+  const indexes = textIndexes(svg)
   for (const m of svg.matchAll(/<g id="(KEY\d+)"[^>]*>([\s\S]*?)<\/g>/g)) {
     const texts: RawText[] = []
     for (const t of m[2].matchAll(/<text\b([^>]*)>/g)) {
-      const attrs = attributes(t[1])
-      const cls = attrs.get('class')
-      if (!cls) throw new Error(`card.svg: ${m[1]} text slot must carry a class`)
-      const { x, y, scale } = matrixTransform(attrs.get('transform'))
-      texts.push({ cls, id: attrs.get('id'), x, y, scale })
+      texts.push(readText(t[1], sizes, indexes))
     }
     if (texts.length !== 3) {
       throw new Error(
@@ -455,65 +624,90 @@ function keyGroups(svg: string): { id: string; texts: RawText[] }[] {
   return groups
 }
 
+/** Every <text> inside the first matching group tag, parsed as RawText. */
+function groupTexts(svg: string, marker: RegExp, sizes: Map<string, number>): RawText[] {
+  const group = svg.match(marker)
+  if (!group) throw new Error('card.svg: no <g id="OVR"> group (the OVR number + job line)')
+  const indexes = textIndexes(svg)
+  return [...group[1].matchAll(/<text\b([^>]*)>/g)].map((t) => readText(t[1], sizes, indexes))
+}
+
 function parseCard(svg: string): CardGeometry {
-  const sizes = classFontSizes(svg)
-  const need = (cls: string, what: string): number => {
-    const s = sizes.get(cls)
-    if (s === undefined) throw new Error(`card.svg: ${what} class ${cls} has no font-size in <style>`)
-    return s
+  const sizes = styleFontSizes(svg)
+  const texts = textSlots(svg, sizes)
+
+  // --- <g id="OVR">: the big number + the job line under it ---------------
+  const ovrTexts = groupTexts(svg, /<g id="OVR"[^>]*>([\s\S]*?)<\/g>/, sizes)
+  if (ovrTexts.length !== 2) {
+    throw new Error(`card.svg: the OVR group must hold exactly 2 texts (number + job), found ${ovrTexts.length}`)
   }
-  const ovrSize = need('cls-4', 'OVR')
-  const jobSize = need('cls-5', 'job')
-  const labelSize = need('cls-7', 'stat label / value')
-  const pointsSize = need('cls-8', 'points')
-  const nameSize = need('cls-6', 'player name')
+  // The BIGGEST is the OVR number, the other the job line — the file's own
+  // ratio (148 vs 56), resolved structurally so a size tweak never breaks it.
+  const ranked = [...ovrTexts].sort((a, b) => b.size - a.size)
+  const ovrRaw = ranked[0]
+  const jobRaw = ranked[1]
+  if (!(jobRaw.y > ovrRaw.y)) {
+    throw new Error('card.svg: the job-class line must sit BELOW the OVR number')
+  }
+  const ovr = slotOf(ovrRaw)
+  const job = slotOf(jobRaw)
 
-  const texts = textSlots(svg)
-  expectCount(texts, 'cls-4', 1)
-  expectCount(texts, 'cls-5', 1)
-  expectCount(texts, 'cls-6', 1)
-  // Global census: ALL cls-7/cls-8 texts must live in the KEY groups —
-  // a future edit adding a stray slot fails loudly here.
-  expectCount(texts, 'cls-7', 12) // 6 labels + 6 raw values
-  expectCount(texts, 'cls-8', 6)
+  // --- PLAYERNAME: the ORBITRON text (the only one outside a group) -------
+  const groups = keyGroups(svg, sizes)
+  // Census: EVERY text in the file must belong to a group (OVR or KEY) or be
+  // the player name — a stray slot would silently fail to render.
+  const grouped = new Set<number>([
+    ...groups.flatMap((g) => g.texts.map((t) => t.index)),
+    ...ovrTexts.map((t) => t.index),
+  ])
+  const nameRaw = texts.find((t) => !grouped.has(t.index) && t.family.includes('orbitron'))
+  if (!nameRaw) throw new Error('card.svg: no ORBITRON text found for the player name slot')
+  const strays = texts.filter((t) => !grouped.has(t.index) && !t.family.includes('orbitron'))
+  if (strays.length) {
+    throw new Error(
+      `card.svg: ${strays.length} text slot(s) sit outside the OVR/KEY groups (indexes ${strays.map((s) => s.index).join(',')})`,
+    )
+  }
+  const name = slotOf(nameRaw)
 
-  // OVR: ONE OF THE TWO slots allowed a scaled matrix — resolve ONCE here
-  // (6.992px × 21.169 ≈ 148px effective; the hack never reaches render).
-  const ovrRaw = texts.find((t) => t.cls === 'cls-4')!
-  if (ovrRaw.scale === 1) throw new Error('card.svg: the OVR slot must carry its design matrix scale')
-  const ovr: CardTextSlot = { x: ovrRaw.x, y: ovrRaw.y, size: ovrSize * ovrRaw.scale }
-
-  const job = slotOf(texts.find((t) => t.cls === 'cls-5')!, jobSize)
-
-  // PLAYERNAME: the SECOND slot allowed a scaled matrix (0.656 → ≈72px).
-  const nameRaw = texts.find((t) => t.cls === 'cls-6')!
-  const name = slotOf(nameRaw, nameSize)
-
-  // THE SIX STAT COLUMNS (round 8 semantic groups): resolve roles inside
-  // each KEY group, then order the columns LEFT → RIGHT by the RATING
-  // anchor — the visual grid (the KEY ids are NOT the visual order: the
-  // owner's file sits KEY3/KEY4 and KEY5/KEY6 visually swapped).
-  const groups = keyGroups(svg).map((g) => {
-    const rating = g.texts.find((t) => t.cls === 'cls-8')
-    if (!rating) throw new Error(`card.svg: stat group ${g.id} has no cls-8 RATING slot`)
-    const pair = g.texts.filter((t) => t.cls === 'cls-7').sort((a, b) => a.y - b.y)
+  // --- THE SIX STAT COLUMNS (semantic groups), ordered left → right -------
+  const columns = groups.map((g) => {
+    const rating = [...g.texts].sort((a, b) => b.size - a.size)[0]
+    const pair = g.texts.filter((t) => t !== rating).sort((a, b) => a.y - b.y)
     if (pair.length !== 2) {
-      throw new Error(`card.svg: stat group ${g.id} must hold exactly 2 cls-7 slots (label + value)`)
+      throw new Error(`card.svg: stat group ${g.id} must hold exactly 2 non-rating slots (label + value)`)
     }
     if (pair[1].y <= pair[0].y) {
       throw new Error(`card.svg: stat group ${g.id} label/value rows must sit at DISTINCT y`)
     }
     return { id: g.id, label: pair[0], rating, value: pair[1] }
   })
-  const pointsRaw = groups
+  const pointsRaw = columns
     .sort((a, b) => a.rating.x - b.rating.x)
     .map((g) => ({ id: g.id, label: g.label, rating: g.rating, value: g.value }))
 
-  // THE COLUMN-CENTER GRID (rounds 7-8): the RATING placeholders are the
+  // One size per role across the six columns (the file's 56 / 148): a per-
+  // column drift means the export broke the grid, and the render would show
+  // mismatched hero numbers — fail loudly instead.
+  const pointsSize = pointsRaw[0].rating.size * pointsRaw[0].rating.scale
+  const lineSize = pointsRaw[0].label.size * pointsRaw[0].label.scale
+  for (const col of pointsRaw) {
+    if (Math.abs(col.rating.size * col.rating.scale - pointsSize) > 1) {
+      throw new Error(`card.svg: stat group ${col.id} rating font-size drifts from the column grid`)
+    }
+    if (Math.abs(col.label.size * col.label.scale - lineSize) > 1) {
+      throw new Error(`card.svg: stat group ${col.id} label font-size drifts from the column grid`)
+    }
+    if (col.label.size !== col.value.size) {
+      throw new Error(`card.svg: stat group ${col.id} label/value font-sizes must match`)
+    }
+  }
+
+  // THE COLUMN-CENTER GRID (rounds 7-8, held): the RATING placeholders are the
   // SAME string ('99') in every column, so their left anchors sit at
-  // center − width('99')/2 — CONSTANT offset → the rating x's are the
-  // column centers' grid, evenly pitched. Lock the even pitch: a future
-  // file edit that breaks the grid breaks the central-alignment design.
+  // center − width('99')/2 — CONSTANT offset → the rating x's are the column
+  // centers' grid, evenly pitched. Lock the even pitch: a future file edit
+  // that breaks the grid breaks the central-alignment design.
   for (let i = 1; i < pointsRaw.length; i++) {
     const pitch = pointsRaw[i].rating.x - pointsRaw[i - 1].rating.x
     const first = pointsRaw[1].rating.x - pointsRaw[0].rating.x
@@ -525,8 +719,8 @@ function parseCard(svg: string): CardGeometry {
   }
 
   const stats: CardStatSlot[] = pointsRaw.map((col) => {
-    // Sanity bound (NOT centering): the three anchors are left-anchors of
-    // the owner's PLACEHOLDER strings — they may differ from each other
+    // Sanity bound (NOT centering): the three anchors are left-anchors of the
+    // owner's PLACEHOLDER strings — they may differ from each other
     // (different string widths) but must stay near their column. The COLUMN
     // CENTER is derived downstream (rating anchor + width('99')/2, the
     // owner's own centering of the placeholder — see buildCardPlan).
@@ -534,14 +728,15 @@ function parseCard(svg: string): CardGeometry {
     const span = Math.max(...xs) - Math.min(...xs)
     if (span > 20) throw new Error(`card.svg: stat slot ${col.id} is not column-aligned (span ${span}px)`)
     return {
-      label: slotOf(col.label, labelSize),
-      points: slotOf(col.rating, pointsSize),
-      value: slotOf(col.value, labelSize),
+      label: slotOf(col.label),
+      points: slotOf(col.rating),
+      value: slotOf(col.value),
     }
   })
 
   const platePath = pickPlatePath(svg)
   const cropPath = pickCropPath(svg)
+
 
   return {
     platePath,
@@ -549,6 +744,7 @@ function parseCard(svg: string): CardGeometry {
     cropPath,
     cropBBox: pathBBox(cropPath, 'crop-path'),
     borderStroke: borderStroke(svg),
+    statsPlate: statsPlate(svg),
     slots: { ovr, job, name, stats },
   }
 }

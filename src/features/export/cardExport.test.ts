@@ -50,7 +50,7 @@ import {
   type CardExportData,
   type TextMeasurer,
 } from './cardExport'
-import { contrastRatio, resolveCardTextFill } from './cardAssets'
+import { contrastRatio, resolveCardTextFill, tierPlateColor } from './cardAssets'
 
 const data: CardExportData = {
   name: 'Maria Silva',
@@ -233,9 +233,14 @@ describe('buildCardPlan — round-5 palette contract (tier colors applied by cod
       } else {
         expect(plan.name.color).toBe('#241a10')
       }
-      // The border keeps card.svg's GEOMETRY with the palette's stops.
-      expect(plan.card.borderStroke.width).toBe(48)
-      expect(plan.card.borderStroke.strokePath).toBe(CARD_GEOMETRY.platePath)
+      // When the file draws a border, it keeps the FILE's geometry with the
+      // PALETTE's colors: the stroked silhouette plus the file's own stroke
+      // width. The owner's current file draws NO border at all, so the layer is
+      // optional (see the stats-plate test below).
+      expect(plan.card.borderStroke).toBe(CARD_GEOMETRY.borderStroke)
+      if (plan.card.borderStroke !== undefined) {
+        expect(plan.card.borderStroke.strokePath).toBe(CARD_GEOMETRY.platePath)
+      }
       expect(plan.palette.borderStops).toEqual(TIER_PALETTE[tier].borderStops)
     }
   })
@@ -280,6 +285,46 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     expect(backing.photoClipPath).toBe(CARD_GEOMETRY.cropPath)
     expect(backing.photoBBox.w).toBe(CARD_GEOMETRY.cropBBox.w * 2)
     expect(backing.photoBBox.h).toBe(CARD_GEOMETRY.cropBBox.h * 2)
+  })
+
+  // 2026-10-29 re-export contract: the border layer declares NO gradient and
+  // NO clip, so both render surfaces must paint a SOLID per-tier ring
+  // UNCLIPPED — "largura do arquivo, cor por tier" (owner decision). The plan
+  // 2026-10-29 re-export contract: the owner's current file draws NO border,
+  // so the layer is optional and both surfaces skip it. A border reappearing
+  // (restored round-8 file / first re-export) must still parse — the assertions
+  // are optional-chained so the re-based contract holds either way.
+  it('draws no border in the owner\'s current file (the border layer is optional)', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    expect(plan.card.borderStroke).toBeUndefined()
+  })
+
+  it('carries the stats contrast plate through to the plan (geometry + fade from the file)', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    const plate = plan.card.statsPlate
+    expect(plate).toBeDefined()
+    if (plate === undefined) return
+    // Geometry and fade are the file's own; the COLOR is the tier's (owner
+    // 2026-10-29), so the fade carries no color at all.
+    expect(plate).toBe(CARD_GEOMETRY.statsPlate)
+    expect(plate.fades.length).toBeGreaterThanOrEqual(2)
+    for (const fade of plate.fades) {
+      expect(Object.keys(fade).sort()).toEqual(['offset', 'opacity'])
+    }
+  })
+
+  it('paints the plate in the TIER color, not the SVG ramp (owner tier-color contract)', () => {
+    // Owner 2026-10-29: "the fills must follow tier colors, not the color in
+    // the svg". Every tier resolves a color from its OWN palette, and the four
+    // tiers are distinguishable — the purple ramp in the file must never leak.
+    const colors = (['bronze', 'silver', 'gold', 'platinum'] as const).map(
+      (tier) => tierPlateColor(TIER_PALETTE[tier]),
+    )
+    expect(new Set(colors).size).toBe(4)
+    for (const color of colors) {
+      expect(color).toMatch(/^#[0-9a-f]{3,6}$/i)
+      expect(color.toLowerCase()).not.toBe('#662d91')
+    }
   })
 
   it('backs the over-photo OVR block with a top legibility scrim inside the crop area', () => {
@@ -505,9 +550,11 @@ describe('downloadCard — round-7 PNG export contract (recorded paint sequence)
       expect(y).toBeGreaterThanOrEqual(0)
       expect(y + (r.args[3] as number)).toBeLessThanOrEqual(canvas.height)
     }
-    // The plate path paints (tier fill), the border strokes, and text draws.
+    // The plate path paints (tier fill) and text draws. NO stroke: the owner's
+    // current file draws no border at all (2026-10-29), and the stats plate is
+    // a fill, not a stroke.
     expect(ops.some((o) => o.op === 'fill')).toBe(true)
-    expect(ops.some((o) => o.op === 'stroke')).toBe(true)
+    expect(ops.some((o) => o.op === 'stroke')).toBe(false)
     expect(ops.filter((o) => o.op === 'fillText').length).toBeGreaterThanOrEqual(2 + 6 * 3 + 1)
   })
 })
