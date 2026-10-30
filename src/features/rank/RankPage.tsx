@@ -270,60 +270,90 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                               RoleRankRow.stats — display rounding only, zero
                               client rank math. Unmapped keys (defensive;
                               unreachable — the catalog covers all 57) fall
-                              back to Geral. */}
-                          {GROUP_ORDER.map((group, index) => {
-                            const groupStats = row.stats.filter(
-                              (stat) => (statGroups.get(stat.stat_key) ?? 'general') === group,
-                            )
-                            if (groupStats.length === 0) return null
-                            return (
-                              <div key={group} className={index === 0 ? '' : 'mt-3'}>
-                                <p className="text-sm font-semibold text-content">
-                                  {GROUP_LABELS[group]}
-                                </p>
-                                <div className="mt-1 flex flex-col">
-                                  {groupStats.map((stat) => {
-                                    const tier = tierForPoints(stat.points)
-                                    return (
-                                      <div
-                                        key={stat.stat_key}
-                                        className="flex items-center justify-between gap-2 py-1"
+                              back to Geral.
+
+                              TABULAR view (owner feedback): the flex row this
+                              replaces pushed "Média / valor / pontos" to the
+                              far edge of a very wide cell, leaving an empty
+                              middle that made each label ambiguous about which
+                              numbers it owned. One auto-width table keeps every
+                              value in its own column under its own header,
+                              hugging the label instead of stretching across the
+                              shell. */}
+                          <table className="mt-1 text-sm">
+                            <thead>
+                              <tr className="border-b border-line">
+                                <th scope="col" className="py-1.5 pr-8 text-left font-medium text-muted">
+                                  Stat
+                                </th>
+                                <th scope="col" className="px-3 py-1.5 text-right font-medium text-muted">
+                                  Média
+                                </th>
+                                <th scope="col" className="px-3 py-1.5 text-right font-medium text-muted">
+                                  Valor
+                                </th>
+                                <th scope="col" className="py-1.5 pl-3 text-right font-medium text-muted">
+                                  Pontos
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {GROUP_ORDER.map((group) => {
+                                const groupStats = row.stats.filter(
+                                  (stat) => (statGroups.get(stat.stat_key) ?? 'general') === group,
+                                )
+                                if (groupStats.length === 0) return null
+                                return (
+                                  <Fragment key={group}>
+                                    <tr>
+                                      <th
+                                        scope="colgroup"
+                                        colSpan={4}
+                                        className="pt-4 pb-1 text-left text-sm font-semibold text-content"
                                       >
-                                        <span className="flex min-w-0 items-baseline gap-2">
-                                          <span className="text-sm font-semibold text-content">
+                                        {GROUP_LABELS[group]}
+                                      </th>
+                                    </tr>
+                                    {groupStats.map((stat) => {
+                                      const tier = tierForPoints(stat.points)
+                                      return (
+                                        <tr
+                                          key={stat.stat_key}
+                                          className="border-b border-line/50 last:border-b-0"
+                                        >
+                                          <th scope="row" className="whitespace-nowrap py-1.5 pr-8 text-left font-semibold text-content">
                                             {stat.label}
-                                          </span>
-                                        </span>
-                                        <span className="flex shrink-0 items-center gap-2">
+                                          </th>
                                           {/* D-20: class average for context. */}
-                                          <span className="text-sm text-muted">
-                                            Média:{' '}
+                                          <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted">
                                             {stat.class_average === null
                                               ? '—'
                                               : formatStatValue(stat.class_average, stat.value_type)}
-                                          </span>
-                                          <span className="text-sm text-content">
+                                          </td>
+                                          <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-content">
                                             {stat.value === null
                                               ? '—'
                                               : formatStatValue(stat.value, stat.value_type)}
-                                          </span>
-                                          <span
-                                            className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
-                                              tier === null ? 'border-line text-muted' : `${TIER_BORDER_DISPLAY[tier]} ${TIER_TEXT_DISPLAY[tier]}`
-                                            }`}
-                                          >
-                                            {stat.points === null ? '—' : stat.points}
-                                          </span>
-                                        </span>
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              </div>
-                            )
-                          })}
-                          </div>
-                        </td>
+                                          </td>
+                                          <td className="whitespace-nowrap py-1.5 pl-3 text-right">
+                                            <span
+                                              className={`inline-block min-w-9 rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums ${
+                                                tier === null ? 'border-line text-muted' : `${TIER_BORDER_DISPLAY[tier]} ${TIER_TEXT_DISPLAY[tier]}`
+                                              }`}
+                                            >
+                                              {stat.points === null ? '—' : stat.points}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      )
+                                    })}
+                                  </Fragment>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
                       </tr>
                     )}
                   </Fragment>
