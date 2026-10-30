@@ -242,6 +242,14 @@ delete from members where discord_handle like '${SENTINEL}-%';
 // exactly six usable keys, plus their live census and the real anchor (newest
 // validated submitter) when one exists.
 //
+// COHORT IDENTITY (migration 0038): a merged class ranks inside its group, so
+// the census, the anchor, the floor and the key-config reads must scope by the
+// GROUP or the merged cohort (Artista) would look member-less and get primers
+// while its real members (Bard + Gypsy) were invisible. `cohortClass` is
+// resolved at startup: `public.cohort_group(expr)` once 0038 is live, the plain
+// expression before it (the helper does not exist yet, so it cannot be named).
+let cohortClass = (expr) => expr
+
 // Three different filters matter here, and they answer three different
 // questions:
 //   - the SKIP count ignores this script's own namespace (smoke-mtx-%) so a
@@ -253,7 +261,7 @@ delete from members where discord_handle like '${SENTINEL}-%';
 //   - real_members (owner 2026-10-29) counts active members of the cohort that
 //     are NOT any kind of smoke fixture: 0 means the cohort has no member
 //     registered yet, which is what earns the combo a THIRD primer.
-const TARGETS_SQL = `
+const targetsSql = () => `
 with combo as (
   select cc.class_name, cc.char_function
   from class_cohorts cc
@@ -272,14 +280,14 @@ census as (
          (select count(distinct s.member_id)
             from submissions s
             join members m on m.id = s.member_id
-           where m.char_class = c.class_name
+           where ${cohortClass('m.char_class')} = ${cohortClass('c.class_name')}
              and m.char_function = c.char_function
              and m.active
              and s.status = 'validated'
              and m.discord_handle not like '${SENTINEL}-%') as validators,
          (select count(distinct m.id)
             from members m
-           where m.char_class = c.class_name
+           where ${cohortClass('m.char_class')} = ${cohortClass('c.class_name')}
              and m.char_function = c.char_function
              and m.active
              and m.discord_handle not like 'smoke%') as real_members,
@@ -289,7 +297,7 @@ census as (
     select m.id as anchor_id, m.display_name as anchor_display
     from members m
     join submissions s on s.member_id = m.id and s.status = 'validated'
-    where m.char_class = c.class_name and m.char_function = c.char_function and m.active
+    where ${cohortClass('m.char_class')} = ${cohortClass('c.class_name')} and m.char_function = c.char_function and m.active
       and m.discord_handle not like 'smoke%'
     group by m.id, m.display_name
     order by max(s.submitted_at) desc
@@ -343,7 +351,7 @@ function fixtureRowsSql(fixtures) {
 // Worst REAL value per (fixture, stat) + the derived floor. Shared by the seed
 // and by the completion probe (gap 0 = "a player who just arrived under the
 // floor", i.e. the worst case the primers must not block).
-const worstAndBaseSql = `
+const worstAndBaseSql = () => `
 create temp table mtx_worst (handle text, stat_key text, worst_value numeric) on commit drop;
 insert into mtx_worst (handle, stat_key, worst_value)
 select f.handle, sc.stat_key,
@@ -364,7 +372,7 @@ left join lateral (
     join submissions s on s.id = ss.submission_id
     where s.member_id in (
       select m.id from members m
-      where m.char_class = f.class_name
+      where ${cohortClass('m.char_class')} = ${cohortClass('f.class_name')}
         and m.char_function = f.char_function
         and m.active
         and m.discord_handle not like 'smoke%'
@@ -405,7 +413,7 @@ create temp table mtx_fixtures (handle text, display text, class_name text, char
 insert into mtx_fixtures (handle, display, class_name, char_function, gap, anchor_id) values
 ${fixtureRowsSql(fixtures)};
 
-${worstAndBaseSql}
+${worstAndBaseSql()}
 
 -- Invariant: one base per catalog stat per fixture, no gaps, no unknown keys.
 do $$ begin
@@ -500,7 +508,7 @@ order by 1;
 // Live re-check of the floor invariant AFTER the rows are stored (rounding
 // included): no primer value may be above the worst real value it descends from.
 // Empty rows = primers are all at or below the cohort's (or guild's) worst.
-const FLOOR_CHECK_SQL = `
+const floorCheckSql = () => `
 with latest as (
   select distinct on (sub.member_id, ss.stat_key) sub.member_id, ss.stat_key, ss.value
   from submission_stats ss
@@ -517,12 +525,12 @@ global_worst as (
   group by sc.stat_key, sc.stat_direction
 ),
 cohort_worst as (
-  select m.char_class, m.char_function, l.stat_key,
+  select ${cohortClass('m.char_class')} as char_class, m.char_function, l.stat_key,
          case sc.stat_direction when 'lower' then max(l.value) else min(l.value) end as worst_value
   from latest l
   join members m on m.id = l.member_id
   join stat_catalog sc on sc.stat_key = l.stat_key
-  group by m.char_class, m.char_function, l.stat_key, sc.stat_direction
+  group by ${cohortClass('m.char_class')}, m.char_function, l.stat_key, sc.stat_direction
 ),
 primer_latest as (
   select distinct on (sub.member_id, ss.stat_key) sub.member_id, ss.stat_key, ss.value
@@ -537,7 +545,7 @@ from members m
 join primer_latest p on p.member_id = m.id
 join stat_catalog sc on sc.stat_key = p.stat_key
 left join cohort_worst cw
-  on cw.char_class = m.char_class and cw.char_function = m.char_function and cw.stat_key = p.stat_key
+  on cw.char_class = ${cohortClass('m.char_class')} and cw.char_function = m.char_function and cw.stat_key = p.stat_key
 left join global_worst gw on gw.stat_key = p.stat_key
 where m.discord_handle like '${SENTINEL}-%'
   and coalesce(cw.worst_value, gw.worst_value) is not null
@@ -552,13 +560,13 @@ order by 1, 4;
 // max (higher-is-better) / min (lower-is-better), so if EVERYBODY reports 0 the
 // denominator is 0 and the cohort's OVR stays null until a non-zero report. A
 // primer is never inflated to dodge that — it is a basis, not a competitor.
-const ZERO_FLOOR_KEY_SQL = `
+const zeroFloorKeySql = () => `
 select distinct m.char_class, m.char_function, ss.stat_key
 from members m
 join submissions s on s.member_id = m.id and s.status = 'validated'
 join submission_stats ss on ss.submission_id = s.id
 join class_key_stats ks
-  on ks.class_name = m.char_class
+  on ks.class_name = ${cohortClass('m.char_class')}
  and ks.char_function = m.char_function
  and ks.selection_order <= 6
  and ks.stat_key = ss.stat_key
@@ -591,7 +599,7 @@ create temp table mtx_fixtures (handle text, display text, class_name text, char
 -- does — that is the claim this probe makes.
 insert into mtx_fixtures values
   ('${probe.handle}', '${probe.display}', '${probe.className}', '${probe.charFunction}', 0.000, null::uuid);
-${worstAndBaseSql}
+${worstAndBaseSql()}
 insert into members (discord_handle, display_name, pin_hash, role, active, char_class, char_function)
 select handle, display, '${bcrypt.hashSync(FIXTURE_PIN, 10)}', 'member', true, class_name, char_function
 from mtx_fixtures;
@@ -639,13 +647,21 @@ async function main() {
   const catalogCount = Number((await mgmtQuery(CATALOG_COUNT_SQL))[0].n)
   console.log(`[smoke-matrix] catalog: ${catalogCount} stats`)
 
+  // 0038 detection: once the Artista merge is live, every cohort scope must go
+  // through the group helper (see the cohortClass note above).
+  const groupFn = (await mgmtQuery(`select to_regprocedure('public.cohort_group(text)') as f;`))?.[0]?.f
+  if (groupFn) {
+    cohortClass = (expr) => `public.cohort_group(${expr})`
+    console.log('[smoke-matrix] cohort_group() present → merged classes are primed as their group')
+  }
+
   const split = (await mgmtQuery(META_SPLIT_SQL))[0]
   console.log(
     `[smoke-matrix] class_cohorts split: ${split.meta} meta / ${split.dark} non-viable ` +
       `(only meta combos are primed)`,
   )
 
-  const targets = (await mgmtQuery(TARGETS_SQL)) ?? []
+  const targets = (await mgmtQuery(targetsSql())) ?? []
   if (targets.length === 0) throw new Error('no meta (class, function) combo has 6 key stats configured')
   console.log(`[smoke-matrix] meta combos with 6 usable keys: ${targets.length}`)
 
@@ -737,7 +753,7 @@ async function main() {
   }
 
   // Floor invariant, re-checked on the stored rows (rounding included).
-  const aboveFloor = (await mgmtQuery(FLOOR_CHECK_SQL)) ?? []
+  const aboveFloor = (await mgmtQuery(floorCheckSql())) ?? []
   if (aboveFloor.length) {
     console.log(
       `[smoke-matrix] FAIL — ${aboveFloor.length} primer value(s) above the worst real value: ` +
@@ -755,7 +771,7 @@ async function main() {
     )
   }
 
-  const zeroKeys = (await mgmtQuery(ZERO_FLOOR_KEY_SQL)) ?? []
+  const zeroKeys = (await mgmtQuery(zeroFloorKeySql())) ?? []
   if (zeroKeys.length) {
     console.log(
       '[smoke-matrix] note — key stats that floor at 0 (a cohort where every report is 0 keeps its ' +

@@ -210,10 +210,30 @@ const LATEST_CTE = `
     order by sub.member_id, ss.stat_key, sub.submitted_at desc
   )`
 
+// The cohort groups introduced by migration 0038 (Menestrel + Cigana ->
+// Artista): a merged class ranks inside its GROUP and reads the GROUP's key
+// config, so the independent math here must scope by the same identity or it
+// would compare a merged card against an unmerged basis and call it divergence.
+// Before 0038 the table does not exist and the group is the class itself.
+const sqlLit = (s) => `'${String(s).replace(/'/g, "''")}'`
+let classGroupSql = (expr) => expr
+try {
+  const merges = await mgmtQuery(`select class_name, group_name from public.class_cohort_merges;`)
+  if (Array.isArray(merges) && merges.length > 0) {
+    const cases = merges
+      .map((m) => `when ${sqlLit(m.class_name)} then ${sqlLit(m.group_name)}`)
+      .join(' ')
+    classGroupSql = (expr) => `case ${expr} ${cases} else ${expr} end`
+  }
+} catch {
+  // Pre-0038 project: class_cohort_merges does not exist yet; no merges.
+}
+
 const parityRows = await mgmtQuery(
   `with ${LATEST_CTE},
   audited as (
-    select m.id, m.display_name, m.char_class, m.char_function
+    select m.id, m.display_name, m.char_class as own_class,
+           ${classGroupSql('m.char_class')} as char_class, m.char_function
     from members m
     where m.active and m.char_class is not null
   ),
@@ -223,7 +243,7 @@ const parityRows = await mgmtQuery(
     join audited a on a.id = l.member_id
   )
   select
-    a.id as member_id, a.display_name, a.char_class, a.char_function,
+    a.id as member_id, a.display_name, a.char_class, a.own_class, a.char_function,
 
     -- [1] role_rank basis (0036 body): agg (char_class, stat_key) over the
     --     member's own function board, gate ag.n >= 3, keys class+function+<=6
@@ -397,6 +417,7 @@ const members = (parityRows ?? []).map((r) => ({
   member_id: r.member_id,
   display_name: r.display_name,
   char_class: r.char_class,
+  own_class: r.own_class ?? r.char_class,
   char_function: r.char_function,
   rank_ovr: num(r.rank_ovr),
   rank_keyed_ovr: num(r.rank_keyed_ovr),
@@ -427,7 +448,7 @@ for (const m of members) {
     status = nonNull.length === 0 ? 'OK_NULL' : 'REVERSE_DIVERGENCE'
     if (nonNull.length > 0) {
       parityFailures.push(
-        `${m.display_name} (${m.char_class}/${m.char_function}): promo basis null but a gated basis rates non-null`,
+        `${m.display_name} (${m.own_class}/${m.char_function}${m.own_class === m.char_class ? '' : ` -> ${m.char_class}`}): promo basis null but a gated basis rates non-null`,
       )
     }
   } else if (nonNull.length !== 4) {
@@ -436,7 +457,7 @@ for (const m of members) {
       .filter(([, v]) => v === null)
       .map(([k]) => k)
     parityFailures.push(
-      `${m.display_name} (${m.char_class}/${m.char_function}): cards rate ${m.promo_ovr} but basis(es) [${nullBases.join(', ')}] went null (key-filter regression)`,
+      `${m.display_name} (${m.own_class}/${m.char_function}${m.own_class === m.char_class ? '' : ` -> ${m.char_class}`}): cards rate ${m.promo_ovr} but basis(es) [${nullBases.join(', ')}] went null (key-filter regression)`,
     )
   } else if (nonNull.every((v) => v === nonNull[0])) {
     status = 'OK'
@@ -445,10 +466,10 @@ for (const m of members) {
     status = 'DIVERGED'
     delta = Number((m.rank_ovr - m.promo_ovr).toFixed(4))
     parityFailures.push(
-      `${m.display_name} (${m.char_class}/${m.char_function}): rank=${m.rank_ovr} card=${m.card_ovr} report=${m.report_ovr} promo=${m.promo_ovr} (delta ${delta})`,
+      `${m.display_name} (${m.own_class}/${m.char_function}${m.own_class === m.char_class ? '' : ` -> ${m.char_class}`}): rank=${m.rank_ovr} card=${m.card_ovr} report=${m.report_ovr} promo=${m.promo_ovr} (delta ${delta})`,
     )
   }
-  const combo = `${m.char_class}/${m.char_function}`
+  const combo = `${m.own_class}/${m.char_function}${m.own_class === m.char_class ? '' : ` -> ${m.char_class}`}`
   console.log(
     `  ${String(m.display_name).padEnd(24)} ${combo.padEnd(28)} ${fmt(m.rank_ovr).padStart(6)} ${fmt(m.rank_keyed_ovr).padStart(11)} ${fmt(m.card_ovr).padStart(6)} ${fmt(m.report_ovr).padStart(7)} ${fmt(m.promo_ovr).padStart(7)} ${fmt(delta).padStart(7)}   ${status}`,
   )
@@ -472,7 +493,7 @@ const applicantRows = await mgmtQuery(
     select char_class, char_function, stat_key,
            count(*) as n, max(value) as max_v, min(value) as min_v
     from (
-      select l.member_id, l.stat_key, l.value, m.char_class, m.char_function
+      select l.member_id, l.stat_key, l.value, ${classGroupSql('m.char_class')} as char_class, m.char_function
       from latest l
       join members m on m.id = l.member_id
       where m.active and m.char_class is not null
@@ -481,12 +502,12 @@ const applicantRows = await mgmtQuery(
   )
   select r.id as request_id, r.nickname, r.char_class, r.char_function,
     (select count(*) from class_key_stats ks
-      where ks.class_name = r.char_class
+      where ks.class_name = ${classGroupSql('r.char_class')}
         and ks.char_function = r.char_function
         and ks.selection_order <= 6) as keys_configured,
     (select count(*) from membership_request_stats rq
       join class_key_stats ks
-        on ks.class_name = r.char_class
+        on ks.class_name = ${classGroupSql('r.char_class')}
        and ks.char_function = r.char_function
        and ks.selection_order <= 6
        and ks.stat_key = rq.stat_key
@@ -494,9 +515,9 @@ const applicantRows = await mgmtQuery(
     (select min(ag.n) from class_key_stats ks
       left join cohort_agg ag
         on ag.stat_key = ks.stat_key
-       and ag.char_class = r.char_class
+       and ag.char_class = ${classGroupSql('r.char_class')}
        and ag.char_function = r.char_function
-      where ks.class_name = r.char_class
+      where ks.class_name = ${classGroupSql('r.char_class')}
         and ks.char_function = r.char_function
         and ks.selection_order <= 6) as cohort_n_min,
     (select case when count(*) = 6 and count(p) = 6 then 51 + avg(p) * 48.0/99 end
@@ -514,9 +535,9 @@ const applicantRows = await mgmtQuery(
          on rq.request_id = r.id and rq.stat_key = ks.stat_key
        left join cohort_agg ag
          on ag.stat_key = ks.stat_key
-        and ag.char_class = r.char_class
+        and ag.char_class = ${classGroupSql('r.char_class')}
         and ag.char_function = r.char_function
-       where ks.class_name = r.char_class
+       where ks.class_name = ${classGroupSql('r.char_class')}
          and ks.char_function = r.char_function
          and ks.selection_order <= 6
      ) kp) as applicant_ovr
