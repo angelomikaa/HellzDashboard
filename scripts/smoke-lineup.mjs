@@ -246,6 +246,25 @@ async function main() {
     check('C4 member direct table read allowed (active member)', directRead.status === 200 && Array.isArray(directRead.json) && directRead.json.length === 5, `status=${directRead.status}`)
 
     // ---- D. officer writes ------------------------------------------------
+    // Device guard (0041 / 0024 design): a wrong or missing X-Device-Fingerprint
+    // must raise device_mismatch before any role check, and write nothing.
+    const wrongFp = await rest('/rpc/set_lineup_slot', {
+      method: 'POST', session: officer, extra: { 'X-Device-Fingerprint': '0'.repeat(64) },
+      body: { p_battlefield: 'vigrid_field', p_party: 8, p_slot: 5, p_member: null },
+    })
+    const noFp = await rest('/rpc/set_lineup_slot', {
+      method: 'POST', session: officer, extra: { 'X-Device-Fingerprint': '' },
+      body: { p_battlefield: 'vigrid_field', p_party: 8, p_slot: 5, p_member: null },
+    })
+    const stillFilled = (await mgmt(
+      `select count(*)::int as n from lineup_slots where battlefield='vigrid_field' and party_index=8 and slot_index=5 and member_id is not null;`,
+    ))[0].n === 1
+    check(
+      'D0 device guard: wrong or missing fingerprint -> device_mismatch, no write',
+      !wrongFp.ok && wrongFp.text.includes('device_mismatch') && !noFp.ok && noFp.text.includes('device_mismatch') && stillFilled,
+      `wrong=${wrongFp.status} missing=${noFp.status}`,
+    )
+
     const smokeReject = await rest('/rpc/set_lineup_slot', {
       method: 'POST', session: officer, body: { p_battlefield: 'vigrid_field', p_party: 1, p_slot: 1, p_member: fixtureIds[HANDLES.member] },
     })
