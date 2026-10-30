@@ -24,6 +24,7 @@ import {
 } from '../../lib/api'
 import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER } from '../../lib/groups'
 import { classLabel } from '../../lib/classLabels'
+import { groupLabel, isVirtualClassGroup as isClassGroup, mergedClassOptions } from '../../lib/classGroups'
 import type { NeoFootSession } from '../auth/session'
 
 // Renders one ordered-set chip for a catalog entry within a (class, build-role)
@@ -224,9 +225,12 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
               className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="">—</option>
-              {classes.map((className) => (
+              {/* 10.3: the stats classes — merged pairs appear ONCE as their
+                  group (Artista), because the config and the rank cohort are
+                  the group's, not each member class'. */}
+              {mergedClassOptions(classes).map((className) => (
                 <option key={className} value={className}>
-                  {classLabel(className)}
+                  {isClassGroup(className) ? groupLabel(className) : classLabel(className)}
                 </option>
               ))}
             </select>

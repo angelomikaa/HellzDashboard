@@ -38,6 +38,13 @@ import {
 import type { NeoFootSession } from '../auth/session'
 import { FUNCTION_LABELS } from '../../lib/groups'
 import { classLabel } from '../../lib/classLabels'
+import {
+  cohortGroup,
+  groupLabel,
+  isVirtualClassGroup as isClassGroup,
+  mergedClassOptions,
+  playableClassOptions,
+} from '../../lib/classGroups'
 import { validateIdentityDraft, OFFICIAL_CLASSES } from '../submit/identity'
 import type { CharFunction } from '../submit/identity'
 import { ClassCrest } from '../assets/ClassCrest'
@@ -310,7 +317,9 @@ export function CharactersPage({
       ? []
       : pinFilteredMembers.filter(
           (member) =>
-            (filterClass === '' || member.char_class === filterClass) &&
+            // 10.3: the filter chip is a stats GROUP — a member matches when
+            // their own class ranks inside it (Bard and Gypsy -> Artista).
+            (filterClass === '' || cohortGroup(member.char_class) === filterClass) &&
             (filterFunction === '' || member.char_function === filterFunction),
         )
 
@@ -658,7 +667,7 @@ export function CharactersPage({
                   >
                     Todas
                   </button>
-                  {data.classes.map((className) => (
+                  {mergedClassOptions(data.classes).map((className) => (
                     <button
                       key={className}
                       type="button"
@@ -670,7 +679,10 @@ export function CharactersPage({
                           : 'border-line text-muted hover-control hover:text-content'
                       }`}
                     >
-                      {classLabel(className)}
+                      {/* 10.3: merged classes appear ONCE as their stats group
+                          (Artista) — the chip still selects every member who
+                          ranks inside it, while each row keeps its own class. */}
+                      {isClassGroup(className) ? groupLabel(className) : classLabel(className)}
                     </button>
                   ))}
                 </FilterDisclosure>
@@ -804,7 +816,11 @@ export function CharactersPage({
                               {/* Display-only '—' (maps to null); saving with it
                                   selected is blocked client-side below. */}
                               <option value="">—</option>
-                              {data.classes.map((className) => (
+                              {/* 10.3: PLAYABLE classes only — a merged group
+                                  (Artista) is a stats identity, never a
+                                  member's class, so a Bard keeps registering as
+                                  Bard. */}
+                              {playableClassOptions(data.classes).map((className) => (
                                 <option key={className} value={className}>
                                   {classLabel(className)}
                                 </option>
