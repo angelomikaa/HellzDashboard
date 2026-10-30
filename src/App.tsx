@@ -27,6 +27,9 @@ const RankPage = lazy(() =>
 const SubmitPage = lazy(() =>
   import('./features/submit/SubmitPage').then((m) => ({ default: m.SubmitPage })),
 )
+const LineupPage = lazy(() =>
+  import('./features/lineup/LineupPage').then((m) => ({ default: m.LineupPage })),
+)
 
 const ROLE_LABELS: Record<'member' | 'officer' | 'owner', string> = {
   member: 'Membro',
@@ -45,6 +48,7 @@ export type Tab =
   | 'characters'
   | 'keystats'
   | 'ranking'
+  | 'lineup'
 
 /**
  * Coalesced identity for the shell (08-08, UAT test 4): the header greeting and
@@ -126,6 +130,10 @@ function App() {
         const showRanking = tab === 'ranking' && isStaff
         // Enviar Status is for EVERY role (members submit their own stats).
         const showSubmit = tab === 'submit'
+        // Lineup (phase 10.4, LNUP-01..03): every active member sees the tab.
+        // Reads are RLS/RPC-gated; writes are officer/owner RPCs inside the
+        // page, so this flag is UX-only (no staff gate on the tab itself).
+        const showLineup = tab === 'lineup'
         // Início (Phase 10, HOME-01 + round 9): the guild landing page —
         // the Impecáveis showcase, identical for members and visitors (the
         // redundant personal blocks were removed by owner correction
@@ -186,6 +194,16 @@ function App() {
                       }`}
                     >
                       Enviar Status
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTab('lineup')}
+                      aria-current={showLineup ? 'page' : undefined}
+                      className={`h-11 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                        showLineup ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
+                      }`}
+                    >
+                      Lineup
                     </button>
                     {isStaff && (
                       <ValidacoesTab
@@ -256,6 +274,8 @@ function App() {
                           <RankPage session={session} />
                         ) : showSubmit ? (
                           <SubmitPage session={session} />
+                        ) : showLineup ? (
+                          <LineupPage session={session} />
                         ) : showInicio ? (
                           <InicioPage />
                         ) : (
