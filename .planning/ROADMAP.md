@@ -268,7 +268,7 @@ Cross-cutting constraints: append-only migration (`0040_battlefield_lineups.sql`
 Plans:
 - [x] 10.5-01-PLAN.md — Migration 0046 + server flags + client provenance/warning + Validações panel + tests — Wave 1
 
-**Cross-cutting constraints**: append-only (`0046` adds one table; `create_submission` keeps every 0014 validation; `officer_queue` payload is additive only); the OVR projection copies the 0036 value-proportional expression verbatim (never re-derived, never client-side); `submission_provenance` is RLS-on with no policies (definer surfaces only); deploy order = migration then client (the client tolerates the old server). Live apply pending at hand-off (no token in session).
+**Cross-cutting constraints**: append-only (`0046` adds one table; `create_submission` keeps every 0014 validation; `officer_queue` payload is additive only); the OVR projection copies the 0036 value-proportional expression verbatim (never re-derived, never client-side); `submission_provenance` is RLS-on with no policies (definer surfaces only); deploy order = migration then client (an old cached client works against the new RPC; the reverse would fail `p_provenance` resolution). Migration 0046 applied live 2026-10-30 and verified with rollback-wrapped synthetic submissions; the client bundle is the remaining deploy.
 
 ### Phase 11: Verified Access — Claim Authorization & Discord OAuth (INSERTED)
 
@@ -311,7 +311,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 
 | 10.2 Meta vs Non-Viable Cohorts (inserted) | v1.1 | - | Complete | 2026-10-29 |
 | 10.3 Artista Merged Cohort (inserted) | v1.1 | - | Complete | 2026-10-29 |
 | 10.4 Battlefield Lineups & Roster Sync (inserted) | v1.1 | 3/3 | Complete    | 2026-10-30 |
-| 10.5 Anti-Cheat Guardrails (inserted) | v1.1 | 1/1 | Complete (live apply pending) | 2026-10-30 |
+| 10.5 Anti-Cheat Guardrails (inserted) | v1.1 | 1/1 | Complete (0046 live) | 2026-10-30 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---

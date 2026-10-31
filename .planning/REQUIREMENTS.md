@@ -266,11 +266,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LNUP-03 | Phase 10.4 — Battlefield Lineups & Roster Sync | Planned (10.4-01/02) |
 | LNUP-04 | Phase 10.4 — Battlefield Lineups & Roster Sync | Planned (10.4-01) |
 | LNUP-05 | Phase 10.4 - Battlefield Lineups & Roster Sync | Planned (10.4-03) |
-| CHEAT-01 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 + tests; live apply pending) |
-| CHEAT-02 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 + tests; live apply pending) |
-| CHEAT-03 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 + tests; live apply pending) |
-| CHEAT-04 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 + tests; live apply pending) |
-| CHEAT-05 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 + tests; live apply pending) |
+| CHEAT-01 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 applied live 2026-10-30) |
+| CHEAT-02 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 applied live 2026-10-30) |
+| CHEAT-03 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 applied live 2026-10-30) |
+| CHEAT-04 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 applied live 2026-10-30) |
+| CHEAT-05 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 applied live 2026-10-30) |
 
 ## Anti-Cheat Guardrails (Phase 10.5, inserted 2026-10-30)
 
