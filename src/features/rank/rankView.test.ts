@@ -2,8 +2,8 @@
 // 'server' key must pass the payload through VERBATIM (same reference, no
 // re-order); name/class keys sort a COPY and never mutate the input array.
 import { describe, expect, it } from 'vitest'
-import type { RoleRankRow } from '../../lib/api'
-import { applyViewSort } from './rankView'
+import type { RoleRankRow, StatOverviewRow } from '../../lib/api'
+import { applyViewSort, orderStatRows } from './rankView'
 
 function row(partial: Partial<RoleRankRow>): RoleRankRow {
   return {
@@ -55,5 +55,57 @@ describe('applyViewSort', () => {
     const nameSorted = applyViewSort(serverOrder, 'name')
     expect(applyViewSort(nameSorted, 'server')).toBe(nameSorted)
     expect(nameSorted.map((r) => r.member_id)).not.toEqual(['a', 'b', 'c'])
+  })
+})
+
+function statRow(partial: Partial<StatOverviewRow>): StatOverviewRow {
+  return {
+    member_id: 'id',
+    display_name: 'nome',
+    char_id: null,
+    char_class: 'Classe',
+    char_function: 'dps',
+    value: null,
+    submitted_at: null,
+    class_average: null,
+    class_sample_size: null,
+    cohort_ratio: null,
+    guild_ratio: null,
+    cohort_outlier: false,
+    guild_outlier: false,
+    ...partial,
+  }
+}
+
+// Server contract: raw value desc, no-value members LAST.
+const statServerOrder: StatOverviewRow[] = [
+  statRow({ member_id: 'a', display_name: 'Zeca', value: 9000 }),
+  statRow({ member_id: 'b', display_name: 'Ana', value: 4000 }),
+  statRow({ member_id: 'c', display_name: 'Bruno', value: null }),
+]
+
+describe('orderStatRows', () => {
+  it("'desc' returns the server payload verbatim — same reference", () => {
+    const result = orderStatRows(statServerOrder, 'desc')
+    expect(result).toBe(statServerOrder)
+    expect(result.map((r) => r.member_id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it("'asc' reverses valued rows and keeps no-value members last", () => {
+    const result = orderStatRows(statServerOrder, 'asc')
+    expect(result.map((r) => r.member_id)).toEqual(['b', 'a', 'c'])
+    // input never mutated
+    expect(statServerOrder.map((r) => r.member_id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it("'asc' uses a pt-BR name tie-break for equal values", () => {
+    const result = orderStatRows(
+      [
+        statRow({ member_id: '1', display_name: 'Zeca', value: 500 }),
+        statRow({ member_id: '2', display_name: 'Ana', value: 500 }),
+      ],
+      'asc',
+    )
+    expect(result.map((r) => r.member_id)).toEqual(['2', '1'])
   })
 })

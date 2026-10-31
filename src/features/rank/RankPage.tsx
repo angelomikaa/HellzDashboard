@@ -20,7 +20,10 @@ import {
   fetchCatalog,
   fetchClasses,
   fetchRoleRank,
+  fetchStatOverview,
   type RoleRankRow,
+  type StatCatalogEntry,
+  type StatOverview,
 } from '../../lib/api'
 import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER } from '../../lib/groups'
 import { classLabel } from '../../lib/classLabels'
@@ -29,7 +32,7 @@ import { formatStatValue } from '../../lib/parseStatValue'
 import { tierForPoints } from '../dashboard/presentation'
 import { TIER_BORDER_DISPLAY, TIER_TEXT_DISPLAY } from '../dashboard/tierDisplay'
 import { ClassCrest } from '../assets/ClassCrest'
-import { applyViewSort, type RankSortKey } from './rankView'
+import { applyViewSort, orderStatRows, type RankSortKey, type StatOrder } from './rankView'
 import type { NeoFootSession } from '../auth/session'
 
 // Enumeration-safe pt-BR copy (UI contract): never expose HTTP codes, gateway
@@ -54,15 +57,29 @@ const SORT_KEYS: { key: RankSortKey; label: string }[] = [
   { key: 'class', label: 'Classe' },
 ]
 
+type RankView = 'ovr' | 'stat'
+
+const submittedFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' })
+const ratioFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
+
 export function RankPage({ session }: { session: NeoFootSession }) {
   // Class filter options (D-18: default '— todas as classes' = undefined) +
-  // the stat_catalog group join. The role_rank payload is a CLOSED field list
-  // (0013 census: no per-stat group_name), so grouping needs the catalog's
+  // the stat_catalog. The role_rank payload is a CLOSED field list (0013
+  // census: no per-stat group_name), so grouping needs the catalog's
   // group_name keyed by stat_key — staff-only RLS read, same as Stats-Chave.
+  // 0047: the same catalog feeds the cross-cohort stat selector.
   const [classes, setClasses] = useState<string[]>([])
-  const [statGroups, setStatGroups] = useState<ReadonlyMap<string, string>>(new Map())
+  const [catalog, setCatalog] = useState<StatCatalogEntry[]>([])
   const [board, setBoard] = useState<Board>('dps')
   const [boardClass, setBoardClass] = useState('')
+
+  // 0047 cross-cohort inspector: 'ovr' keeps the original role boards;
+  // 'stat' shows ONE stat across every real member, independent of cohort.
+  const [view, setView] = useState<RankView>('ovr')
+  const [statKey, setStatKey] = useState('rpdef')
+  const [statOrder, setStatOrder] = useState<StatOrder>('desc')
+  const [overview, setOverview] = useState<StatOverview | null>(null)
+  const [overviewError, setOverviewError] = useState<string | null>(null)
 
   const [rows, setRows] = useState<RoleRankRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -71,6 +88,11 @@ export function RankPage({ session }: { session: NeoFootSession }) {
   // One expanded player detail at a time (member_id — display_name has no
   // unique constraint, the fetchRoleRank composite-key discipline).
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const statGroups = useMemo(
+    () => new Map(catalog.map((entry) => [entry.stat_key, entry.group_name])),
+    [catalog],
+  )
 
   // Class options + the catalog group map load once; a failure only degrades
   // the filter (the select keeps the all-classes option) — it never blocks
@@ -88,7 +110,7 @@ export function RankPage({ session }: { session: NeoFootSession }) {
       })
     fetchCatalog(session)
       .then((entries) => {
-        if (!cancelled) setStatGroups(new Map(entries.map((e) => [e.stat_key, e.group_name])))
+        if (!cancelled) setCatalog(entries)
       })
       .catch(() => {
         /* grouping degraded; detail values still render */
@@ -98,11 +120,21 @@ export function RankPage({ session }: { session: NeoFootSession }) {
     }
   }, [session])
 
+  // 0047: if the default stat is absent from the live catalog (defensive —
+  // rpdef exists since 0019), fall back to the first catalog stat.
+  useEffect(() => {
+    if (catalog.length === 0) return
+    if (!catalog.some((entry) => entry.stat_key === statKey)) {
+      setStatKey(catalog[0].stat_key)
+    }
+  }, [catalog, statKey])
+
   // Board or class change refetches via fetchRoleRank with the cancelled-flag
   // stale-guard pattern (KeyStatsPage loadClassData precedent): the flag
   // guards ALL state writes so a slow earlier fetch can never overwrite the
-  // currently selected board.
+  // currently selected board. Skipped while the cross-cohort view is active.
   useEffect(() => {
+    if (view !== 'ovr') return
     let cancelled = false
     setRows(null)
     setError(null)
@@ -123,7 +155,37 @@ export function RankPage({ session }: { session: NeoFootSession }) {
     return () => {
       cancelled = true
     }
-  }, [session, board, boardClass])
+  }, [session, view, board, boardClass])
+
+  // 0047: cross-cohort stat fetch (staff-only RPC). Same stale-guard pattern.
+  useEffect(() => {
+    if (view !== 'stat' || statKey === '') return
+    let cancelled = false
+    setOverview(null)
+    setOverviewError(null)
+    fetchStatOverview(session, statKey)
+      .then((data) => {
+        if (!cancelled) setOverview(data)
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setOverviewError(
+          err instanceof ApiError && err.kind === 'unauthorized'
+            ? SESSION_ERROR
+            : NETWORK_ERROR,
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [session, view, statKey])
+
+  // Display-only ordering (T-072-11 view aid): 'desc' is the server order
+  // verbatim; 'asc' reverses valued rows and keeps no-value members last.
+  const orderedStatRows = useMemo(
+    () => (overview === null ? [] : orderStatRows(overview.rows, statOrder)),
+    [overview, statOrder],
+  )
 
   // T-072-11 view aid: 'server' passes the payload through verbatim (same
   // reference); name/class sort a copy. Memoized so re-renders (expansions)
@@ -137,9 +199,37 @@ export function RankPage({ session }: { session: NeoFootSession }) {
     <section className="rounded-lg border border-line bg-surface p-6">
       <h2 className="text-xl font-semibold text-content">Ranking</h2>
       <p className="mt-1 text-sm text-muted">
-        Comparação por função de build — valor, pontos e média por stat para oficiais.
+        Comparação por função de build ou por stat entre toda a guilda — para oficiais.
       </p>
 
+      {/* 0047 view switch: the original OVR boards, or ONE stat across every
+          real member regardless of class/cohort (cheat inspection). */}
+      <div role="tablist" aria-label="Modo do ranking" className="mt-4 flex gap-1">
+        {(
+          [
+            { value: 'ovr', label: 'OVR por função' },
+            { value: 'stat', label: 'Stat entre todos' },
+          ] as const
+        ).map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            role="tab"
+            aria-selected={view === option.value}
+            onClick={() => setView(option.value)}
+            className={`h-11 rounded-md border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+              view === option.value
+                ? 'border-accent bg-accent text-accent-foreground glow-accent-soft'
+                : 'border-line text-muted hover-control hover:text-content'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'ovr' ? (
+        <>
       {/* D-18 board selector: the build-role axis (FUNCTION_LABELS vocabulary). */}
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div role="group" aria-label="Função de build" className="flex gap-1">
@@ -362,6 +452,220 @@ export function RankPage({ session }: { session: NeoFootSession }) {
             </tbody>
           </table>
         </div>
+      )}
+        </>
+      ) : (
+        <>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <select
+              value={statKey}
+              onChange={(e) => {
+                setStatKey(e.target.value)
+                setStatOrder('desc')
+              }}
+              aria-label="Stat para comparar entre todos"
+              className="h-11 rounded-md border border-line bg-surface px-3 text-sm text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              {GROUP_ORDER.map((group) => {
+                const entries = catalog.filter((entry) => entry.group_name === group)
+                if (entries.length === 0) return null
+                return (
+                  <optgroup key={group} label={GROUP_LABELS[group]}>
+                    {entries.map((entry) => (
+                      <option key={entry.stat_key} value={entry.stat_key}>
+                        {entry.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              })}
+            </select>
+            <button
+              type="button"
+              onClick={() => setStatOrder((order) => (order === 'desc' ? 'asc' : 'desc'))}
+              aria-pressed={statOrder === 'asc'}
+              className="h-11 rounded-md border border-line px-3 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              {statOrder === 'desc' ? 'Maior primeiro ▾' : 'Menor primeiro ▴'}
+            </button>
+          </div>
+
+          {overviewError !== null ? (
+            <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-error">
+              {overviewError}
+            </p>
+          ) : overview === null ? (
+            <p className="mt-6 text-base text-muted">Carregando…</p>
+          ) : (
+            <>
+              <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+                <span className="font-semibold text-content">{overview.label}</span>
+                {overview.guild.sample_size === 0 ? (
+                  <span className="text-muted">Sem envios validados para este stat.</span>
+                ) : (
+                  <span className="text-muted">
+                    {`${overview.guild.sample_size} membros com valor · média ${
+                      overview.guild.average === null
+                        ? '—'
+                        : formatStatValue(overview.guild.average, overview.value_type)
+                    } · mediana ${
+                      overview.guild.median === null
+                        ? '—'
+                        : formatStatValue(overview.guild.median, overview.value_type)
+                    } · máx ${
+                      overview.guild.max === null
+                        ? '—'
+                        : formatStatValue(overview.guild.max, overview.value_type)
+                    } · mín ${
+                      overview.guild.min === null
+                        ? '—'
+                        : formatStatValue(overview.guild.min, overview.value_type)
+                    }`}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                Somente envios validados; fixtures de teste excluídos. “Acima da coorte” =
+                1,5× ou mais a média da classe/função (regra anti-cheat); “Fora do padrão” =
+                1,5× ou mais a média geral da guilda (indício, não veredito). Confirme no
+                painel anti-cheat de Validações.
+              </p>
+              {orderedStatRows.length === 0 ? (
+                <p className="mt-6 text-center text-base text-muted">
+                  Nenhum membro ativo para comparar.
+                </p>
+              ) : (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-max text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-line">
+                        <th
+                          scope="col"
+                          className="px-2 py-2 font-semibold text-muted"
+                          aria-label="Classe (ícone)"
+                        />
+                        <th scope="col" className="px-2 py-2 font-semibold text-muted">
+                          Nome
+                        </th>
+                        <th scope="col" className="px-2 py-2 font-semibold text-muted">
+                          Classe
+                        </th>
+                        <th scope="col" className="px-2 py-2 font-semibold text-muted">
+                          Função
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-2 py-2 text-right font-semibold text-muted"
+                        >
+                          Valor
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-2 py-2 text-right font-semibold text-muted"
+                        >
+                          Média classe/função
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-2 py-2 text-right font-semibold text-muted"
+                        >
+                          vs. classe
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-2 py-2 text-right font-semibold text-muted"
+                        >
+                          vs. guilda
+                        </th>
+                        <th scope="col" className="px-2 py-2 font-semibold text-muted">
+                          Último envio
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orderedStatRows.map((row) => {
+                        return (
+                          <tr key={row.member_id} className="border-b border-line">
+                            <td className="px-2 py-2">
+                              <ClassCrest charClass={row.char_class} size="sm" />
+                            </td>
+                            <td className="px-2 py-2 text-content">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span>{row.display_name}</span>
+                                {row.cohort_outlier && (
+                                  <span className="rounded-full bg-error/15 px-2 py-0.5 text-xs font-semibold text-error">
+                                    Acima da coorte
+                                  </span>
+                                )}
+                                {!row.cohort_outlier && row.guild_outlier && (
+                                  <span className="rounded-full border border-tier-gold/60 px-2 py-0.5 text-xs font-semibold text-tier-gold">
+                                    Fora do padrão
+                                  </span>
+                                )}
+                              </div>
+                              {row.char_id !== null && row.char_id !== '' && (
+                                <div className="font-mono text-xs text-muted">{row.char_id}</div>
+                              )}
+                            </td>
+                            <td className="px-2 py-2 text-muted">
+                              {row.char_class === null ? '—' : classLabel(row.char_class)}
+                            </td>
+                            <td className="px-2 py-2 text-muted">
+                              {row.char_function === null
+                                ? '—'
+                                : FUNCTION_LABELS[row.char_function]}
+                            </td>
+                            <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-content">
+                              {row.value === null
+                                ? '—'
+                                : formatStatValue(row.value, overview.value_type)}
+                            </td>
+                            <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-muted">
+                              {row.class_average === null
+                                ? '—'
+                                : `${formatStatValue(row.class_average, overview.value_type)}${
+                                    row.class_sample_size === null
+                                      ? ''
+                                      : ` (n=${row.class_sample_size})`
+                                  }`}
+                            </td>
+                            <td
+                              className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${
+                                row.cohort_outlier
+                                  ? 'font-semibold text-error'
+                                  : 'text-muted'
+                              }`}
+                            >
+                              {row.cohort_ratio === null
+                                ? '—'
+                                : `${ratioFormatter.format(row.cohort_ratio)}×`}
+                            </td>
+                            <td
+                              className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${
+                                row.guild_outlier
+                                  ? 'font-semibold text-tier-gold'
+                                  : 'text-muted'
+                              }`}
+                            >
+                              {row.guild_ratio === null
+                                ? '—'
+                                : `${ratioFormatter.format(row.guild_ratio)}×`}
+                            </td>
+                            <td className="whitespace-nowrap px-2 py-2 text-muted">
+                              {row.submitted_at === null
+                                ? '—'
+                                : submittedFormatter.format(new Date(row.submitted_at))}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </section>
   )

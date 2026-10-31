@@ -762,6 +762,63 @@ export async function fetchMyCard(session: NeoFootSession): Promise<MyCard> {
   return card
 }
 
+/** One member in the cross-cohort stat inspector (0047). */
+export interface StatOverviewRow {
+  member_id: string
+  display_name: string
+  char_id: string | null
+  char_class: string | null
+  char_function: 'dps' | 'mdps' | 'suporte' | null
+  value: number | null
+  submitted_at: string | null
+  /** Same class+build-role average, self excluded (null when n < 3). */
+  class_average: number | null
+  class_sample_size: number | null
+  cohort_ratio: number | null
+  guild_ratio: number | null
+  cohort_outlier: boolean
+  guild_outlier: boolean
+}
+
+export interface StatOverview {
+  stat_key: string
+  label: string
+  label_short: string
+  group_name: 'general' | 'quasi' | 'special'
+  value_type: 'flat' | 'percentual'
+  stat_direction: 'higher' | 'lower'
+  guild: {
+    sample_size: number
+    average: number | null
+    median: number | null
+    max: number | null
+    min: number | null
+  }
+  rows: StatOverviewRow[]
+}
+
+/**
+ * Cross-cohort stat inspector (0047): ONE stat across every active real
+ * member, independent of class/cohort. Staff-only gate inside the RPC — a
+ * member JWT raises 'forbidden'. Rows arrive ordered by raw value descending
+ * (nulls last); the client only reverses the array for the ascending view
+ * (T-072-11 view-aid discipline, no rank math in the browser).
+ */
+export async function fetchStatOverview(
+  session: NeoFootSession,
+  statKey: string,
+): Promise<StatOverview> {
+  const res = await restFetch(session, '/rpc/stat_overview', {
+    method: 'POST',
+    body: JSON.stringify({ p_stat_key: statKey }),
+  })
+  const overview = await parseBody<StatOverview>(res)
+  if (!overview || !Array.isArray(overview.rows)) {
+    throw new ApiError(0, 'server', 'malformed stat_overview response')
+  }
+  return overview
+}
+
 export async function fetchRoleRank(
   session: NeoFootSession,
   charFunction: 'dps' | 'mdps' | 'suporte',
