@@ -278,6 +278,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CURVE-02 | Phase 10.7 - Statistical Buff Detection | Complete (0049 applied live 2026-10-30) |
 | CURVE-03 | Phase 10.7 - Statistical Buff Detection | Complete (0049 applied live 2026-10-30) |
 | CURVE-04 | Phase 10.7 - Statistical Buff Detection | Complete (0049 applied live 2026-10-30) |
+| CURVE-05 | Phase 10.7 - Statistical Buff Detection | Complete (0050 applied live 2026-10-30) |
 
 ## Anti-Cheat Guardrails (Phase 10.5, inserted 2026-10-30)
 
@@ -296,7 +297,8 @@ Owner request: use the data to catch possible cheaters instead of only the 1.5x 
 - **CURVE-01**: `curve_deviation()` models `base = flat / (1 + pct/100)` per stats cohort with a robust median/MAD (latest validated, self excluded, n >= 5), the expected flat for the submitted pct, a normalized-base sigma and a 30% curve-deviation test.
 - **CURVE-02**: The Impositio Manus undo test (`flat/1.35`, `pct-35`) flags when the pct is a high outlier AND the de-buffed base returns to the cohort curve; a normal clone and a legitimate high-% build stay clean.
 - **CURVE-03**: Defense spikes flag on `1.5x average OR sigma >= 3.5 vs median`; `stat_overview` exposes `class_median`/`class_mad`/`class_z`/`class_sigma_outlier` for every stat, and the inspector shows the sigma badge ahead of the 1.5x signals.
-- **CURVE-04**: Review aids only, no auto-rejection; cohorts below n=5 get `available:false` / null sigma and fall back to the 1.5x rule; no key-stat config leak, no client-executable internal helper, no new dependencies.
+- **CURVE-04**: Review aids only, no auto-rejection; cohorts below n=5 get `available:false` / null sigma; no key-stat config leak, no client-executable internal helper, no new dependencies.
+- **CURVE-05** (owner refinement 2026-10-30): discard the fixed standard — the 1.5x margin and the guild-wide "Fora do padrão" badge are removed from the reference logic. Defense flags/player warnings use only the robust median/MAD sigma (n >= 5); the Ranking stat mode shows median/Nσ only. Legacy average/ratio fields stay in the payload for cached clients but never flag; cohorts below n=5 produce no automatic curve signal (no 1.5x fallback).
 
 ## Cross-Cohort Stat Inspector (Phase 10.6, inserted 2026-10-30)
 
@@ -307,6 +309,6 @@ Owner request: see the same stat for all members, independent of class and cohor
 - **XSTAT-03**: Staff-only RPC gate (member JWT forbidden, anon no EXECUTE), validated-only, fixture-free, zero changes to OVR/points surfaces, zero new npm dependencies.
 
 **Coverage:**
-- v1.1 requirements: 70 total
-- Mapped to phases: 70 ✓
+- v1.1 requirements: 71 total
+- Mapped to phases: 71 ✓
 - Unmapped: 0 ✓

@@ -292,21 +292,22 @@ Plans:
 
 ### Phase 10.7: Statistical Buff Detection (INSERTED 2026-10-30)
 
-**Goal**: Catch buffed submissions from the data itself instead of relying only on the fixed 1.5× margin. For every stats cohort, the normalized base `flat / (1 + pct/100)` is modeled with a robust median/MAD curve; a pending submission is flagged when its base is ≥ 3.5σ off the curve or the actual flat is ≥ 30% away from the curve's expected value. The Impositio Manus signature (+35% PATK/MATK, +35 p.p. Equipment ATK%) is tested by undoing the buff (`flat/1.35`, `pct-35`) and checking whether the de-buffed base returns to the cohort curve. Defense spikes gain the same σ signal alongside the 1.5× ratio, and the cross-cohort inspector shows median/σ for every stat.
+**Goal**: Catch buffed submissions from the data itself instead of relying only on the fixed 1.5× margin. For every stats cohort, the normalized base `flat / (1 + pct/100)` is modeled with a robust median/MAD curve; a pending submission is flagged when its base is ≥ 3.5σ off the curve or the actual flat is ≥ 30% away from the curve's expected value. The Impositio Manus signature (+35% PATK/MATK, +35 p.p. Equipment ATK%) is tested by undoing the buff (`flat/1.35`, `pct-35`) and checking whether the de-buffed base returns to the cohort curve. Defense spikes use the same σ signal (the fixed 1.5× ratio was removed by the 10.7-02 curve-only refinement), and the cross-cohort inspector shows median/σ for every stat.
 
 **Depends on**: Phase 10.5 (anti-cheat panel), Phase 10.6 (stat inspector), Phase 10.1 (no OVR formula change)
-**Requirements**: CURVE-01, CURVE-02, CURVE-03, CURVE-04
+**Requirements**: CURVE-01, CURVE-02, CURVE-03, CURVE-04, CURVE-05
 **Success Criteria** (what must be TRUE):
   1. `curve_deviation()` computes the proportional curve per stats cohort (latest validated, self excluded, `n ≥ 5`) with median/MAD, expected flat, sigma and curve deviation; small cohorts return `available:false` (CURVE-01/CURVE-04)
   2. A synthetic Impositio submission is flagged `reason='impositio'` on both ATK and MATK; a normal clone and a legitimate high-% build are not; a flat-only inflation is flagged `reason='curve'` (CURVE-01/CURVE-02)
-  3. Defense spikes flag on `1.5× average OR σ ≥ 3.5 vs median` and carry median/MAD/z/reason; a 1.21×/3.70σ value is flagged as `sigma` (CURVE-03)
-  4. `stat_overview` returns `class_median`, `class_mad`, `class_z` and a direction-aware `class_sigma_outlier` for every stat; the Ranking inspector shows the σ badge ahead of the 1.5× badges (CURVE-03)
+  3. Defense spikes flag only on `σ ≥ 3.5 vs median` and carry median/MAD/z; a 1.21×/3.70σ value is flagged as `sigma` (CURVE-03/CURVE-05)
+  4. `stat_overview` returns `class_median`, `class_mad`, `class_z` and a direction-aware `class_sigma_outlier` for every stat; the Ranking inspector shows only the σ badge — the 1.5× badges/columns were removed (CURVE-03/CURVE-05)
   5. No auto-rejection, no key-stat leak, no client-executable internal helper, no new dependencies (CURVE-04)
 
-**Plans**: 1 plan
+**Plans**: 2 plans
 - [x] 10.7-01-PLAN.md — Migration 0049 (`curve_deviation` + sigma defense + inspector sigma) + client panel/table + tests — Wave 1 — applied live 2026-10-30
+- [x] 10.7-02-PLAN.md — Curve-only refinement (owner: discard the fixed standard, use only the curve): migration 0050, median/MAD player baselines, defense sigma-only flags, inspector without ratio badges/columns, tests — applied live 2026-10-30
 
-**Cross-cutting constraints**: review aids only — officers keep the Validar/Rejeitar decision; cohorts below n=5 get no curve/sigma verdict and fall back to the 1.5× ratio; the robust median/MAD resists one contaminated value; Impositio constants are the owner-stated +35% / +35 p.p. The same-session 0049 cast correction (`percentile_cont` → numeric before `round`) was re-applied before use. Deploy order: migration first, then the client bundle.
+**Cross-cutting constraints**: review aids only — officers keep the Validar/Rejeitar decision; **curve-only reference (10.7-02)** — no fixed 1.5× margin and no guild-wide "Fora do padrão" badge; the flags come from the robust cohort median/MAD sigma and the ATK/MATK proportional curve. Cohorts below n=5 get no curve/sigma verdict at all (the 1.5× fallback was deliberately removed); the robust median/MAD resists one contaminated value; Impositio constants are the owner-stated +35% / +35 p.p. The same-session 0049 cast correction (`percentile_cont` → numeric before `round`) was re-applied before use. Deploy order: migration first, then the client bundle.
 
 ### Phase 11: Verified Access — Claim Authorization & Discord OAuth (INSERTED)
 
@@ -351,7 +352,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 
 | 10.4 Battlefield Lineups & Roster Sync (inserted) | v1.1 | 3/3 | Complete    | 2026-10-30 |
 | 10.5 Anti-Cheat Guardrails (inserted) | v1.1 | 1/1 | Complete (0046 live) | 2026-10-30 |
 | 10.6 Cross-Cohort Stat Inspector (inserted) | v1.1 | 1/1 | Complete (0047 live) | 2026-10-30 |
-| 10.7 Statistical Buff Detection (inserted) | v1.1 | 1/1 | Complete (0049 live) | 2026-10-30 |
+| 10.7 Statistical Buff Detection (inserted) | v1.1 | 2/2 | Complete (0049/0050 live) | 2026-10-30 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---
