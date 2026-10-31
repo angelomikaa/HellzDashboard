@@ -33,6 +33,7 @@
 - [x] Phase 10.3: Artista Merged Cohort (INSERTED 2026-10-29) — Menestrel and Cigana are one cohort for stats (exception only; every other tab unchanged), ONE shared 6-key config per owner, members keep their own class on card/registry; migration 0038 APPLIED LIVE 2026-10-29 (22 meta / 14 non-viable, OVR parity 0 divergences). Ships with the card.svg tier-color re-export (no border, stats contrast plate) and third primers for the ten meta cohorts with zero real members
 - [ ] Phase 10.4: Battlefield Lineups & Roster Sync (INSERTED 2026-10-30) — Lineup tab for **Vigrid Field (Raid 1)** and **Ruinscape (Raid 2)** (8 parties `G1`–`G8` × 5 slots, slot 1 = Party Leader, editable party assignment labels, `N/5` counters, smoke-excluded); members view & download JPG, officers/owner edit lineups at will; pre-registers all new real nicknames from the owner's Raid 1/2 lineups into `Personagens` without guessing ambiguous classes; generates Hellz dark/neon JPG per battlefield (3 plans)
 - [x] Phase 10.5: Anti-Cheat Guardrails (INSERTED 2026-10-30) — server-side defense spike flags (≥1.5× the class+role cohort average for RPDEF/RMDEF/Equip. PDEF%/MDEF%), per-field OCR provenance (source + printed value + final value), and ≥8-point OVR-swing warnings when class/role are unchanged; flagged submissions stay pending for officer review; migration 0046 + client wizard warning + Validações anti-cheat panel
+- [x] Phase 10.6: Cross-Cohort Stat Inspector (INSERTED 2026-10-30) — new "Stat entre todos" mode in the staff Ranking tab: pick any stat, see every active real member's latest validated value side by side (independent of class/cohort) with the self-excluded class+role average, the guild average, and heuristic cohort/guild outlier badges; migration 0047
 - [ ] Phase 11: Verified Access — Claim Authorization & Discord OAuth — first access is manual-fill and officer-validated since 0034 (DSCD-01 holds via claim/registration request approvals, no print anywhere); Phase 11 replaces the manual trust with the real anchor: one-time officer-confirmed Discord↔character link, server-side bot-token role check, custom access token hook keeping every RLS policy intact, device-binding re-decision, PIN retirement path (INSERTED 2026-10-26)
 
 </details>
@@ -270,6 +271,24 @@ Plans:
 
 **Cross-cutting constraints**: append-only (`0046` adds one table; `create_submission` keeps every 0014 validation; `officer_queue` payload is additive only); the OVR projection copies the 0036 value-proportional expression verbatim (never re-derived, never client-side); `submission_provenance` is RLS-on with no policies (definer surfaces only); deploy order = migration then client (an old cached client works against the new RPC; the reverse would fail `p_provenance` resolution). Migration 0046 applied live 2026-10-30 and verified with rollback-wrapped synthetic submissions; the client bundle is the remaining deploy.
 
+### Phase 10.6: Cross-Cohort Stat Inspector (INSERTED 2026-10-30)
+
+**Goal**: Officers can inspect ONE stat across the entire real roster, independent of class and build-role cohort — the lens cheat investigation needs. The staff Ranking tab gains a "Stat entre todos" mode backed by `stat_overview(p_stat_key)`: latest validated value per active real member, self-excluded class+role average, guild average, and direction-aware 1.5×/0.5× review hints. Fixtures (`smoke%` / `dummy-%`) never appear; members without a value are listed last with `—`. Nothing is auto-rejected and no key-stat config is exposed.
+
+**Depends on**: Phase 10.5 (cohort baseline rule), Phase 07.2 (staff Ranking tab), Phase 10.1 (no rating formula change)
+**Requirements**: XSTAT-01, XSTAT-02, XSTAT-03
+**Success Criteria** (what must be TRUE):
+  1. Selecting any catalog stat returns every active real member's latest VALIDATED value with `submitted_at`; members without a value return `value: null` and sort last (XSTAT-01)
+  2. Each row carries the self-excluded class+build-role average (displayed at n ≥ 3, same gate as 0046) and the guild average/median/max/min; both `cohort_ratio` and `guild_ratio` are serialised (XSTAT-02)
+  3. The Ranking tab renders the new mode with a stat selector, guild summary, value ordering toggle and two badges: red **Acima da coorte** (≥ 1.5× cohort, the canonical anti-cheat rule) and gold **Fora do padrão** (≥ 1.5× guild, indicative). Lower-is-better stats flag at ≤ 0.5× (XSTAT-02)
+  4. The RPC is staff-only (member JWT → `forbidden`, anon no EXECUTE), validated-only, fixture-free, and does not change any OVR/points surface (XSTAT-03)
+  5. No new npm dependencies; append-only migration 0047 with bookkeeping + pgrst reload.
+
+**Plans**: 1 plan
+- [x] 10.6-01-PLAN.md — Migration 0047 + `stat_overview` + Ranking stat mode + ordering/tests — Wave 1 — applied live 2026-10-30
+
+**Cross-cutting constraints**: raw value order is desc/null-last from the server (buffs inflate upward); the client may only reverse the array for the ascending view (view aid, no rank math); `class_average` is suppressed below n=3 and excludes the member; the guild badge is deliberately sensitive on zero-heavy stats (`crit_dmg`) and is labeled as a hint, never a verdict. **0048 corrective migration** aligns every 0046/0047 cohort scope with the 0038 `cohort_group()` (Artista = Bard + Gypsy; the shared key config drives `ovr_projection`) — live-proven by exact `ovr_projection`/`my_report` parity for a Gypsy/suporte member and a merged n=5 inspector baseline. Deploy order: migration first, then the client bundle.
+
 ### Phase 11: Verified Access — Claim Authorization & Discord OAuth (INSERTED)
 
 **Goal**: Access is bound to something the attacker cannot steal from a Discord post. The 0032 stopgap (officer-authorized claims) shipped 2026-10-26 and was reverted the same day by 0033 at the owner's call — registration is one-go again (immediate PIN setter; registration requests carry the PIN so the approval activates it) with manual validation staying on (officer approval + the post-claim D-05 identity review) — so Phase 11 carries the full identity load: a one-time, officer-confirmed Discord↔character link per member, Discord OAuth as the login, a server-side guild-role check with the guild bot token, and session continuity that keeps every existing RLS policy working unchanged.
@@ -291,7 +310,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
+Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 → 10.6 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|------------|
@@ -312,6 +331,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 
 | 10.3 Artista Merged Cohort (inserted) | v1.1 | - | Complete | 2026-10-29 |
 | 10.4 Battlefield Lineups & Roster Sync (inserted) | v1.1 | 3/3 | Complete    | 2026-10-30 |
 | 10.5 Anti-Cheat Guardrails (inserted) | v1.1 | 1/1 | Complete (0046 live) | 2026-10-30 |
+| 10.6 Cross-Cohort Stat Inspector (inserted) | v1.1 | 1/1 | Complete (0047 live) | 2026-10-30 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---

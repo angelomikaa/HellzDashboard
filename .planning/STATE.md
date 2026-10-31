@@ -24,9 +24,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 ## Current Position
 
-Phase: 10.5
-Plan: 10.5-01 complete (code + tests green)
-Status: Complete — migration 0046 applied live and verified 2026-10-30
+Phase: 10.6
+Plan: 10.6-01 complete (code + tests green)
+Status: Complete — migration 0047 applied live and verified 2026-10-30; client push pending
 Last activity: 2026-10-30
 
 ## Accumulated Context
@@ -155,6 +155,8 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 
 - [Phase 10.5 anti-cheat 2026-10-30 — owner request, FIRST SLICE]: four locked decisions — baseline is the same class+build-role cohort (latest validated per active member, submitting member excluded, n>=3; never the whole-guild average), spike threshold >= 1.5x, submissions are SAVED PENDING with warning (never auto-blocked), OVR swing >= 8 points only when class/function are unchanged, and OCR edits store source + printed value + final value. Migration **0046** adds `submission_provenance` (append-only, RLS deny-all), `create_submission` v4 (optional `p_provenance`; catalog final values re-derived from `p_stats`; invalid_provenance guards; 2-arg overload dropped), `defense_cohort_baselines()` (member aggregates), `ovr_projection()` (internal review projection — the 0036 value-proportional formula copied verbatim, exact for the member's own points), `submission_anti_cheat()` (spikes + OCR overrides + swing + flagged) and the additive `officer_queue().anti_cheat`. Client: `antiCheat.ts` pure helpers (1.5x mirror, provenance builder, ovrSwingFlagged), `AntiCheatWarnings` on the Especial step + above Enviar, `SubmitPage` OCR trace ref + tooltip origin plumbing + parallel baseline fetch, `AntiCheatPanel` on the Validações expanded row, `⚠ Revisar` chip on flagged collapsed rows. 800 tests / 52 files green, tsc/oxlint/build green. **0046 APPLIED LIVE 2026-10-30** via `apply-seed.mjs` (bookkeeping row + pgrst reload): live signatures verified (3-arg create_submission, defense_cohort_baselines, 5-arg ovr_projection, submission_anti_cheat), member baseline RPC returns 4 cohort aggregates (n=6 for Biochemist/suporte), a transaction-wrapped synthetic 2x-RPDEF row returned one spike + one OCR override + `flagged:true` and a clean rollback (0 residue), a ×5 key-stat row returned `delta 12.37` with NO defense spike, a class change returned `flagged:false` with the swing still shown, and `create_submission` re-derived a forged final_value (client sent 999999 for PDEF, stored 1234 from p_stats) + rejected an out-of-payload provenance key with `invalid_provenance`. **Client bundle still to deploy** (migration-first order satisfied); an old cached client works against the new RPC.
 
+- [Phase 10.6 cross-cohort stat inspector 2026-10-30 — owner request, Ranking tab]: new "Stat entre todos" mode + `stat_overview(p_stat_key)` (migration **0047**) for cheat investigation: ONE stat across every active real member, independent of class/cohort. Decisions: validated-only (pending stays in Validações), `smoke%`/`dummy-%` excluded, every real member returned (no-value rows last with `—`), self-excluded class+role average shown at n>=3 (same rule as 0046), guild average/median/max/min, direction-aware 1.5×/0.5× hints. Red **Acima da coorte** badge = canonical cohort rule; gold **Fora do padrão** = guild heuristic (deliberately sensitive on zero-heavy stats — `crit_dmg` flagged 5 legit high-crit builds in the live probe; labeled indicative). Client: stat selector grouped Geral→Quasi→Especial, "Maior/Menor primeiro" view-aid ordering (`orderStatRows`: desc = server array verbatim), OVR fetch skipped in stat mode. **0047 APPLIED LIVE 2026-10-30 + verified** (rollback-wrapped): `rpdef` returned 80 real rows (30 valued / 50 `—`), guild avg 3.446,30 / median 3.628,50 / max 4.108, 0 fixtures, 0 outliers; member claim → `forbidden`; authenticated EXECUTE true / anon false; bookkeeping 0047 = 1. **0048 corrective migration APPLIED LIVE same day** (merged-cohort alignment): `defense_cohort_baselines`, `ovr_projection`, `submission_anti_cheat` and `stat_overview` now scope by `public.cohort_group(char_class)` exactly like the 0038 rank RPCs (Artista = Bard + Gypsy, shared key config). Live proof: Gypsy/suporte `ovr_projection` = `my_report` OVR exactly (95.28929292929292931 both; before the fix the projection had no Gypsy key config) and the inspector's merged `class_sample_size` = 5 vs the manual Bard+Gypsy count (pre-fix: 2, below the display gate). 817 tests / 54 files, tsc/oxlint/build green. Client bundle still to push.
+
 ### Blockers/Concerns (open — carry to next milestone)
 
 - **[Pending live op] Migration 0045 (public showcase stat gate) is NOT applied live** — ship the client first (it already sends the member JWT on the same RPC), then `node scripts/apply-seed.mjs supabase/migrations/0045_promotion_public_stat_gate.sql`. Until then the anon payload still carries the values and only the client mask hides them.
@@ -180,7 +182,7 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 ## Session Continuity
 
 Last session: 2026-10-30T00:00:00.000Z
-Stopped At: Completed Phase 10.5 plan 01 (anti-cheat guardrails: migration 0046 applied LIVE + verified with rollback-wrapped synthetic rows; client warning/provenance + Validações panel; 800 tests / tsc / lint / build green). Next: deploy the client bundle (migration-first order satisfied), then officer browser walk of a pending submission with and without flags.
+Stopped At: Completed Phase 10.6 plan 01 (cross-cohort stat inspector: migration 0047 applied LIVE + verified; Ranking "Stat entre todos" mode; 817 tests / tsc / lint / build green). Next: push the client bundle, then officer browser walk of the new Ranking mode and the Validações anti-cheat panel.
 Resume file: .planning/phases/10.5-anti-cheat-guardrails/10.5-01-SUMMARY.md
 
 ## Performance Metrics

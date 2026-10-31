@@ -271,6 +271,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CHEAT-03 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 applied live 2026-10-30) |
 | CHEAT-04 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 applied live 2026-10-30) |
 | CHEAT-05 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 applied live 2026-10-30) |
+| XSTAT-01 | Phase 10.6 - Cross-Cohort Stat Inspector | Complete (0047 applied live 2026-10-30) |
+| XSTAT-02 | Phase 10.6 - Cross-Cohort Stat Inspector | Complete (0047 applied live 2026-10-30) |
+| XSTAT-03 | Phase 10.6 - Cross-Cohort Stat Inspector | Complete (0047 applied live 2026-10-30) |
 
 ## Anti-Cheat Guardrails (Phase 10.5, inserted 2026-10-30)
 
@@ -282,7 +285,15 @@ Owner request: the form is meant to be filled without buffs. Angelus and Assumpt
 - **CHEAT-04**: The projected OVR (same value-proportional formula, server-side) is compared with the current OVR; a >= 8-point swing with an unchanged class/build-role shows previous -> projected and sets `flagged`.
 - **CHEAT-05**: Server-side enforcement, RLS deny-all on the audit table, no key-stat config in anti-cheat payloads, append-only migration, no new npm dependencies.
 
+## Cross-Cohort Stat Inspector (Phase 10.6, inserted 2026-10-30)
+
+Owner request: see the same stat for all members, independent of class and cohort, to inspect possible stat cheating, from the Ranking tab.
+
+- **XSTAT-01**: `stat_overview(p_stat_key)` returns every active real member's latest VALIDATED value for one stat (fixtures `smoke%`/`dummy-%` excluded); members without a value return `value: null` and sort last.
+- **XSTAT-02**: Each row carries the self-excluded stats-cohort average under `cohort_group()` (Artista = Bard + Gypsy; displayed at n >= 3) and the guild aggregates; the Ranking tab renders a "Stat entre todos" mode with a stat selector, guild summary, value ordering toggle, red "Acima da coorte" (>= 1.5x cohort) and gold "Fora do padrão" (>= 1.5x guild, indicative) badges; lower-is-better stats flag at <= 0.5x. 0048 aligns the 10.5/10.6 cohort scopes with the 0038 merge.
+- **XSTAT-03**: Staff-only RPC gate (member JWT forbidden, anon no EXECUTE), validated-only, fixture-free, zero changes to OVR/points surfaces, zero new npm dependencies.
+
 **Coverage:**
-- v1.1 requirements: 58 total
-- Mapped to phases: 58 ✓
+- v1.1 requirements: 66 total
+- Mapped to phases: 66 ✓
 - Unmapped: 0 ✓
