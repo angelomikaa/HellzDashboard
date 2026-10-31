@@ -31,7 +31,7 @@ describe('migration 0046 — anti-cheat guardrails', () => {
 
   it('keeps the review projection internal (no client EXECUTE)', () => {
     expect(sql).toContain(
-      'revoke execute on function public.ovr_projection(uuid, text, text, jsonb) from public, anon, authenticated',
+      'revoke execute on function public.ovr_projection(uuid, text, text, jsonb, uuid) from public, anon, authenticated',
     )
     expect(sql).toContain(
       'revoke execute on function public.submission_anti_cheat(uuid) from public, anon, authenticated',

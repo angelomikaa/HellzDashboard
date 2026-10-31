@@ -142,12 +142,16 @@ grant execute on function public.defense_cohort_baselines() to authenticated;
 -- ---------------------------------------------------------------------------
 -- 3. ovr_projection() -- internal OVR calculator for REVIEW projections.
 --    This is the Phase 9 / 10.1 value-proportional formula, copied verbatim
---    from the 0036 role_rank body (do not re-derive it). p_stats optionally
---    overrides the member's own latest values with a pending submission's
---    staircase, which lets officer_queue show "OVR before -> OVR if approved"
---    without validating anything. For the member's OWN points the projection
---    is exact: a pending value that becomes the cohort max/min clamps at 99 in
---    either direction, exactly like the validated live value.
+--    from the 0036 role_rank body (do not re-derive it) over the SAME cohort
+--    definition the member-facing RPCs use (non-rejected AND non-discarded
+--    rows, ACTIVE members, same class+build-role). p_stats optionally
+--    overrides the member's own values (needed when projecting a class/role
+--    change, where the member row still carries the old class), and
+--    p_exclude_submission removes exactly one row (the pending row being
+--    reviewed) so "OVR before" ignores it while "OVR after" includes it.
+--    For the member's OWN points the projection is exact: a pending value
+--    that becomes the cohort max/min clamps at 99 in either direction,
+--    exactly like the live value.
 --
 --    Internal only (no client EXECUTE): officer_queue is SECURITY DEFINER and
 --    calls it as the owner.
@@ -157,7 +161,8 @@ create or replace function public.ovr_projection(
   p_member uuid,
   p_class text,
   p_function text,
-  p_stats jsonb default null
+  p_stats jsonb default null,
+  p_exclude_submission uuid default null
 )
 returns numeric
 language sql
@@ -171,7 +176,8 @@ as $$
     from submission_stats ss
     join submissions s on s.id = ss.submission_id
     join members m on m.id = s.member_id
-    where s.status = 'validated'
+    where s.status not in ('rejected', 'discarded')
+      and (p_exclude_submission is null or s.id <> p_exclude_submission)
       and m.active
       and m.char_class = p_class
       and m.char_function = p_function
@@ -231,10 +237,10 @@ as $$
   from points;
 $$;
 
-comment on function public.ovr_projection(uuid, text, text, jsonb) is
-  'Internal review-only OVR projection (0046): the Phase 9/10.1 value-proportional formula (copied verbatim from role_rank 0036) over the member''s 6 ordered key stats for (class, build-role). p_stats (jsonb array of {stat_key,value}) optionally overrides the member''s own latest validated values with a PENDING submission so officers can see the OVR swing before validating. No client EXECUTE -- called only by the SECURITY DEFINER officer_queue().';
+comment on function public.ovr_projection(uuid, text, text, jsonb, uuid) is
+  'Internal review-only OVR projection (0046): the Phase 9/10.1 value-proportional formula (copied verbatim from role_rank 0036) over the member''s 6 ordered key stats for (class, build-role), using the canonical cohort (non-rejected/non-discarded rows over ACTIVE members). p_stats (jsonb array of {stat_key,value}) optionally overrides the member''s own values (class/role-change projections), and p_exclude_submission removes exactly one row so "OVR before" ignores the pending submission being reviewed while "OVR after" includes it. No client EXECUTE -- called only by the SECURITY DEFINER officer_queue().';
 
-revoke execute on function public.ovr_projection(uuid, text, text, jsonb) from public, anon, authenticated;
+revoke execute on function public.ovr_projection(uuid, text, text, jsonb, uuid) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 4. submission_anti_cheat() -- one pending submission's review flags.
@@ -364,7 +370,11 @@ begin
   where pr.submission_id = p_submission;
 
   -- OVR swing (owner threshold: 8 points, only when class/role are unchanged).
-  v_previous := public.ovr_projection(v_member, v_member_class, v_member_function, null);
+  -- "Before" excludes the pending row under review; "after" includes it
+  -- (canonical cohort: non-rejected/non-discarded rows are already ranked).
+  v_previous := public.ovr_projection(
+    v_member, v_member_class, v_member_function, null, p_submission
+  );
   v_projected := public.ovr_projection(
     v_member,
     v_class,
@@ -373,7 +383,8 @@ begin
       select jsonb_agg(jsonb_build_object('stat_key', ss.stat_key, 'value', ss.value))
       from submission_stats ss
       where ss.submission_id = p_submission
-    )
+    ),
+    null
   );
   v_swing_flagged :=
     not v_class_changed
