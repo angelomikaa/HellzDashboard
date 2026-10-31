@@ -626,92 +626,99 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
         </div>
       </section>
 
-      <section className="rounded-lg border border-line bg-surface p-4">
-        <h3 className="text-sm font-semibold text-content">
-          Validação: par de referência do dono (externo ao banco)
-        </h3>
-        <p className="mt-1 text-xs text-muted">
-          Os dois pontos têm MATK/MATK% reais fornecidos pelo dono, mas não têm PATK nem
-          Equipment MATK flat no banco. Eles aparecem nos gráficos como losangos e NÃO
-          entram no treino. A classificação abaixo usa só o modelo MATK × MATK% e é
-          ilustrativa; o modelo principal (MATK/PATK) não pode ser testado sem o PATK do par.
-        </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {referenceClasses.map((entry) => (
-            <div key={entry.reference.point.label} className="rounded-md border border-line bg-card p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-content">
-                  {entry.reference.point.label}
-                </p>
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${VERDICT_CLASS[entry.verdict]}`}
-                >
-                  {VERDICT_LABEL[entry.verdict]}
-                </span>
-              </div>
-              <StatLine
-                label="MATK / MATK%"
-                value={`${fmt(entry.reference.point.matk)} · ${fmt(entry.reference.point.matk_pct, true)}`}
-              />
-              <StatLine
-                label="Previsto pela curva"
-                value={`${fmt(entry.reference.predicted)} (${entry.z.toFixed(2)}σ)`}
-              />
-              <StatLine label="Resíduo" value={fmt(entry.reference.residual)} />
-              {entry.reference.debuffedPredicted !== null && (
-                <StatLine
-                  label="Se o % fosse −35 p.p."
-                  value={`${fmt(entry.reference.debuffedPredicted)} (${entry.debuffedZ?.toFixed(2) ?? '—'}σ)`}
-                />
-              )}
-              {entry.score !== null && (
-                <StatLine label="Score (+35 p.p.)" value={entry.score.toFixed(2)} />
-              )}
+      <details className="rounded-lg border border-line bg-surface p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-content">
+          Metodologia, premissas e validação do par de referência
+        </summary>
+        <div className="mt-3 flex flex-col gap-4">
+          <section className="rounded-md border border-line bg-card p-3">
+            <h3 className="text-sm font-semibold text-content">
+              Validação: par de referência do dono (externo ao banco)
+            </h3>
+            <p className="mt-1 text-xs text-muted">
+              Os dois pontos têm MATK/MATK% reais fornecidos pelo dono, mas não têm PATK nem
+              Equipment MATK flat no banco. Eles aparecem nos gráficos como losangos e NÃO
+              entram no treino. A classificação abaixo usa só o modelo MATK × MATK% e é
+              ilustrativa; o modelo principal (MATK/PATK) não pode ser testado sem o PATK do par.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {referenceClasses.map((entry) => (
+                <div key={entry.reference.point.label} className="rounded-md border border-line bg-card p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-content">
+                      {entry.reference.point.label}
+                    </p>
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${VERDICT_CLASS[entry.verdict]}`}
+                    >
+                      {VERDICT_LABEL[entry.verdict]}
+                    </span>
+                  </div>
+                  <StatLine
+                    label="MATK / MATK%"
+                    value={`${fmt(entry.reference.point.matk)} · ${fmt(entry.reference.point.matk_pct, true)}`}
+                  />
+                  <StatLine
+                    label="Previsto pela curva"
+                    value={`${fmt(entry.reference.predicted)} (${entry.z.toFixed(2)}σ)`}
+                  />
+                  <StatLine label="Resíduo" value={fmt(entry.reference.residual)} />
+                  {entry.reference.debuffedPredicted !== null && (
+                    <StatLine
+                      label="Se o % fosse −35 p.p."
+                      value={`${fmt(entry.reference.debuffedPredicted)} (${entry.debuffedZ?.toFixed(2) ?? '—'}σ)`}
+                    />
+                  )}
+                  {entry.score !== null && (
+                    <StatLine label="Score (+35 p.p.)" value={entry.score.toFixed(2)} />
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <p className="mt-2 text-xs text-muted">
-          No modelo MATK × MATK% o ponto de 102,46% é deslocado para 67,46% e volta para
-          perto da curva (z declarado ≈ −2,97σ; deslocado ≈ +0,37σ), então o exemplo do dono
-          é reconhecido como POSSÍVEL BUFF. Isso é uma validação ilustrativa: sem PATK e
-          sem Equipment/Base flat, o detector não tem como separar com segurança uma build
-          alta legítima do buff em todos os casos.
-        </p>
-      </section>
+            <p className="mt-2 text-xs text-muted">
+              No modelo MATK × MATK% o ponto de 102,46% é deslocado para 67,46% e volta para
+              perto da curva (z declarado ≈ −2,97σ; deslocado ≈ +0,37σ), então o exemplo do dono
+              é reconhecido como POSSÍVEL BUFF. Isso é uma validação ilustrativa: sem PATK e
+              sem Equipment/Base flat, o detector não tem como separar com segurança uma build
+              alta legítima do buff em todos os casos.
+            </p>
+          </section>
 
-      <section className="rounded-lg border border-line bg-card p-4 text-xs text-muted">
-        <h3 className="text-sm font-semibold text-content">Método e premissas</h3>
-        <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>
-            Apenas o último envio validado por membro entra no ajuste; envios repetidos não
-            são duplicados na amostra (13 membros têm mais de um envio).
-          </li>
-          <li>
-            OLS é a referência; Theil–Sen é a reta robusta. O IC de 95% é o do OLS para a
-            resposta média. O score usa o MAD dos resíduos, não o desvio-padrão.
-          </li>
-          <li>
-            A hipótese de buff desloca MATK% em −35 p.p. e compara os resíduos declarado vs
-            deslocado. O efeito real no MATK total (~24% no par do dono) NÃO é assumido como
-            1,35×; ele é estimado pela curva.
-          </li>
-          <li>
-            MATK e PATK não são intercambiáveis: o controle físico usa a razão MATK/PATK e a
-            diferença de percentuais; a força da relação é medida no próprio banco.
-          </li>
-          <li>
-            Sem Equipment/Base MATK/PATK flat, a separação entre “build alta legítima” e
-            buff de +35 p.p. é limitada. O dashboard reporta isso em vez de forçar um
-            veredito.
-          </li>
-          <li>
-            Defesa (Angelus/Assumptio): a hipótese de buff divide RPDEF/RMDEF por 1,95
-            (+95%); o eixo X é o % de equipamento, que o buff não altera. A curva de defesa
-            tem R² menor (≈0,37/0,45) e mínimo de 0,25 — é exploratória e mais sensível a
-            diferenças de classe do que o controle MATK/PATK.
-          </li>
-        </ul>
-      </section>
+          <section className="rounded-md border border-line bg-card p-3 text-xs text-muted">
+            <h3 className="text-sm font-semibold text-content">Método e premissas</h3>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>
+                Apenas o último envio validado por membro entra no ajuste; envios repetidos não
+                são duplicados na amostra (13 membros têm mais de um envio).
+              </li>
+              <li>
+                OLS é a referência; Theil–Sen é a reta robusta. O IC de 95% é o do OLS para a
+                resposta média. O score usa o MAD dos resíduos, não o desvio-padrão.
+              </li>
+              <li>
+                A hipótese de buff desloca MATK% em −35 p.p. e compara os resíduos declarado vs
+                deslocado. O efeito real no MATK total (~24% no par do dono) NÃO é assumido como
+                1,35×; ele é estimado pela curva.
+              </li>
+              <li>
+                MATK e PATK não são intercambiáveis: o controle físico usa a razão MATK/PATK e a
+                diferença de percentuais; a força da relação é medida no próprio banco.
+              </li>
+              <li>
+                Sem Equipment/Base MATK/PATK flat, a separação entre “build alta legítima” e
+                buff de +35 p.p. é limitada. O dashboard reporta isso em vez de forçar um
+                veredito.
+              </li>
+              <li>
+                Defesa (Angelus/Assumptio): a hipótese de buff divide RPDEF/RMDEF por 1,95
+                (+95%); o eixo X é o % de equipamento, que o buff não altera. A curva de defesa
+                tem R² menor (≈0,37/0,45) e mínimo de 0,25 — é exploratória e mais sensível a
+                diferenças de classe do que o controle MATK/PATK.
+              </li>
+            </ul>
+          </section>
+        </div>
+      </details>
     </div>
   )
 }

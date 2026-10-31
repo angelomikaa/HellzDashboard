@@ -3,7 +3,15 @@
 // re-order); name/class keys sort a COPY and never mutate the input array.
 import { describe, expect, it } from 'vitest'
 import type { RoleRankRow, StatOverviewRow } from '../../lib/api'
-import { applyViewSort, orderStatRows } from './rankView'
+import {
+  applyViewSort,
+  filterRankRows,
+  filterStatRows,
+  normalizeSearch,
+  orderStatRows,
+  summarizeRankRows,
+  summarizeStatRows,
+} from './rankView'
 
 function row(partial: Partial<RoleRankRow>): RoleRankRow {
   return {
@@ -87,6 +95,68 @@ const statServerOrder: StatOverviewRow[] = [
   statRow({ member_id: 'b', display_name: 'Ana', value: 4000 }),
   statRow({ member_id: 'c', display_name: 'Bruno', value: null }),
 ]
+
+describe('OVR filters and summary', () => {
+  it('normalizes accents and case for search', () => {
+    expect(normalizeSearch('  José  ')).toBe('jose')
+    expect(normalizeSearch('AHYRA')).toBe('ahyra')
+  })
+
+  it('filters by name or char ID and returns the same array without a query', () => {
+    const rows = [
+      row({ member_id: 'a', display_name: 'José', char_id: '111' }),
+      row({ member_id: 'b', display_name: 'Ahrya', char_id: '222' }),
+    ]
+    expect(filterRankRows(rows, '')).toBe(rows)
+    expect(filterRankRows(rows, 'jose').map((r) => r.member_id)).toEqual(['a'])
+    expect(filterRankRows(rows, '222').map((r) => r.member_id)).toEqual(['b'])
+  })
+
+  it('summarizes OVR values and insufficient rows', () => {
+    const summary = summarizeRankRows([
+      row({ member_id: 'a', ovr: 90 }),
+      row({ member_id: 'b', ovr: 80 }),
+      row({ member_id: 'c', ovr: null }),
+    ])
+    expect(summary).toEqual({ total: 3, withOvr: 2, missingOvr: 1, averageOvr: 85 })
+  })
+})
+
+describe('stat filters and summary', () => {
+  it('filters by query, merged class group and function', () => {
+    const rows = [
+      statRow({ member_id: 'a', display_name: 'Gohan', char_class: 'Gypsy', char_function: 'suporte' }),
+      statRow({ member_id: 'b', display_name: 'JINXx', char_class: 'Bard', char_function: 'suporte' }),
+      statRow({ member_id: 'c', display_name: 'Atillos', char_class: 'High Wizard', char_function: 'mdps' }),
+    ]
+    expect(filterStatRows(rows, { query: '', classGroup: '', charFunction: '' })).toBe(rows)
+    expect(
+      filterStatRows(rows, { query: '', classGroup: 'Artista', charFunction: '' }).map(
+        (r) => r.member_id,
+      ),
+    ).toEqual(['a', 'b'])
+    expect(
+      filterStatRows(rows, { query: '', classGroup: '', charFunction: 'mdps' }).map(
+        (r) => r.member_id,
+      ),
+    ).toEqual(['c'])
+    expect(
+      filterStatRows(rows, { query: 'jinx', classGroup: 'Artista', charFunction: 'suporte' }).map(
+        (r) => r.member_id,
+      ),
+    ).toEqual(['b'])
+  })
+
+  it('summarizes only non-null values', () => {
+    const summary = summarizeStatRows([
+      statRow({ value: 10 }),
+      statRow({ value: 20 }),
+      statRow({ value: 30 }),
+      statRow({ value: null }),
+    ])
+    expect(summary).toEqual({ total: 4, withValue: 3, median: 20, min: 10, max: 30 })
+  })
+})
 
 describe('orderStatRows', () => {
   it("'desc' returns the server payload verbatim — same reference", () => {

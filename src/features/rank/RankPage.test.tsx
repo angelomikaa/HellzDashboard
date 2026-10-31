@@ -43,9 +43,17 @@ const rowWithout: RoleRankRow = {
 }
 
 describe('RankPage render', () => {
-  it('renders loading state', () => {
+  it('renders loading state on the default OVR section', () => {
     const html = renderToStaticMarkup(<RankPage session={session} />)
     expect(html).toContain('Carregando')
+  })
+
+  it('renders the three sibling sections with OVR as the default', () => {
+    const html = renderToStaticMarkup(<RankPage session={session} />)
+    expect(html).toContain('Ranking OVR')
+    expect(html).toContain('Explorador de stats')
+    expect(html).toContain('Análise estatística')
+    expect(html).toContain('aria-selected="true"')
   })
 })
 
