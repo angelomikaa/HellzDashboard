@@ -34,6 +34,7 @@
 - [ ] Phase 10.4: Battlefield Lineups & Roster Sync (INSERTED 2026-10-30) — Lineup tab for **Vigrid Field (Raid 1)** and **Ruinscape (Raid 2)** (8 parties `G1`–`G8` × 5 slots, slot 1 = Party Leader, editable party assignment labels, `N/5` counters, smoke-excluded); members view & download JPG, officers/owner edit lineups at will; pre-registers all new real nicknames from the owner's Raid 1/2 lineups into `Personagens` without guessing ambiguous classes; generates Hellz dark/neon JPG per battlefield (3 plans)
 - [x] Phase 10.5: Anti-Cheat Guardrails (INSERTED 2026-10-30) — server-side defense spike flags (≥1.5× the class+role cohort average for RPDEF/RMDEF/Equip. PDEF%/MDEF%), per-field OCR provenance (source + printed value + final value), and ≥8-point OVR-swing warnings when class/role are unchanged; flagged submissions stay pending for officer review; migration 0046 + client wizard warning + Validações anti-cheat panel
 - [x] Phase 10.6: Cross-Cohort Stat Inspector (INSERTED 2026-10-30) — new "Stat entre todos" mode in the staff Ranking tab: pick any stat, see every active real member's latest validated value side by side (independent of class/cohort) with the self-excluded class+role average, the guild average, and heuristic cohort/guild outlier badges; migration 0047
+- [x] Phase 10.7: Statistical Buff Detection (INSERTED 2026-10-30) — data-driven anti-cheat beyond the fixed 1.5× margin: per-cohort robust curve (`base = flat / (1+pct/100)`, median/MAD), Impositio Manus undo test (+35%/+35 p.p. on PATK/MATK), defense σ ≥ 3.5 alongside the 1.5× ratio, and inspector sigma badges for any stat; migration 0049
 - [ ] Phase 11: Verified Access — Claim Authorization & Discord OAuth — first access is manual-fill and officer-validated since 0034 (DSCD-01 holds via claim/registration request approvals, no print anywhere); Phase 11 replaces the manual trust with the real anchor: one-time officer-confirmed Discord↔character link, server-side bot-token role check, custom access token hook keeping every RLS policy intact, device-binding re-decision, PIN retirement path (INSERTED 2026-10-26)
 
 </details>
@@ -289,6 +290,24 @@ Plans:
 
 **Cross-cutting constraints**: raw value order is desc/null-last from the server (buffs inflate upward); the client may only reverse the array for the ascending view (view aid, no rank math); `class_average` is suppressed below n=3 and excludes the member; the guild badge is deliberately sensitive on zero-heavy stats (`crit_dmg`) and is labeled as a hint, never a verdict. **0048 corrective migration** aligns every 0046/0047 cohort scope with the 0038 `cohort_group()` (Artista = Bard + Gypsy; the shared key config drives `ovr_projection`) — live-proven by exact `ovr_projection`/`my_report` parity for a Gypsy/suporte member and a merged n=5 inspector baseline. Deploy order: migration first, then the client bundle.
 
+### Phase 10.7: Statistical Buff Detection (INSERTED 2026-10-30)
+
+**Goal**: Catch buffed submissions from the data itself instead of relying only on the fixed 1.5× margin. For every stats cohort, the normalized base `flat / (1 + pct/100)` is modeled with a robust median/MAD curve; a pending submission is flagged when its base is ≥ 3.5σ off the curve or the actual flat is ≥ 30% away from the curve's expected value. The Impositio Manus signature (+35% PATK/MATK, +35 p.p. Equipment ATK%) is tested by undoing the buff (`flat/1.35`, `pct-35`) and checking whether the de-buffed base returns to the cohort curve. Defense spikes gain the same σ signal alongside the 1.5× ratio, and the cross-cohort inspector shows median/σ for every stat.
+
+**Depends on**: Phase 10.5 (anti-cheat panel), Phase 10.6 (stat inspector), Phase 10.1 (no OVR formula change)
+**Requirements**: CURVE-01, CURVE-02, CURVE-03, CURVE-04
+**Success Criteria** (what must be TRUE):
+  1. `curve_deviation()` computes the proportional curve per stats cohort (latest validated, self excluded, `n ≥ 5`) with median/MAD, expected flat, sigma and curve deviation; small cohorts return `available:false` (CURVE-01/CURVE-04)
+  2. A synthetic Impositio submission is flagged `reason='impositio'` on both ATK and MATK; a normal clone and a legitimate high-% build are not; a flat-only inflation is flagged `reason='curve'` (CURVE-01/CURVE-02)
+  3. Defense spikes flag on `1.5× average OR σ ≥ 3.5 vs median` and carry median/MAD/z/reason; a 1.21×/3.70σ value is flagged as `sigma` (CURVE-03)
+  4. `stat_overview` returns `class_median`, `class_mad`, `class_z` and a direction-aware `class_sigma_outlier` for every stat; the Ranking inspector shows the σ badge ahead of the 1.5× badges (CURVE-03)
+  5. No auto-rejection, no key-stat leak, no client-executable internal helper, no new dependencies (CURVE-04)
+
+**Plans**: 1 plan
+- [x] 10.7-01-PLAN.md — Migration 0049 (`curve_deviation` + sigma defense + inspector sigma) + client panel/table + tests — Wave 1 — applied live 2026-10-30
+
+**Cross-cutting constraints**: review aids only — officers keep the Validar/Rejeitar decision; cohorts below n=5 get no curve/sigma verdict and fall back to the 1.5× ratio; the robust median/MAD resists one contaminated value; Impositio constants are the owner-stated +35% / +35 p.p. The same-session 0049 cast correction (`percentile_cont` → numeric before `round`) was re-applied before use. Deploy order: migration first, then the client bundle.
+
 ### Phase 11: Verified Access — Claim Authorization & Discord OAuth (INSERTED)
 
 **Goal**: Access is bound to something the attacker cannot steal from a Discord post. The 0032 stopgap (officer-authorized claims) shipped 2026-10-26 and was reverted the same day by 0033 at the owner's call — registration is one-go again (immediate PIN setter; registration requests carry the PIN so the approval activates it) with manual validation staying on (officer approval + the post-claim D-05 identity review) — so Phase 11 carries the full identity load: a one-time, officer-confirmed Discord↔character link per member, Discord OAuth as the login, a server-side guild-role check with the guild bot token, and session continuity that keeps every existing RLS policy working unchanged.
@@ -310,7 +329,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 → 10.6 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
+Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 → 10.6 → 10.7 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|------------|
@@ -332,6 +351,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 
 | 10.4 Battlefield Lineups & Roster Sync (inserted) | v1.1 | 3/3 | Complete    | 2026-10-30 |
 | 10.5 Anti-Cheat Guardrails (inserted) | v1.1 | 1/1 | Complete (0046 live) | 2026-10-30 |
 | 10.6 Cross-Cohort Stat Inspector (inserted) | v1.1 | 1/1 | Complete (0047 live) | 2026-10-30 |
+| 10.7 Statistical Buff Detection (inserted) | v1.1 | 1/1 | Complete (0049 live) | 2026-10-30 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---

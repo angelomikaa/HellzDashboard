@@ -24,9 +24,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 ## Current Position
 
-Phase: 10.6
-Plan: 10.6-01 complete (code + tests green)
-Status: Complete — migration 0047 applied live and verified 2026-10-30; client push pending
+Phase: 10.7
+Plan: 10.7-01 complete (code + tests green)
+Status: Complete — migration 0049 applied live and verified 2026-10-30; client push pending
 Last activity: 2026-10-30
 
 ## Accumulated Context
@@ -157,6 +157,8 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 
 - [Phase 10.6 cross-cohort stat inspector 2026-10-30 — owner request, Ranking tab]: new "Stat entre todos" mode + `stat_overview(p_stat_key)` (migration **0047**) for cheat investigation: ONE stat across every active real member, independent of class/cohort. Decisions: validated-only (pending stays in Validações), `smoke%`/`dummy-%` excluded, every real member returned (no-value rows last with `—`), self-excluded class+role average shown at n>=3 (same rule as 0046), guild average/median/max/min, direction-aware 1.5×/0.5× hints. Red **Acima da coorte** badge = canonical cohort rule; gold **Fora do padrão** = guild heuristic (deliberately sensitive on zero-heavy stats — `crit_dmg` flagged 5 legit high-crit builds in the live probe; labeled indicative). Client: stat selector grouped Geral→Quasi→Especial, "Maior/Menor primeiro" view-aid ordering (`orderStatRows`: desc = server array verbatim), OVR fetch skipped in stat mode. **0047 APPLIED LIVE 2026-10-30 + verified** (rollback-wrapped): `rpdef` returned 80 real rows (30 valued / 50 `—`), guild avg 3.446,30 / median 3.628,50 / max 4.108, 0 fixtures, 0 outliers; member claim → `forbidden`; authenticated EXECUTE true / anon false; bookkeeping 0047 = 1. **0048 corrective migration APPLIED LIVE same day** (merged-cohort alignment): `defense_cohort_baselines`, `ovr_projection`, `submission_anti_cheat` and `stat_overview` now scope by `public.cohort_group(char_class)` exactly like the 0038 rank RPCs (Artista = Bard + Gypsy, shared key config). Live proof: Gypsy/suporte `ovr_projection` = `my_report` OVR exactly (95.28929292929292931 both; before the fix the projection had no Gypsy key config) and the inspector's merged `class_sample_size` = 5 vs the manual Bard+Gypsy count (pre-fix: 2, below the display gate). 817 tests / 54 files, tsc/oxlint/build green. Client bundle still to push.
 
+- [Phase 10.7 statistical buff detection 2026-10-30 — owner request]: replaces the fixed-1.5x-only judgement with a data-driven curve. **Migration 0049** adds `curve_deviation(p_submission, class, function, flat_key, pct_key)` (internal): for the stats cohort (cohort_group + role, latest validated, self excluded, n>=5), `base = flat/(1+pct/100)`, robust **median/MAD** curve, expected flat, normalized-base sigma, 30% curve-deviation test, and the **Impositio Manus undo test** (`flat/1.35`, `pct-35` → base back on the curve; flag needs pct z>=2, base z>=1, de-buff |z|<=1.5 and better than observed). `submission_anti_cheat` v4 adds defense spikes on **1.5x average OR sigma>=3.5 vs median** (with median/mad/z/reason) and `curve_deviations` for PATK/MATK. `stat_overview` v3 adds `class_median`, `class_mad`, `class_z`, direction-aware `class_sigma_outlier` for every stat; the Ranking inspector shows `média · mediana (n)`, an `Nσ` column and a σ-first badge hierarchy. **0049 APPLIED LIVE 2026-10-30 + verified with rollback-only rows**: Impositio simulation (patk/matk x1.35, equip pct +35) → both curves `reason=impositio` (PATK z_pct 5.66, z_base 1.21, z_debuff 0.18; MATK z_pct 5.35, z_debuff -0.17); normal clone and legit high-% Gypsy (chud, merged Artista n=7) clean; flat-only x1.8 → `reason=curve` (z_base 11.61, +82.33%); defense 4.662 → ratio 1.21 but z 3.70 → `reason=sigma`; inspector validated 4.662 → median 3.883, MAD 142, class_z 3.70, sigma_outlier true, ratio_outlier false. Same-session fix: percentile_cont is double precision, so every `round(...)` casts to numeric (first live call exposed it; 0049 re-applied before use). 832 tests / 56 files, tsc/oxlint/build green. Client bundle still to push.
+
 ### Blockers/Concerns (open — carry to next milestone)
 
 - **[Pending live op] Migration 0045 (public showcase stat gate) is NOT applied live** — ship the client first (it already sends the member JWT on the same RPC), then `node scripts/apply-seed.mjs supabase/migrations/0045_promotion_public_stat_gate.sql`. Until then the anon payload still carries the values and only the client mask hides them.
@@ -182,7 +184,7 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 ## Session Continuity
 
 Last session: 2026-10-30T00:00:00.000Z
-Stopped At: Completed Phase 10.6 plan 01 (cross-cohort stat inspector: migration 0047 applied LIVE + verified; Ranking "Stat entre todos" mode; 817 tests / tsc / lint / build green). Next: push the client bundle, then officer browser walk of the new Ranking mode and the Validações anti-cheat panel.
+Stopped At: Completed Phase 10.7 plan 01 (statistical buff detection: migration 0049 applied LIVE + verified; Impositio curve + defense/inspector sigma; 832 tests / tsc / lint / build green). Next: push the client bundle, then officer browser walk of the new anti-cheat curve evidence and the Ranking sigma badges.
 Resume file: .planning/phases/10.5-anti-cheat-guardrails/10.5-01-SUMMARY.md
 
 ## Performance Metrics

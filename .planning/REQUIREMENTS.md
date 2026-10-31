@@ -274,6 +274,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | XSTAT-01 | Phase 10.6 - Cross-Cohort Stat Inspector | Complete (0047 applied live 2026-10-30) |
 | XSTAT-02 | Phase 10.6 - Cross-Cohort Stat Inspector | Complete (0047 applied live 2026-10-30) |
 | XSTAT-03 | Phase 10.6 - Cross-Cohort Stat Inspector | Complete (0047 applied live 2026-10-30) |
+| CURVE-01 | Phase 10.7 - Statistical Buff Detection | Complete (0049 applied live 2026-10-30) |
+| CURVE-02 | Phase 10.7 - Statistical Buff Detection | Complete (0049 applied live 2026-10-30) |
+| CURVE-03 | Phase 10.7 - Statistical Buff Detection | Complete (0049 applied live 2026-10-30) |
+| CURVE-04 | Phase 10.7 - Statistical Buff Detection | Complete (0049 applied live 2026-10-30) |
 
 ## Anti-Cheat Guardrails (Phase 10.5, inserted 2026-10-30)
 
@@ -285,6 +289,15 @@ Owner request: the form is meant to be filled without buffs. Angelus and Assumpt
 - **CHEAT-04**: The projected OVR (same value-proportional formula, server-side) is compared with the current OVR; a >= 8-point swing with an unchanged class/build-role shows previous -> projected and sets `flagged`.
 - **CHEAT-05**: Server-side enforcement, RLS deny-all on the audit table, no key-stat config in anti-cheat payloads, append-only migration, no new npm dependencies.
 
+## Statistical Buff Detection (Phase 10.7, inserted 2026-10-30)
+
+Owner request: use the data to catch possible cheaters instead of only the 1.5x margin; model the Impositio Manus (+35% PATK/MATK, +35 p.p. Equipment ATK%) pattern as a curve deviation.
+
+- **CURVE-01**: `curve_deviation()` models `base = flat / (1 + pct/100)` per stats cohort with a robust median/MAD (latest validated, self excluded, n >= 5), the expected flat for the submitted pct, a normalized-base sigma and a 30% curve-deviation test.
+- **CURVE-02**: The Impositio Manus undo test (`flat/1.35`, `pct-35`) flags when the pct is a high outlier AND the de-buffed base returns to the cohort curve; a normal clone and a legitimate high-% build stay clean.
+- **CURVE-03**: Defense spikes flag on `1.5x average OR sigma >= 3.5 vs median`; `stat_overview` exposes `class_median`/`class_mad`/`class_z`/`class_sigma_outlier` for every stat, and the inspector shows the sigma badge ahead of the 1.5x signals.
+- **CURVE-04**: Review aids only, no auto-rejection; cohorts below n=5 get `available:false` / null sigma and fall back to the 1.5x rule; no key-stat config leak, no client-executable internal helper, no new dependencies.
+
 ## Cross-Cohort Stat Inspector (Phase 10.6, inserted 2026-10-30)
 
 Owner request: see the same stat for all members, independent of class and cohort, to inspect possible stat cheating, from the Ranking tab.
@@ -294,6 +307,6 @@ Owner request: see the same stat for all members, independent of class and cohor
 - **XSTAT-03**: Staff-only RPC gate (member JWT forbidden, anon no EXECUTE), validated-only, fixture-free, zero changes to OVR/points surfaces, zero new npm dependencies.
 
 **Coverage:**
-- v1.1 requirements: 66 total
-- Mapped to phases: 66 ✓
+- v1.1 requirements: 70 total
+- Mapped to phases: 70 ✓
 - Unmapped: 0 ✓
