@@ -27,7 +27,13 @@ import { formatStatValue } from '../../lib/parseStatValue'
 
 interface DefenseStepProps {
   inputs: GroupInputs
-  onEquipmentChange: (key: (typeof EQUIPMENT_RAW_KEYS)[number], raw: string) => void
+  /** origin = who wrote the value: a tooltip OCR read ('ocr'), a failed read
+   *  ('ocr_failed', clears the audit trace) or the player ('user'). */
+  onEquipmentChange: (
+    key: (typeof EQUIPMENT_RAW_KEYS)[number],
+    raw: string,
+    origin: 'user' | 'ocr' | 'ocr_failed',
+  ) => void
   disabled: boolean
 }
 
@@ -72,8 +78,11 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
         n.delete(card.equipmentKey)
         return n
       })
-      onEquipmentChange(card.equipmentKey, outcome.raw)
+      onEquipmentChange(card.equipmentKey, outcome.raw, 'ocr')
     } else {
+      // 0046: the value shown is no longer OCR-owned — drop its audit trace
+      // without changing what the player sees.
+      onEquipmentChange(card.equipmentKey, inputs[card.equipmentKey] ?? '', 'ocr_failed')
       setFailed((prev) => {
         const n = new Set(prev)
         n.add(card.equipmentKey)
@@ -187,7 +196,7 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
                   <input
                     type="text"
                     value={equipRaw}
-                    onChange={(e) => onEquipmentChange(card.equipmentKey, e.target.value)}
+                    onChange={(e) => onEquipmentChange(card.equipmentKey, e.target.value, 'user')}
                     onBlur={() => handleEquipmentBlur(card.equipmentKey)}
                     disabled={disabled || isRunning}
                     className="h-10 rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"

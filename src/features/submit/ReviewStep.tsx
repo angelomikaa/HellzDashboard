@@ -12,6 +12,8 @@
 import type { StatCatalogEntry } from '../../lib/api'
 import { formatStatValue, parseStatValue } from '../../lib/parseStatValue'
 import { WIZARD_GROUPS, type GroupInputs, type WizardGroup } from './wizard'
+import type { DefenseWarning } from './antiCheat'
+import { AntiCheatWarnings } from './AntiCheatWarnings'
 
 const GROUP_LABELS: Record<WizardGroup, string> = {
   general: 'Geral',
@@ -23,6 +25,9 @@ interface ReviewStepProps {
   /** full catalog (all groups; combat_power included) */
   entries: StatCatalogEntry[]
   inputs: GroupInputs
+  /** 0046 defense buff warnings (advisory — the submission is still allowed
+   *  and saved pending for officer review) */
+  antiCheatWarnings?: readonly DefenseWarning[]
   /** all four capture-step verifications currently checked (SubmitPage
    *  owns the checkboxes — see the D-08 note above) */
   allStepsVerified: boolean
@@ -40,6 +45,7 @@ interface ReviewStepProps {
 export function ReviewStep({
   entries,
   inputs,
+  antiCheatWarnings = [],
   allStepsVerified,
   submitting,
   missingRequired,
@@ -78,6 +84,8 @@ export function ReviewStep({
           </div>
         </section>
       ))}
+
+      <AntiCheatWarnings warnings={antiCheatWarnings} />
 
       {missingRequired !== null && missingRequired.length > 0 && (
         <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">

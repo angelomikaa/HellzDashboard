@@ -177,6 +177,18 @@ describe('createSubmission — p_identity with the typed values', () => {
     await createSubmission(session, [{ stat_key: 'crit', value: 16 }])
     const body = JSON.parse(calls[0].init.body as string)
     expect(body.p_identity).toBe(null)
+    expect(body.p_provenance).toBe(null)
+  })
+
+  it('sends the OCR audit trail as p_provenance (0046)', async () => {
+    nextResponse = () => res(200, JSON.stringify('22222222-2222-2222-2222-222222222222'))
+    await createSubmission(session, [{ stat_key: 'pdef', value: 5200 }], IDENTITY, [
+      { input_key: 'pdef', source: 'ocr_edited', ocr_value: 4100, final_value: 5200 },
+    ])
+    const body = JSON.parse(calls[0].init.body as string)
+    expect(body.p_provenance).toEqual([
+      { input_key: 'pdef', source: 'ocr_edited', ocr_value: 4100, final_value: 5200 },
+    ])
   })
 })
 

@@ -185,18 +185,37 @@ export async function updateCharacter(
   })
 }
 
+/**
+ * Anti-cheat OCR audit entry (migration 0046). `source` says whether the value
+ * the OCR printed was submitted as-is or edited by the player afterwards;
+ * `ocr_value` is what the read printed and `final_value` what was submitted.
+ * Catalog final values are re-derived server-side from p_stats.
+ */
+export interface SubmissionProvenanceEntry {
+  input_key: string
+  source: 'ocr' | 'ocr_edited'
+  ocr_value: number
+  final_value: number
+}
+
 export async function createSubmission(
   session: NeoFootSession,
   stats: { stat_key: string; value: number }[],
   identity?: SubmissionIdentity,
+  provenance?: SubmissionProvenanceEntry[],
 ): Promise<string> {
   // Atomic append-only RPC (INPT-04): member_id is derived from the JWT
   // server-side; unknown stat keys are rejected server-side. The optional
   // identity is stored ON the submission and promoted only at validation
-  // (0014); old call sites keep compiling and send p_identity: null.
+  // (0014); optional provenance is the 0046 anti-cheat OCR audit trail. Old
+  // call sites keep compiling and send nulls.
   const res = await restFetch(session, '/rpc/create_submission', {
     method: 'POST',
-    body: JSON.stringify({ p_stats: stats, p_identity: identity ?? null }),
+    body: JSON.stringify({
+      p_stats: stats,
+      p_identity: identity ?? null,
+      p_provenance: provenance ?? null,
+    }),
   })
   // PostgREST returns the function result as a JSON-encoded uuid string.
   return parseBody<string>(res)
@@ -332,6 +351,46 @@ export interface QueueStat {
   value: number
 }
 
+/** One stat value at >= 1.5x the same class+role cohort average (0046). */
+export interface AntiCheatDefenseSpike {
+  stat_key: string
+  label: string
+  value_type: 'flat' | 'percentual'
+  value: number
+  baseline: number
+  ratio: number
+  sample_size: number
+}
+
+/** One input the OCR read filled and the player changed afterwards (0046). */
+export interface AntiCheatOcrOverride {
+  input_key: string
+  label: string
+  value_type: 'flat' | 'percentual'
+  source: 'ocr' | 'ocr_edited'
+  ocr_value: number | null
+  final_value: number | null
+  delta_pct: number | null
+}
+
+/** OVR before the pending submission vs OVR if it is validated (0046). */
+export interface AntiCheatOvrSwing {
+  previous: number | null
+  projected: number | null
+  delta: number | null
+  class_changed: boolean
+  function_changed: boolean
+}
+
+export interface AntiCheatFlags {
+  flagged: boolean
+  defense_spikes: AntiCheatDefenseSpike[]
+  ocr_overrides: AntiCheatOcrOverride[]
+  ocr_filled_count: number
+  ocr_edited_count: number
+  ovr_swing: AntiCheatOvrSwing
+}
+
 export interface OfficerQueueRow {
   submission_id: string
   submitted_at: string
@@ -344,15 +403,41 @@ export interface OfficerQueueRow {
   char_id: string | null
   nickname: string | null
   char_function: 'dps' | 'mdps' | 'suporte'
-  stats: QueueStat[] // all 57 catalog entries, ordered group_name, label
+  stats: QueueStat[] // all catalog entries, ordered group_name, label
+  // 0046 anti-cheat review flags. Optional so an in-flight bundle keeps
+  // rendering against the previous server during the deploy window.
+  anti_cheat?: AntiCheatFlags | null
+}
+
+/** One class+role cohort average used by the pre-submit warning (0046). */
+export interface DefenseBaseline {
+  stat_key: string
+  average: number
+  sample_size: number
 }
 
 export async function fetchOfficerQueue(session: NeoFootSession): Promise<OfficerQueueRow[]> {
   // SECURITY DEFINER RPC (0011): staff-only gate INSIDE the function — a member
   // JWT raises 'forbidden' (HTTP 500). Queue = all pending submissions, newest
-  // first; the 0010 one-pending rule caps rows at one per member.
+  // first; the 0010 one-pending rule caps rows at one per member. 0046 adds
+  // the additive anti_cheat object.
   const res = await restFetch(session, '/rpc/officer_queue', { method: 'POST', body: JSON.stringify({}) })
   return (await parseBody<OfficerQueueRow[]>(res)) ?? []
+}
+
+/**
+ * Anti-cheat pre-submit baselines (0046): aggregates-only averages for the
+ * four defense stats over the caller's own class+build-role cohort. Used by
+ * the submit wizard to warn BEFORE sending; the server re-computes the
+ * authoritative flag on the pending submission. A failure here must never
+ * block submission — callers treat it as "no baselines".
+ */
+export async function fetchDefenseBaselines(session: NeoFootSession): Promise<DefenseBaseline[]> {
+  const res = await restFetch(session, '/rpc/defense_cohort_baselines', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  return (await parseBody<DefenseBaseline[]>(res)) ?? []
 }
 
 export async function setSubmissionStatus(

@@ -22,7 +22,9 @@ import {
   ApiError,
   createSubmission,
   fetchCatalog,
+  fetchDefenseBaselines,
   fetchMyIdentity,
+  type DefenseBaseline,
   type MyIdentity,
   type StatCatalogEntry,
 } from '../../lib/api'
@@ -54,7 +56,17 @@ import {
   type GroupInputs,
   type WizardGroup,
 } from './wizard'
-import { withDerivedDefenses, isRawDefenseStat, RAW_DEFENSE_STAT_KEYS } from './rawDefense'
+import {
+  withDerivedDefenses,
+  isRawDefenseStat,
+  RAW_DEFENSE_STAT_KEYS,
+} from './rawDefense'
+import {
+  buildProvenance,
+  defenseSpikeWarnings,
+  provenanceInputKeys,
+} from './antiCheat'
+import { AntiCheatWarnings } from './AntiCheatWarnings'
 
 // Enumeration-safe copy (UI contract): never expose HTTP codes or internals.
 const NETWORK_ERROR =
@@ -176,18 +188,37 @@ interface SubmitPageProps {
   session: NeoFootSession
 }
 
+interface SubmitLoad {
+  self: MyIdentity
+  catalog: StatCatalogEntry[]
+  // 0046 anti-cheat baselines (aggregates only). A failed read leaves [] and
+  // never blocks the wizard.
+  baselines: DefenseBaseline[]
+}
+
 export function SubmitPage({ session }: SubmitPageProps) {
-  const [data, setData] = useState<{ self: MyIdentity; catalog: StatCatalogEntry[] } | null>(null)
+  const [data, setData] = useState<SubmitLoad | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [phase, setPhase] = useState<'wizard' | 'submitted'>('wizard')
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
   const [inputs, setInputs] = useState<GroupInputs>({})
 
+  // 0046 OCR audit trace: input key -> raw string the LATEST read printed.
+  // A ref (not state) because it never drives rendering — it is serialized
+  // into p_provenance at submit time.
+  const ocrTraceRef = useRef<Record<string, string>>({})
+
   // Effective inputs = manual inputs + computed read-only raw defenses
   // (Phase 9.1 DEF-03). rpdef/rmdef are merged here so groupComplete,
   // ReviewStep and buildStatsPayload always see consistent raw values.
   const effectiveInputs = useMemo(() => withDerivedDefenses(inputs), [inputs])
+
+  // 0046 pre-submit buff warning (advisory; the server re-computes the flag).
+  const spikeWarnings = useMemo(
+    () => (data === null ? [] : defenseSpikeWarnings(data.catalog, effectiveInputs, data.baselines)),
+    [data, effectiveInputs],
+  )
 
   // Editable identity (08-04, IDEN-01/02): mandatory on every submission.
   // Classe/Função prefill from the member row; ID/Nick start blank and are
@@ -254,9 +285,14 @@ export function SubmitPage({ session }: SubmitPageProps) {
     let cancelled = false
     ;(async () => {
       try {
-        const [identity, catalog] = await Promise.all([fetchMyIdentity(session), fetchCatalog(session)])
+        const [identity, catalog, baselines] = await Promise.all([
+          fetchMyIdentity(session),
+          fetchCatalog(session),
+          // Advisory only: a baseline failure must never block submission.
+          fetchDefenseBaselines(session).catch(() => [] as DefenseBaseline[]),
+        ])
         if (!cancelled) {
-          setData({ self: identity, catalog })
+          setData({ self: identity, catalog, baselines })
           // Registry values are the starting point only: never overwrite a
           // field the player already edited while the load was in flight.
           setIdentity((current) => ({
@@ -386,6 +422,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
    *  overwritten (append-only, INPT-04). The identity stays — it describes
    *  the same character, and the player can still edit it. */
   function restartWizard() {
+    ocrTraceRef.current = {}
     setInputs({})
     setStepVerified({ 1: false, 2: false, 3: false, 4: false })
     setOcrRunningStep(null)
@@ -432,7 +469,21 @@ export function SubmitPage({ session }: SubmitPageProps) {
     }
     setSubmitting(true)
     try {
-      await createSubmission(session, result.stats, identity as SubmissionIdentity)
+      // 0046: attach the OCR audit trail. Catalog final values are
+      // re-derived server-side; the equipment tooltip inputs ride along as
+      // evidence for the derived RPDEF/RMDEF. Inputs never read by OCR are
+      // omitted (the server records them as manual by absence).
+      const provenance = buildProvenance(
+        ocrTraceRef.current,
+        inputs,
+        provenanceInputKeys(data.catalog),
+      )
+      await createSubmission(
+        session,
+        result.stats,
+        identity as SubmissionIdentity,
+        provenance,
+      )
       setPhase('submitted')
     } catch (err) {
       // The wizard state is KEPT — nothing the player typed is lost
@@ -515,6 +566,18 @@ export function SubmitPage({ session }: SubmitPageProps) {
     const { filled, failed } = applyOcrOutcomes(displayed, outcomes, handleChange)
     setFailedFields((prev) => ({ ...prev, [step]: failed }))
     setOcrFilledFields((prev) => ({ ...prev, [step]: filled }))
+
+    // 0046 audit trace: a fresh read replaces this step's claims wholesale —
+    // drop its old trace, then record the raw value of every field it filled.
+    // Failed fields were blanked, so they are no longer OCR-owned.
+    const nextTrace = { ...ocrTraceRef.current }
+    for (const key of displayed) delete nextTrace[key]
+    for (const outcome of outcomes) {
+      if (outcome.status === 'filled' && displayed.includes(outcome.stat_key)) {
+        nextTrace[outcome.stat_key] = outcome.raw
+      }
+    }
+    ocrTraceRef.current = nextTrace
   }
 
   /** D-18: nothing was read — the step's failure claims are cleared (no
@@ -785,13 +848,24 @@ export function SubmitPage({ session }: SubmitPageProps) {
               ) && (
                 <DefenseStep
                   inputs={inputs}
-                  onEquipmentChange={(key, raw) => {
+                  onEquipmentChange={(key, raw, origin) => {
                     setInputs((prev) => ({ ...prev, [key]: raw }))
+                    // 0046: tooltip reads are part of the OCR audit trail —
+                    // a later hand-typed Equipment PDEF must surface as
+                    // ocr_edited on the officer's panel.
+                    if (origin === 'ocr') {
+                      ocrTraceRef.current = { ...ocrTraceRef.current, [key]: raw }
+                    } else if (origin === 'ocr_failed') {
+                      const nextTrace = { ...ocrTraceRef.current }
+                      delete nextTrace[key]
+                      ocrTraceRef.current = nextTrace
+                    }
                     setStepVerified((v) => ({ ...v, 4: false }))
                   }}
                   disabled={submitting || ocrRunningStep === 4}
                 />
               )}
+              <AntiCheatWarnings warnings={spikeWarnings} />
               <div className="mt-4">
                 <StepVerifyCheckbox
                   stepNo={step}
@@ -807,6 +881,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
               <ReviewStep
                 entries={catalog}
                 inputs={effectiveInputs}
+                antiCheatWarnings={spikeWarnings}
                 allStepsVerified={
                   stepVerified[1] && stepVerified[2] && stepVerified[3] && stepVerified[4]
                 }
