@@ -265,7 +265,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LNUP-02 | Phase 10.4 — Battlefield Lineups & Roster Sync | Planned (10.4-01/02) |
 | LNUP-03 | Phase 10.4 — Battlefield Lineups & Roster Sync | Planned (10.4-01/02) |
 | LNUP-04 | Phase 10.4 — Battlefield Lineups & Roster Sync | Planned (10.4-01) |
-| LNUP-05 | Phase 10.4 — Battlefield Lineups & Roster Sync | Planned (10.4-03) |
+| LNUP-05 | Phase 10.4 - Battlefield Lineups & Roster Sync | Planned (10.4-03) |
+| CHEAT-01 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 + tests; live apply pending) |
+| CHEAT-02 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 + tests; live apply pending) |
+| CHEAT-03 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 + tests; live apply pending) |
+| CHEAT-04 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 + tests; live apply pending) |
+| CHEAT-05 | Phase 10.5 - Anti-Cheat Guardrails | Complete (0046 + tests; live apply pending) |
+
+## Anti-Cheat Guardrails (Phase 10.5, inserted 2026-10-30)
+
+Owner request: the form is meant to be filled without buffs. Angelus and Assumptio nearly double the defense values, so suspicious submissions must be flagged; fields edited after the OCR read must be tracked; large OVR swings without a class/role change must warn.
+
+- **CHEAT-01**: Server flags `rpdef`, `rmdef`, `equip_pdef_pct`, `equip_mdef_pct` at >= 1.5x the same class+build-role cohort average. Baseline = latest validated value per active member, submitting member excluded, n >= 3. Flags live in `officer_queue().anti_cheat.defense_spikes` and set `flagged`.
+- **CHEAT-02**: The player sees an advisory warning on the Especial step and above Enviar; the submission is saved pending (never auto-rejected) and the officer decides.
+- **CHEAT-03**: Every OCR-filled input is recorded as `ocr` or `ocr_edited` with `ocr_value` and `final_value` in the append-only `submission_provenance` table. Catalog final values are re-derived from `submission_stats`; the transient Equipment PDEF/MDEF tooltip inputs are included.
+- **CHEAT-04**: The projected OVR (same value-proportional formula, server-side) is compared with the current OVR; a >= 8-point swing with an unchanged class/build-role shows previous -> projected and sets `flagged`.
+- **CHEAT-05**: Server-side enforcement, RLS deny-all on the audit table, no key-stat config in anti-cheat payloads, append-only migration, no new npm dependencies.
 
 **Coverage:**
 - v1.1 requirements: 58 total

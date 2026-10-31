@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: ready_to_plan
-last_updated: "2026-10-29T00:00:00.000Z"
-last_activity: 2026-10-29
+last_updated: "2026-10-30T00:00:00.000Z"
+last_activity: 2026-10-30
 progress:
   total_phases: 11
   completed_phases: 11
@@ -24,9 +24,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Ready to plan
+Phase: 10.5
+Plan: 10.5-01 complete (code + tests green)
+Status: Live apply pending (migration 0046)
 Last activity: 2026-10-30
 
 ## Accumulated Context
@@ -153,7 +153,11 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 
 - [Showcase polish 2026-10-30 — OWNER: thin token ring + each card's real class + dynamic Artista crest]: two owner reports. (1) The neon ring read too thick on the build tokens: `neon-ring` now takes its frame width from `--neon-ring-width` (`var(--neon-ring-thickness, 2px)`); the title/panels keep 2px and the build tokens set `--neon-ring-thickness:1px` (measured in-browser: title inset/padding 2px, token 1px). (2) Artista had no icon (monogram 'A') and its cards printed the umbrella name — the cards must show each member's own class (Menestrel / Cigana). Root cause: migration **0039** (per-card `char_class`) was committed but NEVER APPLIED — live `get_promotion_public` carried no such field (0/60 cards; bookkeeping stopped at 0044 with a 0039 gap). **0039 APPLIED LIVE 2026-10-30** via apply-seed.mjs; anon EXECUTE preserved (`pg_proc` ACL still `anon=X`), post-apply anon payload 20 sections / 60 cards with `char_class` on EVERY card (Gohan=Gypsy, JINXx=Bard, Astroel=Gypsy). Client: `HighlightsCarousel` scopes the crest derivation to virtual groups and reads the SPOTLIGHT card (`cards[active].char_class`) — Artista shows the Cigana icon while a Gypsy is centered and the Menestrel icon with a Bard centered (both browser-verified, the crest switches live); `PromotionCard` already rendered `char_class ?? section`, so the card job line now prints CIGANA / MENESTREL. 784 tests, tsc/oxlint/build green.
 
+- [Phase 10.5 anti-cheat 2026-10-30 — owner request, FIRST SLICE]: four locked decisions — baseline is the same class+build-role cohort (latest validated per active member, submitting member excluded, n>=3; never the whole-guild average), spike threshold >= 1.5x, submissions are SAVED PENDING with warning (never auto-blocked), OVR swing >= 8 points only when class/function are unchanged, and OCR edits store source + printed value + final value. Migration **0046** adds `submission_provenance` (append-only, RLS deny-all), `create_submission` v4 (optional `p_provenance`; catalog final values re-derived from `p_stats`; invalid_provenance guards; 2-arg overload dropped), `defense_cohort_baselines()` (member aggregates), `ovr_projection()` (internal review projection — the 0036 value-proportional formula copied verbatim, exact for the member's own points), `submission_anti_cheat()` (spikes + OCR overrides + swing + flagged) and the additive `officer_queue().anti_cheat`. Client: `antiCheat.ts` pure helpers (1.5x mirror, provenance builder, ovrSwingFlagged), `AntiCheatWarnings` on the Especial step + above Enviar, `SubmitPage` OCR trace ref + tooltip origin plumbing + parallel baseline fetch, `AntiCheatPanel` on the Validações expanded row, `⚠ Revisar` chip on flagged collapsed rows. 800 tests / 52 files green, tsc/oxlint/build green. **Live apply PENDING (no SUPABASE_ACCESS_TOKEN this session)**: `node scripts/apply-seed.mjs supabase/migrations/0046_anti_cheat_guardrails.sql`, then deploy the client.
+
 ### Blockers/Concerns (open — carry to next milestone)
+
+- **[Pending live op] Migration 0046 (anti-cheat guardrails) is NOT applied live** — apply it before/with the phase 10.5 client bundle: `node scripts/apply-seed.mjs supabase/migrations/0046_anti_cheat_guardrails.sql` (needs `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF`). The client degrades gracefully until then (no `anti_cheat` panel, no pre-submit baselines), but the server-side flags only exist after apply.
 
 - **[Pending live op] Migration 0045 (public showcase stat gate) is NOT applied live** — ship the client first (it already sends the member JWT on the same RPC), then `node scripts/apply-seed.mjs supabase/migrations/0045_promotion_public_stat_gate.sql`. Until then the anon payload still carries the values and only the client mask hides them.
 
@@ -177,9 +181,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-27T16:54:06.423Z
-Stopped At: Completed 10.1-02-PLAN.md (phase 10.1 both plans done - owner verdict recorded, all gates PASS; ready for /gsd-verify-work + /gsd-transition)
-Resume file: None
+Last session: 2026-10-30T00:00:00.000Z
+Stopped At: Completed Phase 10.5 plan 01 (anti-cheat guardrails: migration 0046 + client warning/provenance + Validações panel; 800 tests / tsc / lint / build green). Next: apply migration 0046 live, deploy the client, then re-test the pending-submission warning path with an officer token.
+Resume file: .planning/phases/10.5-anti-cheat-guardrails/10.5-01-SUMMARY.md
 
 ## Performance Metrics
 

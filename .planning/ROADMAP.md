@@ -32,6 +32,7 @@
 - [ ] Phase 10.2: Meta vs Non-Viable Cohorts (INSERTED 2026-10-28) — the 39 keyed (class, function) combos split into 23 playable (meta) and 16 non-viable, persisted in `class_cohorts` (migration 0037); Início shows one carousel per meta build (client half 2026-10-29) — completed 2026-10-29
 - [x] Phase 10.3: Artista Merged Cohort (INSERTED 2026-10-29) — Menestrel and Cigana are one cohort for stats (exception only; every other tab unchanged), ONE shared 6-key config per owner, members keep their own class on card/registry; migration 0038 APPLIED LIVE 2026-10-29 (22 meta / 14 non-viable, OVR parity 0 divergences). Ships with the card.svg tier-color re-export (no border, stats contrast plate) and third primers for the ten meta cohorts with zero real members
 - [ ] Phase 10.4: Battlefield Lineups & Roster Sync (INSERTED 2026-10-30) — Lineup tab for **Vigrid Field (Raid 1)** and **Ruinscape (Raid 2)** (8 parties `G1`–`G8` × 5 slots, slot 1 = Party Leader, editable party assignment labels, `N/5` counters, smoke-excluded); members view & download JPG, officers/owner edit lineups at will; pre-registers all new real nicknames from the owner's Raid 1/2 lineups into `Personagens` without guessing ambiguous classes; generates Hellz dark/neon JPG per battlefield (3 plans)
+- [x] Phase 10.5: Anti-Cheat Guardrails (INSERTED 2026-10-30) — server-side defense spike flags (≥1.5× the class+role cohort average for RPDEF/RMDEF/Equip. PDEF%/MDEF%), per-field OCR provenance (source + printed value + final value), and ≥8-point OVR-swing warnings when class/role are unchanged; flagged submissions stay pending for officer review; migration 0046 + client wizard warning + Validações anti-cheat panel
 - [ ] Phase 11: Verified Access — Claim Authorization & Discord OAuth — first access is manual-fill and officer-validated since 0034 (DSCD-01 holds via claim/registration request approvals, no print anywhere); Phase 11 replaces the manual trust with the real anchor: one-time officer-confirmed Discord↔character link, server-side bot-token role check, custom access token hook keeping every RLS policy intact, device-binding re-decision, PIN retirement path (INSERTED 2026-10-26)
 
 </details>
@@ -250,6 +251,25 @@ Plans:
 Cross-cutting constraints: append-only migration (`0040_battlefield_lineups.sql`), applied live via `scripts/apply-seed.mjs` with `schema_migrations` bookkeeping + `notify pgrst, 'reload schema'`; `get_lineups` returns ONLY `{member_id, display_name, char_class, char_function}` per occupant (never stats/OVR/key-stat config — RNK-02 / CMP-03 discipline); smoke fixtures (`smoke%`, `dummy-%`) never enter lineups; zero new npm dependencies.
 **UI hint**: yes
 
+### Phase 10.5: Anti-Cheat Guardrails (INSERTED 2026-10-30)
+
+**Goal**: A buffed submission can no longer silently inflate the ranking. The server flags defense values at or above 1.5× the same class+build-role cohort average (RPDEF/RMDEF from the Equipment PDEF/MDEF tooltips, plus Equipment PDEF%/MDEF% — the four values Angelus and Assumptio inflate by ~95%), records every field the player altered after the OCR read (printed value → final value), and warns officers about an 8+ point OVR swing when class and build-role are unchanged. Nothing is auto-rejected: the submission is saved pending and the officer decides.
+
+**Depends on**: Phase 9.1 (`rpdef`/`rmdef`), Phase 10.1 (canonical value-proportional OVR), Phase 8 (submission identity)
+**Requirements**: CHEAT-01, CHEAT-02, CHEAT-03, CHEAT-04, CHEAT-05
+**Success Criteria** (what must be TRUE):
+  1. `rpdef`, `rmdef`, `equip_pdef_pct` and `equip_mdef_pct` at ≥ 1.5× the class+role cohort average (latest validated per active member, submitting member excluded, n ≥ 3) appear in `officer_queue().anti_cheat.defense_spikes` and set `flagged` (CHEAT-01)
+  2. The player is warned before sending on the Especial step and above Enviar; the submission is still allowed and saved pending with the warning visible to officers (CHEAT-02)
+  3. Every input the OCR read filled is stored as `ocr` or `ocr_edited` with the printed value and the final value; catalog final values are re-derived server-side, never trusted from the client; equipment tooltip inputs are included because RPDEF/RMDEF derive from them (CHEAT-03)
+  4. A pending submission that would move OVR by ≥ 8 points with unchanged class/build-role shows previous→projected and sets `flagged`; a class/role change suppresses that specific warning (CHEAT-04)
+  5. Server-side enforcement, one rating formula, no member read path to the audit table, no key-stat config in any anti-cheat payload, no new npm dependencies (CHEAT-05)
+
+**Plans**: 1 plan
+Plans:
+- [x] 10.5-01-PLAN.md — Migration 0046 + server flags + client provenance/warning + Validações panel + tests — Wave 1
+
+**Cross-cutting constraints**: append-only (`0046` adds one table; `create_submission` keeps every 0014 validation; `officer_queue` payload is additive only); the OVR projection copies the 0036 value-proportional expression verbatim (never re-derived, never client-side); `submission_provenance` is RLS-on with no policies (definer surfaces only); deploy order = migration then client (the client tolerates the old server). Live apply pending at hand-off (no token in session).
+
 ### Phase 11: Verified Access — Claim Authorization & Discord OAuth (INSERTED)
 
 **Goal**: Access is bound to something the attacker cannot steal from a Discord post. The 0032 stopgap (officer-authorized claims) shipped 2026-10-26 and was reverted the same day by 0033 at the owner's call — registration is one-go again (immediate PIN setter; registration requests carry the PIN so the approval activates it) with manual validation staying on (officer approval + the post-claim D-05 identity review) — so Phase 11 carries the full identity load: a one-time, officer-confirmed Discord↔character link per member, Discord OAuth as the login, a server-side guild-role check with the guild bot token, and session continuity that keeps every existing RLS policy working unchanged.
@@ -271,7 +291,7 @@ Cross-cutting constraints: append-only migration (`0040_battlefield_lineups.sql`
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
+Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|------------|
@@ -291,6 +311,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 11 (8
 | 10.2 Meta vs Non-Viable Cohorts (inserted) | v1.1 | - | Complete | 2026-10-29 |
 | 10.3 Artista Merged Cohort (inserted) | v1.1 | - | Complete | 2026-10-29 |
 | 10.4 Battlefield Lineups & Roster Sync (inserted) | v1.1 | 3/3 | Complete    | 2026-10-30 |
+| 10.5 Anti-Cheat Guardrails (inserted) | v1.1 | 1/1 | Complete (live apply pending) | 2026-10-30 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---
