@@ -224,20 +224,34 @@ export function formatEquation(fit: { slope: number; intercept: number }, digits
 // Models
 // ---------------------------------------------------------------------------
 
-export type ModelKey = 'ratio_diff' | 'matk_pct' | 'patk_pct' | 'matk_patk'
+export type ModelKey =
+  | 'ratio_diff'
+  | 'matk_pct'
+  | 'patk_pct'
+  | 'matk_patk'
+  | 'rpdef_pct'
+  | 'rmdef_pct'
+
+/** How the buff hypothesis is undone: shift x or scale y. */
+export type DebuffKind = 'x_shift' | 'y_scale'
 
 export interface ModelDefinition {
   key: ModelKey
   label: string
   xLabel: string
   yLabel: string
+  xType: 'flat' | 'percentual'
+  yType: 'flat' | 'percentual'
   buffRelevant: boolean
+  /** Human-readable buff hypothesis (used in the explanation). */
+  buffLabel: string
+  debuffKind: DebuffKind
+  /** x shift in p.p. (35) or y multiplier (1.95). */
+  debuffAmount: number
+  /** Model-specific minimum R² before a classification is trusted. */
+  minR2: number
   xOf: (member: RegressionMember) => number | null
   yOf: (member: RegressionMember) => number | null
-  /** Expected total MATK from the predicted y. */
-  expectedMatk: (member: RegressionMember, predictedY: number) => number
-  /** The +35 p.p. value on the x axis under the buff hypothesis. */
-  debuffedX: (x: number) => number
 }
 
 export const MODELS: Record<ModelKey, ModelDefinition> = {
@@ -246,46 +260,92 @@ export const MODELS: Record<ModelKey, ModelDefinition> = {
     label: 'MATK/PATK × Δ% (controle físico)',
     xLabel: 'MATK% − PATK% (p.p.)',
     yLabel: 'MATK / PATK',
+    xType: 'flat',
+    yType: 'flat',
     buffRelevant: true,
+    buffLabel: 'Impositio Manus (+35 p.p. em MATK%)',
+    debuffKind: 'x_shift',
+    debuffAmount: 35,
+    minR2: 0.5,
     xOf: (m) =>
       m.matk_pct !== null && m.patk_pct !== null ? m.matk_pct - m.patk_pct : null,
     yOf: (m) =>
       m.matk !== null && m.patk !== null && m.patk !== 0 ? m.matk / m.patk : null,
-    expectedMatk: (m, predictedY) => (m.patk === null ? Number.NaN : predictedY * m.patk),
-    debuffedX: (x) => x - 35,
   },
   matk_pct: {
     key: 'matk_pct',
     label: 'MATK × MATK%',
     xLabel: 'Equip. MATK %',
     yLabel: 'MATK total',
+    xType: 'percentual',
+    yType: 'flat',
     buffRelevant: true,
+    buffLabel: 'Impositio Manus (+35 p.p. em MATK%)',
+    debuffKind: 'x_shift',
+    debuffAmount: 35,
+    minR2: 0.5,
     xOf: (m) => m.matk_pct,
     yOf: (m) => m.matk,
-    expectedMatk: (_m, predictedY) => predictedY,
-    debuffedX: (x) => x - 35,
   },
   patk_pct: {
     key: 'patk_pct',
     label: 'PATK × PATK% (controle)',
     xLabel: 'Equip. PATK %',
     yLabel: 'PATK total',
+    xType: 'percentual',
+    yType: 'flat',
     buffRelevant: false,
+    buffLabel: 'Modelo de controle físico',
+    debuffKind: 'x_shift',
+    debuffAmount: 0,
+    minR2: 0.5,
     xOf: (m) => m.patk_pct,
     yOf: (m) => m.patk,
-    expectedMatk: (_m, predictedY) => predictedY,
-    debuffedX: (x) => x,
   },
   matk_patk: {
     key: 'matk_patk',
     label: 'MATK × PATK (contexto)',
     xLabel: 'PATK total',
     yLabel: 'MATK total',
+    xType: 'flat',
+    yType: 'flat',
     buffRelevant: false,
+    buffLabel: 'Modelo de contexto (MATK × PATK)',
+    debuffKind: 'x_shift',
+    debuffAmount: 0,
+    minR2: 0.5,
     xOf: (m) => m.patk,
     yOf: (m) => m.matk,
-    expectedMatk: (_m, predictedY) => predictedY,
-    debuffedX: (x) => x,
+  },
+  rpdef_pct: {
+    key: 'rpdef_pct',
+    label: 'RPDEF × Equip. PDEF% (Angelus/Assumptio)',
+    xLabel: 'Equip. PDEF %',
+    yLabel: 'RPDEF (base física)',
+    xType: 'percentual',
+    yType: 'flat',
+    buffRelevant: true,
+    buffLabel: 'Angelus / Assumptio (+95% defesa física)',
+    debuffKind: 'y_scale',
+    debuffAmount: 1.95,
+    minR2: 0.25,
+    xOf: (m) => m.equip_pdef_pct,
+    yOf: (m) => m.rpdef,
+  },
+  rmdef_pct: {
+    key: 'rmdef_pct',
+    label: 'RMDEF × Equip. MDEF% (Assumptio)',
+    xLabel: 'Equip. MDEF %',
+    yLabel: 'RMDEF (base mágica)',
+    xType: 'percentual',
+    yType: 'flat',
+    buffRelevant: true,
+    buffLabel: 'Assumptio (+95% defesa mágica)',
+    debuffKind: 'y_scale',
+    debuffAmount: 1.95,
+    minR2: 0.25,
+    xOf: (m) => m.equip_mdef_pct,
+    yOf: (m) => m.rmdef,
   },
 }
 
@@ -335,16 +395,25 @@ export const DEFAULT_CLASSIFICATION: ClassificationOptions = {
 export interface MemberClassification {
   member: RegressionMember
   verdict: BuffVerdict
+  /** Generic model coordinates and derived values (all models). */
+  x: number
+  y: number
+  declaredValue: number
+  inferredValue: number | null
+  observedValue: number
+  expectedValue: number
+  residual: number
+  residualDebuffed: number
+  standardizedResidual: number
+  score: number
+  explanation: string
+  point: { x: number; y: number }
+  /** MATK-specific convenience fields (null on defense models). */
   declaredMatkPct: number | null
   inferredMatkPct: number | null
   observedMatk: number | null
   expectedMatk: number | null
   residualMatk: number | null
-  residual: number
-  standardizedResidual: number
-  score: number
-  explanation: string
-  point: { x: number; y: number }
 }
 
 export interface ClassificationResult {
@@ -373,25 +442,47 @@ export function classifyMembers(
     }
   }
 
+  const alternativeLabel =
+    model.debuffKind === 'x_shift'
+      ? `−${model.debuffAmount} p.p.`
+      : `÷${model.debuffAmount}`
+
   const globalLimitation =
     stats.ols.n < options.minN
       ? `Amostra pequena (n=${stats.ols.n}; mínimo ${options.minN}).`
-      : stats.ols.r2 < options.minR2
-        ? `Modelo fraco (R²=${stats.ols.r2.toFixed(2)}; mínimo ${options.minR2}).`
+      : stats.ols.r2 < model.minR2
+        ? `Modelo fraco (R²=${stats.ols.r2.toFixed(2)}; mínimo ${model.minR2} para este eixo).`
         : null
 
   const items: MemberClassification[] = points.map((point) => {
     const { member, x, y } = point
     const predictedDeclared = predict(stats.robust, x)
-    const predictedDebuffed = predict(stats.robust, model.debuffedX(x))
-    const residualDeclared = y - predictedDeclared
-    const residualDebuffed = y - predictedDebuffed
-    const standardizedResidual = residualDeclared / stats.scale
-    const score = (Math.abs(residualDeclared) - Math.abs(residualDebuffed)) / stats.scale
-    const expectedMatk = model.expectedMatk(member, predictedDeclared)
+    let predictedDebuffed: number
+    let residualDebuffed: number
+    let inferredValue: number
+    if (model.debuffKind === 'x_shift') {
+      const adjustedX = x - model.debuffAmount
+      predictedDebuffed = predict(stats.robust, adjustedX)
+      residualDebuffed = y - predictedDebuffed
+      inferredValue = adjustedX
+    } else {
+      const adjustedY = y / model.debuffAmount
+      predictedDebuffed = predictedDeclared
+      residualDebuffed = adjustedY - predictedDeclared
+      inferredValue = adjustedY
+    }
+    const residual = y - predictedDeclared
+    const standardizedResidual = residual / stats.scale
+    const score = (Math.abs(residual) - Math.abs(residualDebuffed)) / stats.scale
+    const expectedMatk =
+      model.key === 'ratio_diff' && member.patk !== null
+        ? predictedDeclared * member.patk
+        : model.key === 'matk_pct'
+          ? predictedDeclared
+          : null
     const observedMatk = member.matk
     const residualMatk =
-      observedMatk !== null && Number.isFinite(expectedMatk) ? observedMatk - expectedMatk : null
+      observedMatk !== null && expectedMatk !== null ? observedMatk - expectedMatk : null
 
     let verdict: BuffVerdict
     let explanation: string
@@ -399,14 +490,11 @@ export function classifyMembers(
       verdict = 'INCONCLUSIVE'
       explanation =
         globalLimitation ??
-        'Modelo de controle físico: não há hipótese de buff mágico neste eixo.'
-    } else if (
-      score >= options.possibleScore &&
-      Math.abs(residualDeclared) >= 2 * stats.scale
-    ) {
+        'Modelo de controle: não há hipótese de buff neste eixo.'
+    } else if (score >= options.possibleScore && Math.abs(residual) >= 2 * stats.scale) {
       verdict = 'POSSIBLE_BUFF'
       explanation =
-        `A hipótese de +${options.debuffPoints} p.p. em MATK% explica melhor o valor ` +
+        `A hipótese ${model.buffLabel} (${alternativeLabel}) explica melhor o valor ` +
         `(ganho de ${score.toFixed(2)}σ; resíduo declarado ${standardizedResidual.toFixed(2)}σ).`
     } else if (Math.abs(standardizedResidual) <= options.normalSigma) {
       verdict = 'NORMAL'
@@ -415,25 +503,34 @@ export function classifyMembers(
       verdict = 'INCONCLUSIVE'
       explanation =
         `Fora da faixa (${standardizedResidual.toFixed(2)}σ), mas sem assinatura clara de ` +
-        `+${options.debuffPoints} p.p. em MATK%.`
+        `${model.buffLabel}.`
     }
 
     return {
       member,
       verdict,
-      declaredMatkPct: member.matk_pct,
-      inferredMatkPct:
-        verdict === 'POSSIBLE_BUFF' && member.matk_pct !== null
-          ? member.matk_pct - options.debuffPoints
-          : member.matk_pct,
-      observedMatk,
-      expectedMatk: Number.isFinite(expectedMatk) ? expectedMatk : null,
-      residualMatk,
-      residual: residualDeclared,
+      x,
+      y,
+      declaredValue: x,
+      inferredValue,
+      observedValue: y,
+      expectedValue: predictedDeclared,
+      residual,
+      residualDebuffed,
       standardizedResidual,
       score,
       explanation,
       point: { x, y },
+      declaredMatkPct: member.matk_pct,
+      inferredMatkPct:
+        verdict === 'POSSIBLE_BUFF' &&
+        member.matk_pct !== null &&
+        model.debuffKind === 'x_shift'
+          ? member.matk_pct - model.debuffAmount
+          : member.matk_pct,
+      observedMatk,
+      expectedMatk: expectedMatk !== null && Number.isFinite(expectedMatk) ? expectedMatk : null,
+      residualMatk,
     }
   })
 

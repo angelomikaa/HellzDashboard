@@ -41,7 +41,14 @@ const NETWORK_ERROR =
   'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 const SESSION_ERROR = 'Sua sessão expirou ou você não tem permissão. Entre novamente.'
 
-const MODEL_KEYS: ModelKey[] = ['ratio_diff', 'matk_pct', 'patk_pct', 'matk_patk']
+const MODEL_KEYS: ModelKey[] = [
+  'ratio_diff',
+  'matk_pct',
+  'patk_pct',
+  'matk_patk',
+  'rpdef_pct',
+  'rmdef_pct',
+]
 
 const VERDICT_LABEL: Record<BuffVerdict, string> = {
   NORMAL: 'Normal',
@@ -305,9 +312,9 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
     return <p className="mt-6 text-base text-muted">Carregando dados de regressão…</p>
   }
 
-  const equipmentFlatMissing =
-    dataset.fields.equip_matk?.available === false ||
-    dataset.fields.equip_patk?.available === false
+  const equipmentFlatMissing = ['equip_matk', 'equip_patk', 'equip_pdef', 'equip_mdef'].some(
+    (key) => dataset.fields[key]?.available === false,
+  )
 
   const classificationItems = classification?.items ?? []
   const possible = classificationItems.filter((item) => item.verdict === 'POSSIBLE_BUFF')
@@ -322,6 +329,10 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
           <p className="text-muted">
             {`${dataset.coverage.members_with_validated} membros com envio validado · `}
             {`${dataset.coverage.complete_both_pairs} com MATK/PATK completos`}
+          </p>
+          <p className="text-muted">
+            {`${dataset.coverage.complete_rpdef_pairs} pares RPDEF · `}
+            {`${dataset.coverage.complete_rmdef_pairs} pares RMDEF`}
           </p>
           <p className="text-muted">
             {`${dataset.coverage.total_validated_submissions} envios validados · `}
@@ -483,18 +494,41 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
                 label="Classe / função"
                 value={`${safeClassLabel(selected.member.char_class)} · ${memberFunction(selected.member)}`}
               />
-              <StatLine label="MATK% declarado" value={fmt(selected.declaredMatkPct, true)} />
-              <StatLine label="MATK% inferido" value={fmt(selected.inferredMatkPct, true)} />
-              <StatLine label="MATK observado" value={fmt(selected.observedMatk)} />
+              <StatLine
+                label={`${classification?.model.xLabel ?? 'X'} declarado`}
+                value={fmt(selected.declaredValue, classification?.model.xType === 'percentual')}
+              />
+              <StatLine
+                label="Inferido"
+                value={fmt(
+                  selected.inferredValue,
+                  classification?.model.debuffKind === 'x_shift'
+                    ? classification?.model.xType === 'percentual'
+                    : classification?.model.yType === 'percentual',
+                )}
+              />
+              <StatLine
+                label={`${classification?.model.yLabel ?? 'Y'} observado`}
+                value={fmt(selected.observedValue, classification?.model.yType === 'percentual')}
+              />
             </div>
             <div>
-              <StatLine label="MATK esperado" value={fmt(selected.expectedMatk)} />
-              <StatLine label="Resíduo MATK" value={fmt(selected.residualMatk)} />
+              <StatLine
+                label={`${classification?.model.yLabel ?? 'Y'} esperado`}
+                value={fmt(selected.expectedValue, classification?.model.yType === 'percentual')}
+              />
+              <StatLine
+                label="Resíduo"
+                value={fmt(selected.residual, classification?.model.yType === 'percentual')}
+              />
               <StatLine
                 label="Resíduo padronizado"
                 value={`${selected.standardizedResidual.toFixed(2)}σ`}
               />
-              <StatLine label="Score (+35 p.p.)" value={selected.score.toFixed(2)} />
+              <StatLine label="Score da hipótese" value={selected.score.toFixed(2)} />
+              {selected.expectedMatk !== null && (
+                <StatLine label="MATK esperado / resíduo" value={`${fmt(selected.expectedMatk)} / ${fmt(selected.residualMatk)}`} />
+              )}
             </div>
           </div>
           <p className="mt-2 text-sm text-muted">{selected.explanation}</p>
@@ -505,7 +539,11 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
         <h3 className="text-sm font-semibold text-content">Classificação por jogador</h3>
         <p className="mt-1 text-xs text-muted">
           Score é um sinal estatístico, não uma probabilidade de cheat. Inconclusivo = o
-          modelo não separa as hipóteses com segurança.
+          modelo não separa as hipóteses com segurança. Inferido =
+          {classification?.model.debuffKind === 'x_shift'
+            ? ` x − ${classification.model.debuffAmount} p.p.`
+            : ` y ÷ ${classification?.model.debuffAmount}`}
+          .
         </p>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-max text-left text-sm">
@@ -513,46 +551,71 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
               <tr className="border-b border-line">
                 <th className="px-2 py-2 font-semibold text-muted">Jogador</th>
                 <th className="px-2 py-2 font-semibold text-muted">Classe</th>
-                <th className="px-2 py-2 text-right font-semibold text-muted">MATK% decl.</th>
-                <th className="px-2 py-2 text-right font-semibold text-muted">MATK% inf.</th>
-                <th className="px-2 py-2 text-right font-semibold text-muted">MATK obs.</th>
-                <th className="px-2 py-2 text-right font-semibold text-muted">MATK esp.</th>
+                <th className="px-2 py-2 text-right font-semibold text-muted">
+                  {`${classification?.model.xLabel ?? 'X'} decl.`}
+                </th>
+                <th className="px-2 py-2 text-right font-semibold text-muted">Inferido</th>
+                <th className="px-2 py-2 text-right font-semibold text-muted">
+                  {`${classification?.model.yLabel ?? 'Y'} obs.`}
+                </th>
+                <th className="px-2 py-2 text-right font-semibold text-muted">
+                  {`${classification?.model.yLabel ?? 'Y'} esp.`}
+                </th>
                 <th className="px-2 py-2 text-right font-semibold text-muted">Resíduo</th>
                 <th className="px-2 py-2 text-right font-semibold text-muted">Score</th>
                 <th className="px-2 py-2 font-semibold text-muted">Veredito</th>
               </tr>
             </thead>
             <tbody>
-              {classificationItems.map((item) => (
-                <tr key={item.member.member_id} className="border-b border-line">
-                  <td className="px-2 py-2 text-content">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(item.member.member_id)}
-                      className="text-left font-semibold hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    >
-                      {item.member.display_name}
-                    </button>
-                    <div className="text-xs text-muted">{item.explanation}</div>
-                  </td>
-                  <td className="px-2 py-2 text-muted">
-                    {safeClassLabel(item.member.char_class)}
-                  </td>
-                  <td className="px-2 py-2 text-right font-mono">{fmt(item.declaredMatkPct, true)}</td>
-                  <td className="px-2 py-2 text-right font-mono">{fmt(item.inferredMatkPct, true)}</td>
-                  <td className="px-2 py-2 text-right font-mono">{fmt(item.observedMatk)}</td>
-                  <td className="px-2 py-2 text-right font-mono">{fmt(item.expectedMatk)}</td>
-                  <td className="px-2 py-2 text-right font-mono">{fmt(item.residualMatk)}</td>
-                  <td className="px-2 py-2 text-right font-mono">{item.score.toFixed(2)}</td>
-                  <td className="px-2 py-2">
-                    <span
-                      className={`inline-block rounded-full border px-2 py-0.5 text-xs font-semibold ${VERDICT_CLASS[item.verdict]}`}
-                    >
-                      {VERDICT_LABEL[item.verdict]}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {classificationItems.map((item) => {
+                const model = classification?.model
+                const inferredPercent =
+                  model === undefined
+                    ? false
+                    : model.debuffKind === 'x_shift'
+                      ? model.xType === 'percentual'
+                      : model.yType === 'percentual'
+                return (
+                  <tr key={item.member.member_id} className="border-b border-line">
+                    <td className="px-2 py-2 text-content">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(item.member.member_id)}
+                        className="text-left font-semibold hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      >
+                        {item.member.display_name}
+                      </button>
+                      <div className="text-xs text-muted">{item.explanation}</div>
+                    </td>
+                    <td className="px-2 py-2 text-muted">
+                      {safeClassLabel(item.member.char_class)}
+                    </td>
+                    <td className="px-2 py-2 text-right font-mono">
+                      {fmt(item.declaredValue, model?.xType === 'percentual')}
+                    </td>
+                    <td className="px-2 py-2 text-right font-mono">
+                      {fmt(item.inferredValue, inferredPercent)}
+                    </td>
+                    <td className="px-2 py-2 text-right font-mono">
+                      {fmt(item.observedValue, model?.yType === 'percentual')}
+                    </td>
+                    <td className="px-2 py-2 text-right font-mono">
+                      {fmt(item.expectedValue, model?.yType === 'percentual')}
+                    </td>
+                    <td className="px-2 py-2 text-right font-mono">
+                      {fmt(item.residual, model?.yType === 'percentual')}
+                    </td>
+                    <td className="px-2 py-2 text-right font-mono">{item.score.toFixed(2)}</td>
+                    <td className="px-2 py-2">
+                      <span
+                        className={`inline-block rounded-full border px-2 py-0.5 text-xs font-semibold ${VERDICT_CLASS[item.verdict]}`}
+                      >
+                        {VERDICT_LABEL[item.verdict]}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -635,6 +698,12 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
             Sem Equipment/Base MATK/PATK flat, a separação entre “build alta legítima” e
             buff de +35 p.p. é limitada. O dashboard reporta isso em vez de forçar um
             veredito.
+          </li>
+          <li>
+            Defesa (Angelus/Assumptio): a hipótese de buff divide RPDEF/RMDEF por 1,95
+            (+95%); o eixo X é o % de equipamento, que o buff não altera. A curva de defesa
+            tem R² menor (≈0,37/0,45) e mínimo de 0,25 — é exploratória e mais sensível a
+            diferenças de classe do que o controle MATK/PATK.
           </li>
         </ul>
       </section>

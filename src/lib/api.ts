@@ -864,6 +864,13 @@ export interface RegressionMember {
   matk_pct: number | null
   patk: number | null
   patk_pct: number | null
+  /** 0052: defense fields for the Angelus / Assumptio models. */
+  pdef: number | null
+  mdef: number | null
+  rpdef: number | null
+  rmdef: number | null
+  equip_pdef_pct: number | null
+  equip_mdef_pct: number | null
   latest_submitted_at: string | null
   validated_submissions: number
 }
@@ -874,6 +881,9 @@ export interface RegressionCoverage {
   complete_matk_pairs: number
   complete_patk_pairs: number
   complete_both_pairs: number
+  /** 0052: defense pair coverage. */
+  complete_rpdef_pairs: number
+  complete_rmdef_pairs: number
   repeated_submitters: number
   total_validated_submissions: number
 }

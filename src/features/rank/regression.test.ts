@@ -25,6 +25,12 @@ function member(partial: Partial<RegressionMember>): RegressionMember {
     matk_pct: null,
     patk: null,
     patk_pct: null,
+    pdef: null,
+    mdef: null,
+    rpdef: null,
+    rmdef: null,
+    equip_pdef_pct: null,
+    equip_mdef_pct: null,
     latest_submitted_at: null,
     validated_submissions: 1,
     ...partial,
@@ -142,6 +148,33 @@ describe('classification — +35 p.p. hypothesis', () => {
     const result = classifyMembers(ratioMembers, MODELS.ratio_diff)
     const item = result.items.find((entry) => entry.member.member_id === 'ratio-buffed')
     expect(item?.verdict).toBe('POSSIBLE_BUFF')
+  })
+
+  it('flags an Angelus/Assumptio buff on the RPDEF curve (y × 1,95)', () => {
+    const defenseMembers: RegressionMember[] = Array.from({ length: 24 }, (_, i) => {
+      const pct = 18 + i
+      return member({
+        member_id: `def-${i}`,
+        display_name: `Defense ${i}`,
+        equip_pdef_pct: pct,
+        rpdef: 1500 + 55 * pct + NOISE[i % NOISE.length],
+      })
+    })
+    const truePct = 30
+    const trueRpdef = 1500 + 55 * truePct
+    defenseMembers.push(
+      member({
+        member_id: 'def-buffed',
+        display_name: 'Defense Buffed',
+        equip_pdef_pct: truePct,
+        rpdef: trueRpdef * 1.95,
+      }),
+    )
+    const result = classifyMembers(defenseMembers, MODELS.rpdef_pct)
+    const item = result.items.find((entry) => entry.member.member_id === 'def-buffed')
+    expect(item?.verdict).toBe('POSSIBLE_BUFF')
+    expect(item?.inferredValue).toBeCloseTo(trueRpdef, 0)
+    expect(item?.score ?? 0).toBeGreaterThan(1.5)
   })
 
   it('returns INCONCLUSIVE when the sample is too small', () => {
