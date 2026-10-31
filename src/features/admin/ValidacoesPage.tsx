@@ -18,6 +18,7 @@ import { formatStatValue } from '../../lib/parseStatValue'
 import { ClassCrest } from '../assets/ClassCrest'
 import { classLabel } from '../../lib/classLabels'
 import { AntiCheatPanel } from './AntiCheatPanel'
+import { reviewDisplay } from './reviewDisplay'
 import { ConfirmDialog } from './ConfirmDialog'
 import { IdentityReview } from './IdentityReview'
 import { RequestReview } from './RequestReview'
@@ -206,6 +207,7 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
               {rows.map((row) => {
                 const isExpanded = expandedId === row.submission_id
                 const regionId = `queue-review-${row.submission_id}`
+                const reviewBadge = reviewDisplay(row.anti_cheat?.review?.category)
                 return (
                   <div key={row.submission_id} className="flex flex-col">
                     {/* The WHOLE row is the toggle (UI-SPEC list-item contract). */}
@@ -226,11 +228,17 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                        <span className="flex min-w-0 flex-col">
                          <span className="flex flex-wrap items-center gap-2 text-base text-content">
                            <span>{row.display_name}</span>
-                           {row.anti_cheat?.flagged === true && (
+                           {reviewBadge !== null ? (
+                             <span
+                               className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${reviewBadge.chip}`}
+                             >
+                               {reviewBadge.label}
+                             </span>
+                           ) : row.anti_cheat?.flagged === true ? (
                              <span className="rounded-full bg-error/15 px-2 py-0.5 text-xs font-semibold text-error">
                                ⚠ Revisar
                              </span>
-                           )}
+                           ) : null}
                          </span>
                          {(row.nickname !== null || row.char_id !== null || row.char_class !== null) && (
                            <span className="text-sm text-muted">

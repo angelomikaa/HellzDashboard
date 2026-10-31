@@ -438,8 +438,21 @@ export interface AntiCheatHistoryDeviation {
   flagged: boolean
 }
 
+/** 0054: server-side three-state officer review category. */
+export type AntiCheatReviewCategory = 'consistent' | 'inconclusive' | 'buffed'
+
+export interface AntiCheatReview {
+  category: AntiCheatReviewCategory
+  cohort_available: boolean
+  history_available: boolean
+  history_sample_size: number
+  reasons: string[]
+}
+
 export interface AntiCheatFlags {
   flagged: boolean
+  /** 0054: green/yellow/orange review category + human-readable reasons. */
+  review?: AntiCheatReview
   defense_spikes: AntiCheatDefenseSpike[]
   /** 0049: PATK/MATK curve verdicts (always two entries; `available` says whether n >= 5). */
   curve_deviations?: AntiCheatCurveDeviation[]

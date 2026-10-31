@@ -83,7 +83,7 @@ describe('AntiCheatPanel', () => {
 
   it('renders the spike, the OCR edit and the OVR swing', () => {
     const html = renderToStaticMarkup(<AntiCheatPanel flags={flags} />)
-    expect(html).toContain('Alertas anti-cheat')
+    expect(html).toContain('Revisão anti-cheat')
     expect(html).toContain('Revisar antes de validar')
     expect(html).toContain('RPDEF')
     expect(html).toContain('4,1σ')
@@ -188,6 +188,32 @@ describe('AntiCheatPanel', () => {
     )
     expect(html).toContain('curva indisponível (n=3)')
     expect(html).not.toContain('Possível Impositio Manus')
+  })
+
+  it('renders the three review categories', () => {
+    const categories = [
+      ['consistent', 'Consistente'],
+      ['inconclusive', 'Inconclusivo'],
+      ['buffed', 'Buffado'],
+    ] as const
+    for (const [category, label] of categories) {
+      const html = renderToStaticMarkup(
+        <AntiCheatPanel
+          flags={{
+            ...flags,
+            review: {
+              category,
+              cohort_available: true,
+              history_available: true,
+              history_sample_size: 3,
+              reasons: ['Motivo de teste.'],
+            },
+          }}
+        />,
+      )
+      expect(html).toContain(label)
+      expect(html).toContain('Motivo de teste.')
+    }
   })
 
   it('does not flag an OVR swing when class or function changed', () => {

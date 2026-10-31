@@ -21,6 +21,7 @@ import {
   OVR_SWING_POINTS,
   ovrSwingFlagged,
 } from '../submit/antiCheat'
+import { reviewDisplay } from './reviewDisplay'
 
 const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
 const ratio = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
@@ -70,17 +71,29 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
   const historyFlagged = history.some((entry) => entry.flagged)
   const hasAny =
     spikes.length > 0 || overrides.length > 0 || swingFlagged || curveFlagged || historyFlagged
+  const review = flags.review ?? null
+  const display = reviewDisplay(review?.category)
 
   return (
     <section
-      aria-label="Alertas anti-cheat"
+      aria-label="Revisão anti-cheat"
       className={`mt-3 rounded-md border p-3 ${
-        flags.flagged ? 'border-error/60 bg-error/10' : 'border-line bg-card'
+        display !== null
+          ? display.panel
+          : flags.flagged
+            ? 'border-error/60 bg-error/10'
+            : 'border-line bg-card'
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-content">Alertas anti-cheat</h4>
-        {flags.flagged ? (
+        <h4 className="text-sm font-semibold text-content">Revisão anti-cheat</h4>
+        {display !== null ? (
+          <span
+            className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${display.badge}`}
+          >
+            {display.label}
+          </span>
+        ) : flags.flagged ? (
           <span className="rounded-full bg-error/15 px-2 py-0.5 text-xs font-semibold text-error">
             Revisar antes de validar
           </span>
@@ -88,6 +101,14 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
           <span className="text-xs text-muted">Sem alerta bloqueante</span>
         )}
       </div>
+
+      {review !== null && review.reasons.length > 0 && (
+        <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-content">
+          {review.reasons.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      )}
 
       {spikes.length > 0 && (
         <div className="mt-3">
