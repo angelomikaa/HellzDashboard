@@ -33,6 +33,7 @@ import { tierForPoints } from '../dashboard/presentation'
 import { TIER_BORDER_DISPLAY, TIER_TEXT_DISPLAY } from '../dashboard/tierDisplay'
 import { ClassCrest } from '../assets/ClassCrest'
 import { applyViewSort, orderStatRows, type RankSortKey, type StatOrder } from './rankView'
+import { RegressionDashboard } from './RegressionDashboard'
 import type { NeoFootSession } from '../auth/session'
 
 // Enumeration-safe pt-BR copy (UI contract): never expose HTTP codes, gateway
@@ -76,6 +77,7 @@ export function RankPage({ session }: { session: NeoFootSession }) {
   // 0047 cross-cohort inspector: 'ovr' keeps the original role boards;
   // 'stat' shows ONE stat across every real member, independent of cohort.
   const [view, setView] = useState<RankView>('ovr')
+  const [statView, setStatView] = useState<'table' | 'regression'>('table')
   const [statKey, setStatKey] = useState('rpdef')
   const [statOrder, setStatOrder] = useState<StatOrder>('desc')
   const [overview, setOverview] = useState<StatOverview | null>(null)
@@ -159,7 +161,7 @@ export function RankPage({ session }: { session: NeoFootSession }) {
 
   // 0047: cross-cohort stat fetch (staff-only RPC). Same stale-guard pattern.
   useEffect(() => {
-    if (view !== 'stat' || statKey === '') return
+    if (view !== 'stat' || statView !== 'table' || statKey === '') return
     let cancelled = false
     setOverview(null)
     setOverviewError(null)
@@ -178,7 +180,7 @@ export function RankPage({ session }: { session: NeoFootSession }) {
     return () => {
       cancelled = true
     }
-  }, [session, view, statKey])
+  }, [session, view, statView, statKey])
 
   // Display-only ordering (T-072-11 view aid): 'desc' is the server order
   // verbatim; 'asc' reverses valued rows and keeps no-value members last.
@@ -456,6 +458,38 @@ export function RankPage({ session }: { session: NeoFootSession }) {
         </>
       ) : (
         <>
+          <div
+            role="tablist"
+            aria-label="Modo da análise por stat"
+            className="mt-4 flex gap-1"
+          >
+            {(
+              [
+                { value: 'table', label: 'Tabela por stat' },
+                { value: 'regression', label: 'Regressão' },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="tab"
+                aria-selected={statView === option.value}
+                onClick={() => setStatView(option.value)}
+                className={`h-10 rounded-md border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  statView === option.value
+                    ? 'border-accent bg-accent text-accent-foreground'
+                    : 'border-line text-muted hover-control hover:text-content'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {statView === 'regression' ? (
+            <RegressionDashboard session={session} />
+          ) : (
+            <>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <select
               value={statKey}
@@ -637,6 +671,8 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                   </table>
                 </div>
               )}
+            </>
+          )}
             </>
           )}
         </>

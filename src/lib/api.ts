@@ -846,6 +846,65 @@ export interface StatOverview {
   rows: StatOverviewRow[]
 }
 
+/** Field availability metadata for the regression dataset (0051). */
+export interface RegressionField {
+  label: string
+  value_type?: 'flat' | 'percentual'
+  available: boolean
+  reason?: string
+}
+
+/** One member's latest validated attack values (0051). */
+export interface RegressionMember {
+  member_id: string
+  display_name: string
+  char_class: string | null
+  char_function: 'dps' | 'mdps' | 'suporte' | null
+  matk: number | null
+  matk_pct: number | null
+  patk: number | null
+  patk_pct: number | null
+  latest_submitted_at: string | null
+  validated_submissions: number
+}
+
+export interface RegressionCoverage {
+  active_real_members: number
+  members_with_validated: number
+  complete_matk_pairs: number
+  complete_patk_pairs: number
+  complete_both_pairs: number
+  repeated_submitters: number
+  total_validated_submissions: number
+}
+
+export interface RegressionDataset {
+  generated_at: string
+  fields: Record<string, RegressionField>
+  coverage: RegressionCoverage
+  members: RegressionMember[]
+}
+
+/**
+ * Read-only regression dataset (0051): latest validated MATK/MATK%/PATK/PATK%
+ * per active real member + coverage metadata. Staff-only gate inside the RPC.
+ * The RPC reports Equipment/Base flat MATK/PATK as unavailable instead of
+ * inventing them. Statistical calculations live in the pure regression module.
+ */
+export async function fetchRegressionDataset(
+  session: NeoFootSession,
+): Promise<RegressionDataset> {
+  const res = await restFetch(session, '/rpc/stat_regression_dataset', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  const dataset = await parseBody<RegressionDataset>(res)
+  if (!dataset || !Array.isArray(dataset.members)) {
+    throw new ApiError(0, 'server', 'malformed stat_regression_dataset response')
+  }
+  return dataset
+}
+
 /**
  * Cross-cohort stat inspector (0047): ONE stat across every active real
  * member, independent of class/cohort. Staff-only gate inside the RPC — a
