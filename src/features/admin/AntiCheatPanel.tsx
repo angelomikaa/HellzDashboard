@@ -1,14 +1,17 @@
-// AntiCheatPanel — the officer-facing review panel (Phase 10.5, 0046).
+// AntiCheatPanel — the officer-facing review panel (Phase 10.5, 0046/0049).
 //
-// Read-only evidence beside the pending submission. Three independent blocks:
-//   - defense spikes vs the same class+build-role cohort average (>= 1.5x);
+// Read-only evidence beside the pending submission. Four independent blocks:
+//   - defense spikes: the fixed 1.5x cohort-average ratio AND/OR a robust
+//     sigma >= 3.5 vs the cohort median (n >= 5, 0049);
+//   - attribute curves: the normalized-base curve for PATK/MATK, including the
+//     Impositio Manus undo test (0049);
 //   - inputs the player edited after the OCR read (original -> final);
 //   - the OVR swing if the submission is validated (>= 8 points warns, and
 //     only when class/build-role are unchanged).
 // The panel never writes and never decides — Validar/Rejeitar stay the only
 // actions on the queue, exactly as before.
 import { formatStatValue } from '../../lib/parseStatValue'
-import type { AntiCheatFlags } from '../../lib/api'
+import type { AntiCheatCurveDeviation, AntiCheatFlags } from '../../lib/api'
 import {
   DEFENSE_SPIKE_RATIO,
   OVR_SWING_POINTS,
@@ -23,14 +26,34 @@ function signed(n: number): string {
   return n > 0 ? `+${formatted}` : formatted
 }
 
+function sigma(z: number | null | undefined): string {
+  return z === null || z === undefined ? '—' : `${number.format(z)}σ`
+}
+
+function fmt(
+  value: number | null | undefined,
+  type: 'flat' | 'percentual' | null | undefined,
+): string {
+  if (value === null || value === undefined) return '—'
+  return formatStatValue(value, type === 'percentual' ? 'percentual' : 'flat')
+}
+
+function curveTitle(curve: AntiCheatCurveDeviation): string {
+  if (!curve.available) return 'Curva indisponível'
+  if (!curve.flagged) return 'Dentro da curva'
+  return curve.reason === 'impositio' ? 'Possível Impositio Manus' : 'Desvio da curva'
+}
+
 export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
   if (!flags) return null
 
   const spikes = flags.defense_spikes ?? []
+  const curves = flags.curve_deviations ?? []
   const overrides = flags.ocr_overrides ?? []
   const swing = flags.ovr_swing
   const swingFlagged = ovrSwingFlagged(flags)
-  const hasAny = spikes.length > 0 || overrides.length > 0 || swingFlagged
+  const curveFlagged = curves.some((curve) => curve.flagged)
+  const hasAny = spikes.length > 0 || overrides.length > 0 || swingFlagged || curveFlagged
 
   return (
     <section
@@ -53,7 +76,7 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
       {spikes.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-semibold text-error">
-            {`Defesa acima do esperado (≥ ${ratio.format(DEFENSE_SPIKE_RATIO)}× a média da classe/função)`}
+            {`Defesa acima do esperado (≥ ${ratio.format(DEFENSE_SPIKE_RATIO)}× a média ou ≥ 3,5σ da mediana)`}
           </p>
           <ul className="mt-1 flex flex-col gap-1">
             {spikes.map((spike) => (
@@ -66,8 +89,68 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
                   {formatStatValue(spike.value, spike.value_type)}
                 </span>
                 <span className="text-muted">
-                  {`· média ${formatStatValue(spike.baseline, spike.value_type)} · ${ratio.format(spike.ratio)}× · n=${spike.sample_size}`}
+                  {`· média ${formatStatValue(spike.baseline, spike.value_type)} · ${ratio.format(spike.ratio)}×`}
+                  {spike.median !== null && spike.median !== undefined
+                    ? ` · mediana ${formatStatValue(spike.median, spike.value_type)}`
+                    : ''}
+                  {spike.z !== null && spike.z !== undefined ? ` · ${sigma(spike.z)}` : ''}
+                  {` · n=${spike.sample_size}`}
                 </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {curves.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-content">Curva de atributos (ATK/MATK)</p>
+          <ul className="mt-1 flex flex-col gap-2">
+            {curves.map((curve) => (
+              <li key={curve.flat_stat} className="text-sm text-content">
+                {!curve.available ? (
+                  <span className="text-muted">
+                    {`${curve.flat_label ?? curve.flat_stat} / ${curve.pct_label ?? curve.pct_stat}: curva indisponível (n=${curve.sample_size})`}
+                  </span>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span
+                        className={
+                          curve.flagged ? 'font-semibold text-error' : 'font-semibold text-content'
+                        }
+                      >
+                        {curveTitle(curve)}
+                      </span>
+                      <span className="font-mono">
+                        {`${curve.flat_label ?? curve.flat_stat} ${fmt(curve.flat_value, curve.flat_value_type)}`}
+                      </span>
+                      <span className="text-muted">
+                        {`· esperado ${fmt(curve.expected_flat, curve.flat_value_type)} para ${curve.pct_label ?? curve.pct_stat} ${fmt(curve.pct_value, curve.pct_value_type)}`}
+                      </span>
+                      {curve.curve_deviation_pct !== null &&
+                        curve.curve_deviation_pct !== undefined && (
+                          <span className={curve.flagged ? 'text-error' : 'text-muted'}>
+                            {`(${signed(curve.curve_deviation_pct)}%)`}
+                          </span>
+                        )}
+                    </div>
+                    <div className="text-xs text-muted">
+                      <span>
+                        {`base ${fmt(curve.base_value, 'flat')} · mediana ${fmt(curve.median_base, 'flat')} · ${sigma(curve.z_base)}`}
+                      </span>
+                      {curve.reason === 'impositio' &&
+                        curve.base_debuff !== null &&
+                        curve.base_debuff !== undefined &&
+                        curve.z_debuff !== null &&
+                        curve.z_debuff !== undefined && (
+                          <span>
+                            {` · sem o buff (+35%/+35 p.p.): base ${fmt(curve.base_debuff, 'flat')} (${sigma(curve.z_debuff)})`}
+                          </span>
+                        )}
+                    </div>
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -137,7 +220,7 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
 
       {!hasAny && (
         <p className="mt-2 text-sm text-muted">
-          Nenhum valor acima do limite e nenhum OVR fora do esperado.
+          Nenhum valor fora da curva, nenhuma edição de OCR e nenhum OVR fora do esperado.
         </p>
       )}
     </section>

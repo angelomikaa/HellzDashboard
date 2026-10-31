@@ -352,7 +352,7 @@ export interface QueueStat {
   value: number
 }
 
-/** One stat value at >= 1.5x the same class+role cohort average (0046). */
+/** One flagged defense value (0046 ratio; 0049 adds the robust sigma). */
 export interface AntiCheatDefenseSpike {
   stat_key: string
   label: string
@@ -360,6 +360,44 @@ export interface AntiCheatDefenseSpike {
   value: number
   baseline: number
   ratio: number
+  sample_size: number
+  /** 0049: cohort median/MAD/sigma (present when n >= 5). */
+  median?: number | null
+  mad?: number | null
+  z?: number | null
+  reason?: 'ratio' | 'sigma' | 'both' | null
+}
+
+/**
+ * 0049: one flat/percent curve verdict for a pending submission.
+ * `base = flat / (1 + pct/100)`; the cohort median base defines the expected
+ * flat for the submitted pct. `reason = 'impositio'` means the observed
+ * percent is a high outlier AND removing the +35%/+35 p.p. buff puts the base
+ * back on the curve.
+ */
+export interface AntiCheatCurveDeviation {
+  available: boolean
+  flagged: boolean
+  reason: 'impositio' | 'curve' | null
+  flat_stat: string
+  pct_stat: string
+  flat_label: string | null
+  pct_label: string | null
+  flat_value_type: 'flat' | 'percentual' | null
+  pct_value_type: 'flat' | 'percentual' | null
+  flat_value: number | null
+  pct_value: number | null
+  base_value?: number | null
+  median_base?: number | null
+  median_pct?: number | null
+  mad_base?: number | null
+  mad_pct?: number | null
+  z_base?: number | null
+  z_pct?: number | null
+  expected_flat?: number | null
+  curve_deviation_pct?: number | null
+  base_debuff?: number | null
+  z_debuff?: number | null
   sample_size: number
 }
 
@@ -386,6 +424,8 @@ export interface AntiCheatOvrSwing {
 export interface AntiCheatFlags {
   flagged: boolean
   defense_spikes: AntiCheatDefenseSpike[]
+  /** 0049: PATK/MATK curve verdicts (always two entries; `available` says whether n >= 5). */
+  curve_deviations?: AntiCheatCurveDeviation[]
   ocr_overrides: AntiCheatOcrOverride[]
   ocr_filled_count: number
   ocr_edited_count: number
@@ -771,9 +811,15 @@ export interface StatOverviewRow {
   char_function: 'dps' | 'mdps' | 'suporte' | null
   value: number | null
   submitted_at: string | null
-  /** Same class+build-role average, self excluded (null when n < 3). */
+  /** Same stats-cohort average, self excluded (null when n < 3). */
   class_average: number | null
+  /** 0049: cohort median (n >= 3) and MAD (n >= 5). */
+  class_median: number | null
+  class_mad: number | null
   class_sample_size: number | null
+  /** 0049: robust sigma vs the cohort median (n >= 5, positive median/MAD). */
+  class_z: number | null
+  class_sigma_outlier: boolean
   cohort_ratio: number | null
   guild_ratio: number | null
   cohort_outlier: boolean

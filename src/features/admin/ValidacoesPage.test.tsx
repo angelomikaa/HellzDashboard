@@ -87,6 +87,74 @@ describe('AntiCheatPanel', () => {
     expect(html).toContain('+11,9')
   })
 
+  it('renders the Impositio curve evidence (0049)', () => {
+    const html = renderToStaticMarkup(
+      <AntiCheatPanel
+        flags={{
+          ...flags,
+          curve_deviations: [
+            {
+              available: true,
+              flagged: true,
+              reason: 'impositio',
+              flat_stat: 'patk',
+              pct_stat: 'equip_patk_pct',
+              flat_label: 'PATK',
+              pct_label: 'Equip. PATK %',
+              flat_value_type: 'flat',
+              pct_value_type: 'percentual',
+              flat_value: 6114,
+              pct_value: 70.04,
+              base_value: 3595,
+              median_base: 3354,
+              median_pct: 31.56,
+              mad_base: 92,
+              mad_pct: 3.48,
+              z_base: 1.44,
+              z_pct: 7.46,
+              expected_flat: 5703,
+              curve_deviation_pct: 7.2,
+              base_debuff: 3354,
+              z_debuff: 0,
+              sample_size: 7,
+            },
+          ],
+        }}
+      />,
+    )
+    expect(html).toContain('Possível Impositio Manus')
+    expect(html).toContain('sem o buff')
+    expect(html).toContain('Curva de atributos')
+  })
+
+  it('renders an unavailable curve without a verdict', () => {
+    const html = renderToStaticMarkup(
+      <AntiCheatPanel
+        flags={{
+          ...flags,
+          curve_deviations: [
+            {
+              available: false,
+              flagged: false,
+              reason: null,
+              flat_stat: 'patk',
+              pct_stat: 'equip_patk_pct',
+              flat_label: 'PATK',
+              pct_label: 'Equip. PATK %',
+              flat_value_type: 'flat',
+              pct_value_type: 'percentual',
+              flat_value: 4000,
+              pct_value: 30,
+              sample_size: 3,
+            },
+          ],
+        }}
+      />,
+    )
+    expect(html).toContain('curva indisponível (n=3)')
+    expect(html).not.toContain('Possível Impositio Manus')
+  })
+
   it('does not flag an OVR swing when class or function changed', () => {
     expect(
       ovrSwingFlagged({
@@ -116,7 +184,7 @@ describe('AntiCheatPanel', () => {
         }}
       />,
     )
-    expect(html).toContain('Nenhum valor acima do limite')
+    expect(html).toContain('Nenhum valor fora da curva')
   })
 
   it('renders nothing without flags (old server during deploy)', () => {
