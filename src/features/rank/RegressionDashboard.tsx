@@ -353,6 +353,11 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
             {' Por isso o eixo de equipamento usa apenas o %. Não inventamos os valores flat.'}
           </p>
         )}
+        <p className="mt-2 text-xs text-muted">
+          Este painel usa somente envios <strong>validados</strong>. Envios pendentes são
+          revisados em Validações, onde aparecem os alertas anti-cheat — incluindo o desvio
+          contra o histórico validado do próprio jogador.
+        </p>
       </section>
 
       <section className="rounded-lg border border-line bg-surface p-4">

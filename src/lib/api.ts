@@ -421,11 +421,30 @@ export interface AntiCheatOvrSwing {
   function_changed: boolean
 }
 
+/** 0053: one pending-vs-history deviation for the buff-sensitive stats. */
+export interface AntiCheatHistoryDeviation {
+  stat_key: string
+  label: string
+  value_type: 'flat' | 'percentual'
+  previous: number
+  value: number
+  delta: number
+  delta_pct: number | null
+  history_median: number | null
+  history_mad: number | null
+  history_sample_size: number
+  z: number | null
+  pattern: 'impositio' | 'defense' | 'history_jump' | null
+  flagged: boolean
+}
+
 export interface AntiCheatFlags {
   flagged: boolean
   defense_spikes: AntiCheatDefenseSpike[]
   /** 0049: PATK/MATK curve verdicts (always two entries; `available` says whether n >= 5). */
   curve_deviations?: AntiCheatCurveDeviation[]
+  /** 0053: pending vs the member's own validated history (known buff signatures). */
+  history_deviations?: AntiCheatHistoryDeviation[]
   ocr_overrides: AntiCheatOcrOverride[]
   ocr_filled_count: number
   ocr_edited_count: number

@@ -88,6 +88,36 @@ describe('AntiCheatPanel', () => {
     expect(html).toContain('RPDEF')
     expect(html).toContain('4,1σ')
     expect(html).toContain('Equip. PDEF (valor)')
+  })
+
+  it('renders a history deviation with the buff pattern', () => {
+    const html = renderToStaticMarkup(
+      <AntiCheatPanel
+        flags={{
+          ...flags,
+          history_deviations: [
+            {
+              stat_key: 'equip_matk_pct',
+              label: 'Equip. MATK %',
+              value_type: 'percentual',
+              previous: 67.3,
+              value: 102.46,
+              delta: 35.16,
+              delta_pct: 52.24,
+              history_median: 79.34,
+              history_mad: 2.88,
+              history_sample_size: 6,
+              z: 5.41,
+              pattern: 'impositio',
+              flagged: true,
+            },
+          ],
+        }}
+      />,
+    )
+    expect(html).toContain('Desvio vs. histórico validado')
+    expect(html).toContain('Padrão Impositio')
+    expect(html).toContain('35,16 p.p.')
     expect(html).toContain('Variação de OVR')
     expect(html).toContain('+11,9')
   })
