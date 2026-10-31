@@ -279,6 +279,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CURVE-03 | Phase 10.7 - Statistical Buff Detection | Complete (0049 applied live 2026-10-30) |
 | CURVE-04 | Phase 10.7 - Statistical Buff Detection | Complete (0049 applied live 2026-10-30) |
 | CURVE-05 | Phase 10.7 - Statistical Buff Detection | Complete (0050 applied live 2026-10-30) |
+| MREG-01 | Phase 10.8 - MATK/PATK Regression Dashboard | Complete (0051 applied live 2026-10-30) |
+| MREG-02 | Phase 10.8 - MATK/PATK Regression Dashboard | Complete (0051 applied live 2026-10-30) |
+| MREG-03 | Phase 10.8 - MATK/PATK Regression Dashboard | Complete (0051 applied live 2026-10-30) |
+| MREG-04 | Phase 10.8 - MATK/PATK Regression Dashboard | Complete (0051 applied live 2026-10-30) |
 
 ## Anti-Cheat Guardrails (Phase 10.5, inserted 2026-10-30)
 
@@ -289,6 +293,15 @@ Owner request: the form is meant to be filled without buffs. Angelus and Assumpt
 - **CHEAT-03**: Every OCR-filled input is recorded as `ocr` or `ocr_edited` with `ocr_value` and `final_value` in the append-only `submission_provenance` table. Catalog final values are re-derived from `submission_stats`; the transient Equipment PDEF/MDEF tooltip inputs are included.
 - **CHEAT-04**: The projected OVR (same value-proportional formula, server-side) is compared with the current OVR; a >= 8-point swing with an unchanged class/build-role shows previous -> projected and sets `flagged`.
 - **CHEAT-05**: Server-side enforcement, RLS deny-all on the audit table, no key-stat config in anti-cheat payloads, append-only migration, no new npm dependencies.
+
+## MATK/PATK Regression Dashboard (Phase 10.8, inserted 2026-10-30)
+
+Owner task: investigate undeclared +35 p.p. MATK% buffs with a regression dashboard built on the real database, without inventing game formulas or samples.
+
+- **MREG-01**: `stat_regression_dataset()` is staff-only and read-only; returns the latest validated `matk`/`equip_matk_pct`/`patk`/`equip_patk_pct` per active real member, coverage counts, history count, and a `fields` map marking Equipment/Base flat MATK/PATK as unavailable (the form does not capture them).
+- **MREG-02**: Ranking → Stat entre todos gains a Regressão view with MATK×MATK%, PATK×PATK%, MATK/PATK×Δ% and MATK×PATK scatters (OLS + Theil–Sen + 95% CI + n + R²), a robust residual histogram, clickable points and a member detail card.
+- **MREG-03**: Classification NORMAL / POSSIBLE_BUFF / INCONCLUSIVE using the +35 p.p. `x−35` hypothesis against the empirically fitted curve, with declared/inferred MATK%, observed/expected MATK, residual, standardized residual and score; scores are anomaly signals, not cheat probabilities. The current dataset is not forced into a second population; the owner reference pair is recognized as POSSIBLE_BUFF on MATK×MATK% with the missing-PATK caveat.
+- **MREG-04**: No fabricated samples, no source-data writes, no key-stat leak, no new npm dependencies; Theil–Sen + MAD for robustness, OLS only for R²/CI; 13 repeated submitters are not pseudo-replicated (latest validated row per member).
 
 ## Statistical Buff Detection (Phase 10.7, inserted 2026-10-30)
 
@@ -309,6 +322,6 @@ Owner request: see the same stat for all members, independent of class and cohor
 - **XSTAT-03**: Staff-only RPC gate (member JWT forbidden, anon no EXECUTE), validated-only, fixture-free, zero changes to OVR/points surfaces, zero new npm dependencies.
 
 **Coverage:**
-- v1.1 requirements: 71 total
-- Mapped to phases: 71 ✓
+- v1.1 requirements: 75 total
+- Mapped to phases: 75 ✓
 - Unmapped: 0 ✓

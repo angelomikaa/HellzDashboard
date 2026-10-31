@@ -35,6 +35,7 @@
 - [x] Phase 10.5: Anti-Cheat Guardrails (INSERTED 2026-10-30) — server-side defense spike flags (≥1.5× the class+role cohort average for RPDEF/RMDEF/Equip. PDEF%/MDEF%), per-field OCR provenance (source + printed value + final value), and ≥8-point OVR-swing warnings when class/role are unchanged; flagged submissions stay pending for officer review; migration 0046 + client wizard warning + Validações anti-cheat panel
 - [x] Phase 10.6: Cross-Cohort Stat Inspector (INSERTED 2026-10-30) — new "Stat entre todos" mode in the staff Ranking tab: pick any stat, see every active real member's latest validated value side by side (independent of class/cohort) with the self-excluded class+role average, the guild average, and heuristic cohort/guild outlier badges; migration 0047
 - [x] Phase 10.7: Statistical Buff Detection (INSERTED 2026-10-30) — data-driven anti-cheat beyond the fixed 1.5× margin: per-cohort robust curve (`base = flat / (1+pct/100)`, median/MAD), Impositio Manus undo test (+35%/+35 p.p. on PATK/MATK), defense σ ≥ 3.5 alongside the 1.5× ratio, and inspector sigma badges for any stat; migration 0049
+- [x] Phase 10.8: MATK/PATK Regression Dashboard (INSERTED 2026-10-30) — read-only regression dashboard inside Ranking → Stat entre todos: real MATK/PATK records, OLS + Theil–Sen with 95% CI, MATK% / PATK% / ratio-control scatters + residual histogram, and NORMAL / POSSIBLE_BUFF / INCONCLUSIVE classification for the +35 p.p. MATK% hypothesis; Equipment/Base flat MATK/PATK are reported missing, not invented; migration 0051
 - [ ] Phase 11: Verified Access — Claim Authorization & Discord OAuth — first access is manual-fill and officer-validated since 0034 (DSCD-01 holds via claim/registration request approvals, no print anywhere); Phase 11 replaces the manual trust with the real anchor: one-time officer-confirmed Discord↔character link, server-side bot-token role check, custom access token hook keeping every RLS policy intact, device-binding re-decision, PIN retirement path (INSERTED 2026-10-26)
 
 </details>
@@ -309,6 +310,24 @@ Plans:
 
 **Cross-cutting constraints**: review aids only — officers keep the Validar/Rejeitar decision; **curve-only reference (10.7-02)** — no fixed 1.5× margin and no guild-wide "Fora do padrão" badge; the flags come from the robust cohort median/MAD sigma and the ATK/MATK proportional curve. Cohorts below n=5 get no curve/sigma verdict at all (the 1.5× fallback was deliberately removed); the robust median/MAD resists one contaminated value; Impositio constants are the owner-stated +35% / +35 p.p. The same-session 0049 cast correction (`percentile_cont` → numeric before `round`) was re-applied before use. Deploy order: migration first, then the client bundle.
 
+### Phase 10.8: MATK/PATK Regression Dashboard (INSERTED 2026-10-30)
+
+**Goal**: An interactive, read-only regression dashboard in Ranking → Stat entre todos that lets officers investigate whether a submission's MATK% looks displaced by +35 p.p. Use only the real validated records (total MATK/PATK + Equipment percentages); report the missing Equipment/Base flat fields instead of inventing them. Fit OLS and Theil–Sen curves with confidence bands, expose residuals, and classify each member as NORMAL / POSSIBLE_BUFF / INCONCLUSIVE. Scores are anomaly signals, never cheat probabilities.
+
+**Depends on**: Phase 10.6 (Stat entre todos tab), Phase 10.7 (statistical approach), live validated data
+**Requirements**: MREG-01, MREG-02, MREG-03, MREG-04
+**Success Criteria** (what must be TRUE):
+  1. `stat_regression_dataset()` is read-only and staff-only, returns one latest-validated row per active real member (four attack fields + history count), coverage counts, and an explicit `fields` map marking Equipment/Base flat MATK/PATK as unavailable (MREG-01)
+  2. The dashboard renders MATK×MATK%, PATK×PATK%, MATK/PATK×Δ% and MATK×PATK scatters with OLS + Theil–Sen lines, 95% CI, n, R², and a robust residual histogram; points are clickable with a member detail card (MREG-02)
+  3. Classification returns NORMAL / POSSIBLE_BUFF / INCONCLUSIVE with member, declared/inferred MATK%, observed/expected MATK, residual, standardized residual and score; the +35 hypothesis is `x−35` against the empirically fitted curve, never a fixed 1.35× MATK multiplier (MREG-03)
+  4. The owner reference pair is recognized as POSSIBLE_BUFF on MATK×MATK% (illustrative; no PATK/Equipment flat), and the current dataset is not forced into a second population (MREG-03)
+  5. No fabricated samples, no writes to source data, no key-stat leak, no new npm dependencies (MREG-04)
+
+**Plans**: 1 plan
+- [x] 10.8-01-PLAN.md — Migration 0051 + regression core + SVG dashboard + classification/tests — Wave 1 — applied live 2026-10-30
+
+**Cross-cutting constraints**: read-only RPC (no table writes except the bookkeeping row); latest validated per member to avoid pseudo-replication (13 repeated submitters; 61 validated submissions); Theil–Sen + MAD for robustness; OLS only for R²/CI; MATK and PATK are not interchangeable — the ratio model uses PATK as a measured physical control (R² 0,922). Equipment/Base flat MATK/PATK are **not captured** by the form; this is the main limitation and is surfaced in the UI. Deploy order: migration first, then the client bundle.
+
 ### Phase 11: Verified Access — Claim Authorization & Discord OAuth (INSERTED)
 
 **Goal**: Access is bound to something the attacker cannot steal from a Discord post. The 0032 stopgap (officer-authorized claims) shipped 2026-10-26 and was reverted the same day by 0033 at the owner's call — registration is one-go again (immediate PIN setter; registration requests carry the PIN so the approval activates it) with manual validation staying on (officer approval + the post-claim D-05 identity review) — so Phase 11 carries the full identity load: a one-time, officer-confirmed Discord↔character link per member, Discord OAuth as the login, a server-side guild-role check with the guild bot token, and session continuity that keeps every existing RLS policy working unchanged.
@@ -330,7 +349,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 → 10.6 → 10.7 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
+Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 → 10.6 → 10.7 → 10.8 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|------------|
@@ -353,6 +372,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 
 | 10.5 Anti-Cheat Guardrails (inserted) | v1.1 | 1/1 | Complete (0046 live) | 2026-10-30 |
 | 10.6 Cross-Cohort Stat Inspector (inserted) | v1.1 | 1/1 | Complete (0047 live) | 2026-10-30 |
 | 10.7 Statistical Buff Detection (inserted) | v1.1 | 2/2 | Complete (0049/0050 live) | 2026-10-30 |
+| 10.8 MATK/PATK Regression Dashboard (inserted) | v1.1 | 1/1 | Complete (0051 live) | 2026-10-30 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---

@@ -24,9 +24,9 @@ See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 ## Current Position
 
-Phase: 10.7
-Plan: 10.7-01 complete (code + tests green)
-Status: Complete — migration 0049 applied live and verified 2026-10-30; client push pending
+Phase: 10.8
+Plan: 10.8-01 complete (code + tests green)
+Status: Complete — migration 0051 applied live and verified 2026-10-30; client push pending
 Last activity: 2026-10-30
 
 ## Accumulated Context
@@ -161,6 +161,8 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 
 - [Phase 10.7-02 curve-only reference 2026-10-30 — owner refinement "vamos descartar o padrão, e usar apenas a curva como referencia"]: the fixed 1.5× margin and the guild-wide "Fora do padrão" badge are no longer references. **Migration 0050** re-creates `defense_cohort_baselines` (n≥5, returns average/median/mad) and `submission_anti_cheat` (defense spikes only when `z >= 3.5` vs the cohort median; average/ratio fields stay in the payload for cached clients but never flag). `stat_overview` is unchanged; the client ignores its legacy 1.5× fields. Client: `DEFENSE_SIGMA_THRESHOLD 3.5` / `DEFENSE_MIN_SAMPLE 5`, `defenseCurveWarnings` (median/MAD sigma) replaces the ratio helper, the player warning shows median/σ, the officer panel shows median/σ only, and the Ranking stat mode drops the ratio columns/badges (median + Nσ only, guild summary without the average). **0050 APPLIED LIVE 2026-10-30 + verified** (rollback-only): member baselines return median/MAD with n=6; crafted rpdef 4.662 → `reason=sigma`, z 3.70, median 3.883, legacy ratio 1.21 unused; bookkeeping 0050 = 1; grants unchanged; zero residue. 837 tests / 57 files, tsc/build green (a pre-existing lazy-import test flake was stabilized with a 5s waitFor). Client bundle still to push.
 
+- [Phase 10.8 MATK/PATK regression dashboard 2026-10-30 — owner task]: read-only regression view inside Ranking → Stat entre todos. **Data exploration (live)**: 80 active real members, 30 with validated data, 30 complete MATK/PATK pairs, 61 validated submissions, 13 repeated submitters; **Equipment/Base MATK/PATK FLAT are NOT in the schema** (only total + equipment %), reported in the payload instead of invented. Correlations: MATK×MATK% 0.933, PATK×PATK% 0.937, MATK×PATK −0.395, MATK%×PATK% −0.703, MATK/PATK×Δ% **0.960**. OLS equations (n=30): MATK×MATK% y=2199.00+70.2298x (R² 0.871); PATK×PATK% y=2642.52+64.7208x (R² 0.879); MATK/PATK×Δ% y=1.099+0.0113x (R² **0.922**); MATK×PATK y=8285.43−0.4671x (R² 0.156). **Migration 0051** adds `stat_regression_dataset()` (staff-only, read-only, latest validated per member, coverage + fields metadata). Client: `regression.ts` (OLS/Theil–Sen/MAD/CI/LOO/sensitivity, four models, +35 p.p. classification, reference classification), `ScatterChart` SVG (lines + CI + clickable points), `RegressionDashboard` (data limitations, model selector, 4 scatters + residual histogram, stats, classification table, detail card, reference validation, method panel), `RankPage` Tabela|Regressão toggle. **Classification on the current data**: no member crosses POSSIBLE_BUFF on the ratio model (max ≈0.8σ; all within ±2.5σ) → 30 NORMAL; the owner reference pair on MATK×MATK% is recognized as POSSIBLE_BUFF (67.46%/5,798 → NORMAL −1.53σ; 102.46%/7,212 → declared −2.65σ, debuffed +0.40σ, score 2.26), labeled illustrative because the pair has no PATK/Equipment flat. 852 tests / 59 files, tsc/build green. Client bundle still to push.
+
 ### Blockers/Concerns (open — carry to next milestone)
 
 - **[Pending live op] Migration 0045 (public showcase stat gate) is NOT applied live** — ship the client first (it already sends the member JWT on the same RPC), then `node scripts/apply-seed.mjs supabase/migrations/0045_promotion_public_stat_gate.sql`. Until then the anon payload still carries the values and only the client mask hides them.
@@ -186,7 +188,7 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 ## Session Continuity
 
 Last session: 2026-10-30T00:00:00.000Z
-Stopped At: Completed Phase 10.7 plan 02 (curve-only reference: migration 0050 applied LIVE + verified; fixed 1.5×/guild badges removed from the UI, defense sigma-only, median/MAD player baselines; 837 tests / tsc / build green). Next: push the client bundle, then officer browser walk of the curve evidence and the Ranking Nσ badges.
+Stopped At: Completed Phase 10.8 plan 01 (MATK/PATK regression dashboard: migration 0051 applied LIVE + verified; real-data regression view with OLS/Theil–Sen, classification and reference validation; 852 tests / tsc / build green). Next: push the client bundle, then officer browser walk of the Regressão view; consider capturing Equipment/Base flat MATK/PATK to strengthen the detector.
 Resume file: .planning/phases/10.5-anti-cheat-guardrails/10.5-01-SUMMARY.md
 
 ## Performance Metrics
