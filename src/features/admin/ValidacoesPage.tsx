@@ -17,6 +17,7 @@ import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER, type GroupKey } from '../..
 import { formatStatValue } from '../../lib/parseStatValue'
 import { ClassCrest } from '../assets/ClassCrest'
 import { classLabel } from '../../lib/classLabels'
+import { AntiCheatPanel } from './AntiCheatPanel'
 import { ConfirmDialog } from './ConfirmDialog'
 import { IdentityReview } from './IdentityReview'
 import { RequestReview } from './RequestReview'
@@ -223,7 +224,14 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                         {isExpanded ? '▾' : '▸'}
                       </span>
                        <span className="flex min-w-0 flex-col">
-                         <span className="text-base text-content">{row.display_name}</span>
+                         <span className="flex flex-wrap items-center gap-2 text-base text-content">
+                           <span>{row.display_name}</span>
+                           {row.anti_cheat?.flagged === true && (
+                             <span className="rounded-full bg-error/15 px-2 py-0.5 text-xs font-semibold text-error">
+                               ⚠ Revisar
+                             </span>
+                           )}
+                         </span>
                          {(row.nickname !== null || row.char_id !== null || row.char_class !== null) && (
                            <span className="text-sm text-muted">
                              {row.nickname !== null && row.nickname !== undefined && row.nickname !== '' && (
@@ -247,6 +255,8 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
                     </button>
                     {isExpanded && (
                       <div id={regionId} className="rounded-md border border-line bg-surface p-3">
+                        {/* 0046 anti-cheat evidence (server-computed). */}
+                        <AntiCheatPanel flags={row.anti_cheat} />
                         {/* Read-only review: all values in server order, grouped
                             Geral → Quasi → Especial. No inputs exist on this page. */}
                         {GROUP_ORDER.map((group, index) => {
