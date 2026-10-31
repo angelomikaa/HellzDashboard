@@ -315,7 +315,7 @@ Plans:
 **Goal**: An interactive, read-only regression dashboard in Ranking → Stat entre todos that lets officers investigate whether a submission's MATK% looks displaced by +35 p.p. Use only the real validated records (total MATK/PATK + Equipment percentages); report the missing Equipment/Base flat fields instead of inventing them. Fit OLS and Theil–Sen curves with confidence bands, expose residuals, and classify each member as NORMAL / POSSIBLE_BUFF / INCONCLUSIVE. Scores are anomaly signals, never cheat probabilities.
 
 **Depends on**: Phase 10.6 (Stat entre todos tab), Phase 10.7 (statistical approach), live validated data
-**Requirements**: MREG-01, MREG-02, MREG-03, MREG-04, MREG-05, MREG-06
+**Requirements**: MREG-01, MREG-02, MREG-03, MREG-04, MREG-05, MREG-06, MREG-07
 **Success Criteria** (what must be TRUE):
   1. `stat_regression_dataset()` is read-only and staff-only, returns one latest-validated row per active real member (four attack fields + history count), coverage counts, and an explicit `fields` map marking Equipment/Base flat MATK/PATK as unavailable (MREG-01)
   2. The dashboard renders MATK×MATK%, PATK×PATK%, MATK/PATK×Δ% and MATK×PATK scatters with OLS + Theil–Sen lines, 95% CI, n, R², and a robust residual histogram; points are clickable with a member detail card (MREG-02)
@@ -327,6 +327,7 @@ Plans:
 - [x] 10.8-01-PLAN.md — Migration 0051 + regression core + SVG dashboard + classification/tests — Wave 1 — applied live 2026-10-30
 - [x] 10.8-02-PLAN.md — Angelus/Assumptio defense models: migration 0052, RPDEF/RMDEF curves with y ÷ 1,95, generic classification table/charts — applied live 2026-10-31
 - [x] 10.8-03-PLAN.md — Member-history buff detection (owner seeded buffed batch miss): migration 0053, pending vs own validated history, Impositio/Angelus/Assumptio patterns + panel evidence — applied live 2026-10-31
+- [x] 10.8-04-PLAN.md — Three-state officer review (green Consistente / yellow Inconclusivo / orange Buffado): migration 0054, server category + reasons, Validações chip and panel colors — applied live 2026-10-31
 
 **Cross-cutting constraints**: read-only RPC (no table writes except the bookkeeping row); latest validated per member to avoid pseudo-replication (13 repeated submitters; 61 validated submissions); Theil–Sen + MAD for robustness; OLS only for R²/CI; MATK and PATK are not interchangeable — the ratio model uses PATK as a measured physical control (R² 0,922). Equipment/Base flat MATK/PATK are **not captured** by the form; this is the main limitation and is surfaced in the UI. **Defense extension (10.8-02)**: RPDEF/RMDEF × equipment % with the Angelus/Assumptio y ÷ 1,95 hypothesis; the defense curve is weaker (R² 0,365/0,447) and uses minR² 0,25 with an exploratory label. Deploy order: migration first, then the client bundle.
 
@@ -374,7 +375,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 
 | 10.5 Anti-Cheat Guardrails (inserted) | v1.1 | 1/1 | Complete (0046 live) | 2026-10-30 |
 | 10.6 Cross-Cohort Stat Inspector (inserted) | v1.1 | 1/1 | Complete (0047 live) | 2026-10-30 |
 | 10.7 Statistical Buff Detection (inserted) | v1.1 | 2/2 | Complete (0049/0050 live) | 2026-10-30 |
-| 10.8 MATK/PATK Regression Dashboard (inserted) | v1.1 | 3/3 | Complete (0051/0052/0053 live) | 2026-10-31 |
+| 10.8 MATK/PATK Regression Dashboard (inserted) | v1.1 | 4/4 | Complete (0051..0054 live) | 2026-10-31 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---
