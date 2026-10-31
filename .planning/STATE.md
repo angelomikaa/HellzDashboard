@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: ready_to_plan
-last_updated: "2026-10-30T00:00:00.000Z"
-last_activity: 2026-10-30
+last_updated: "2026-10-31T00:00:00.000Z"
+last_activity: 2026-10-31
 progress:
-  total_phases: 11
-  completed_phases: 11
-  total_plans: 45
-  completed_plans: 45
+  total_phases: 12
+  completed_phases: 12
+  total_plans: 46
+  completed_plans: 46
   percent: 100
 ---
 
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13, after v1.0 milestone)
 
 **Core value:** Each player can see, through their stat cards, exactly where they stand compared to players of the same class and function — and what they must improve to reach guild standards.
-**Current focus:** Phase 10.4 — Battlefield Lineups & Roster Sync (Vigrid Field / Raid 1 & Ruinscape / Raid 2 lineups, 80-player roster pre-registration in Personagens, and Hellz dark/neon JPG export)
+**Current focus:** Phase 10.9 - Ranking UI Reorganization (three sibling sections: Ranking OVR, Explorador de stats, Análise estatística; player 59-stat detail in an accessible modal; client-only, no migration)
 
 ## Current Position
 
-Phase: 10.8
-Plan: 10.8-01 complete (code + tests green)
-Status: Complete — migration 0051 applied live and verified 2026-10-30; client push pending
-Last activity: 2026-10-30
+Phase: 10.9
+Plan: 10.9-01 complete (client-only reorganization)
+Status: Complete - Ranking page split into three sibling sections, OVR detail moved to an accessible modal, explorer filters added; no migration, client push pending
+Last activity: 2026-10-31
 
 ## Accumulated Context
 
@@ -39,6 +39,7 @@ Last activity: 2026-10-30
 - Phase 10.1 inserted after 10, BEFORE 11 (URGENT, 2026-10-27): Universal Rating Unification — owner report "OVR from the cards inconsistent with the Ranking tab"; investigation proved the ratings engine split-brain (0018 swapped the value-proportional formula into only 3 of 6 OVR RPCs; 0023/0024 preserved the old formula; 0028's key filter missed role_rank/staff_requests). Migration 0036 + parity smoke; evidence in `.planning/phases/10.1-universal-rating-unification/10.1-CONTEXT.md`
 - Phase 10.2 inserted after 10.1 (owner request 2026-10-28): Meta vs non-viable cohorts — the 39 keyed (class, function) combos were split into 23 currently playable (meta) and 16 non-viable ("forgotten until second order"); the split persists in `class_cohorts` (migration 0037), gates Início AND the smoke primers, and Início now shows the top 3 by OVR per cohort instead of every Impecável. Ranking boards keep every class
 - Phase 10.3 inserted after 10.2 (owner request 2026-10-29): Artista merged cohort — Menestrel and Cigana are one class for stats purposes, merged in an exception that leaves every other tab untouched; plus the 2026-10-29 card.svg tier-color re-export and third primers for meta cohorts with zero real members
+- Phase 10.9 inserted after 10.8 (owner request 2026-10-31, UI-only): the staff Ranking tab becomes three sibling sections (Ranking OVR / Explorador de stats / Análise estatística) in one tablist; the 59-stat player detail moves from an inline row into an accessible modal; the OVR board drops the Function column and gains toolbar sort + name/ID search; the explorer gains a searchable stat picker plus merged-class/function/name filters; methodology and reference validation collapse by default. No server change, no migration, no new dependency
 
 ### Decisions
 
@@ -193,9 +194,9 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 
 ## Session Continuity
 
-Last session: 2026-10-30T00:00:00.000Z
-Stopped At: Completed Phase 10.8 plan 04 (three-state review: migration 0054 applied LIVE + verified; Consistente/Inconclusivo/Buffado in Validações; Ahrya buffed, synthetic clean consistent, sigma-only inconclusive; PaiDeMenina now validated and out of the pending queue). Next: push the client bundle; decide whether to extend the watched stats to FLEE/PvE or tune the Battle Theme (+100/+10%) pattern.
-Resume file: .planning/phases/10.5-anti-cheat-guardrails/10.5-01-SUMMARY.md
+Last session: 2026-10-31T00:00:00.000Z
+Stopped At: Completed Phase 10.9 plan 01 (Ranking UI reorganization: three sibling sections, accessible 59-stat modal, explorer stat/class/function/name filters, collapsed methodology; client-only, no migration). Gates: tsc clean, 883 tests / 66 files, build green. Visual walk skipped (no browser tabs available); the temporary officer fixture was reverted to member and the dev server stopped. Next: push the client bundle and confirm the Vercel deploy.
+Resume file: .planning/phases/10.9-ranking-ui-reorganization/10.9-01-SUMMARY.md
 
 ## Performance Metrics
 
@@ -221,6 +222,7 @@ Resume file: .planning/phases/10.5-anti-cheat-guardrails/10.5-01-SUMMARY.md
 | 08.1 | 08.1-05 | ~20 min | 3 | 4 | 2026-10-22 |
 | 10.1 | 10.1-01 | ~37 min | 6 | 1 | 2026-10-27 |
 | 10.1 | 10.1-02 | multi-session (~55 min active + owner walk gate) | 5 | 3 | 2026-10-27 |
+| 10.9 | 10.9-01 | ~40 min (client-only reorg) | 5 | 12 | 2026-10-31 |
 
 ---
 *v1.0 shipped 2026-10-13. v2 deferred items: delta badges (DELT-01), history view (HIST-01), officer guild-health dashboard (OFCR-01), catalog self-service (CAT-01), OCR confidence surfacing (OCRX-01), shareable PNG export (SHAR-01), power-shift significance rule.*
@@ -232,3 +234,5 @@ Resume file: .planning/phases/10.5-anti-cheat-guardrails/10.5-01-SUMMARY.md
 - [Phase 10.4 - code review, 2026-10-30]: REVIEW.md found 1 blocker (assert_device_bound is bypassable: the fingerprint is a claim inside the token the caller already holds, so a token thief can echo it - the "stolen session is invalidated from a different device" comment is false; owner decision needed on a server-stored per-session secret) plus 9 warnings. Fixed in phase: WR-01 ghost slots (get_lineups read display fields from the filtered roster, so deactivating a seated player produced a nameless row), WR-02 mirrored-swap deadlock (both rows now locked in one ordered statement) via migration 0044; WR-06 device_mismatch left the user in a dead shell (localStorage cleared but RequireAuth held the session in state) -> `invalidateSession()` notifies the guard; WR-07 read failures no longer say "could not save". Open: WR-03 (silent unseat when placing an unassigned player), WR-05 (UA-based binding breaks on a mid-session browser update).
 - [Phase 10.4 - classes stay empty by design, owner 2026-10-30]: the 42 members with `char_class` null are the unclaimed rows; the owner ruled the class is filled by the member's own solicitation/claim, so staff must NOT backfill from the reference screenshots.
 
+
+- [Phase 10.9 - Ranking UI reorganization, owner 2026-10-31]: the staff Ranking tab is now three sibling sections in one tablist (Ranking OVR default / Explorador de stats / Análise estatística) instead of nested modes. The 59-stat player detail moved from an inline row to an accessible modal (role=dialog, focus trap, Escape/backdrop/close, focus return, body scroll lock). The OVR board dropped the redundant Function column and gained toolbar sort + accent-insensitive name/ID search plus a summary line; the explorer gained a searchable stat picker plus merged-cohort class, build-function and name/ID filters with a visible reset and a filtered median/min/max summary. Methodology, assumptions and the owner reference-pair validation collapse by default in the analysis section. Filters are client-side view aids over already-fetched staff payloads - no server change, no migration, no new dependency, no client rank math; the three-state review chips stay in Validações. Gates: tsc clean, 883 tests / 66 files, vite build green; visual walk skipped (no browser tabs available) and the temporary officer fixture reverted to member.

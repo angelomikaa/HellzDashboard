@@ -286,6 +286,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MREG-05 | Phase 10.8 - MATK/PATK Regression Dashboard | Complete (0052 applied live 2026-10-31) |
 | MREG-06 | Phase 10.8 - MATK/PATK Regression Dashboard | Complete (0053 applied live 2026-10-31) |
 | MREG-07 | Phase 10.8 - MATK/PATK Regression Dashboard | Complete (0054 applied live 2026-10-31) |
+| RUI-01 | Phase 10.9 - Ranking UI Reorganization | Complete (client-only) |
+| RUI-02 | Phase 10.9 - Ranking UI Reorganization | Complete (client-only) |
+| RUI-03 | Phase 10.9 - Ranking UI Reorganization | Complete (client-only) |
+| RUI-04 | Phase 10.9 - Ranking UI Reorganization | Complete (client-only) |
+| RUI-05 | Phase 10.9 - Ranking UI Reorganization | Complete (client-only) |
 
 ## Anti-Cheat Guardrails (Phase 10.5, inserted 2026-10-30)
 
@@ -308,6 +313,17 @@ Owner task: investigate undeclared +35 p.p. MATK% buffs with a regression dashbo
 - **MREG-05** (owner request 2026-10-31): extend the dashboard to the Angelus/Assumptio formulas — `RPDEF × Equip. PDEF%` and `RMDEF × Equip. MDEF%`, with the buff hypothesis `y ÷ 1,95` on the defense axis (the equipment % is unaffected). Migration 0052 adds the six defense fields and coverage to the read-only RPC; the defense models are exploratory (`minR2 = 0,25`, R² 0,365/0,447) and a synthetic ×1,95 is detected (declared 7,71σ vs debuffed 0,84σ). Current data has no forced candidate (max |z| 1,54σ).
 - **MREG-06** (investigation 2026-10-31, owner seeded a buffed batch that was missed): migration 0053 adds `member_history_deviations()` — the pending buff-sensitive stats are compared with the member's own validated history. Known signatures: Impositio +25..45 p.p. on equip MATK%/PATK%, Angelus/Assumptio +80..110 p.p. on equip PDEF%/MDEF% or rpdef/rmdef ×1,6..2,3, plus a generic history jump (robust z ≥ 3,5 / ≥20 p.p. / ≥25% flat). It works even when the cohort has n<5; the panel shows "Desvio vs. histórico validado". The regression dashboard remains validated-only (pending rows are reviewed in Validações).
 - **MREG-07** (owner request 2026-10-31): the officer queue shows three server-side categories instead of a single `flagged` boolean — **Consistente** (green; no anomaly + reliable cohort/history reference), **Inconclusivo** (yellow; anomaly without a recognized buff signature, or no reliable reference), **Buffado** (orange; recognized Impositio/Angelus/Assumptio pattern). `submission_anti_cheat.review` carries `category`, `cohort_available`, `history_available`, `history_sample_size` and human-readable `reasons`; the UI only renders it. `flagged` remains for old clients and equals `category <> 'consistent'`. OCR edits never change the category by themselves.
+
+## Ranking UI Reorganization (Phase 10.9, inserted 2026-10-31)
+
+Owner request: the staff Ranking tab should read as three obvious destinations instead of
+nested modes, and the per-player detail should not blow up the table.
+
+- **RUI-01**: The staff Ranking page exposes exactly three sibling sections in one tablist — `Ranking OVR` (default), `Explorador de stats` and `Análise estatística` — with no nested tablist. Staff-only by construction; no server change.
+- **RUI-02**: `Ver stats` opens an accessible dialog (`role="dialog"`, `aria-modal`, labelled by the player) showing the OVR, all 59 stats grouped Geral/Quasi/Especial, class average, value and points. Tab is trapped, Escape/backdrop/close dismiss it, body scroll is locked and focus returns to the trigger.
+- **RUI-03**: The OVR board keeps the three build-role boards, the merged-class filter (Artista once), toolbar sort (OVR = server order verbatim, Nome, Classe) and accent-insensitive name/ID search; the redundant Function column is removed and a summary line shows players, average OVR and the insufficient-data count.
+- **RUI-04**: The stat explorer uses a searchable grouped stat picker (label/key/short label) plus merged cohort class, build function and name/ID filters, all client-side over the already-fetched `stat_overview` payload, with a visible reset and a median/min/max summary of the filtered rows. "Como ler esta tabela" is collapsed by default.
+- **RUI-05**: Methodology, assumptions and the owner reference-pair validation collapse by default in the analysis section. No new npm dependency, no migration, no client rank math, no key-stat config in any payload; the three-state review chips stay in Validações.
 
 ## Statistical Buff Detection (Phase 10.7, inserted 2026-10-30)
 
