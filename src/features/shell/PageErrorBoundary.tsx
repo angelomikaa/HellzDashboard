@@ -15,6 +15,29 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
 const FALLBACK_MESSAGE =
   'Algo deu errado ao carregar esta página. Tente novamente ou escolha outra aba.'
 
+/**
+ * A deploy replaces the hashed lazy chunks. A tab opened before the deploy can
+ * still hold the old index and ask for a chunk that no longer exists — the
+ * dynamic import rejects and looks exactly like a page render failure. This
+ * detector lets the boundary force ONE reload to pick up the new bundle; a
+ * second failure inside the window falls through to the friendly message, so a
+ * genuinely broken page can never loop. Exported for the unit lock.
+ */
+export function isChunkLoadError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const message = `${error.name} ${error.message}`.toLowerCase()
+  return (
+    message.includes('failed to fetch dynamically imported module') ||
+    message.includes('importing a module script failed') ||
+    message.includes('error loading dynamically imported module') ||
+    message.includes('chunkloaderror') ||
+    message.includes('loading chunk')
+  )
+}
+
+const CHUNK_RELOAD_KEY = 'neofoot:chunk-reload-at'
+const CHUNK_RELOAD_WINDOW_MS = 30_000
+
 type PageErrorBoundaryProps = { children: ReactNode }
 type PageErrorBoundaryState = { failed: boolean }
 
@@ -29,6 +52,21 @@ export class PageErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    // Stale-chunk recovery: one automatic reload when the lazy chunk from a
+    // previous deploy cannot be fetched. Never loop — a second failure inside
+    // the window shows the normal fallback.
+    if (isChunkLoadError(error)) {
+      try {
+        const last = Number(window.sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? 0)
+        if (!last || Date.now() - last > CHUNK_RELOAD_WINDOW_MS) {
+          window.sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
+          window.location.reload()
+          return
+        }
+      } catch {
+        /* storage unavailable: fall through to the fallback */
+      }
+    }
     // Dev-only diagnostics (same convention as the OCR pipeline): production
     // users see the friendly copy, never a stack trace.
     if (import.meta.env?.DEV) {
