@@ -6,6 +6,7 @@
 // Coverage: mandatory identity gate, OCR prefill that never overwrites a
 // typed field, the shared OCR applier, p_identity on create_submission and
 // the anonymous catalog read.
+import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NeoFootSession } from '../auth/session'
 import {
@@ -221,5 +222,30 @@ describe('fetchPublicCatalog — anon label projection only', () => {
     const error = await fetchPublicCatalog().catch((err: unknown) => err)
     expect(error).toBeInstanceOf(ApiError)
     expect((error as ApiError).status).toBe(503)
+  })
+})
+
+import { AntiCheatWarnings } from './AntiCheatWarnings'
+
+describe('AntiCheatWarnings render', () => {
+  it('renders a curve warning without throwing', () => {
+    const html = renderToStaticMarkup(
+      <AntiCheatWarnings
+        warnings={[
+          {
+            stat_key: 'rpdef',
+            label: 'RPDEF',
+            value_type: 'flat',
+            value: 9000,
+            median: 3900,
+            mad: 100,
+            z: 4.1,
+            sample_size: 6,
+          },
+        ]}
+      />,
+    )
+    expect(html).toContain('RPDEF')
+    expect(html).toContain('4,1σ')
   })
 })
