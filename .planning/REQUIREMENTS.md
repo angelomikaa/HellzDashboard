@@ -283,6 +283,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MREG-02 | Phase 10.8 - MATK/PATK Regression Dashboard | Complete (0051 applied live 2026-10-30) |
 | MREG-03 | Phase 10.8 - MATK/PATK Regression Dashboard | Complete (0051 applied live 2026-10-30) |
 | MREG-04 | Phase 10.8 - MATK/PATK Regression Dashboard | Complete (0051 applied live 2026-10-30) |
+| MREG-05 | Phase 10.8 - MATK/PATK Regression Dashboard | Complete (0052 applied live 2026-10-31) |
 
 ## Anti-Cheat Guardrails (Phase 10.5, inserted 2026-10-30)
 
@@ -302,6 +303,7 @@ Owner task: investigate undeclared +35 p.p. MATK% buffs with a regression dashbo
 - **MREG-02**: Ranking → Stat entre todos gains a Regressão view with MATK×MATK%, PATK×PATK%, MATK/PATK×Δ% and MATK×PATK scatters (OLS + Theil–Sen + 95% CI + n + R²), a robust residual histogram, clickable points and a member detail card.
 - **MREG-03**: Classification NORMAL / POSSIBLE_BUFF / INCONCLUSIVE using the +35 p.p. `x−35` hypothesis against the empirically fitted curve, with declared/inferred MATK%, observed/expected MATK, residual, standardized residual and score; scores are anomaly signals, not cheat probabilities. The current dataset is not forced into a second population; the owner reference pair is recognized as POSSIBLE_BUFF on MATK×MATK% with the missing-PATK caveat.
 - **MREG-04**: No fabricated samples, no source-data writes, no key-stat leak, no new npm dependencies; Theil–Sen + MAD for robustness, OLS only for R²/CI; 13 repeated submitters are not pseudo-replicated (latest validated row per member).
+- **MREG-05** (owner request 2026-10-31): extend the dashboard to the Angelus/Assumptio formulas — `RPDEF × Equip. PDEF%` and `RMDEF × Equip. MDEF%`, with the buff hypothesis `y ÷ 1,95` on the defense axis (the equipment % is unaffected). Migration 0052 adds the six defense fields and coverage to the read-only RPC; the defense models are exploratory (`minR2 = 0,25`, R² 0,365/0,447) and a synthetic ×1,95 is detected (declared 7,71σ vs debuffed 0,84σ). Current data has no forced candidate (max |z| 1,54σ).
 
 ## Statistical Buff Detection (Phase 10.7, inserted 2026-10-30)
 
@@ -322,6 +324,6 @@ Owner request: see the same stat for all members, independent of class and cohor
 - **XSTAT-03**: Staff-only RPC gate (member JWT forbidden, anon no EXECUTE), validated-only, fixture-free, zero changes to OVR/points surfaces, zero new npm dependencies.
 
 **Coverage:**
-- v1.1 requirements: 75 total
-- Mapped to phases: 75 ✓
+- v1.1 requirements: 76 total
+- Mapped to phases: 76 ✓
 - Unmapped: 0 ✓
