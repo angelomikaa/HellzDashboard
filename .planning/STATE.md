@@ -157,7 +157,7 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 
 ### Blockers/Concerns (open — carry to next milestone)
 
-- **[Pending live op] Migration 0046 (anti-cheat guardrails) is NOT applied live** — apply it before/with the phase 10.5 client bundle: `node scripts/apply-seed.mjs supabase/migrations/0046_anti_cheat_guardrails.sql` (needs `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF`). The client degrades gracefully until then (no `anti_cheat` panel, no pre-submit baselines), but the server-side flags only exist after apply.
+- **[Pending live op] Migration 0046 (anti-cheat guardrails) is NOT applied live** — apply it **BEFORE** the phase 10.5 client bundle: `node scripts/apply-seed.mjs supabase/migrations/0046_anti_cheat_guardrails.sql` (needs `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF`). An old cached client works against the new RPC, but a new bundle against the old 2-arg `create_submission` fails to resolve `p_provenance` — submissions would break during the window if the order is reversed. Reads fail soft (no panel / no pre-warning).
 
 - **[Pending live op] Migration 0045 (public showcase stat gate) is NOT applied live** — ship the client first (it already sends the member JWT on the same RPC), then `node scripts/apply-seed.mjs supabase/migrations/0045_promotion_public_stat_gate.sql`. Until then the anon payload still carries the values and only the client mask hides them.
 

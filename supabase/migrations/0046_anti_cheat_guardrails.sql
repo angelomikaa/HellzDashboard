@@ -28,9 +28,11 @@
 -- Append-only. Apply:
 --   node scripts/apply-seed.mjs supabase/migrations/0046_anti_cheat_guardrails.sql
 --
--- Deploy order: migration first, then the client bundle (the client tolerates
--- the old RPC during the in-flight window: p_provenance is optional and the
--- queue's anti_cheat field is simply absent on an older server).
+-- Deploy order: MIGRATION FIRST, then the client bundle. An OLD cached client
+-- keeps working against this RPC (p_provenance defaults null), but a NEW
+-- bundle must never reach the old 2-arg function: PostgREST would fail to
+-- resolve the unknown p_provenance argument. The reverse reads (queue, member
+-- baselines) fail soft in the client, but submissions do not -- apply first.
 
 begin;
 

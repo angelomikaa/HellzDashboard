@@ -208,7 +208,8 @@ export async function createSubmission(
   // server-side; unknown stat keys are rejected server-side. The optional
   // identity is stored ON the submission and promoted only at validation
   // (0014); optional provenance is the 0046 anti-cheat OCR audit trail. Old
-  // call sites keep compiling and send nulls.
+  // call sites keep compiling and send nulls. Deploy migration 0046 BEFORE
+  // this bundle: the old 2-arg RPC cannot resolve the p_provenance argument.
   const res = await restFetch(session, '/rpc/create_submission', {
     method: 'POST',
     body: JSON.stringify({
