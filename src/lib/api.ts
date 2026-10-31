@@ -450,10 +450,13 @@ export interface OfficerQueueRow {
   anti_cheat?: AntiCheatFlags | null
 }
 
-/** One class+role cohort average used by the pre-submit warning (0046). */
+/** One stats-cohort curve baseline used by the pre-submit warning (0046/0050). */
 export interface DefenseBaseline {
   stat_key: string
-  average: number
+  /** Kept for backward compatibility; the warning uses the median/MAD sigma. */
+  average: number | null
+  median: number | null
+  mad: number | null
   sample_size: number
 }
 

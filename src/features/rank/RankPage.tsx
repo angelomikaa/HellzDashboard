@@ -504,11 +504,7 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                   <span className="text-muted">Sem envios validados para este stat.</span>
                 ) : (
                   <span className="text-muted">
-                    {`${overview.guild.sample_size} membros com valor · média ${
-                      overview.guild.average === null
-                        ? '—'
-                        : formatStatValue(overview.guild.average, overview.value_type)
-                    } · mediana ${
+                    {`${overview.guild.sample_size} membros com valor · mediana ${
                       overview.guild.median === null
                         ? '—'
                         : formatStatValue(overview.guild.median, overview.value_type)
@@ -525,11 +521,10 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                 )}
               </div>
               <p className="mt-1 text-xs text-muted">
-                Somente envios validados; fixtures de teste excluídos. “Fora da curva (Nσ)” =
-                desvio ≥ 3,5σ da mediana da coorte (modelo robusto, n ≥ 5); “1,5× a coorte” =
-                margem fixa sobre a média; “Fora do padrão” = 1,5× ou mais a média geral da
-                guilda (indício). Todos são alertas para revisão — confirme no painel
-                anti-cheat de Validações.
+                Somente envios validados; fixtures de teste excluídos. A referência é a
+                <strong> curva da coorte</strong>: mediana + desvio robusto (MAD), n ≥ 5.
+                “Fora da curva (Nσ)” = desvio ≥ 3,5σ da mediana. Sem margem fixa e sem
+                média geral como referência — confirme no painel anti-cheat de Validações.
               </p>
               {orderedStatRows.length === 0 ? (
                 <p className="mt-6 text-center text-base text-muted">
@@ -564,25 +559,13 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                           scope="col"
                           className="px-2 py-2 text-right font-semibold text-muted"
                         >
-                          Média/mediana (n)
+                          Mediana (n)
                         </th>
                         <th
                           scope="col"
                           className="px-2 py-2 text-right font-semibold text-muted"
                         >
                           Nσ
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-2 py-2 text-right font-semibold text-muted"
-                        >
-                          vs. classe
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-2 py-2 text-right font-semibold text-muted"
-                        >
-                          vs. guilda
                         </th>
                         <th scope="col" className="px-2 py-2 font-semibold text-muted">
                           Último envio
@@ -599,19 +582,11 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                             <td className="px-2 py-2 text-content">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span>{row.display_name}</span>
-                                {row.class_sigma_outlier ? (
+                                {row.class_sigma_outlier && (
                                   <span className="rounded-full bg-error/15 px-2 py-0.5 text-xs font-semibold text-error">
                                     {`Fora da curva (${ratioFormatter.format(row.class_z ?? 0)}σ)`}
                                   </span>
-                                ) : row.cohort_outlier ? (
-                                  <span className="rounded-full bg-error/15 px-2 py-0.5 text-xs font-semibold text-error">
-                                    1,5× a coorte
-                                  </span>
-                                ) : row.guild_outlier ? (
-                                  <span className="rounded-full border border-tier-gold/60 px-2 py-0.5 text-xs font-semibold text-tier-gold">
-                                    Fora do padrão
-                                  </span>
-                                ) : null}
+                                )}
                               </div>
                               {row.char_id !== null && row.char_id !== '' && (
                                 <div className="font-mono text-xs text-muted">{row.char_id}</div>
@@ -631,13 +606,9 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                                 : formatStatValue(row.value, overview.value_type)}
                             </td>
                             <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-muted">
-                              {row.class_average === null
+                              {row.class_median === null
                                 ? '—'
-                                : `${formatStatValue(row.class_average, overview.value_type)}${
-                                    row.class_median === null
-                                      ? ''
-                                      : ` · ${formatStatValue(row.class_median, overview.value_type)}`
-                                  }${
+                                : `${formatStatValue(row.class_median, overview.value_type)}${
                                     row.class_sample_size === null
                                       ? ''
                                       : ` (n=${row.class_sample_size})`
@@ -653,28 +624,6 @@ export function RankPage({ session }: { session: NeoFootSession }) {
                               {row.class_z === null
                                 ? '—'
                                 : `${ratioFormatter.format(row.class_z)}σ`}
-                            </td>
-                            <td
-                              className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${
-                                row.cohort_outlier
-                                  ? 'font-semibold text-error'
-                                  : 'text-muted'
-                              }`}
-                            >
-                              {row.cohort_ratio === null
-                                ? '—'
-                                : `${ratioFormatter.format(row.cohort_ratio)}×`}
-                            </td>
-                            <td
-                              className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${
-                                row.guild_outlier
-                                  ? 'font-semibold text-tier-gold'
-                                  : 'text-muted'
-                              }`}
-                            >
-                              {row.guild_ratio === null
-                                ? '—'
-                                : `${ratioFormatter.format(row.guild_ratio)}×`}
                             </td>
                             <td className="whitespace-nowrap px-2 py-2 text-muted">
                               {row.submitted_at === null

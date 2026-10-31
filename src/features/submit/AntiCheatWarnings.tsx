@@ -1,15 +1,17 @@
-// AntiCheatWarnings — the player-facing buff warning (Phase 10.5, 0046).
+// AntiCheatWarnings — the player-facing curve warning (Phase 10.5/10.7).
 //
 // Shown on the Especial step (where the equipment values live) and again on
-// the review step just above Enviar. Advisory only: the submission is still
-// allowed and is SAVED PENDING for officer review (owner decision 2026-10-30).
+// the review step just above Enviar. CURVE-ONLY reference: a value at or above
+// 3.5 sigma from the cohort median (robust median/MAD, n >= 5). No fixed 1.5x
+// margin. Advisory only: the submission is still allowed and is SAVED PENDING
+// for officer review.
 import { formatStatValue } from '../../lib/parseStatValue'
 import {
-  DEFENSE_SPIKE_RATIO,
+  DEFENSE_SIGMA_THRESHOLD,
   type DefenseWarning,
 } from './antiCheat'
 
-const ratioFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
+const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
 
 export function AntiCheatWarnings({ warnings }: { warnings: readonly DefenseWarning[] }) {
   if (warnings.length === 0) return null
@@ -20,9 +22,9 @@ export function AntiCheatWarnings({ warnings }: { warnings: readonly DefenseWarn
       aria-live="polite"
       className="mt-4 rounded-lg border border-error/60 bg-error/10 p-4"
     >
-      <h4 className="text-sm font-semibold text-error">Confira: possível buff ativo</h4>
+      <h4 className="text-sm font-semibold text-error">Confira: valor fora da curva</h4>
       <p className="mt-1 text-sm text-content">
-        {`Estes valores estão ${ratioFormatter.format(DEFENSE_SPIKE_RATIO)}× ou mais acima da média do seu grupo. Angelus e Assumptio aumentam a defesa em cerca de 95% — envie os valores SEM buffs.`}
+        {`Estes valores estão ${number.format(DEFENSE_SIGMA_THRESHOLD)}σ ou mais acima da mediana do seu grupo. Angelus e Assumptio aumentam a defesa em cerca de 95% — envie os valores SEM buffs.`}
       </p>
       <ul className="mt-3 flex flex-col gap-1">
         {warnings.map((warning) => (
@@ -32,7 +34,7 @@ export function AntiCheatWarnings({ warnings }: { warnings: readonly DefenseWarn
               {formatStatValue(warning.value, warning.value_type)}
             </span>
             <span className="text-muted">
-              {`· média do grupo ${formatStatValue(warning.baseline, warning.value_type)} · ${ratioFormatter.format(warning.ratio)}×`}
+              {`· mediana do grupo ${formatStatValue(warning.median, warning.value_type)} · ${number.format(warning.z)}σ · n=${warning.sample_size}`}
             </span>
           </li>
         ))}

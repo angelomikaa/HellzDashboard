@@ -13,7 +13,7 @@
 import { formatStatValue } from '../../lib/parseStatValue'
 import type { AntiCheatCurveDeviation, AntiCheatFlags } from '../../lib/api'
 import {
-  DEFENSE_SPIKE_RATIO,
+  DEFENSE_SIGMA_THRESHOLD,
   OVR_SWING_POINTS,
   ovrSwingFlagged,
 } from '../submit/antiCheat'
@@ -76,7 +76,7 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
       {spikes.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-semibold text-error">
-            {`Defesa acima do esperado (≥ ${ratio.format(DEFENSE_SPIKE_RATIO)}× a média ou ≥ 3,5σ da mediana)`}
+            {`Defesa fora da curva (≥ ${ratio.format(DEFENSE_SIGMA_THRESHOLD)}σ da mediana, n ≥ 5)`}
           </p>
           <ul className="mt-1 flex flex-col gap-1">
             {spikes.map((spike) => (
@@ -89,10 +89,7 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
                   {formatStatValue(spike.value, spike.value_type)}
                 </span>
                 <span className="text-muted">
-                  {`· média ${formatStatValue(spike.baseline, spike.value_type)} · ${ratio.format(spike.ratio)}×`}
-                  {spike.median !== null && spike.median !== undefined
-                    ? ` · mediana ${formatStatValue(spike.median, spike.value_type)}`
-                    : ''}
+                  {`· mediana ${spike.median === null || spike.median === undefined ? '—' : formatStatValue(spike.median, spike.value_type)}`}
                   {spike.z !== null && spike.z !== undefined ? ` · ${sigma(spike.z)}` : ''}
                   {` · n=${spike.sample_size}`}
                 </span>

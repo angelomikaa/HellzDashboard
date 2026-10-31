@@ -53,6 +53,10 @@ describe('AntiCheatPanel', () => {
         baseline: 4100,
         ratio: 2.22,
         sample_size: 5,
+        median: 3900,
+        mad: 100,
+        z: 4.1,
+        reason: 'sigma' as const,
       },
     ],
     ocr_overrides: [
@@ -82,6 +86,7 @@ describe('AntiCheatPanel', () => {
     expect(html).toContain('Alertas anti-cheat')
     expect(html).toContain('Revisar antes de validar')
     expect(html).toContain('RPDEF')
+    expect(html).toContain('4,1σ')
     expect(html).toContain('Equip. PDEF (valor)')
     expect(html).toContain('Variação de OVR')
     expect(html).toContain('+11,9')

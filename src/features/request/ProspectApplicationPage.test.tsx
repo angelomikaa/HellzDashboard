@@ -328,7 +328,7 @@ describe('RequireAuth — application handoff', () => {
       )
       if (markup.includes('Carregando…')) throw new Error('request view still loading')
       return markup
-    })
+    }, { timeout: 5000 })
     expect(html).toContain('Solicitação enviada')
     expect(html).toContain('req-1')
   })

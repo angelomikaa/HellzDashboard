@@ -63,7 +63,7 @@ import {
 } from './rawDefense'
 import {
   buildProvenance,
-  defenseSpikeWarnings,
+  defenseCurveWarnings,
   provenanceInputKeys,
 } from './antiCheat'
 import { AntiCheatWarnings } from './AntiCheatWarnings'
@@ -214,9 +214,9 @@ export function SubmitPage({ session }: SubmitPageProps) {
   // ReviewStep and buildStatsPayload always see consistent raw values.
   const effectiveInputs = useMemo(() => withDerivedDefenses(inputs), [inputs])
 
-  // 0046 pre-submit buff warning (advisory; the server re-computes the flag).
-  const spikeWarnings = useMemo(
-    () => (data === null ? [] : defenseSpikeWarnings(data.catalog, effectiveInputs, data.baselines)),
+  // Curve-only pre-submit buff warning (advisory; the server re-computes it).
+  const curveWarnings = useMemo(
+    () => (data === null ? [] : defenseCurveWarnings(data.catalog, effectiveInputs, data.baselines)),
     [data, effectiveInputs],
   )
 
@@ -865,7 +865,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   disabled={submitting || ocrRunningStep === 4}
                 />
               )}
-              <AntiCheatWarnings warnings={spikeWarnings} />
+              <AntiCheatWarnings warnings={curveWarnings} />
               <div className="mt-4">
                 <StepVerifyCheckbox
                   stepNo={step}
@@ -881,7 +881,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
               <ReviewStep
                 entries={catalog}
                 inputs={effectiveInputs}
-                antiCheatWarnings={spikeWarnings}
+                antiCheatWarnings={curveWarnings}
                 allStepsVerified={
                   stepVerified[1] && stepVerified[2] && stepVerified[3] && stepVerified[4]
                 }

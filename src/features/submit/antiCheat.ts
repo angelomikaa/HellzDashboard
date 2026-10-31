@@ -2,12 +2,13 @@
 //
 // TWO responsibilities, both PURE (no React, no network):
 //
-// 1. Pre-submit defense warning. Angelus (~+95% Base PDEF) and Assumptio
+// 1. Pre-submit curve warning. Angelus (~+95% Base PDEF) and Assumptio
 //    (~+95% Equipment PDEF/MDEF) can nearly double the four watched values.
-//    The server flags anything >= 1.5x the same class+build-role cohort average
-//    (migration 0046); this module mirrors that threshold client-side so the
-//    player is warned BEFORE sending. The server value is authoritative — the
-//    UI warning is advisory, exactly like the rest of the wizard's gates.
+//    The server reference is the robust COHORT CURVE only (median + MAD,
+//    n >= 5); a value at >= 3.5 sigma above the median is flagged (migration
+//    0050). This module mirrors that rule client-side so the player is warned
+//    BEFORE sending. No fixed 1.5x margin is used. The server value is
+//    authoritative — the UI warning is advisory, like the wizard's gates.
 //
 // 2. OCR provenance. The wizard records, per input key, the raw value the OCR
 //    read printed. At submit time this module turns that trace into the
@@ -30,8 +31,11 @@ import { parseStatValue } from '../../lib/parseStatValue'
 import { EQUIPMENT_RAW_KEYS, RAW_DEFENSE_STAT_KEYS } from './rawDefense'
 import type { GroupInputs } from './wizard'
 
-/** Server threshold (migration 0046, submission_anti_cheat). Keep in sync. */
-export const DEFENSE_SPIKE_RATIO = 1.5
+/** Robust curve gate (migration 0050, submission_anti_cheat). Keep in sync. */
+export const DEFENSE_SIGMA_THRESHOLD = 3.5
+
+/** Minimum cohort size for the robust median/MAD curve. */
+export const DEFENSE_MIN_SAMPLE = 5
 
 /** Owner threshold for an OVR swing without a class/role change (0046). */
 export const OVR_SWING_POINTS = 8
@@ -48,8 +52,9 @@ export interface DefenseWarning {
   label: string
   value_type: 'flat' | 'percentual'
   value: number
-  baseline: number
-  ratio: number
+  median: number
+  mad: number
+  z: number
   sample_size: number
 }
 
@@ -60,12 +65,13 @@ interface CatalogLike {
 }
 
 /**
- * Defense values at or above 1.5x the cohort average. `inputs` must be the
- * EFFECTIVE inputs (withDerivedDefenses) so rpdef/rmdef are present. Missing
- * or unparseable values, unknown baselines and non-positive averages are
- * skipped (the server applies the same n>=3 / avg>0 guards).
+ * Defense values at or above 3.5 sigma from the cohort MEDIAN (robust
+ * median/MAD curve). `inputs` must be the EFFECTIVE inputs
+ * (withDerivedDefenses) so rpdef/rmdef are present. Missing baselines, n < 5,
+ * non-positive medians/MADs and unparseable values are skipped — exactly the
+ * server guards; no fixed 1.5x margin is involved.
  */
-export function defenseSpikeWarnings(
+export function defenseCurveWarnings(
   catalog: readonly CatalogLike[],
   inputs: GroupInputs,
   baselines: readonly DefenseBaseline[],
@@ -76,19 +82,23 @@ export function defenseSpikeWarnings(
 
   for (const statKey of ANTI_CHEAT_DEFENSE_KEYS) {
     const baseline = byKey.get(statKey)
-    if (baseline === undefined || baseline.average <= 0) continue
+    if (baseline === undefined || baseline.sample_size < DEFENSE_MIN_SAMPLE) continue
+    if (baseline.median === null || baseline.mad === null) continue
+    if (baseline.median <= 0 || baseline.mad <= 0) continue
     const parsed = parseStatValue(inputs[statKey] ?? '')
     if (!parsed.ok || parsed.value === null) continue
-    const ratio = parsed.value / baseline.average
-    if (ratio < DEFENSE_SPIKE_RATIO) continue
+    const scale = Math.max(1.4826 * baseline.mad, 0.05 * Math.abs(baseline.median), 1)
+    const z = (parsed.value - baseline.median) / scale
+    if (z < DEFENSE_SIGMA_THRESHOLD) continue
     const entry = labels.get(statKey)
     warnings.push({
       stat_key: statKey,
       label: entry?.label ?? statKey,
       value_type: entry?.value_type ?? 'flat',
       value: parsed.value,
-      baseline: baseline.average,
-      ratio,
+      median: baseline.median,
+      mad: baseline.mad,
+      z,
       sample_size: baseline.sample_size,
     })
   }
