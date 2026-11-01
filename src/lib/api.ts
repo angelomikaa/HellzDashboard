@@ -2040,7 +2040,7 @@ export async function setLineupPartyLabel(
   return asLineupsPayload(await parseBody<unknown>(res))
 }
 
-/** Change the Emperium raid count (officer/owner; 2..8, empty extras only). */
+/** Change the Emperium raid count (officer/owner; 2..8). */
 export async function setLineupRaidCount(
   session: NeoFootSession,
   warMode: WarMode,
@@ -2049,6 +2049,22 @@ export async function setLineupRaidCount(
   const res = await restFetch(session, '/rpc/set_lineup_raid_count', {
     method: 'POST',
     body: JSON.stringify({ p_war_mode: warMode, p_raid_count: raidCount }),
+  })
+  return asLineupsPayload(await parseBody<unknown>(res))
+}
+
+/**
+ * Set the Emperium party distribution (officer/owner). The server requires
+ * 2..8 raids, 1..8 parties per raid and exactly 16 parties total.
+ */
+export async function setLineupPartyCounts(
+  session: NeoFootSession,
+  warMode: WarMode,
+  counts: number[],
+): Promise<LineupsPayload> {
+  const res = await restFetch(session, '/rpc/set_lineup_party_counts', {
+    method: 'POST',
+    body: JSON.stringify({ p_war_mode: warMode, p_counts: counts }),
   })
   return asLineupsPayload(await parseBody<unknown>(res))
 }

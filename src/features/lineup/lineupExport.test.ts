@@ -196,4 +196,25 @@ describe('buildLineupExportPlan — labels, title and filenames', () => {
     expect(plan.columns.every((c) => c.slots.length === 5 && c.footer.filled === 0)).toBe(true)
     expect(plan.header.status.text).toBe('0 / 40 ESCALADOS')
   })
+
+  it('paints only the actual parties of an Emperium raid (6/6/4 layout)', () => {
+    const six = lineup('emperium_raid_1')
+    six.parties = six.parties.slice(0, 6)
+    const plan = buildLineupExportPlan(six, 'emperium')
+    expect(plan.columns).toHaveLength(6)
+    expect(plan.columns.map((c) => c.header.label)).toEqual(['G1', 'G2', 'G3', 'G4', 'G5', 'G6'])
+    expect(plan.header.status.text).toBe('30 / 30 ESCALADOS')
+    expect(plan.columns[0].rect.w).toBeGreaterThan(216)
+
+    const four = lineup('emperium_raid_3')
+    four.parties = four.parties.slice(0, 4)
+    const short = buildLineupExportPlan(four, 'emperium')
+    expect(short.columns).toHaveLength(4)
+    expect(short.header.status.text).toBe('20 / 20 ESCALADOS')
+
+    for (const rect of short.columns.flatMap((c) => [c.rect, c.header.rect, c.footer.rect, ...c.slots.map((s) => s.rect)])) {
+      expect(rect.x).toBeGreaterThanOrEqual(0)
+      expect(rect.x + rect.w).toBeLessThanOrEqual(short.width)
+    }
+  })
 })

@@ -10,8 +10,8 @@
  *
  * Probes:
  *   A. seed shape: 16 Vigrid parties / 80 filled slots / 40 per raid; the 3
- *      seeded Emperium raids (24 parties / 120 empty slots); role labels;
- *      zero smoke/dummy members in any lineup.
+ *      seeded Emperium raids with 6/6/4 parties (16 parties / 80 empty slots);
+ *      role labels; zero smoke/dummy members in any lineup.
  *   B. member read: get_lineups() + get_lineups_mode('emperium') 200 with a
  *      closed field list (no ovr, points, stats, key-stat config, pin_hash);
  *      roster count equals the live assignable roster; fixture members absent.
@@ -20,8 +20,9 @@
  *   D. officer writes (Vigrid): smoke member rejected (invalid_lineup_member);
  *      swap two slots; clear a slot (N/5 -> 4/5); cross-raid move; label edit +
  *      clear; over-long label rejected (invalid_lineup_label). Emperium: grow to
- *      4 raids, seat a member, refuse removing a non-empty raid, clear + shrink
- *      to 3, refuse below the two-raid minimum.
+ *      4 raids (4/4/4/4), set a custom 5/5/3/3, seat a member, shrink to 3
+ *      (6/6/4) while preserving the seat, refuse invalid distributions and
+ *      below the two-raid minimum.
  *   E. restore: live lineup identical to the pre-run snapshot (zero residue).
  *
  * Credentials come from smoke-config.mjs (env or .env). Never prints token,
@@ -225,14 +226,19 @@ async function main() {
           `(select raid_count::int from lineup_war_config where war_mode='emperium') as configured;`,
       )
     )[0]
+    const emperiumCounts = await mgmt(
+      `select raid_index, count(*)::int as parties from lineup_parties ` +
+        `where war_mode='emperium' group by raid_index order by raid_index;`,
+    )
     check(
-      'A5 Emperium seeded with 3 empty raids x 8 parties (24 parties / 120 slots)',
-      emperiumShape.parties === 24 &&
+      'A5 Emperium seeded as 3 empty raids with 6/6/4 parties (16 parties / 80 slots)',
+      emperiumShape.parties === 16 &&
         emperiumShape.raids === 3 &&
-        emperiumShape.slots === 120 &&
+        emperiumShape.slots === 80 &&
         emperiumShape.filled === 0 &&
-        emperiumShape.configured === 3,
-      `parties=${emperiumShape.parties} raids=${emperiumShape.raids} slots=${emperiumShape.slots} filled=${emperiumShape.filled} config=${emperiumShape.configured}`,
+        emperiumShape.configured === 3 &&
+        JSON.stringify(emperiumCounts.map((r) => r.parties)) === JSON.stringify([6, 6, 4]),
+      `parties=${emperiumShape.parties} raids=${emperiumShape.raids} slots=${emperiumShape.slots} filled=${emperiumShape.filled} config=${emperiumShape.configured} counts=${emperiumCounts.map((r) => r.parties).join('/')}`,
     )
     const labelMap = Object.fromEntries(
       snap0.parties
@@ -300,14 +306,17 @@ async function main() {
       method: 'POST', session: member, body: { p_war_mode: 'emperium' },
     })
     const ep = empRead.json || {}
+    const empCounts = (ep.battlefields || []).map((b) => b.parties.length)
     check(
-      'B9 member reads the 3 Emperium raids via get_lineups_mode',
+      'B9 member reads the 3 Emperium raids with 6/6/4 parties (16 total)',
       empRead.status === 200 &&
         ep.war_mode === 'emperium' &&
         ep.raid_count === 3 &&
         ep.battlefields?.length === 3 &&
-        ep.battlefields.every((b) => b.parties.length === 8 && typeof b.raid_index === 'number'),
-      `status=${empRead.status} raids=${ep.battlefields?.length}`,
+        JSON.stringify(empCounts) === JSON.stringify([6, 6, 4]) &&
+        empCounts.reduce((sum, n) => sum + n, 0) === 16 &&
+        ep.battlefields.every((b) => typeof b.raid_index === 'number'),
+      `status=${empRead.status} raids=${ep.battlefields?.length} counts=${empCounts.join('/')}`,
     )
 
     // ---- C. member writes denied, reads allowed ---------------------------
@@ -408,21 +417,36 @@ async function main() {
     })
     check('D7 officer clears a label to null', unlabel.status === 200 && unlabel.json?.battlefields?.[0]?.parties?.[1]?.role_label === null)
 
-    // ---- Emperium raid management (0056) ----------------------------------
+    // ---- Emperium party-distribution invariant (0057) ---------------------
+    const partyCounts = (payload) => payload?.battlefields?.map((b) => b.parties.length) ?? []
+    const totalParties = (payload) => partyCounts(payload).reduce((sum, n) => sum + n, 0)
+
     const grow = await rest('/rpc/set_lineup_raid_count', {
       method: 'POST', session: officer, body: { p_war_mode: 'emperium', p_raid_count: 4 },
     })
     check(
-      'D8 officer grows Emperium to 4 raids (4 x 8 parties returned)',
+      'D8 growing to 4 raids rebalances to 4/4/4/4 with 16 parties',
       grow.status === 200 &&
         grow.json?.war_mode === 'emperium' &&
         grow.json?.raid_count === 4 &&
-        grow.json?.battlefields?.length === 4 &&
-        grow.json?.battlefields?.every((b) => b.parties.length === 8),
-      `status=${grow.status} raids=${grow.json?.battlefields?.length}`,
+        JSON.stringify(partyCounts(grow.json)) === JSON.stringify([4, 4, 4, 4]) &&
+        totalParties(grow.json) === 16,
+      `status=${grow.status} counts=${partyCounts(grow.json).join('/')} total=${totalParties(grow.json)}`,
     )
 
-    const emperiumMember = grow.json?.roster?.[0]?.member_id
+    const custom = await rest('/rpc/set_lineup_party_counts', {
+      method: 'POST', session: officer,
+      body: { p_war_mode: 'emperium', p_counts: [5, 5, 3, 3] },
+    })
+    check(
+      'D9 officer sets an arbitrary valid 5/5/3/3 distribution (16 parties)',
+      custom.status === 200 &&
+        JSON.stringify(partyCounts(custom.json)) === JSON.stringify([5, 5, 3, 3]) &&
+        totalParties(custom.json) === 16,
+      `status=${custom.status} counts=${partyCounts(custom.json).join('/')} total=${totalParties(custom.json)}`,
+    )
+
+    const emperiumMember = custom.json?.roster?.[0]?.member_id
     const seat = await rest('/rpc/set_lineup_slot_mode', {
       method: 'POST', session: officer,
       body: {
@@ -434,44 +458,48 @@ async function main() {
       },
     })
     check(
-      'D9 officer seats a member in Emperium Raid 4',
+      'D10 officer seats a member in Emperium Raid 4',
       seat.status === 200 && seat.json?.battlefields?.[3]?.parties?.[0]?.filled === 1,
       `status=${seat.status}`,
     )
 
-    const blockedShrink = await rest('/rpc/set_lineup_raid_count', {
-      method: 'POST', session: officer, body: { p_war_mode: 'emperium', p_raid_count: 3 },
-    })
-    check(
-      'D10 removing a non-empty raid is refused (lineup_raid_not_empty)',
-      !blockedShrink.ok && blockedShrink.text.includes('lineup_raid_not_empty'),
-      `status=${blockedShrink.status}`,
-    )
-
-    const clearEmp = await rest('/rpc/set_lineup_slot_mode', {
-      method: 'POST', session: officer,
-      body: {
-        p_war_mode: 'emperium',
-        p_battlefield: 'emperium_raid_4',
-        p_party: 1,
-        p_slot: 1,
-        p_member: null,
-      },
-    })
     const shrink = await rest('/rpc/set_lineup_raid_count', {
       method: 'POST', session: officer, body: { p_war_mode: 'emperium', p_raid_count: 3 },
     })
+    const seatedAfter = (
+      await mgmt(
+        `select count(*)::int as n from lineup_slots where war_mode='emperium' and member_id='${emperiumMember}';`,
+      )
+    )[0].n
     check(
-      'D11 officer clears and shrinks Emperium back to 3 raids',
-      clearEmp.status === 200 && shrink.status === 200 && shrink.json?.raid_count === 3 && shrink.json?.battlefields?.length === 3,
-      `status=${shrink.status} raids=${shrink.json?.battlefields?.length}`,
+      'D11 removing a raid rebalances to 6/6/4 and preserves the seated member',
+      shrink.status === 200 &&
+        JSON.stringify(partyCounts(shrink.json)) === JSON.stringify([6, 6, 4]) &&
+        totalParties(shrink.json) === 16 &&
+        seatedAfter === 1,
+      `status=${shrink.status} counts=${partyCounts(shrink.json).join('/')} seated=${seatedAfter}`,
+    )
+
+    const badSum = await rest('/rpc/set_lineup_party_counts', {
+      method: 'POST', session: officer,
+      body: { p_war_mode: 'emperium', p_counts: [5, 5, 5] },
+    })
+    const badMax = await rest('/rpc/set_lineup_party_counts', {
+      method: 'POST', session: officer,
+      body: { p_war_mode: 'emperium', p_counts: [9, 7] },
+    })
+    check(
+      'D12 invalid distributions are refused (sum != 16 / >8 per raid)',
+      !badSum.ok && badSum.text.includes('invalid_lineup_party_counts') &&
+        !badMax.ok && badMax.text.includes('invalid_lineup_party_counts'),
+      `sum=${badSum.status} max=${badMax.status}`,
     )
 
     const tooFew = await rest('/rpc/set_lineup_raid_count', {
       method: 'POST', session: officer, body: { p_war_mode: 'emperium', p_raid_count: 1 },
     })
     check(
-      'D12 below the two-raid minimum is refused (invalid_lineup_raid_count)',
+      'D13 below the two-raid minimum is refused (invalid_lineup_raid_count)',
       !tooFew.ok && tooFew.text.includes('invalid_lineup_raid_count'),
       `status=${tooFew.status}`,
     )

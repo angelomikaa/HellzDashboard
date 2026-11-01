@@ -9,15 +9,21 @@ import {
   classAccentHex,
   CLASS_ACCENT_HEX,
   BATTLEFIELD_META,
+  defaultEmperiumPartyCounts,
   filterAssignableRoster,
   findMemberAssignment,
   isPartyFull,
+  isValidPartyCounts,
+  MAX_PARTIES_PER_RAID,
   MAX_RAIDS,
   MIN_RAIDS,
   NULL_CLASS_ACCENT_HEX,
   normalizeRoleLabel,
   partyFilledCount,
+  raidCapacity,
   raidMeta,
+  TOTAL_PARTIES,
+  totalPartyCount,
   WAR_MODE_META,
 } from './lineupModel'
 
@@ -121,6 +127,41 @@ describe('party and battlefield counts', () => {
   it('reports a full party only at 5/5', () => {
     expect(isPartyFull(party(1, ['a', 'b', 'c', 'd', 'e']))).toBe(true)
     expect(isPartyFull(party(1, ['a', 'b', 'c', 'd', null]))).toBe(false)
+  })
+
+  it('derives capacity and total parties from the actual party counts', () => {
+    const six = { parties: Array.from({ length: 6 }, (_, i) => party(i + 1, [])) }
+    const four = { parties: Array.from({ length: 4 }, (_, i) => party(i + 1, [])) }
+    expect(raidCapacity(six)).toBe(30)
+    expect(raidCapacity(four)).toBe(20)
+    expect(totalPartyCount([six, four])).toBe(10)
+    expect(TOTAL_PARTIES).toBe(16)
+  })
+})
+
+describe('Emperium party distribution invariant', () => {
+  it('defaults to 6/6/4 for three raids and 8/8 for two', () => {
+    expect(defaultEmperiumPartyCounts(2)).toEqual([8, 8])
+    expect(defaultEmperiumPartyCounts(3)).toEqual([6, 6, 4])
+    expect(defaultEmperiumPartyCounts(4)).toEqual([4, 4, 4, 4])
+    expect(defaultEmperiumPartyCounts(5)).toEqual([4, 3, 3, 3, 3])
+    expect(defaultEmperiumPartyCounts(8)).toEqual([2, 2, 2, 2, 2, 2, 2, 2])
+    for (let raids = 2; raids <= 8; raids++) {
+      const counts = defaultEmperiumPartyCounts(raids)
+      expect(counts.reduce((sum, count) => sum + count, 0)).toBe(TOTAL_PARTIES)
+      expect(counts.every((count) => count >= 1 && count <= MAX_PARTIES_PER_RAID)).toBe(true)
+    }
+  })
+
+  it('accepts only 2..8 raids, 1..8 parties each, summing to 16', () => {
+    expect(isValidPartyCounts([6, 6, 4])).toBe(true)
+    expect(isValidPartyCounts([8, 8])).toBe(true)
+    expect(isValidPartyCounts([7, 5, 4])).toBe(true)
+    expect(isValidPartyCounts([8, 8, 0])).toBe(false)
+    expect(isValidPartyCounts([9, 7])).toBe(false)
+    expect(isValidPartyCounts([6, 6])).toBe(false)
+    expect(isValidPartyCounts([5, 5, 5])).toBe(false)
+    expect(isValidPartyCounts([2])).toBe(false)
   })
 })
 

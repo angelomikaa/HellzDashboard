@@ -28,7 +28,6 @@ import {
   CLASS_ACCENT_HEX,
   PARTIES_PER_BATTLEFIELD,
   SLOTS_PER_PARTY,
-  TOTAL_CAPACITY_PER_BATTLEFIELD,
   classAccentHex,
   isPartyFull,
   partyFilledCount,
@@ -64,7 +63,11 @@ const TEXT_FIT_FLOOR = 0.6
 
 const MARGIN = 40
 const GUTTER = 16
-const COLUMN_W = (LINEUP_EXPORT_WIDTH - 2 * MARGIN - (PARTIES_PER_BATTLEFIELD - 1) * GUTTER) / PARTIES_PER_BATTLEFIELD
+
+/** Width of one party column for a raid with `partyCount` parties. */
+function columnWidth(partyCount: number): number {
+  return (LINEUP_EXPORT_WIDTH - 2 * MARGIN - (partyCount - 1) * GUTTER) / partyCount
+}
 
 const LAYOUT = {
   markY: 32,
@@ -158,8 +161,13 @@ function normalizeSlots(party: LineupParty | null): LineupSlot[] {
   })
 }
 
-function buildColumn(partyIndex: number, party: LineupParty | null, col: number): LineupExportColumn {
-  const x = MARGIN + col * (COLUMN_W + GUTTER)
+function buildColumn(
+  partyIndex: number,
+  party: LineupParty | null,
+  col: number,
+  width: number,
+): LineupExportColumn {
+  const x = MARGIN + col * (width + GUTTER)
   const slots = normalizeSlots(party)
   const normalized: LineupParty = {
     party_index: partyIndex,
@@ -175,16 +183,16 @@ function buildColumn(partyIndex: number, party: LineupParty | null, col: number)
     partyIndex,
     header: {
       label: `G${partyIndex}`,
-      rect: { x, y: LAYOUT.columnY, w: COLUMN_W, h: LAYOUT.headerBandH },
+      rect: { x, y: LAYOUT.columnY, w: width, h: LAYOUT.headerBandH },
     },
     roleLabel:
       party?.role_label !== null && party?.role_label !== undefined && party.role_label !== ''
         ? {
             text: party.role_label,
-            rect: { x, y: LAYOUT.roleBannerY, w: COLUMN_W, h: LAYOUT.roleBannerH },
+            rect: { x, y: LAYOUT.roleBannerY, w: width, h: LAYOUT.roleBannerH },
           }
         : null,
-    rect: { x, y: LAYOUT.columnY, w: COLUMN_W, h: LAYOUT.columnH },
+    rect: { x, y: LAYOUT.columnY, w: width, h: LAYOUT.columnH },
     slots: slots.map((slot, k) => {
       const vacant = slot.member_id === null
       const charClass = slot.char_class
@@ -193,7 +201,7 @@ function buildColumn(partyIndex: number, party: LineupParty | null, col: number)
         rect: {
           x: x + LAYOUT.slotInset,
           y: LAYOUT.slotY + k * (LAYOUT.slotH + LAYOUT.slotGap),
-          w: COLUMN_W - 2 * LAYOUT.slotInset,
+          w: width - 2 * LAYOUT.slotInset,
           h: LAYOUT.slotH,
         },
         leader: slot.slot_index === 1,
@@ -210,7 +218,7 @@ function buildColumn(partyIndex: number, party: LineupParty | null, col: number)
       filled,
       full,
       color: full ? COLORS.success : COLORS.warning,
-      rect: { x: x + LAYOUT.slotInset, y: LAYOUT.footerY, w: COLUMN_W - 2 * LAYOUT.slotInset, h: LAYOUT.footerH },
+      rect: { x: x + LAYOUT.slotInset, y: LAYOUT.footerY, w: width - 2 * LAYOUT.slotInset, h: LAYOUT.footerH },
     },
   }
 }
@@ -226,11 +234,19 @@ export function buildLineupExportPlan(
 ): LineupExportPlan {
   const meta = raidMeta(warMode, lineup.raid_index)
   const partiesByIndex = new Map(lineup.parties.map((p) => [p.party_index, p]))
+  // Vigrid always paints the fixed 8-party battlefield. Emperium paints the
+  // raid's actual 1..8 parties, so a 6/6/4 distribution prints 6/6/4 columns.
+  const partyCount =
+    warMode === 'emperium'
+      ? Math.max(1, lineup.parties.length)
+      : PARTIES_PER_BATTLEFIELD
+  const width = columnWidth(partyCount)
 
-  const columns = Array.from({ length: PARTIES_PER_BATTLEFIELD }, (_, col) =>
-    buildColumn(col + 1, partiesByIndex.get(col + 1) ?? null, col),
+  const columns = Array.from({ length: partyCount }, (_, col) =>
+    buildColumn(col + 1, partiesByIndex.get(col + 1) ?? null, col, width),
   )
   const filled = columns.reduce((sum, c) => sum + c.footer.filled, 0)
+  const capacity = partyCount * SLOTS_PER_PARTY
 
   const legendKeys = Object.keys(CLASS_ACCENT_HEX)
   const itemW = (LINEUP_EXPORT_WIDTH - 2 * MARGIN) / legendKeys.length
@@ -257,7 +273,7 @@ export function buildLineupExportPlan(
         y: 116,
       },
       status: {
-        text: `${filled} / ${TOTAL_CAPACITY_PER_BATTLEFIELD} ESCALADOS`,
+        text: `${filled} / ${capacity} ESCALADOS`,
         rect: { x: LINEUP_EXPORT_WIDTH - MARGIN - statusW, y: 50, w: statusW, h: 48 },
       },
       rule: { x: 0, y: LAYOUT.headerRuleY, w: LINEUP_EXPORT_WIDTH, h: LAYOUT.headerRuleH },

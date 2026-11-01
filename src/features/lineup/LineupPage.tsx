@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   fetchLineups,
+  setLineupPartyCounts,
   setLineupPartyLabel,
   setLineupRaidCount,
   setLineupSlot,
@@ -32,17 +33,23 @@ import {
   battlefieldFilledCount,
   buildAssignmentMap,
   classAccentHex,
+  defaultEmperiumPartyCounts,
   filterAssignableRoster,
   findMemberAssignment,
   isPartyFull,
+  isValidPartyCounts,
   lineupErrorCopy,
+  MAX_PARTIES_PER_RAID,
+  MIN_PARTIES_PER_RAID,
   normalizeRoleLabel,
   partyFilledCount,
+  raidCapacity,
   raidMeta,
   ROLE_LABEL_MAX,
   ROLE_LABEL_PRESETS,
   SLOTS_PER_PARTY,
-  TOTAL_CAPACITY_PER_BATTLEFIELD,
+  TOTAL_PARTIES,
+  totalPartyCount,
   WAR_MODES,
   WAR_MODE_META,
   type LineupAssignment,
@@ -68,6 +75,8 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
   const [saving, setSaving] = useState(false)
   const [selectedRaid, setSelectedRaid] = useState(1)
   const [stacked, setStacked] = useState(false)
+  const [distOpen, setDistOpen] = useState(false)
+  const [distCounts, setDistCounts] = useState<number[]>([])
   const [exporting, setExporting] = useState<ExportScope | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
 
@@ -154,11 +163,30 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
   const activeRaid = raids.find((raid) => raid.raid_index === selectedRaid) ?? raids[0] ?? null
   const visible: BattlefieldLineup[] = stacked ? raids : activeRaid === null ? [] : [activeRaid]
   const modeMeta = WAR_MODE_META[payload.war_mode]
-  const lastRaid = raids[raids.length - 1]
-  const lastRaidFilled = lastRaid === undefined ? 0 : battlefieldFilledCount(lastRaid)
-  const canRemoveRaid =
-    payload.war_mode === 'emperium' && payload.raid_count > payload.min_raids && lastRaidFilled === 0
+  const partiesTotal = totalPartyCount(raids)
+  const canRemoveRaid = payload.war_mode === 'emperium' && payload.raid_count > payload.min_raids
   const canAddRaid = payload.war_mode === 'emperium' && payload.raid_count < payload.max_raids
+  const distTotal = distCounts.reduce((sum, count) => sum + count, 0)
+  const distValid = isValidPartyCounts(distCounts)
+
+  function openDistribution() {
+    setDistCounts(raids.map((raid) => raid.parties.length))
+    setDistOpen(true)
+  }
+
+  function updateDistCount(index: number, raw: string) {
+    const parsed = Number.parseInt(raw, 10)
+    const value = Number.isNaN(parsed)
+      ? MIN_PARTIES_PER_RAID
+      : Math.min(MAX_PARTIES_PER_RAID, Math.max(MIN_PARTIES_PER_RAID, parsed))
+    setDistCounts((counts) => counts.map((count, i) => (i === index ? value : count)))
+  }
+
+  function saveDistribution() {
+    if (!distValid) return
+    setDistOpen(false)
+    void runMutation((s) => setLineupPartyCounts(s, 'emperium', distCounts))
+  }
 
   return (
     <section aria-labelledby="lineup-title" className="flex flex-col gap-4">
@@ -200,50 +228,122 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
         )}
 
         {payload.war_mode === 'emperium' && (
-          <div className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-3 py-2">
-            <span className="text-sm font-semibold text-content">
-              Raids: {payload.raid_count} / {payload.max_raids}
-            </span>
-            {isStaff && (
-              <>
-                <button
-                  type="button"
-                  aria-label="Remover raid"
-                  disabled={saving || !canRemoveRaid}
-                  title={
-                    lastRaidFilled > 0
-                      ? `Esvazie a ${lastRaid === undefined ? 'última raid' : raidMeta(payload.war_mode, lastRaid.raid_index).subtitle} antes de removê-la.`
-                      : 'Remover a última raid'
-                  }
-                  onClick={() =>
-                    void runMutation((s) => setLineupRaidCount(s, 'emperium', payload.raid_count - 1))
-                  }
-                  className="h-11 min-w-11 rounded-md border border-line px-3 text-lg font-bold text-content hover-control disabled:opacity-40"
-                >
-                  −
-                </button>
-                <button
-                  type="button"
-                  aria-label="Adicionar raid"
-                  disabled={saving || !canAddRaid}
-                  onClick={() =>
-                    void runMutation((s) => setLineupRaidCount(s, 'emperium', payload.raid_count + 1))
-                  }
-                  className="h-11 min-w-11 rounded-md border border-accent px-3 text-lg font-bold text-content hover-control disabled:opacity-40"
-                >
-                  +
-                </button>
-              </>
-            )}
-            {!isStaff && (
-              <span className="text-sm text-muted">
-                Mínimo {payload.min_raids}, máximo {payload.max_raids}.
+          <div className="flex flex-col gap-2 rounded-md border border-line bg-surface px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-content">
+                Raids: {payload.raid_count} / {payload.max_raids}
               </span>
-            )}
-            {isStaff && !canRemoveRaid && payload.raid_count > payload.min_raids && lastRaidFilled > 0 && (
-              <span className="text-xs text-muted">
-                Esvazie a {lastRaid === undefined ? 'última raid' : raidMeta(payload.war_mode, lastRaid.raid_index).subtitle} para removê-la.
+              <span
+                className={`text-sm font-semibold ${partiesTotal === TOTAL_PARTIES ? 'text-success' : 'text-error'}`}
+              >
+                Parties: {partiesTotal} / {TOTAL_PARTIES}
               </span>
+              {isStaff && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Remover raid"
+                    disabled={saving || !canRemoveRaid}
+                    onClick={() => {
+                      setDistOpen(false)
+                      void runMutation((s) =>
+                        setLineupRaidCount(s, 'emperium', payload.raid_count - 1),
+                      )
+                    }}
+                    className="h-11 min-w-11 rounded-md border border-line px-3 text-lg font-bold text-content hover-control disabled:opacity-40"
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Adicionar raid"
+                    disabled={saving || !canAddRaid}
+                    onClick={() => {
+                      setDistOpen(false)
+                      void runMutation((s) =>
+                        setLineupRaidCount(s, 'emperium', payload.raid_count + 1),
+                      )
+                    }}
+                    className="h-11 min-w-11 rounded-md border border-accent px-3 text-lg font-bold text-content hover-control disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => (distOpen ? setDistOpen(false) : openDistribution())}
+                    className="h-11 rounded-md border border-line px-3 text-sm text-content hover-control disabled:opacity-50"
+                  >
+                    {distOpen ? 'Fechar distribuição' : 'Distribuir parties'}
+                  </button>
+                </>
+              )}
+              {!isStaff && (
+                <span className="text-sm text-muted">
+                  {payload.min_raids} a {payload.max_raids} raids, até{' '}
+                  {MAX_PARTIES_PER_RAID} parties por raid.
+                </span>
+              )}
+            </div>
+
+            {distOpen && isStaff && (
+              <div className="flex flex-col gap-2 rounded-md border border-line bg-dominant p-2">
+                <p className="text-xs text-muted">
+                  Cada raid aceita de {MIN_PARTIES_PER_RAID} a {MAX_PARTIES_PER_RAID} parties. O
+                  total precisa ser {TOTAL_PARTIES}.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {raids.map((raid, index) => (
+                    <label
+                      key={raid.battlefield}
+                      className="flex items-center gap-2 text-sm text-content"
+                    >
+                      <span>{raidMeta(payload.war_mode, raid.raid_index).subtitle}</span>
+                      <input
+                        type="number"
+                        min={MIN_PARTIES_PER_RAID}
+                        max={MAX_PARTIES_PER_RAID}
+                        value={distCounts[index] ?? MIN_PARTIES_PER_RAID}
+                        onChange={(event) => updateDistCount(index, event.target.value)}
+                        aria-label={`Parties da ${raidMeta(payload.war_mode, raid.raid_index).subtitle}`}
+                        className="h-11 w-20 rounded-md border border-line bg-surface px-2 text-sm text-content"
+                      />
+                    </label>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`text-sm font-semibold ${distTotal === TOTAL_PARTIES ? 'text-success' : 'text-error'}`}
+                  >
+                    Total: {distTotal} / {TOTAL_PARTIES}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={saving || !distValid}
+                    onClick={saveDistribution}
+                    className="h-11 rounded-md border border-accent px-3 text-sm font-semibold text-content hover-control disabled:opacity-50"
+                  >
+                    Salvar distribuição
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() =>
+                      setDistCounts(defaultEmperiumPartyCounts(payload.raid_count))
+                    }
+                    className="h-11 rounded-md border border-line px-3 text-sm text-content hover-control disabled:opacity-50"
+                  >
+                    Padrão
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDistOpen(false)}
+                    className="h-11 rounded-md border border-line px-3 text-sm text-muted hover-control"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -292,6 +392,7 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
         {raids.map((raid) => {
           const meta = raidMeta(payload.war_mode, raid.raid_index)
           const filled = battlefieldFilledCount(raid)
+          const capacity = raidCapacity(raid)
           const active = !stacked && activeRaid?.raid_index === raid.raid_index
           return (
             <button
@@ -308,7 +409,7 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
               }`}
             >
               {payload.war_mode === 'emperium' ? meta.subtitle : `${meta.title} (${meta.subtitle})`}{' '}
-              <span className="ml-1 text-muted">{filled}/{TOTAL_CAPACITY_PER_BATTLEFIELD}</span>
+              <span className="ml-1 text-muted">{filled}/{capacity}</span>
             </button>
           )
         })}
@@ -378,6 +479,7 @@ export function BattlefieldGrid({
   const meta = raidMeta(warMode, raid.raid_index)
   const parties = raid.parties
   const filled = battlefieldFilledCount(raid)
+  const capacity = raidCapacity(raid)
   const assignments = buildAssignmentMap(payload)
   const ownRaid = parties.some((party) => party.slots.some((slot) => slot.member_id === memberId))
 
@@ -393,7 +495,7 @@ export function BattlefieldGrid({
           </span>
         )}
         <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
-          {filled}/{TOTAL_CAPACITY_PER_BATTLEFIELD} escalados
+          {filled}/{capacity} escalados
         </span>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

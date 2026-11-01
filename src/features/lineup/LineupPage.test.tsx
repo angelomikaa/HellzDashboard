@@ -25,8 +25,8 @@ function slot(index: number, memberId: string | null, name: string | null, charC
   }
 }
 
-function emptyParties(): LineupParty[] {
-  return Array.from({ length: 8 }, (_, i) => ({
+function emptyParties(count = 8): LineupParty[] {
+  return Array.from({ length: count }, (_, i) => ({
     party_index: i + 1,
     role_label: null,
     filled: 0,
@@ -41,6 +41,12 @@ parties[0].slots[1] = slot(2, 'm2', 'Tifa', 'Gypsy')
 parties[0].filled = 2
 // G5 carries a role label.
 parties[4].role_label = 'MOBS CIMA/BAIXO'
+
+// The Emperium example is 3 raids with 6/6/4 parties = 16 total.
+const emperiumViewerParties = emptyParties(4)
+emperiumViewerParties[0].slots[0] = slot(1, 'm1', 'Lanaya', 'Bard')
+emperiumViewerParties[0].slots[1] = slot(2, 'm2', 'Tifa', 'Gypsy')
+emperiumViewerParties[0].filled = 2
 
 const payload: LineupsPayload = {
   war_mode: 'vigrid',
@@ -63,9 +69,9 @@ const emperiumPayload: LineupsPayload = {
   war_mode: 'emperium',
   raid_count: 3,
   battlefields: [
-    { battlefield: 'emperium_raid_1', raid_index: 1, parties: emptyParties() },
-    { battlefield: 'emperium_raid_2', raid_index: 2, parties: emptyParties() },
-    { battlefield: 'emperium_raid_3', raid_index: 3, parties },
+    { battlefield: 'emperium_raid_1', raid_index: 1, parties: emptyParties(6) },
+    { battlefield: 'emperium_raid_2', raid_index: 2, parties: emptyParties(6) },
+    { battlefield: 'emperium_raid_3', raid_index: 3, parties: emperiumViewerParties },
   ],
 }
 
@@ -133,6 +139,10 @@ describe('LineupPage member read-only view', () => {
     expect(html).toContain('Sua Raid')
     expect(html).toContain('Sua PT')
     expect(html).toContain('Você')
+    // Raid 3 has 4 parties (4 x 5 = 20 slots), unlike the fixed 8-party Vigrid fields.
+    expect(html).toContain('2/20 escalados')
+    expect(html).toContain('Party G4')
+    expect(html).not.toContain('Party G5')
   })
 })
 
@@ -165,6 +175,7 @@ describe('lineupErrorCopy', () => {
     expect(lineupErrorCopy(new Error('HTTP 500: forbidden'))).toContain('permissão')
     expect(lineupErrorCopy(new Error('HTTP 500: invalid_lineup_member'))).toContain('não pode ser escalado')
     expect(lineupErrorCopy(new Error('HTTP 500: invalid_lineup_raid_count'))).toContain('entre 2 e 8 raids')
+    expect(lineupErrorCopy(new Error('HTTP 500: invalid_lineup_party_counts'))).toContain('16 parties')
     expect(lineupErrorCopy(new Error('HTTP 500: lineup_raid_not_empty'))).toContain('Esvazie a raid')
     expect(lineupErrorCopy(new ApiError(0, 'network', 'offline'))).toContain('conectar')
     expect(lineupErrorCopy(new Error('boom'))).toContain('Tente novamente')

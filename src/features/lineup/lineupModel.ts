@@ -35,6 +35,15 @@ export const MAX_RAIDS = 8
 export const VIGRID_RAIDS = 2
 export const DEFAULT_EMPERIUM_RAIDS = 3
 
+/**
+ * The Emperium invariant (owner 2026-11-01): the mode always has exactly 16
+ * parties, no matter how many raids they are split into. A raid may hold 1..8
+ * parties, so any raid count from 2 to 8 can produce a valid distribution.
+ */
+export const TOTAL_PARTIES = 16
+export const MAX_PARTIES_PER_RAID = 8
+export const MIN_PARTIES_PER_RAID = 1
+
 export const BATTLEFIELD_IDS: readonly BattlefieldId[] = ['vigrid_field', 'ruinscape']
 
 /** Titles are the owner's words (CONTEXT D-03/D-05). `fileSlug` names the JPG. */
@@ -74,6 +83,44 @@ export function battlefieldForRaid(warMode: WarMode, raidIndex: number): Battlef
 export const PARTIES_PER_BATTLEFIELD = 8
 export const SLOTS_PER_PARTY = 5
 export const TOTAL_CAPACITY_PER_BATTLEFIELD = PARTIES_PER_BATTLEFIELD * SLOTS_PER_PARTY
+
+/** Seated-slot capacity of one raid, derived from its actual party count. */
+export function raidCapacity(raid: { parties: readonly LineupParty[] }): number {
+  return raid.parties.length * SLOTS_PER_PARTY
+}
+
+/** Total parties across a war mode; must equal TOTAL_PARTIES for Emperium. */
+export function totalPartyCount(raids: readonly { parties: readonly LineupParty[] }[]): number {
+  return raids.reduce((sum, raid) => sum + raid.parties.length, 0)
+}
+
+/**
+ * Deterministic default distribution used when the officer changes the raid
+ * count. Mirrors the server's _default_emperium_party_counts():
+ * 3 raids -> 6/6/4 (the current guild layout), 2 -> 8/8, otherwise balanced.
+ */
+export function defaultEmperiumPartyCounts(raidCount: number): number[] {
+  if (raidCount === 2) return [8, 8]
+  if (raidCount === 3) return [6, 6, 4]
+  const base = Math.floor(TOTAL_PARTIES / raidCount)
+  const remainder = TOTAL_PARTIES % raidCount
+  return Array.from({ length: raidCount }, (_, index) => base + (index < remainder ? 1 : 0))
+}
+
+/** True when a distribution respects the Emperium invariant. */
+export function isValidPartyCounts(counts: readonly number[]): boolean {
+  return (
+    counts.length >= MIN_RAIDS &&
+    counts.length <= MAX_RAIDS &&
+    counts.every(
+      (count) =>
+        Number.isInteger(count) &&
+        count >= MIN_PARTIES_PER_RAID &&
+        count <= MAX_PARTIES_PER_RAID,
+    ) &&
+    counts.reduce((sum, count) => sum + count, 0) === TOTAL_PARTIES
+  )
+}
 
 /** Role-label presets offered to officers (CONTEXT D-03). */
 export const ROLE_LABEL_PRESETS: readonly string[] = ['MOBS CIMA/BAIXO', 'MOBS DIREITA/ESQUERDA']
@@ -245,6 +292,12 @@ export function lineupErrorCopy(err: unknown, mode: 'read' | 'write' = 'write'):
   }
   if (message.includes('invalid_lineup_raid_count') || message.includes('invalid_war_mode')) {
     return `A guerra deve ter entre ${MIN_RAIDS} e ${MAX_RAIDS} raids.`
+  }
+  if (
+    message.includes('invalid_lineup_party_counts') ||
+    message.includes('invalid_lineup_party_count')
+  ) {
+    return `A distribuição deve somar ${TOTAL_PARTIES} parties, com ${MIN_PARTIES_PER_RAID} a ${MAX_PARTIES_PER_RAID} por raid.`
   }
   if (message.includes('lineup_raid_not_empty')) {
     return 'Esvazie a raid antes de removê-la.'

@@ -21,6 +21,7 @@ import {
   fetchStaffRequests,
   asLineupsPayload,
   fetchLineups,
+  setLineupPartyCounts,
   setLineupPartyLabel,
   setLineupRaidCount,
   setLineupSlot,
@@ -500,7 +501,22 @@ const lineupPayload = {
   roster: [{ member_id: 'm1', display_name: 'Lanaya', char_class: 'Bard', char_function: 'dps' }],
 }
 
-describe('lineup RPC wrappers (phase 10.4 / 0056, LNUP-01..03)', () => {
+const emperiumPayload = {
+  ...lineupPayload,
+  war_mode: 'emperium',
+  raid_count: 3,
+  battlefields: [
+    {
+      battlefield: 'emperium_raid_1',
+      raid_index: 1,
+      parties: lineupPayload.battlefields[0].parties,
+    },
+    { battlefield: 'emperium_raid_2', raid_index: 2, parties: [] },
+    { battlefield: 'emperium_raid_3', raid_index: 3, parties: [] },
+  ],
+}
+
+describe('lineup RPC wrappers (phase 10.4 / 0056 / 0057, LNUP-01..03)', () => {
   it('fetchLineups POSTs the war mode to get_lineups_mode and returns the validated payload', async () => {
     nextResponse = () => res(200, JSON.stringify(lineupPayload))
     const payload = await fetchLineups(session, 'vigrid')
@@ -554,27 +570,22 @@ describe('lineup RPC wrappers (phase 10.4 / 0056, LNUP-01..03)', () => {
   })
 
   it('setLineupRaidCount POSTs the Emperium raid count', async () => {
-    nextResponse = () =>
-      res(
-        200,
-        JSON.stringify({
-          ...lineupPayload,
-          war_mode: 'emperium',
-          raid_count: 4,
-          battlefields: [
-            {
-              battlefield: 'emperium_raid_1',
-              raid_index: 1,
-              parties: lineupPayload.battlefields[0].parties,
-            },
-          ],
-        }),
-      )
+    nextResponse = () => res(200, JSON.stringify({ ...emperiumPayload, raid_count: 4 }))
     await setLineupRaidCount(session, 'emperium', 4)
     expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/set_lineup_raid_count')
     expect(JSON.parse(calls[0].init.body as string)).toEqual({
       p_war_mode: 'emperium',
       p_raid_count: 4,
+    })
+  })
+
+  it('setLineupPartyCounts POSTs the 16-party distribution', async () => {
+    nextResponse = () => res(200, JSON.stringify(emperiumPayload))
+    await setLineupPartyCounts(session, 'emperium', [6, 6, 4])
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/set_lineup_party_counts')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      p_war_mode: 'emperium',
+      p_counts: [6, 6, 4],
     })
   })
 
