@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BattlefieldId, BattlefieldLineup, LineupParty } from '../../lib/api'
 import { buildLineupExportPlan, LINEUP_EXPORT_HEIGHT, LINEUP_EXPORT_WIDTH, lineupFilename } from './lineupExport'
+import { CLASS_ACCENT_HEX } from './lineupModel'
 
 /** Raid position for the battlefield id used by the tests. */
 function raidIndexFor(battlefield: BattlefieldId): number {
@@ -162,7 +163,7 @@ describe('buildLineupExportPlan — slots, leader and counters', () => {
     expect(seated.vacant).toBe(false)
     expect(seated.name).toBe('Player11')
     expect(seated.classText).toBe('Menestrel')
-    expect(seated.accent).toBe('#8FD3F4')
+    expect(seated.accent).toBe(CLASS_ACCENT_HEX.Bard)
     expect(seated.iconSrc).toBe('/assets/classes/class-icon-bard.webp')
 
     const vacant = plan.columns[0].slots[1]

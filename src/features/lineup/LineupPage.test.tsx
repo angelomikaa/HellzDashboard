@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ApiError, type LineupParty, type LineupsPayload, type WarMode } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { BattlefieldGrid, LineupPage, SlotOfferDialog } from './LineupPage'
-import { lineupErrorCopy } from './lineupModel'
+import { lineupErrorCopy, CLASS_ACCENT_HEX } from './lineupModel'
 
 const memberSession: NeoFootSession = {
   access_token: 't',
@@ -153,7 +153,7 @@ describe('LineupPage member read-only view', () => {
     const html = grid(memberSession)
     // Seated (Bard → Menestrel): the accent fills the whole row.
     expect(html).toContain('linear-gradient(95deg')
-    expect(html).toContain('#8FD3F4')
+    expect(html).toContain(CLASS_ACCENT_HEX.Bard)
     // Empty: dashed outline, no class fill.
     expect(html).toContain('border-dashed')
     expect(html).toContain('— Vago —')

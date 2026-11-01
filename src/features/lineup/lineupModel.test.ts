@@ -120,6 +120,70 @@ describe('class accents', () => {
     expect(classAccentHex('Unknown Class')).toBe(NULL_CLASS_ACCENT_HEX)
     expect(classAccentHex('Bard')).toBe(CLASS_ACCENT_HEX.Bard)
   })
+
+  // Owner report 2026-11-01: "algumas cores de classe não condizem com a cor do
+  // icone". The accents were re-sampled from the committed icons; this guard
+  // measures every icon and fails if an accent drifts away from its own art.
+  it('keeps each accent in the hue family of its own icon', async () => {
+    const sharp = (await import('sharp')).default
+    const { join } = await import('node:path')
+
+    const hueOf = (r: number, g: number, b: number): number => {
+      const max = Math.max(r, g, b)
+      const min = Math.min(r, g, b)
+      const d = max - min
+      if (d === 0) return 0
+      let h: number
+      if (max === r) h = ((g - b) / d) % 6
+      else if (max === g) h = (b - r) / d + 2
+      else h = (r - g) / d + 4
+      h *= 60
+      return h < 0 ? h + 360 : h
+    }
+    const angularDistance = (a: number, b: number): number => {
+      const diff = Math.abs(a - b) % 360
+      return diff > 180 ? 360 - diff : diff
+    }
+
+    for (const [charClass, accent] of Object.entries(CLASS_ACCENT_HEX)) {
+      const slug = charClass.toLowerCase().replace(/\s+/g, '-')
+      const file = join(process.cwd(), 'public', 'assets', 'classes', `class-icon-${slug}.webp`)
+      const { data, info } = await sharp(file)
+        .resize(48, 48, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true })
+
+      // Weighted circular mean of the icon's saturated pixels.
+      let x = 0
+      let y = 0
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] < 200) continue
+        const r = data[i]
+        const g = data[i + 1]
+        const b = data[i + 2]
+        const max = Math.max(r, g, b)
+        const min = Math.min(r, g, b)
+        const sat = max === 0 ? 0 : (max - min) / max
+        const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        if (sat < 0.18 || lum < 40 || lum > 235) continue
+        const h = (hueOf(r, g, b) * Math.PI) / 180
+        x += Math.cos(h) * sat
+        y += Math.sin(h) * sat
+      }
+      expect(info.width).toBe(48)
+      expect(Math.hypot(x, y), `${charClass}: icon has no usable hue`).toBeGreaterThan(0)
+      const iconHue = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360
+
+      const ar = parseInt(accent.slice(1, 3), 16)
+      const ag = parseInt(accent.slice(3, 5), 16)
+      const ab = parseInt(accent.slice(5, 7), 16)
+      const accentHue = hueOf(ar, ag, ab)
+
+      const drift = angularDistance(iconHue, accentHue)
+      expect(drift, `${charClass}: icon ${Math.round(iconHue)}° vs accent ${Math.round(accentHue)}°`).toBeLessThanOrEqual(40)
+    }
+  }, 30_000)
 })
 
 describe('party and battlefield counts', () => {

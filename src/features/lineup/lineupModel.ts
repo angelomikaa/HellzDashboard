@@ -193,23 +193,38 @@ export const ROLE_LABEL_MAX = 40
  * distinct, mid-to-light tone so the 4px bar stays visible on #1E1E1E. They are
  * decorative only: no text is ever set in these colours, so text AA contrast
  * comes from the neutral foreground tokens.
+ *
+ * RE-DERIVED 2026-11-01 from the committed icons themselves
+ * (public/assets/classes/class-icon-<slug>.webp): every entry was sampled from
+ * its own icon and then lifted in lightness/saturation for the dark surface.
+ * Grouped by hue family, and lightness is spread inside a family where the game
+ * art shares a colour (gold, green, red, blue, purple, orange), so twin hues
+ * still separate at a glance.
  */
 export const CLASS_ACCENT_HEX: Readonly<Record<string, string>> = {
-  'High Priest': '#F2D16B',
-  Bard: '#8FD3F4',
-  Gypsy: '#F28BC0',
-  Biochemist: '#9BE15D',
-  Mastersmith: '#C9A46A',
-  Summoner: '#B583F0',
-  'High Wizard': '#5AA9F5',
-  Professor: '#7FD8C4',
-  Sniper: '#9CC46E',
-  Rebellion: '#E0786A',
-  Paladin: '#FFE28A',
-  'Lord Knight': '#6F9CFF',
-  'Assassin Cross': '#D5607F',
-  Stalker: '#6DBE8B',
-  Champion: '#FF8A4C',
+  // --- gold / amber (Bard, Gypsy, Sniper and Rebellion all print gold art)
+  Bard: '#C4AE68',
+  Gypsy: '#E3C87F',
+  Sniper: '#A88E4A',
+  Rebellion: '#8F7D45',
+  // --- green (the High Priest cross and the Champion helm are both green)
+  'High Priest': '#8FD07C',
+  Champion: '#61A24A',
+  // --- red / rose (Lord Knight blade vs Paladin cross)
+  'Lord Knight': '#D95F62',
+  Paladin: '#F2A0A2',
+  // --- blue (High Wizard orb is lighter than the Professor tome)
+  'High Wizard': '#8FB0E8',
+  Professor: '#5E82C6',
+  // --- purple / violet (both icons print the same violet; they separate by
+  //     lightness, never by inventing a hue the art doesn't have)
+  'Assassin Cross': '#A868B8',
+  Stalker: '#C39AD0',
+  // --- orange (Biochemist flask vs Mastersmith anvil)
+  Biochemist: '#D2733A',
+  Mastersmith: '#E09055',
+  // --- pink (Summoner)
+  Summoner: '#F291B4',
 }
 
 /** Neutral accent for an empty / unknown class (monogram fallback). */
