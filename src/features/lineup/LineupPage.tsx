@@ -178,6 +178,7 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
   }
 
   const currentMode = payload.war_mode
+  const currentRaidCount = payload.raid_count
   const own = findMemberAssignment(payload, session.member_id)
   const ownAbsent = payload.absences.includes(session.member_id)
   const raids = payload.battlefields
@@ -342,6 +343,11 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
     setDistOpen(true)
   }
 
+  function addRaid() {
+    setDistOpen(false)
+    void runMutation((s) => setLineupRaidCount(s, 'emperium', currentRaidCount + 1))
+  }
+
   function updateDistCount(index: number, raw: string) {
     const parsed = Number.parseInt(raw, 10)
     const value = Number.isNaN(parsed)
@@ -439,20 +445,6 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
                     className="h-11 min-w-11 rounded-md border border-line px-3 text-lg font-bold text-content hover-control disabled:opacity-40"
                   >
                     −
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Adicionar raid"
-                    disabled={saving || !canAddRaid}
-                    onClick={() => {
-                      setDistOpen(false)
-                      void runMutation((s) =>
-                        setLineupRaidCount(s, 'emperium', payload.raid_count + 1),
-                      )
-                    }}
-                    className="h-11 min-w-11 rounded-md border border-accent px-3 text-lg font-bold text-content hover-control disabled:opacity-40"
-                  >
-                    +
                   </button>
                   <button
                     type="button"
@@ -660,6 +652,8 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
             setSelectedRaid(raidIndex)
           }}
           onToggleStacked={() => setStacked((value) => !value)}
+          onAddRaid={isStaff && payload.war_mode === 'emperium' ? addRaid : undefined}
+          canAddRaid={canAddRaid && !saving}
         />
         {visible.map((raid) => (
           <BattlefieldGrid
@@ -711,6 +705,8 @@ function RaidTabs({
   activeRaid,
   onSelect,
   onToggleStacked,
+  onAddRaid,
+  canAddRaid = false,
 }: {
   raids: BattlefieldLineup[]
   warMode: WarMode
@@ -718,6 +714,8 @@ function RaidTabs({
   activeRaid: BattlefieldLineup | null
   onSelect: (raidIndex: number) => void
   onToggleStacked: () => void
+  onAddRaid?: () => void
+  canAddRaid?: boolean
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Raids">
@@ -746,6 +744,17 @@ function RaidTabs({
           </button>
         )
       })}
+      {onAddRaid !== undefined && (
+        <button
+          type="button"
+          disabled={!canAddRaid}
+          onClick={onAddRaid}
+          aria-label="Criar raid"
+          className="h-11 rounded-md border border-accent px-3 text-sm font-semibold text-content hover-control disabled:opacity-40"
+        >
+          + Criar raid
+        </button>
+      )}
       {raids.length > 1 && (
         <button
           type="button"
