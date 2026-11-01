@@ -67,7 +67,7 @@ const GUTTER = 16
 /** Grid: at most 4 party cards per row (user request 2026-11-01) — 8 parties
  *  become 4×2, so each card is ~2× wider and the name/icon breathe. */
 const GRID_COLS = 4
-const GRID_ROW_GAP = 14
+const GRID_ROW_GAP = 16
 
 /** Width of one party card when the row holds `cols` cards. */
 function columnWidth(partyCount: number): number {
@@ -75,23 +75,57 @@ function columnWidth(partyCount: number): number {
   return (LINEUP_EXPORT_WIDTH - 2 * MARGIN - (cols - 1) * GUTTER) / cols
 }
 
+/**
+ * Vertical rhythm. Every card box is derived from these values, and the row
+ * height comes from the space actually available between the header rule and
+ * the legend — so no band is left empty and no inner padding is lost:
+ *
+ *   headerBandH + topPad + 5·slotH + 4·slotGap + footerGap + footerH + bottomPad
+ *
+ * With two rows (the 8-party case) that resolves to exactly 402px per card:
+ *   40 + 8 + 280 + 28 + 8 + 30 + 8 = 402
+ */
 const LAYOUT = {
   markY: 32,
   markSize: 84,
   headerRuleY: 146,
   headerRuleH: 3,
   gridY: 172,
-  columnH: 350,
-  headerBandH: 38,
-  headerPad: 6,
-  slotH: 50,
-  slotGap: 6,
-  slotInset: 8,
-  footerH: 26,
-  footerPad: 6,
-  legendY: 1012,
+  headerBandH: 40,
+  topPad: 8,
+  slotH: 56,
+  slotGap: 7,
+  slotInset: 10,
+  footerGap: 8,
+  footerH: 30,
+  bottomPad: 8,
+  legendClearance: 24,
+  legendY: 1016,
   legendH: 24,
 } as const
+
+/** Available height for the party grid (between the header rule and legend). */
+function gridAvailableHeight(): number {
+  return LAYOUT.legendY - LAYOUT.legendClearance - LAYOUT.gridY
+}
+
+/** Card height for a grid with `rows` rows, filling the available band. */
+function rowHeight(rows: number): number {
+  return (gridAvailableHeight() - (rows - 1) * GRID_ROW_GAP) / rows
+}
+
+/** Slot height that makes 5 slots + footer exactly fill one card. Derived from
+ *  the row height, so a taller/shorter grid never breaks the inner padding. */
+function slotHeight(cardH: number): number {
+  const chrome =
+    LAYOUT.headerBandH +
+    LAYOUT.topPad +
+    LAYOUT.footerGap +
+    LAYOUT.footerH +
+    LAYOUT.bottomPad +
+    (SLOTS_PER_PARTY - 1) * LAYOUT.slotGap
+  return (cardH - chrome) / SLOTS_PER_PARTY
+}
 
 export interface LineupRect {
   x: number
@@ -171,8 +205,11 @@ function buildColumn(
   x: number,
   y: number,
   width: number,
+  cardH: number,
 ): LineupExportColumn {
   const slots = normalizeSlots(party)
+  const slotH = slotHeight(cardH)
+  const slotsTop = y + LAYOUT.headerBandH + LAYOUT.topPad
   const normalized: LineupParty = {
     party_index: partyIndex,
     role_label: party?.role_label ?? null,
@@ -196,7 +233,7 @@ function buildColumn(
             rect: { x: x + 76, y: y + 5, w: width - 76 - 8, h: LAYOUT.headerBandH - 10 },
           }
         : null,
-    rect: { x, y, w: width, h: LAYOUT.columnH },
+    rect: { x, y, w: width, h: cardH },
     slots: slots.map((slot, k) => {
       const vacant = slot.member_id === null
       const charClass = slot.char_class
@@ -204,9 +241,9 @@ function buildColumn(
         slotIndex: slot.slot_index,
         rect: {
           x: x + LAYOUT.slotInset,
-          y: y + LAYOUT.headerBandH + LAYOUT.headerPad + k * (LAYOUT.slotH + LAYOUT.slotGap),
+          y: slotsTop + k * (slotH + LAYOUT.slotGap),
           w: width - 2 * LAYOUT.slotInset,
-          h: LAYOUT.slotH,
+          h: slotH,
         },
         leader: slot.slot_index === 1,
         vacant,
@@ -224,7 +261,11 @@ function buildColumn(
       color: full ? COLORS.success : COLORS.warning,
       rect: {
         x: x + LAYOUT.slotInset,
-        y: y + LAYOUT.headerBandH + LAYOUT.headerPad + 5 * LAYOUT.slotH + 4 * LAYOUT.slotGap + LAYOUT.footerPad,
+        y:
+          slotsTop +
+          SLOTS_PER_PARTY * slotH +
+          (SLOTS_PER_PARTY - 1) * LAYOUT.slotGap +
+          LAYOUT.footerGap,
         w: width - 2 * LAYOUT.slotInset,
         h: LAYOUT.footerH,
       },
@@ -250,13 +291,15 @@ export function buildLineupExportPlan(
       ? Math.max(1, lineup.parties.length)
       : PARTIES_PER_BATTLEFIELD
   const width = columnWidth(partyCount)
+  const rows = Math.ceil(partyCount / GRID_COLS)
+  const cardH = rowHeight(rows)
 
   const columns = Array.from({ length: partyCount }, (_, col) => {
     const row = Math.floor(col / GRID_COLS)
     const colInRow = col % GRID_COLS
     const x = MARGIN + colInRow * (width + GUTTER)
-    const y = LAYOUT.gridY + row * (LAYOUT.columnH + GRID_ROW_GAP)
-    return buildColumn(col + 1, partiesByIndex.get(col + 1) ?? null, x, y, width)
+    const y = LAYOUT.gridY + row * (cardH + GRID_ROW_GAP)
+    return buildColumn(col + 1, partiesByIndex.get(col + 1) ?? null, x, y, width, cardH)
   })
   const filled = columns.reduce((sum, c) => sum + c.footer.filled, 0)
   const capacity = partyCount * SLOTS_PER_PARTY
@@ -383,10 +426,10 @@ function drawSlot(ctx: CanvasRenderingContext2D, slot: LineupExportSlot, icon: H
     ctx.lineWidth = 2
     ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2)
     ctx.restore()
-    paintText(ctx, '— VAGO —', r.x + r.w / 2, r.y + r.h / 2 + 10, r.w - 16, {
+    paintText(ctx, '— VAGO —', r.x + r.w / 2, r.y + r.h / 2 + 8, r.w - 16, {
       family: FONT.condensed,
       weight: 400,
-      size: 30,
+      size: 24,
       color: COLORS.muted,
       align: 'center',
     })
@@ -405,7 +448,10 @@ function drawSlot(ctx: CanvasRenderingContext2D, slot: LineupExportSlot, icon: H
   ctx.strokeStyle = slot.leader ? COLORS.leader : COLORS.line
   ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1)
 
-  const iconSize = 40
+  // Vertical rhythm inside the slot: one dominant name line, the class line
+  // pinned to the bottom, and the leader mark as a compact corner glyph — so
+  // three lines never fight for the same 56px band.
+  const iconSize = 42
   const ix = r.x + 12
   const iy = r.y + (r.h - iconSize) / 2
   if (icon !== null) {
@@ -421,7 +467,7 @@ function drawSlot(ctx: CanvasRenderingContext2D, slot: LineupExportSlot, icon: H
     ctx.fillRect(ix, iy, iconSize, iconSize)
     ctx.strokeStyle = COLORS.line
     ctx.strokeRect(ix + 0.5, iy + 0.5, iconSize - 1, iconSize - 1)
-    paintText(ctx, slot.monogram, ix + iconSize / 2, iy + 28, iconSize - 10, {
+    paintText(ctx, slot.monogram, ix + iconSize / 2, iy + iconSize / 2 + 7, iconSize - 10, {
       family: FONT.display,
       weight: 700,
       size: 20,
@@ -430,17 +476,14 @@ function drawSlot(ctx: CanvasRenderingContext2D, slot: LineupExportSlot, icon: H
     })
   }
 
-  const tx = ix + iconSize + 12
-  const maxW = r.x + r.w - 10 - tx
-  if (slot.leader) {
-    paintText(ctx, '★ LÍDER', tx, r.y + 16, maxW, { family: FONT.display, weight: 700, size: 12, color: COLORS.leader })
-  }
+  const tx = ix + iconSize + 14
+  const maxW = r.x + r.w - 12 - tx
   // Name: larger + soft shadow so it pops over the tinted surface.
   ctx.save()
   ctx.shadowColor = 'rgba(0,0,0,0.85)'
   ctx.shadowBlur = 6
   ctx.shadowOffsetY = 2
-  paintText(ctx, slot.name ?? '', tx, r.y + (slot.leader ? 34 : 30), maxW, {
+  paintText(ctx, slot.name ?? '', tx, r.y + 29, maxW, {
     family: FONT.display,
     weight: 700,
     size: 23,
@@ -448,7 +491,21 @@ function drawSlot(ctx: CanvasRenderingContext2D, slot: LineupExportSlot, icon: H
   })
   ctx.restore()
   if (slot.classText !== '') {
-    paintText(ctx, slot.classText.toUpperCase(), tx, r.y + r.h - 6, maxW, { family: FONT.condensed, weight: 400, size: 17, color: '#D8CECE' })
+    paintText(ctx, slot.classText.toUpperCase(), tx, r.y + r.h - 8, maxW, {
+      family: FONT.condensed,
+      weight: 400,
+      size: 16,
+      color: '#D8CECE',
+    })
+  }
+  if (slot.leader) {
+    paintText(ctx, '★', r.x + r.w - 12, r.y + 16, 20, {
+      family: FONT.body,
+      weight: 700,
+      size: 14,
+      color: COLORS.leader,
+      align: 'right',
+    })
   }
 }
 

@@ -89,6 +89,49 @@ describe('buildLineupExportPlan — canvas and grid geometry', () => {
     }
   })
 
+  it('fills the vertical band with no dead space above the legend', () => {
+    const plan = buildLineupExportPlan(lineup('vigrid_field'))
+    const bottomRow = plan.columns.filter((c) => c.rect.y === plan.columns[4].rect.y)
+    const cardBottom = Math.max(...bottomRow.map((c) => c.rect.y + c.rect.h))
+    const legendTop = Math.min(...plan.legend.map((l) => l.rect.y))
+    // A single clearance band, not an empty half-screen.
+    const gap = legendTop - cardBottom
+    expect(gap).toBeGreaterThan(0)
+    expect(gap).toBeLessThanOrEqual(32)
+  })
+
+  it('keeps inner padding on every card (footer never touches the border)', () => {
+    const plan = buildLineupExportPlan(lineup('vigrid_field'))
+    for (const col of plan.columns) {
+      const footer = col.footer.rect
+      const cardBottom = col.rect.y + col.rect.h
+      // Symmetric bottom inset with the card's own margin.
+      expect(cardBottom - (footer.y + footer.h)).toBeGreaterThanOrEqual(8)
+      // Footer sits above the card's bottom edge, slots above the footer.
+      expect(col.slots[4].rect.y + col.slots[4].rect.h).toBeLessThan(footer.y)
+      // Slots are inset from the card's left/right edges.
+      expect(col.slots[0].rect.x - col.rect.x).toBeGreaterThanOrEqual(8)
+      expect(col.rect.x + col.rect.w - (col.slots[0].rect.x + col.slots[0].rect.w)).toBeGreaterThanOrEqual(8)
+    }
+  })
+
+  it('gives every slot a tall enough card for two text lines', () => {
+    const plan = buildLineupExportPlan(lineup('vigrid_field'))
+    for (const col of plan.columns) {
+      for (const slot of col.slots) expect(slot.rect.h).toBeGreaterThanOrEqual(54)
+    }
+  })
+
+  it('spaces the two grid rows evenly', () => {
+    const { columns } = buildLineupExportPlan(lineup('vigrid_field'))
+    const row0 = columns.slice(0, 4)
+    const row1 = columns.slice(4)
+    const rowGap = row1[0].rect.y - (row0[0].rect.y + row0[0].rect.h)
+    expect(rowGap).toBe(16)
+    for (const col of row0) expect(col.rect.y).toBe(row0[0].rect.y)
+    for (const col of row1) expect(col.rect.y).toBe(row1[0].rect.y)
+  })
+
   it('gives each slot card room for a readable name (4-col grid)', () => {
     const { columns } = buildLineupExportPlan(lineup('vigrid_field'))
     for (const col of columns) {
