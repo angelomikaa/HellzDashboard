@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { ApiError, type LineupParty, type LineupsPayload, type WarMode } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
-import { BattlefieldGrid, LineupPage } from './LineupPage'
+import { BattlefieldGrid, LineupPage, SlotOfferDialog } from './LineupPage'
 import { lineupErrorCopy } from './lineupModel'
 
 const memberSession: NeoFootSession = {
@@ -162,6 +162,39 @@ describe('LineupPage officer editing controls', () => {
   it('still renders the read-only own highlight for an officer', () => {
     const html = grid(officerSession)
     expect(html).toContain('Sua PT')
+  })
+})
+
+describe('SlotOfferDialog', () => {
+  it('offers the available roster for the clicked empty slot', () => {
+    const html = renderToStaticMarkup(
+      <SlotOfferDialog
+        title="Escolher jogador — Raid 2 G1"
+        members={payload.roster}
+        disabled={false}
+        onPick={noop}
+        onClose={noop}
+      />,
+    )
+    expect(html).toContain('Escolher jogador — Raid 2 G1')
+    expect(html).toContain('Lanaya')
+    expect(html).toContain('Tifa')
+    expect(html).toContain('Kiom')
+    expect(html).toContain('Jogadores disponíveis')
+    expect(html).toContain('Buscar jogador disponível')
+  })
+
+  it('shows the empty state when everyone is already assigned or absent', () => {
+    const html = renderToStaticMarkup(
+      <SlotOfferDialog
+        title="Escolher jogador"
+        members={[]}
+        disabled={false}
+        onPick={noop}
+        onClose={noop}
+      />,
+    )
+    expect(html).toContain('Nenhum jogador disponível.')
   })
 })
 

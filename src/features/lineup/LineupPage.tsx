@@ -88,6 +88,11 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
   const [stacked, setStacked] = useState(false)
   const [selected, setSelected] = useState<PlayerSelection | null>(null)
   const [drag, setDrag] = useState<PlayerSelection | null>(null)
+  const [picker, setPicker] = useState<{
+    battlefield: BattlefieldLineup['battlefield']
+    partyIndex: number
+    slotIndex: number
+  } | null>(null)
   const [availableQuery, setAvailableQuery] = useState('')
   const [distOpen, setDistOpen] = useState(false)
   const [distCounts, setDistCounts] = useState<number[]>([])
@@ -187,6 +192,10 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
   const partiesTotal = totalPartyCount(raids)
   const activeRaid = raids.find((raid) => raid.raid_index === selectedRaid) ?? raids[0] ?? null
   const visible: BattlefieldLineup[] = stacked ? raids : activeRaid === null ? [] : [activeRaid]
+  const pickerRaid =
+    picker === null ? null : (raids.find((raid) => raid.battlefield === picker.battlefield) ?? null)
+  const pickerMeta =
+    pickerRaid === null ? null : raidMeta(payload.war_mode, pickerRaid.raid_index)
   const modeMeta = WAR_MODE_META[payload.war_mode]
   const canRemoveRaid = payload.war_mode === 'emperium' && payload.raid_count > payload.min_raids
   const maxRaidCount = Math.min(payload.max_raids, partiesTotal)
@@ -287,7 +296,17 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
     }
     if (seatedMemberId !== null) {
       setSelected({ memberId: seatedMemberId, source: 'slot' })
+      return
     }
+    // Empty slot: offer the available roster for that exact seat.
+    setPicker({ battlefield, partyIndex, slotIndex })
+  }
+
+  function pickForSlot(memberId: string) {
+    if (picker === null) return
+    const target = picker
+    setPicker(null)
+    assignMember(memberId, target.battlefield, target.partyIndex, target.slotIndex)
   }
 
   function handleSlotDrop(
@@ -357,6 +376,7 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
                 onClick={() => {
                   setStacked(false)
                   setDistOpen(false)
+                  setPicker(null)
                   resetSelection()
                   setMode(warMode)
                 }}
@@ -623,7 +643,8 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
           </div>
           <p className="text-xs text-muted">
             Arraste um jogador para uma PT, para “Disponíveis” ou para “Ausências”. Também é
-            possível selecionar um jogador e clicar no destino.
+            possível selecionar um jogador e clicar no destino. Clique em um slot vazio para
+            escolher um jogador dos disponíveis.
           </p>
         </>
       )}
@@ -664,6 +685,20 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
           />
         ))}
       </div>
+
+      {picker !== null && isStaff && (
+        <SlotOfferDialog
+          title={
+            pickerMeta === null
+              ? 'Escolher jogador'
+              : `Escolher jogador — ${pickerMeta.subtitle} G${picker.partyIndex} · Slot ${picker.slotIndex}`
+          }
+          members={availableMembers}
+          disabled={saving}
+          onPick={pickForSlot}
+          onClose={() => setPicker(null)}
+        />
+      )}
     </section>
   )
 }
@@ -840,6 +875,98 @@ function RosterPanel({
         )}
       </ul>
     </section>
+  )
+}
+
+/**
+ * Quick picker opened by clicking an empty slot. Lists the available roster
+ * (already excludes seated and absent members) with a local search.
+ */
+export function SlotOfferDialog({
+  title,
+  members,
+  disabled,
+  onPick,
+  onClose,
+}: {
+  title: string
+  members: LineupRosterMember[]
+  disabled: boolean
+  onPick: (memberId: string) => void
+  onClose: () => void
+}) {
+  const [query, setQuery] = useState('')
+  const needle = query.trim().toLocaleLowerCase('pt-BR')
+  const filtered =
+    needle === ''
+      ? members
+      : members.filter((member) =>
+          member.display_name.toLocaleLowerCase('pt-BR').includes(needle),
+        )
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center"
+      role="presentation"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="slot-offer-title"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col gap-3 rounded-lg border border-line bg-surface p-4 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') onClose()
+        }}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <h2 id="slot-offer-title" className="font-display text-lg font-bold text-content">
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-11 shrink-0 rounded-md border border-line px-3 text-sm text-content hover-control"
+          >
+            Fechar
+          </button>
+        </div>
+        <input
+          autoFocus
+          type="search"
+          aria-label="Buscar jogador disponível"
+          placeholder="Buscar jogador disponível…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          className="h-11 rounded-md border border-line bg-dominant px-3 text-sm text-content"
+        />
+        <ul
+          aria-label="Jogadores disponíveis"
+          className="flex max-h-80 flex-col gap-1 overflow-y-auto"
+        >
+          {filtered.map((member) => (
+            <li key={member.member_id}>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onPick(member.member_id)}
+                className="flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-content hover-control disabled:opacity-60"
+              >
+                <ClassCrest charClass={member.char_class} size="sm" />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-semibold">{member.display_name}</span>
+                  <span className="truncate text-xs text-muted">{classLabel(member.char_class)}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+          {filtered.length === 0 && (
+            <li className="px-2 py-2 text-sm text-muted">Nenhum jogador disponível.</li>
+          )}
+        </ul>
+      </div>
+    </div>
   )
 }
 
