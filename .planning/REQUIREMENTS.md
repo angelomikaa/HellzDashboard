@@ -32,6 +32,7 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 - [ ] **HOME-02**: Members with more than 7 days since their last validated submission see a stale-data CTA navigating to Enviar Status; members who never submitted see an evergreen first-submission variant; fresh data shows no banner
 - [ ] **HOME-03**: `my_report` gains only `last_validated_at` — closed-payload discipline holds (zero new per-stat fields, zero key-stat hints)
 - [ ] **SHWC-01** (owner feedback 2026-10-20; amended 2026-10-24): Início renders the promo cards as a premium scroll-snap slider (1-up mobile, 3-up desktop, keyboard + swipe reachable, server order preserved). The showcase is PUBLIC — anon-callable `get_promotion_public()` + anon read of active members' card photos (migration 0029); the standalone Destaques tab is removed and Início is the landing page
+- [x] **SHWC-02** (owner request 2026-11-01): the showcase keeps the Impecável gate per BUILD — a build with at least one platinum card (OVR ≥ 85) shows only its platinum cards; a build with no platinum card at all falls back to its server-ranked top 3, so every meta build with data keeps a carousel. Selection is per build (`char_function`), never per class, so a platinum build cannot suppress a non-platinum sibling; server order is preserved and no client rank math is introduced
 
 ### Unified Key/Relevant Selection
 
@@ -245,6 +246,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HOME-01 | Phase 10 — Personalized Home Landing Tab | Pending |
 | HOME-02 | Phase 10 — Personalized Home Landing Tab | Pending |
 | SHWC-01 | Phase 10 — Personalized Home Landing Tab | Pending |
+| SHWC-02 | Phase 10.10 - Início Non-Platinum Fallback | Complete (client-only) |
 | DEF-01 | Phase 9.1 — Hidden Raw Defenses | Complete |
 | DEF-02 | Phase 9.1 — Hidden Raw Defenses | Complete |
 | DEF-03 | Phase 9.1 — Hidden Raw Defenses | Complete |
