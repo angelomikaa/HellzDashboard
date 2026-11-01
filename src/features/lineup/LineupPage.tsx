@@ -1201,22 +1201,39 @@ function SlotRow({
   const accent = classAccentHex(slot.char_class)
   const body = (
     <>
-      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: accent }} />
+      {/* Filled: a solid 3px class-colour bar anchors the card. Empty: no bar
+          at all — the row is a dashed hole, so the two states never read as
+          "same card, slightly different tint". */}
+      {!vacant && (
+        <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px]" style={{ backgroundColor: accent }} />
+      )}
       <ClassCrest charClass={slot.char_class} size="sm" />
       <span className="flex min-w-0 flex-1 flex-col text-left">
         <span className={`flex items-center gap-1.5 truncate text-sm ${leader ? 'font-bold' : 'font-semibold'} ${vacant ? 'text-muted' : 'text-content'}`}>
           {vacant ? '— Vago —' : slot.display_name}
-          {leader && <span className="rounded bg-amber-400 px-1 text-[10px] font-bold uppercase text-black">Líder</span>}
+          {leader && !vacant && <span className="rounded bg-amber-400 px-1 text-[10px] font-bold uppercase text-black">Líder</span>}
           {own && <span className="rounded bg-accent px-1 text-[10px] font-bold text-accent-foreground">Você</span>}
         </span>
         {!vacant && <span className="truncate text-xs text-muted">{classLabel(slot.char_class)}</span>}
       </span>
     </>
   )
-  const base = `relative flex items-center gap-2 overflow-hidden rounded-md border py-1.5 pl-3 pr-2 ${
-    selected ? 'border-accent glow-accent-soft' : own ? 'border-accent glow-accent-soft' : 'border-line'
-  } ${leader ? 'bg-dominant' : 'bg-surface'}`
-  const tint = vacant ? undefined : { backgroundImage: `linear-gradient(90deg, ${accent}24, transparent 70%)` }
+  const base = `relative flex items-center gap-2 overflow-hidden rounded-md border py-1.5 pr-2 ${
+    vacant ? 'border-dashed border-line/60 pl-2.5' : 'pl-3'
+  } ${
+    selected
+      ? 'border-accent glow-accent-soft'
+      : own
+        ? 'border-accent glow-accent-soft'
+        : vacant
+          ? 'border-line/60'
+          : 'border-line'
+  } ${vacant ? 'bg-dominant/50' : 'bg-surface'}`
+  // The class colour FILLS the whole row (26% → 7%), not just a corner fade:
+  // a seated slot is a coloured card, an empty one is an outline.
+  const tint = vacant
+    ? undefined
+    : { backgroundImage: `linear-gradient(95deg, ${accent}42 0%, ${accent}1F 55%, ${accent}12 100%)` }
 
   if (!isStaff) {
     return (

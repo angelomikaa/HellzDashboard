@@ -148,6 +148,25 @@ describe('LineupPage member read-only view', () => {
     expect(html).toContain('Party G4')
     expect(html).not.toContain('Party G5')
   })
+
+  it('fills a seated slot with its class colour and leaves an empty slot as a dashed hole', () => {
+    const html = grid(memberSession)
+    // Seated (Bard → Menestrel): the accent fills the whole row.
+    expect(html).toContain('linear-gradient(95deg')
+    expect(html).toContain('#8FD3F4')
+    // Empty: dashed outline, no class fill.
+    expect(html).toContain('border-dashed')
+    expect(html).toContain('— Vago —')
+
+    // A vacant leader seat (G2 slot 1 is empty in the fixture) must not wear
+    // the Líder badge — the badge only marks an actual seated leader.
+    const g2 = html.split('Party G2')[1]?.split('Party G3')[0] ?? ''
+    expect(g2).toContain('— Vago —')
+    expect(g2).not.toContain('Líder')
+    // ...while the seated leader in G1 still has it.
+    const g1 = html.split('Party G1')[1]?.split('Party G2')[0] ?? ''
+    expect(g1).toContain('Líder')
+  })
 })
 
 describe('LineupPage officer editing controls', () => {

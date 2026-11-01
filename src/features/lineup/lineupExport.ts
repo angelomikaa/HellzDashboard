@@ -436,10 +436,11 @@ function drawSlot(ctx: CanvasRenderingContext2D, slot: LineupExportSlot, icon: H
     return
   }
 
-  // Surface, then the class tint over it (14%), then the 8px class bar.
+  // Surface, then the class tint over it (22% — a seated card reads as a
+  // coloured card at a glance), then the 8px class bar.
   ctx.fillStyle = COLORS.column
   ctx.fillRect(r.x, r.y, r.w, r.h)
-  ctx.fillStyle = withAlpha(slot.accent, 0.14)
+  ctx.fillStyle = withAlpha(slot.accent, 0.22)
   ctx.fillRect(r.x, r.y, r.w, r.h)
   ctx.fillStyle = slot.accent
   ctx.fillRect(r.x, r.y, 8, r.h)
