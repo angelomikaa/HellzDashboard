@@ -79,6 +79,17 @@
  *   node scripts/smoke-matrix-fixtures.mjs --purge
  *   (scripts/smoke-cleanup.mjs --apply covers the whole smoke% namespace)
  *
+ * Targeted refresh (owner report 2026-11-01, Mestre-Ferreiro alone on Início):
+ *   node scripts/smoke-matrix-fixtures.mjs --combo=mastersmith-dps
+ *   A primer is a SNAPSHOT of the cohort's worst real value at seed time. When a
+ *   real player later submits much higher values, the old primers fall below the
+ *   Impecável band (OVR >= 85) and the Início showcase drops them, leaving the
+ *   real card alone. --combo scopes the clean + seed + checks to ONE
+ *   `classSlug-function` combo, so it can be re-anchored to that cohort's current
+ *   worst real values without touching any other primer. It still respects the
+ *   non-competitive rule: the refreshed primers sit 5% / 10% below the worst
+ *   real stat, never above a real player.
+ *
  * Env: SUPABASE_ACCESS_TOKEN (or .env SUPABASE_ACESS_TOKEN — repo spelling),
  *      SUPABASE_PROJECT_REF (fallback: parsed from the VITE_SUPABASE_URL host),
  *      SUPABASE_URL / SUPABASE_ANON_KEY (fallback: .env VITE_*).
@@ -132,6 +143,14 @@ if (missing.length) {
 
 const SENTINEL = 'smoke-mtx'
 const PROBE_HANDLE = 'smoke-mtx-probe'
+// Optional single-combo refresh: --combo=mastersmith-dps (classSlug-function).
+const COMBO = (() => {
+  const arg = process.argv.find((value) => value.startsWith('--combo='))
+  return arg ? arg.slice('--combo='.length).trim().toLowerCase() : null
+})()
+// Every namespace filter below uses this pattern: the whole sentinel by default,
+// or just the requested combo when --combo is present.
+const CLEAN_PATTERN = COMBO ? `${SENTINEL}-${COMBO}-%` : `${SENTINEL}-%`
 let applied = false
 
 // pt-BR display labels (mirror of src/lib/classLabels.ts — display only; the
@@ -226,16 +245,16 @@ async function myReport(session) {
 
 const CLEAN_SQL = `
 delete from pin_login_attempts
-  where discord_handle like '${SENTINEL}-%'
-     or discord_handle in (select id::text from members where discord_handle like '${SENTINEL}-%');
-delete from step_up_tokens where member_id in (select id from members where discord_handle like '${SENTINEL}-%');
-delete from member_identity_history where member_id in (select id from members where discord_handle like '${SENTINEL}-%');
+  where discord_handle like '${CLEAN_PATTERN}'
+     or discord_handle in (select id::text from members where discord_handle like '${CLEAN_PATTERN}');
+delete from step_up_tokens where member_id in (select id from members where discord_handle like '${CLEAN_PATTERN}');
+delete from member_identity_history where member_id in (select id from members where discord_handle like '${CLEAN_PATTERN}');
 delete from submission_stats where submission_id in (
   select s.id from submissions s join members m on m.id = s.member_id
-  where m.discord_handle like '${SENTINEL}-%'
+  where m.discord_handle like '${CLEAN_PATTERN}'
 );
-delete from submissions where member_id in (select id from members where discord_handle like '${SENTINEL}-%');
-delete from members where discord_handle like '${SENTINEL}-%';
+delete from submissions where member_id in (select id from members where discord_handle like '${CLEAN_PATTERN}');
+delete from members where discord_handle like '${CLEAN_PATTERN}';
 `
 
 // META combos (class_cohorts.meta = true, migration 0037) that also have
@@ -481,7 +500,7 @@ select m.discord_handle as handle, m.char_class, m.char_function, count(ss.*)::i
 from members m
 join submissions s on s.member_id = m.id and s.status = 'validated'
 join submission_stats ss on ss.submission_id = s.id
-where m.discord_handle like '${SENTINEL}-%'
+where m.discord_handle like '${CLEAN_PATTERN}'
 group by 1, 2, 3
 order by 1;
 `
@@ -500,7 +519,7 @@ select m.discord_handle, m.char_class, m.char_function
 from members m
 left join class_cohorts cc
   on cc.class_name = m.char_class and cc.char_function = m.char_function
-where m.discord_handle like '${SENTINEL}-%'
+where m.discord_handle like '${CLEAN_PATTERN}'
   and coalesce(cc.meta, false) = false
 order by 1;
 `
@@ -547,7 +566,7 @@ join stat_catalog sc on sc.stat_key = p.stat_key
 left join cohort_worst cw
   on cw.char_class = ${cohortClass('m.char_class')} and cw.char_function = m.char_function and cw.stat_key = p.stat_key
 left join global_worst gw on gw.stat_key = p.stat_key
-where m.discord_handle like '${SENTINEL}-%'
+where m.discord_handle like '${CLEAN_PATTERN}'
   and coalesce(cw.worst_value, gw.worst_value) is not null
   and case sc.stat_direction
         when 'lower' then p.value < coalesce(cw.worst_value, gw.worst_value)
@@ -570,7 +589,7 @@ join class_key_stats ks
  and ks.char_function = m.char_function
  and ks.selection_order <= 6
  and ks.stat_key = ss.stat_key
-where m.discord_handle like '${SENTINEL}-%'
+where m.discord_handle like '${CLEAN_PATTERN}'
   and ss.value = 0
 order by 1, 2, 3;
 `
@@ -661,9 +680,21 @@ async function main() {
       `(only meta combos are primed)`,
   )
 
-  const targets = (await mgmtQuery(targetsSql())) ?? []
-  if (targets.length === 0) throw new Error('no meta (class, function) combo has 6 key stats configured')
-  console.log(`[smoke-matrix] meta combos with 6 usable keys: ${targets.length}`)
+  const allTargets = (await mgmtQuery(targetsSql())) ?? []
+  if (allTargets.length === 0)
+    throw new Error('no meta (class, function) combo has 6 key stats configured')
+  const comboSlug = (t) => `${classSlug(t.class_name)}-${t.char_function}`
+  const targets = COMBO ? allTargets.filter((t) => comboSlug(t) === COMBO) : allTargets
+  if (COMBO && targets.length === 0) {
+    throw new Error(
+      `--combo=${COMBO} is not a meta combo with 6 usable keys; available: ` +
+        allTargets.map(comboSlug).join(', '),
+    )
+  }
+  console.log(
+    `[smoke-matrix] meta combos with 6 usable keys: ${targets.length}` +
+      (COMBO ? ` (scoped to --combo=${COMBO})` : ''),
+  )
 
   const skipped = targets.filter((t) => Number(t.validators) >= 3 && !INCLUDE_PRIMED)
   const selected = targets.filter((t) => Number(t.validators) < 3 || INCLUDE_PRIMED)
@@ -837,6 +868,46 @@ async function main() {
     `[smoke-matrix] combos data-sufficient now: ${sufficient}/${selected.length} ` +
       `(${empty.length} of them answered by their own third primer; the rest need one real submitter each)`,
   )
+
+  // Owner report 2026-11-01 (Mestre-Ferreiro alone on Início): a primer is a
+  // snapshot of the cohort's worst real value at seed time, so a later, much
+  // stronger real submission can push the old primers below the Impecável band
+  // (OVR >= 85) and the showcase drops them. When a combo was explicitly
+  // refreshed, read the PUBLIC payload and report what the landing will render.
+  if (COMBO) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_promotion_public`, {
+      method: 'POST',
+      headers: {
+        apikey: ANON_KEY,
+        Authorization: `Bearer ${ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+    if (!res.ok) {
+      console.log(`[smoke-matrix] Início check skipped: HTTP ${res.status}`)
+    } else {
+      const sections = await res.json()
+      const cards = sections.flatMap((section) =>
+        (section.cards ?? [])
+          .filter((card) => `${classSlug(section.class_name)}-${card.char_function}` === COMBO)
+          .map((card) => ({ ...card, class_name: section.class_name })),
+      )
+      const platinum = cards.filter((card) => Number(card.ovr) >= 85)
+      console.log(
+        `[smoke-matrix] Início check ${COMBO}: ${cards.length} card(s), ${platinum.length} platinum (>= 85) — ` +
+          cards
+            .map((card) => `${card.display_name} ${Number(card.ovr).toFixed(2)}`)
+            .join(' | '),
+      )
+      if (platinum.length < 3) {
+        console.log(
+          '[smoke-matrix] note — fewer than 3 platinum cards: the showcase drops non-platinum cards, ' +
+            'so this build may still render fewer than three posters',
+        )
+      }
+    }
+  }
 }
 
 main()

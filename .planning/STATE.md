@@ -4,7 +4,7 @@ milestone: v1.1
 milestone_name: Home, Whitelist & Fine Ranks
 status: ready_to_plan
 last_updated: "2026-10-31T00:00:00.000Z"
-last_activity: 2026-10-31
+last_activity: 2026-11-01
 progress:
   total_phases: 12
   completed_phases: 12
@@ -195,7 +195,7 @@ Items acknowledged and deferred at milestone close on 2026-10-13:
 ## Session Continuity
 
 Last session: 2026-10-31T00:00:00.000Z
-Stopped At: Completed Phase 10.9 plan 01 (Ranking UI reorganization: three sibling sections, accessible 59-stat modal, explorer stat/class/function/name filters, collapsed methodology; client-only, no migration). Gates: tsc clean, 883 tests / 66 files, build green. Visual walk skipped (no browser tabs available); the temporary officer fixture was reverted to member and the dev server stopped. Next: push the client bundle and confirm the Vercel deploy.
+Stopped At: Completed Phase 10.9 plan 01 (Ranking UI reorganization: three sibling sections, accessible 59-stat modal, explorer stat/class/function/name filters, collapsed methodology; client-only, no migration). Gates: tsc clean, 883 tests / 66 files, build green. Visual walk skipped (no browser tabs available); the temporary officer fixture was reverted to member and the dev server stopped. Next: push the client bundle and confirm the Vercel deploy. 2026-11-01 follow-up: re-anchored the stale Mestre-Ferreiro (Mastersmith/dps) primers with the new --combo scope; the build now returns Synyster 99 + two placeholders at 96.62/94.15 on Início (3 platinum cards).
 Resume file: .planning/phases/10.9-ranking-ui-reorganization/10.9-01-SUMMARY.md
 
 ## Performance Metrics
@@ -236,3 +236,4 @@ Resume file: .planning/phases/10.9-ranking-ui-reorganization/10.9-01-SUMMARY.md
 
 
 - [Phase 10.9 - Ranking UI reorganization, owner 2026-10-31]: the staff Ranking tab is now three sibling sections in one tablist (Ranking OVR default / Explorador de stats / Análise estatística) instead of nested modes. The 59-stat player detail moved from an inline row to an accessible modal (role=dialog, focus trap, Escape/backdrop/close, focus return, body scroll lock). The OVR board dropped the redundant Function column and gained toolbar sort + accent-insensitive name/ID search plus a summary line; the explorer gained a searchable stat picker plus merged-cohort class, build-function and name/ID filters with a visible reset and a filtered median/min/max summary. Methodology, assumptions and the owner reference-pair validation collapse by default in the analysis section. Filters are client-side view aids over already-fetched staff payloads - no server change, no migration, no new dependency, no client rank math; the three-state review chips stay in Validações. Gates: tsc clean, 883 tests / 66 files, vite build green; visual walk skipped (no browser tabs available) and the temporary officer fixture reverted to member.
+- [Phase 10.9 follow-up - Mestre-Ferreiro on Início, owner 2026-11-01]: the Mastersmith/dps build rendered a single card (Synyster, OVR 99) because its primers were seeded 2026-10-29 against the guild floor (OVR 62/61) before Synyster validated his high stats; the showcase Impecável gate (OVR >= 85) dropped them. Fixed by scoping the matrix primer tool to one combo (`node scripts/smoke-matrix-fixtures.mjs --combo=mastersmith-dps`), which cleans/reseeds/checks only that namespace and re-anchors the primers to the cohort current worst real values (5%/10% below, never above a real player). Live result: Synyster 99.00 + Smoke Mestre-Ferreiro Físico Um 96.62 + Dois 94.15 — 3 platinum cards, floor invariant holds, zero other primers touched. Known gap (not changed): the five empty meta builds (Biochemist dps, Champion dps, High Wizard suporte, Stalker dps, Summoner suporte) have guild-floor primers at OVR 83, below the Impecável band, so Início renders no carousel for them; lifting that needs an owner decision on showing non-platinum placeholders.
