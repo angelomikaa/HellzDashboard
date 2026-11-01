@@ -33,6 +33,7 @@ Requirements for the v1.1 milestone. Each maps to roadmap phases.
 - [ ] **HOME-03**: `my_report` gains only `last_validated_at` — closed-payload discipline holds (zero new per-stat fields, zero key-stat hints)
 - [ ] **SHWC-01** (owner feedback 2026-10-20; amended 2026-10-24): Início renders the promo cards as a premium scroll-snap slider (1-up mobile, 3-up desktop, keyboard + swipe reachable, server order preserved). The showcase is PUBLIC — anon-callable `get_promotion_public()` + anon read of active members' card photos (migration 0029); the standalone Destaques tab is removed and Início is the landing page
 - [x] **SHWC-02** (owner request 2026-11-01): the showcase keeps the Impecável gate per BUILD — a build with at least one platinum card (OVR ≥ 85) shows only its platinum cards; a build with no platinum card at all falls back to its server-ranked top 3, so every meta build with data keeps a carousel. Selection is per build (`char_function`), never per class, so a platinum build cannot suppress a non-platinum sibling; server order is preserved and no client rank math is introduced
+- [x] **SHWC-03** (owner request 2026-11-01): a build whose Início cards are ALL smoke fixtures is hidden — the cohort has no real player yet — and returns automatically as soon as one real member has data (compute-on-read). The flag is server-side (`card.placeholder`, migration 0055, `discord_handle like 'smoke%'`), never a display-name heuristic; builds with at least one real card keep their placeholder fillers, and the highlights closed field list is unchanged
 
 ### Unified Key/Relevant Selection
 
@@ -247,6 +248,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HOME-02 | Phase 10 — Personalized Home Landing Tab | Pending |
 | SHWC-01 | Phase 10 — Personalized Home Landing Tab | Pending |
 | SHWC-02 | Phase 10.10 - Início Non-Platinum Fallback | Complete (client-only) |
+| SHWC-03 | Phase 10.11 - Smoke-Only Cohort Hiding | Complete (0055 applied live 2026-11-01) |
 | DEF-01 | Phase 9.1 — Hidden Raw Defenses | Complete |
 | DEF-02 | Phase 9.1 — Hidden Raw Defenses | Complete |
 | DEF-03 | Phase 9.1 — Hidden Raw Defenses | Complete |

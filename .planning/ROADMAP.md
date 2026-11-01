@@ -38,6 +38,7 @@
 - [x] Phase 10.8: MATK/PATK Regression Dashboard (INSERTED 2026-10-30) — read-only regression dashboard inside Ranking → Stat entre todos: real MATK/PATK records, OLS + Theil–Sen with 95% CI, MATK% / PATK% / ratio-control scatters + residual histogram, and NORMAL / POSSIBLE_BUFF / INCONCLUSIVE classification for the +35 p.p. MATK% hypothesis; Equipment/Base flat MATK/PATK are reported missing, not invented; migration 0051
 - [x] Phase 10.9: Ranking UI Reorganization (INSERTED 2026-10-31) — the staff Ranking tab becomes three sibling sections (Ranking OVR / Explorador de stats / Análise estatística) with one tablist, the 59-stat player detail moves into an accessible modal, the stat explorer gains a searchable picker plus class/function/name filters, and methodology/reference validation collapse by default; client-only, no migration
 - [x] Phase 10.10: Início Non-Platinum Fallback (INSERTED 2026-11-01) — the showcase keeps the Impecável gate per build, but a meta build with no platinum card at all now falls back to its server-ranked top 3, so the five empty builds primed at OVR 83 no longer vanish from the landing; client-only, no migration
+- [x] Phase 10.11: Smoke-Only Cohort Hiding (INSERTED 2026-11-01) — a build whose Início cards are ALL smoke fixtures is hidden (migration 0055 adds `card.placeholder`), so Algoz and the other empty cohorts leave the rotation; the moment a real member joins, the build returns by itself (compute-on-read). Placeholders remain as fillers beside a real player
 - [ ] Phase 11: Verified Access — Claim Authorization & Discord OAuth — first access is manual-fill and officer-validated since 0034 (DSCD-01 holds via claim/registration request approvals, no print anywhere); Phase 11 replaces the manual trust with the real anchor: one-time officer-confirmed Discord↔character link, server-side bot-token role check, custom access token hook keeping every RLS policy intact, device-binding re-decision, PIN retirement path (INSERTED 2026-10-26)
 
 </details>
@@ -369,6 +370,24 @@ Plans:
 
 **Cross-cutting constraints**: display-only filter over the payload the RPC already rank-capped (top 3 per meta cohort); it never promotes a card above a real player and never re-sorts. The empty meta builds stay primed by the 10.3 fixtures (OVR 83, guild-floor derived). Deploy order: client bundle only.
 
+### Phase 10.11: Smoke-Only Cohort Hiding (INSERTED 2026-11-01)
+
+**Goal**: A build with no real player behind it must not occupy the Início rotation with fixture cards. The build returns automatically when a real member has data; builds with at least one real player keep their placeholder fillers.
+
+**Depends on**: Phase 10 (Início showcase), Phase 10.2 (per-build carousels), Phase 10.3 (meta cohorts + primers), Phase 10.10 (per-build gate)
+**Requirements**: SHWC-03
+**Success Criteria** (what must be TRUE):
+  1. Every build whose cards are all placeholders is absent from Início (Assassin Cross dps/mdps and the other no-player cohorts) (SHWC-03)
+  2. A build with at least one real card still renders, including its placeholder fillers
+  3. A real member joining a hidden cohort makes the build render on the next fetch — no re-seed, no manual flag, no cache invalidation (SHWC-03)
+  4. The placeholder flag is server-side (`discord_handle like 'smoke%'`), additive, and the highlights closed field list is unchanged; no client rank math (SHWC-03)
+  5. `tsc -b`, the full suite, `vite build` and the live promotion smoke stay green
+
+**Plans**: 1 plan
+- [x] 10.11-01-PLAN.md — Migration 0055 (`card.placeholder`) + per-build hide rule + tests — applied live 2026-11-01
+
+**Cross-cutting constraints**: the flag is a server-side identity fact, never a display-name heuristic; fixtures stay resident as the basis that lets the first real player reach an OVR (10.3), they are only hidden from the showcase. Deploy order: migration first (done), client bundle second.
+
 ### Phase 11: Verified Access — Claim Authorization & Discord OAuth (INSERTED)
 
 **Goal**: Access is bound to something the attacker cannot steal from a Discord post. The 0032 stopgap (officer-authorized claims) shipped 2026-10-26 and was reverted the same day by 0033 at the owner's call — registration is one-go again (immediate PIN setter; registration requests carry the PIN so the approval activates it) with manual validation staying on (officer approval + the post-claim D-05 identity review) — so Phase 11 carries the full identity load: a one-time, officer-confirmed Discord↔character link per member, Discord OAuth as the login, a server-side guild-role check with the guild bot token, and session continuity that keeps every existing RLS policy working unchanged.
@@ -390,7 +409,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 → 10.6 → 10.7 → 10.8 → 10.9 → 10.10 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
+Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 → 10.6 → 10.7 → 10.8 → 10.9 → 10.10 → 10.11 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|------------|
@@ -416,8 +435,9 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 
 | 10.8 MATK/PATK Regression Dashboard (inserted) | v1.1 | 4/4 | Complete (0051..0054 live) | 2026-10-31 |
 | 10.9 Ranking UI Reorganization (inserted) | v1.1 | 1/1 | Complete (client-only) | 2026-10-31 |
 | 10.10 Início Non-Platinum Fallback (inserted) | v1.1 | 1/1 | Complete (client-only) | 2026-11-01 |
+| 10.11 Smoke-Only Cohort Hiding (inserted) | v1.1 | 1/1 | Complete (0055 live) | 2026-11-01 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---
-*Roadmap created: 2026-10-07 · v1.0 archived 2026-10-13 · v1.1 roadmap created 2026-10-13 · revised 2026-10-22 (added Phase 9.1 Hidden Raw Defenses — 5 phases, DEF-01..DEF-06 requirements) · revised 2026-10-27 (inserted Phase 10.1 Universal Rating Unification as an URGENT fix before Phase 11 — owner report of cross-surface OVR inconsistency; investigation in `.planning/phases/10.1-universal-rating-unification/10.1-CONTEXT.md`; UNIF-01..04 requirements) · revised 2026-10-29 (recorded Phase 10.2 meta/non-viable split and inserted Phase 10.3 Artista merged cohort — owner ruling that Menestrel and Cigana are one class for stats; 0038 rehearsed, not live) · revised 2026-10-31 (inserted Phase 10.9 Ranking UI Reorganization — three sibling sections, player-stats modal, explorer filters; client-only) · revised 2026-11-01 (inserted Phase 10.10 Início Non-Platinum Fallback — per-build fallback for builds without a platinum card; client-only)*
+*Roadmap created: 2026-10-07 · v1.0 archived 2026-10-13 · v1.1 roadmap created 2026-10-13 · revised 2026-10-22 (added Phase 9.1 Hidden Raw Defenses — 5 phases, DEF-01..DEF-06 requirements) · revised 2026-10-27 (inserted Phase 10.1 Universal Rating Unification as an URGENT fix before Phase 11 — owner report of cross-surface OVR inconsistency; investigation in `.planning/phases/10.1-universal-rating-unification/10.1-CONTEXT.md`; UNIF-01..04 requirements) · revised 2026-10-29 (recorded Phase 10.2 meta/non-viable split and inserted Phase 10.3 Artista merged cohort — owner ruling that Menestrel and Cigana are one class for stats; 0038 rehearsed, not live) · revised 2026-10-31 (inserted Phase 10.9 Ranking UI Reorganization — three sibling sections, player-stats modal, explorer filters; client-only) · revised 2026-11-01 (inserted Phase 10.10 Início Non-Platinum Fallback — per-build fallback for builds without a platinum card; client-only) · revised 2026-11-01 (inserted Phase 10.11 Smoke-Only Cohort Hiding — migration 0055 adds a server-side placeholder flag; smoke-only builds leave the showcase and return automatically when a real member joins)*
 
