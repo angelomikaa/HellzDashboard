@@ -12,7 +12,7 @@
  *   A. shape: 16 Vigrid parties / 80 filled slots / 40 per raid; the 3 Emperium
  *      raids with 6/6/4 parties (16 parties / 80 slots, any fill state since the
  *      initial formation is officer-editable); role labels; zero smoke/dummy
- *      members in any lineup.
+ *      and zero inactive members in any lineup (deactivation clears seats).
  *   B. member read: get_lineups() + get_lineups_mode('emperium') 200 with a
  *      closed field list (no ovr, points, stats, key-stat config, pin_hash);
  *      roster count equals the live assignable roster; fixture members absent.
@@ -270,10 +270,14 @@ async function main() {
     const smokeInLineup = (
       await mgmt(
         `select count(*)::int as n from lineup_slots s join members m on m.id = s.member_id ` +
-          `where m.discord_handle ilike 'smoke%' or m.discord_handle ilike 'dummy-%';`,
+          `where m.discord_handle ilike 'smoke%' or m.discord_handle ilike 'dummy-%' or not m.active;`,
       )
     )[0].n
-    check('A4 zero smoke/dummy members in the lineup', smokeInLineup === 0, `count=${smokeInLineup}`)
+    check(
+      'A4 zero smoke/dummy/inactive members in the lineup',
+      smokeInLineup === 0,
+      `count=${smokeInLineup}`,
+    )
 
     // ---- fixtures + sessions ---------------------------------------------
     fixtureIds = await createFixtures()
