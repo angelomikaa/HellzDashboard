@@ -50,15 +50,20 @@ describe('buildLineupExportPlan — canvas and grid geometry', () => {
     expect(LINEUP_EXPORT_HEIGHT).toBe(1080)
   })
 
-  it('lays out 8 equal party columns, left to right, with no overlap', () => {
+  it('lays out 8 party cards in a 4x2 grid, left to right, top to bottom', () => {
     const { columns } = buildLineupExportPlan(lineup('vigrid_field'))
     expect(columns).toHaveLength(8)
     expect(columns.map((c) => c.header.label)).toEqual(['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8'])
-    for (const col of columns) expect(col.rect.w).toBe(216)
-    for (let i = 1; i < columns.length; i++) {
+    for (const col of columns) expect(col.rect.w).toBe(448)
+    // First row: 4 cards side by side.
+    for (let i = 1; i < 4; i++) {
       const prev = columns[i - 1].rect
       expect(columns[i].rect.x).toBeGreaterThanOrEqual(prev.x + prev.w)
+      expect(columns[i].rect.y).toBe(prev.y)
     }
+    // Second row wraps below the first.
+    expect(columns[4].rect.x).toBe(columns[0].rect.x)
+    expect(columns[4].rect.y).toBeGreaterThan(columns[0].rect.y + columns[0].rect.h)
   })
 
   it('keeps every drawn rectangle inside the canvas', () => {
@@ -84,12 +89,13 @@ describe('buildLineupExportPlan — canvas and grid geometry', () => {
     }
   })
 
-  it('places each column with five slot cards stacked inside it', () => {
+  it('gives each slot card room for a readable name (4-col grid)', () => {
     const { columns } = buildLineupExportPlan(lineup('vigrid_field'))
     for (const col of columns) {
       expect(col.slots).toHaveLength(5)
       expect(col.slots.map((s) => s.slotIndex)).toEqual([1, 2, 3, 4, 5])
       for (const slot of col.slots) {
+        expect(slot.rect.w).toBeGreaterThanOrEqual(400)
         expect(slot.rect.x).toBeGreaterThanOrEqual(col.rect.x)
         expect(slot.rect.x + slot.rect.w).toBeLessThanOrEqual(col.rect.x + col.rect.w)
       }
@@ -204,7 +210,7 @@ describe('buildLineupExportPlan — labels, title and filenames', () => {
     expect(plan.columns).toHaveLength(6)
     expect(plan.columns.map((c) => c.header.label)).toEqual(['G1', 'G2', 'G3', 'G4', 'G5', 'G6'])
     expect(plan.header.status.text).toBe('30 / 30 ESCALADOS')
-    expect(plan.columns[0].rect.w).toBeGreaterThan(216)
+    expect(plan.columns[0].rect.w).toBeGreaterThan(400)
 
     const four = lineup('emperium_raid_3')
     four.parties = four.parties.slice(0, 4)

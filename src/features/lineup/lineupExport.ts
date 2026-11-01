@@ -64,9 +64,15 @@ const TEXT_FIT_FLOOR = 0.6
 const MARGIN = 40
 const GUTTER = 16
 
-/** Width of one party column for a raid with `partyCount` parties. */
+/** Grid: at most 4 party cards per row (user request 2026-11-01) — 8 parties
+ *  become 4×2, so each card is ~2× wider and the name/icon breathe. */
+const GRID_COLS = 4
+const GRID_ROW_GAP = 14
+
+/** Width of one party card when the row holds `cols` cards. */
 function columnWidth(partyCount: number): number {
-  return (LINEUP_EXPORT_WIDTH - 2 * MARGIN - (partyCount - 1) * GUTTER) / partyCount
+  const cols = Math.min(GRID_COLS, Math.max(1, partyCount))
+  return (LINEUP_EXPORT_WIDTH - 2 * MARGIN - (cols - 1) * GUTTER) / cols
 }
 
 const LAYOUT = {
@@ -74,17 +80,15 @@ const LAYOUT = {
   markSize: 84,
   headerRuleY: 146,
   headerRuleH: 3,
-  roleBannerY: 170,
-  roleBannerH: 36,
-  columnY: 230,
-  columnH: 730,
-  headerBandH: 46,
-  slotY: 290,
-  slotH: 116,
-  slotGap: 10,
+  gridY: 172,
+  columnH: 350,
+  headerBandH: 38,
+  headerPad: 6,
+  slotH: 50,
+  slotGap: 6,
   slotInset: 8,
-  footerY: 922,
-  footerH: 30,
+  footerH: 26,
+  footerPad: 6,
   legendY: 1012,
   legendH: 24,
 } as const
@@ -164,10 +168,10 @@ function normalizeSlots(party: LineupParty | null): LineupSlot[] {
 function buildColumn(
   partyIndex: number,
   party: LineupParty | null,
-  col: number,
+  x: number,
+  y: number,
   width: number,
 ): LineupExportColumn {
-  const x = MARGIN + col * (width + GUTTER)
   const slots = normalizeSlots(party)
   const normalized: LineupParty = {
     party_index: partyIndex,
@@ -183,16 +187,16 @@ function buildColumn(
     partyIndex,
     header: {
       label: `G${partyIndex}`,
-      rect: { x, y: LAYOUT.columnY, w: width, h: LAYOUT.headerBandH },
+      rect: { x, y, w: width, h: LAYOUT.headerBandH },
     },
     roleLabel:
       party?.role_label !== null && party?.role_label !== undefined && party.role_label !== ''
         ? {
             text: party.role_label,
-            rect: { x, y: LAYOUT.roleBannerY, w: width, h: LAYOUT.roleBannerH },
+            rect: { x: x + 76, y: y + 5, w: width - 76 - 8, h: LAYOUT.headerBandH - 10 },
           }
         : null,
-    rect: { x, y: LAYOUT.columnY, w: width, h: LAYOUT.columnH },
+    rect: { x, y, w: width, h: LAYOUT.columnH },
     slots: slots.map((slot, k) => {
       const vacant = slot.member_id === null
       const charClass = slot.char_class
@@ -200,7 +204,7 @@ function buildColumn(
         slotIndex: slot.slot_index,
         rect: {
           x: x + LAYOUT.slotInset,
-          y: LAYOUT.slotY + k * (LAYOUT.slotH + LAYOUT.slotGap),
+          y: y + LAYOUT.headerBandH + LAYOUT.headerPad + k * (LAYOUT.slotH + LAYOUT.slotGap),
           w: width - 2 * LAYOUT.slotInset,
           h: LAYOUT.slotH,
         },
@@ -218,7 +222,12 @@ function buildColumn(
       filled,
       full,
       color: full ? COLORS.success : COLORS.warning,
-      rect: { x: x + LAYOUT.slotInset, y: LAYOUT.footerY, w: width - 2 * LAYOUT.slotInset, h: LAYOUT.footerH },
+      rect: {
+        x: x + LAYOUT.slotInset,
+        y: y + LAYOUT.headerBandH + LAYOUT.headerPad + 5 * LAYOUT.slotH + 4 * LAYOUT.slotGap + LAYOUT.footerPad,
+        w: width - 2 * LAYOUT.slotInset,
+        h: LAYOUT.footerH,
+      },
     },
   }
 }
@@ -226,7 +235,7 @@ function buildColumn(
 /**
  * Build the full 1920×1080 escalação layout plan for one raid. PURE — no
  * canvas, no DOM, no I/O. Missing parties or slots render as vacant, so the
- * plan always has 8 columns × 5 slots.
+ * plan always has N party cards × 5 slots in a 4-per-row grid (8 = 4×2).
  */
 export function buildLineupExportPlan(
   lineup: BattlefieldLineup,
@@ -242,9 +251,13 @@ export function buildLineupExportPlan(
       : PARTIES_PER_BATTLEFIELD
   const width = columnWidth(partyCount)
 
-  const columns = Array.from({ length: partyCount }, (_, col) =>
-    buildColumn(col + 1, partiesByIndex.get(col + 1) ?? null, col, width),
-  )
+  const columns = Array.from({ length: partyCount }, (_, col) => {
+    const row = Math.floor(col / GRID_COLS)
+    const colInRow = col % GRID_COLS
+    const x = MARGIN + colInRow * (width + GUTTER)
+    const y = LAYOUT.gridY + row * (LAYOUT.columnH + GRID_ROW_GAP)
+    return buildColumn(col + 1, partiesByIndex.get(col + 1) ?? null, x, y, width)
+  })
   const filled = columns.reduce((sum, c) => sum + c.footer.filled, 0)
   const capacity = partyCount * SLOTS_PER_PARTY
 
@@ -380,50 +393,62 @@ function drawSlot(ctx: CanvasRenderingContext2D, slot: LineupExportSlot, icon: H
     return
   }
 
-  // Surface, then the class tint over it (14%), then the 6px class bar.
+  // Surface, then the class tint over it (14%), then the 8px class bar.
   ctx.fillStyle = COLORS.column
   ctx.fillRect(r.x, r.y, r.w, r.h)
   ctx.fillStyle = withAlpha(slot.accent, 0.14)
   ctx.fillRect(r.x, r.y, r.w, r.h)
   ctx.fillStyle = slot.accent
-  ctx.fillRect(r.x, r.y, 6, r.h)
+  ctx.fillRect(r.x, r.y, 8, r.h)
 
   ctx.lineWidth = slot.leader ? 2 : 1
   ctx.strokeStyle = slot.leader ? COLORS.leader : COLORS.line
   ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1)
 
-  const iconSize = 56
-  const ix = r.x + 16
+  const iconSize = 40
+  const ix = r.x + 12
   const iy = r.y + (r.h - iconSize) / 2
   if (icon !== null) {
+    // Dark tile behind the icon so light class art reads on any tint.
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'
+    ctx.fillRect(ix - 3, iy - 3, iconSize + 6, iconSize + 6)
     ctx.drawImage(icon, ix, iy, iconSize, iconSize)
+    ctx.strokeStyle = withAlpha(slot.accent, 0.8)
+    ctx.lineWidth = 1.5
+    ctx.strokeRect(ix - 3.5, iy - 3.5, iconSize + 7, iconSize + 7)
   } else {
     ctx.fillStyle = COLORS.background
     ctx.fillRect(ix, iy, iconSize, iconSize)
     ctx.strokeStyle = COLORS.line
     ctx.strokeRect(ix + 0.5, iy + 0.5, iconSize - 1, iconSize - 1)
-    paintText(ctx, slot.monogram, ix + iconSize / 2, iy + 37, iconSize - 10, {
+    paintText(ctx, slot.monogram, ix + iconSize / 2, iy + 28, iconSize - 10, {
       family: FONT.display,
       weight: 700,
-      size: 26,
+      size: 20,
       color: COLORS.muted,
       align: 'center',
     })
   }
 
-  const tx = r.x + 84
-  const maxW = r.x + r.w - 8 - tx
+  const tx = ix + iconSize + 12
+  const maxW = r.x + r.w - 10 - tx
   if (slot.leader) {
-    paintText(ctx, '★ LÍDER', tx, r.y + 28, maxW, { family: FONT.display, weight: 700, size: 13, color: COLORS.leader })
+    paintText(ctx, '★ LÍDER', tx, r.y + 16, maxW, { family: FONT.display, weight: 700, size: 12, color: COLORS.leader })
   }
-  paintText(ctx, slot.name ?? '', tx, r.y + (slot.leader ? 56 : 54), maxW, {
+  // Name: larger + soft shadow so it pops over the tinted surface.
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.85)'
+  ctx.shadowBlur = 6
+  ctx.shadowOffsetY = 2
+  paintText(ctx, slot.name ?? '', tx, r.y + (slot.leader ? 34 : 30), maxW, {
     family: FONT.display,
     weight: 700,
-    size: 20,
-    color: COLORS.content,
+    size: 23,
+    color: '#FFFFFF',
   })
+  ctx.restore()
   if (slot.classText !== '') {
-    paintText(ctx, slot.classText, tx, r.y + 82, maxW, { family: FONT.body, weight: 400, size: 15, color: COLORS.muted })
+    paintText(ctx, slot.classText.toUpperCase(), tx, r.y + r.h - 6, maxW, { family: FONT.condensed, weight: 400, size: 17, color: '#D8CECE' })
   }
 }
 
@@ -495,20 +520,6 @@ export async function renderLineupCanvas(canvas: HTMLCanvasElement, plan: Lineup
   const icons = new Map(iconSrcs.map((src, i) => [src, loaded[i] ?? null] as const))
 
   for (const col of plan.columns) {
-    if (col.roleLabel !== null) {
-      const rl = col.roleLabel.rect
-      ctx.strokeStyle = COLORS.warning
-      ctx.lineWidth = 2
-      ctx.strokeRect(rl.x + 1, rl.y + 1, rl.w - 2, rl.h - 2)
-      paintText(ctx, col.roleLabel.text, rl.x + rl.w / 2, rl.y + rl.h / 2 + 8, rl.w - 12, {
-        family: FONT.condensed,
-        weight: 400,
-        size: 24,
-        color: COLORS.warning,
-        align: 'center',
-      })
-    }
-
     // Column body + hairline.
     ctx.fillStyle = COLORS.column
     ctx.fillRect(col.rect.x, col.rect.y, col.rect.w, col.rect.h)
@@ -516,15 +527,30 @@ export async function renderLineupCanvas(canvas: HTMLCanvasElement, plan: Lineup
     ctx.lineWidth = 1
     ctx.strokeRect(col.rect.x + 0.5, col.rect.y + 0.5, col.rect.w - 1, col.rect.h - 1)
 
-    // Header band: red accent line + G# label.
+    // Header band: red accent line + G# label + role pill on the right.
     ctx.fillStyle = COLORS.accent
     ctx.fillRect(col.header.rect.x, col.header.rect.y, col.header.rect.w, 4)
-    paintText(ctx, col.header.label, col.header.rect.x + 16, col.header.rect.y + 32, col.header.rect.w - 32, {
+    paintText(ctx, col.header.label, col.header.rect.x + 14, col.header.rect.y + 28, 70, {
       family: FONT.display,
       weight: 700,
-      size: 24,
+      size: 22,
       color: COLORS.content,
     })
+    if (col.roleLabel !== null) {
+      const rl = col.roleLabel.rect
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'
+      ctx.fillRect(rl.x, rl.y, rl.w, rl.h)
+      ctx.strokeStyle = COLORS.warning
+      ctx.lineWidth = 1.5
+      ctx.strokeRect(rl.x + 0.5, rl.y + 0.5, rl.w - 1, rl.h - 1)
+      paintText(ctx, col.roleLabel.text, rl.x + rl.w / 2, rl.y + rl.h / 2 + 6, rl.w - 12, {
+        family: FONT.condensed,
+        weight: 400,
+        size: 19,
+        color: COLORS.warning,
+        align: 'center',
+      })
+    }
 
     for (const slot of col.slots) {
       drawSlot(ctx, slot, slot.iconSrc === null ? null : (icons.get(slot.iconSrc) ?? null))
