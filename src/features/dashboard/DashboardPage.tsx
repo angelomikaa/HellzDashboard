@@ -297,7 +297,7 @@ export function DashboardPage({
                     sections and never as one mashed grid. */}
                 {strip.kind !== 'hidden' && (
                   <div className="border-t border-line pt-3">
-                    <h2 className="text-sm font-semibold text-muted">Stats-chave</h2>
+                    <h2 className="text-sm font-semibold text-muted">Stats-Chave</h2>
                     {strip.kind === 'cards' ? (
                       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
                         {strip.stats.map((k) => (

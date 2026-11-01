@@ -22,9 +22,10 @@ export function AntiCheatWarnings({ warnings }: { warnings: readonly DefenseWarn
       aria-live="polite"
       className="mt-4 rounded-lg border border-error/60 bg-error/10 p-4"
     >
-      <h4 className="text-sm font-semibold text-error">Confira: valor fora da curva</h4>
+      <h4 className="text-sm font-semibold text-error">Confira: valor bem acima do normal</h4>
       <p className="mt-1 text-sm text-content">
-        {`Estes valores estão ${number.format(DEFENSE_SIGMA_THRESHOLD)}σ ou mais acima da mediana do seu grupo. Angelus e Assumptio aumentam a defesa em cerca de 95% — envie os valores SEM buffs.`}
+        Estes valores estão bem acima da maioria do seu grupo. Angelus e Assumptio aumentam a
+        defesa em cerca de 95% — envie os valores SEM buffs.
       </p>
       <ul className="mt-3 flex flex-col gap-1">
         {warnings.map((warning) => (
@@ -34,8 +35,9 @@ export function AntiCheatWarnings({ warnings }: { warnings: readonly DefenseWarn
               {formatStatValue(warning.value, warning.value_type)}
             </span>
             <span className="text-muted">
-              {`· mediana do grupo ${formatStatValue(warning.median, warning.value_type)} · ${number.format(warning.z)}σ · n=${warning.sample_size}`}
+              {`· valor comum do grupo ${formatStatValue(warning.median, warning.value_type)} · ${warning.sample_size} jogadores comparados`}
             </span>
+            <span className="sr-only">{`Desvio ${number.format(warning.z)} desvios-padrão, limiar ${number.format(DEFENSE_SIGMA_THRESHOLD)}.`}</span>
           </li>
         ))}
       </ul>

@@ -420,8 +420,18 @@ export function SubmitPage({ session }: SubmitPageProps) {
 
   /** Restart as a NEW submission: fresh stats, nothing prefilled or
    *  overwritten (append-only, INPT-04). The identity stays — it describes
-   *  the same character, and the player can still edit it. */
+   *  the same character, and the player can still edit it. H3: confirm so a
+   *  stray tap doesn't wipe the wizard. */
   function restartWizard() {
+    if (phase !== 'submitted') {
+      const dirty =
+        Object.keys(inputs).length > 0 ||
+        stepVerified[1] ||
+        stepVerified[2] ||
+        stepVerified[3] ||
+        stepVerified[4]
+      if (dirty && !window.confirm('Recomeçar o envio? Os valores digitados serão apagados.')) return
+    }
     ocrTraceRef.current = {}
     setInputs({})
     setStepVerified({ 1: false, 2: false, 3: false, 4: false })
@@ -894,9 +904,10 @@ export function SubmitPage({ session }: SubmitPageProps) {
             </div>
           )}
 
-          {/* Step navigation */}
+          {/* Step navigation — H5/H6: the gate reason is always visible, never a silent disabled button. */}
           {step < 5 && (
-            <div className="mt-6 flex items-center justify-between gap-2">
+            <div className="mt-6 flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
               {step > 1 ? (
                 <button
                   type="button"
@@ -913,6 +924,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   type="button"
                   onClick={() => setStep(2)}
                   disabled={!stepVerified[1]}
+                  aria-describedby="submit-step1-gate"
                   className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Continuar
@@ -926,11 +938,26 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     !groupComplete(catalog, STEP_GROUP[step], effectiveInputs) ||
                     !stepVerified[step]
                   }
+                  aria-describedby={`submit-step${step}-gate`}
                   className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Continuar
                 </button>
               )}
+              </div>
+              {step === 1 && !stepVerified[1] && (
+                <p id="submit-step1-gate" aria-live="polite" className="text-xs text-muted">
+                  Marque “Revisei os valores” no passo 1 para continuar.
+                </p>
+              )}
+              {(step === 2 || step === 3 || step === 4) &&
+                (!groupComplete(catalog, STEP_GROUP[step], effectiveInputs) || !stepVerified[step]) && (
+                  <p id={`submit-step${step}-gate`} aria-live="polite" className="text-xs text-muted">
+                    {!groupComplete(catalog, STEP_GROUP[step], effectiveInputs)
+                      ? 'Preencha todos os campos obrigatórios do grupo para continuar.'
+                      : 'Marque “Revisei os valores” para continuar.'}
+                  </p>
+                )}
             </div>
           )}
         </>

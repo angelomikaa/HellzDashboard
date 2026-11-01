@@ -288,7 +288,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
 
               <div className="mt-6 flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="text-sm font-semibold text-muted">
-                  Stats-chave ({keyCount}/6 configurados)
+                  Stats-Chave ({keyCount}/6 configurados)
                 </h3>
                 <span className="text-sm font-semibold text-muted">
                   {relevantCount} relevante{relevantCount !== 1 ? 's' : ''}

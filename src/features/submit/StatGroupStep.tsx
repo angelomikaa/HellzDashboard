@@ -89,7 +89,10 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
           return (
             <div key={entry.stat_key} className="flex flex-col gap-1">
               <label htmlFor={fieldId(entry.stat_key)} className="text-sm font-semibold text-content">
-                {entry.label}
+                {entry.label}{' '}
+                <span className="font-normal text-muted">
+                  {percentual ? '(ex.: 12,5%)' : '(ex.: 1.234.567)'}
+                </span>
               </label>
               <div className="relative">
                 <input

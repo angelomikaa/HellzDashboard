@@ -25,6 +25,8 @@ export interface PinBoxesProps {
   disabled?: boolean
   label?: string
   autoFocus?: boolean
+  revealed?: boolean
+  onToggleReveal?: () => void
 }
 
 export function PinBoxes({
@@ -33,6 +35,8 @@ export function PinBoxes({
   disabled = false,
   label = 'PIN (4 dígitos)',
   autoFocus = false,
+  revealed = false,
+  onToggleReveal,
 }: PinBoxesProps) {
   const refs = useRef<Array<HTMLInputElement | null>>([])
   const chars = pinChars(value)
@@ -88,7 +92,19 @@ export function PinBoxes({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-semibold text-content">{label}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-content">{label}</span>
+        {onToggleReveal !== undefined && (
+          <button
+            type="button"
+            onClick={onToggleReveal}
+            aria-pressed={revealed}
+            className="text-xs font-semibold text-muted underline-offset-2 hover:text-content hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            {revealed ? 'Ocultar' : 'Mostrar'}
+          </button>
+        )}
+      </div>
       <div role="group" aria-label={label} className="flex gap-2">
         {Array.from({ length: PIN_LENGTH }, (_, index) => (
           <input
@@ -96,7 +112,7 @@ export function PinBoxes({
             ref={(element) => {
               refs.current[index] = element
             }}
-            type="password"
+            type={revealed ? 'text' : 'password'}
             inputMode="numeric"
             pattern="[0-9]"
             maxLength={1}

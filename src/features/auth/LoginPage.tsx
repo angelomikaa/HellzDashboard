@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import hellzMark from '../../assets/hellz-mark.svg'
 import { PinBoxes } from './PinBoxes'
 import { isValidSession, saveSession, type NeoFootSession } from './session'
@@ -31,16 +31,35 @@ const NETWORK_ERROR = 'Não foi possível conectar ao servidor. Verifique sua co
 export function LoginPage({ onLogin, onFirstAccess, onRequestAccess, onBack }: LoginPageProps) {
   const [nickname, setNickname] = useState('')
   const [pin, setPin] = useState('')
+  const [revealed, setRevealed] = useState(false)
   const [status, setStatus] = useState<LoginStatus>({ kind: 'idle' })
+  const [lockSeconds, setLockSeconds] = useState(0)
 
   const submitting = status.kind === 'submitting'
   const locked = status.kind === 'locked'
   const disabled = submitting || locked
+  const formIncomplete = nickname.trim().length === 0 || !/^\d{4}$/.test(pin)
+
+  // H1: lockout countdown — static minutes become a live timer + guidance.
+  useEffect(() => {
+    if (!locked || lockSeconds <= 0) return
+    const timer = window.setTimeout(() => setLockSeconds((s) => Math.max(0, s - 1)), 1000)
+    return () => window.clearTimeout(timer)
+  }, [locked, lockSeconds])
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (disabled) return
-    if (nickname.trim().length === 0 || !/^\d{4}$/.test(pin)) return
+    if (formIncomplete) {
+      setStatus({
+        kind: 'error',
+        message:
+          nickname.trim().length === 0
+            ? 'Informe o nick do personagem para entrar.'
+            : 'Informe os 4 dígitos do PIN para entrar.',
+      })
+      return
+    }
     setStatus({ kind: 'submitting' })
     try {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-pin`, {
@@ -122,11 +141,13 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess, onBack }: L
       }
 
       if (res.status === 429 && typeof body.retry_after_seconds === 'number') {
-        // D-07 UX: static lockout hint — the lockout itself is server-enforced.
-        const minutes = Math.max(1, Math.ceil(body.retry_after_seconds / 60))
+        // H1+H9: live countdown instead of static minutes + recovery guidance.
+        const seconds = Math.max(1, Math.ceil(body.retry_after_seconds))
+        setLockSeconds(seconds)
+        const minutes = Math.max(1, Math.ceil(seconds / 60))
         setStatus({
           kind: 'locked',
-          message: `Muitas tentativas incorretas. Tente novamente em ${minutes} minutos.`,
+          message: `Muitas tentativas incorretas. Tente novamente em ${minutes} minutos. Aguarde o tempo acabar — não adianta insistir antes.`,
         })
         return
       }
@@ -168,10 +189,18 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess, onBack }: L
               className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
             <p className="text-xs text-muted">
-              O nick que aparece no print. O usuário do Discord também funciona.
+              Use o nick do personagem como aparece no jogo. Se você esqueceu, o usuário do
+              Discord também funciona.
             </p>
           </div>
-          <PinBoxes value={pin} onChange={setPin} disabled={disabled} autoFocus />
+          <PinBoxes
+            value={pin}
+            onChange={setPin}
+            disabled={disabled}
+            autoFocus
+            revealed={revealed}
+            onToggleReveal={() => setRevealed((v) => !v)}
+          />
           {status.kind === 'needs-setup' && (
             <div className="rounded-md border border-line bg-dominant px-3 py-3">
               <p className="text-sm font-semibold text-content">
@@ -193,6 +222,17 @@ export function LoginPage({ onLogin, onFirstAccess, onRequestAccess, onBack }: L
               className="text-sm font-semibold text-error"
             >
               {status.message}
+              {status.kind === 'locked' && lockSeconds > 0 && (
+                <span className="mt-1 block text-xs font-medium tabular-nums">
+                  Restam {Math.floor(lockSeconds / 60)}:{String(lockSeconds % 60).padStart(2, '0')} para
+                  tentar de novo.
+                </span>
+              )}
+            </p>
+          )}
+          {formIncomplete && status.kind === 'idle' && (
+            <p aria-live="polite" className="text-xs text-muted">
+              Preencha o nick e os 4 dígitos do PIN para entrar.
             </p>
           )}
           <button

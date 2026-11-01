@@ -38,6 +38,7 @@ interface HistoryListProps {
 export function HistoryList({ session, onNewSubmission }: HistoryListProps) {
   const [rows, setRows] = useState<SubmissionRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -63,6 +64,22 @@ export function HistoryList({ session, onNewSubmission }: HistoryListProps) {
         Minhas entradas
       </h2>
 
+      {rows !== null && rows.length > 3 && (
+        <div className="mt-4 flex flex-col gap-2">
+          <label htmlFor="history-filter" className="text-sm font-semibold text-content">
+            Buscar nas entradas
+          </label>
+          <input
+            id="history-filter"
+            type="search"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Buscar por data ou status… ( / foca aqui )"
+            className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          />
+        </div>
+      )}
+
       {error !== null ? (
         <p role="alert" aria-live="polite" className="mt-4 text-sm font-semibold text-error">
           {error}
@@ -73,7 +90,14 @@ export function HistoryList({ session, onNewSubmission }: HistoryListProps) {
         <p className="mt-4 text-base text-muted">Você ainda não enviou status.</p>
       ) : (
         <ul className="mt-4 flex flex-col gap-2">
-          {rows.map((row) => (
+          {rows
+            .filter((row) => {
+              const q = filter.trim().toLowerCase()
+              if (q === '') return true
+              const date = dateTimeFormatter.format(new Date(row.submitted_at)).toLowerCase()
+              return date.includes(q) || STATUS_LABELS[row.status].toLowerCase().includes(q)
+            })
+            .map((row) => (
             <li
               key={row.id}
               className="flex h-11 items-center justify-between gap-4 rounded-md border border-line bg-surface px-3"

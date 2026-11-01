@@ -171,7 +171,9 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
               key={t}
               type="button"
               role="tab"
+              id={`validacoes-tab-${t}`}
               aria-selected={tab === t}
+              aria-controls="validacoes-panel"
               onClick={() => setTab(t)}
               className={`h-10 rounded-md px-4 text-sm font-semibold ${
                 tab === t
@@ -185,8 +187,9 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
         })}
       </div>
 
+      <div id="validacoes-panel" role="tabpanel" aria-labelledby={`validacoes-tab-${tab}`} className="mt-6">
       {tab === 'envios' && (
-      <div className="mt-6" role="tabpanel">
+      <div role="none">
       {error !== null ? (
         <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-error">
           {error}
@@ -364,16 +367,17 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
       )}
 
       {tab === 'solicitacoes' && (
-        <div className="mt-6" role="tabpanel">
+        <div role="none">
           <RequestReview session={session} />
         </div>
       )}
 
       {tab === 'identidades' && (
-        <div className="mt-6" role="tabpanel">
+        <div role="none">
           <IdentityReview session={session} />
         </div>
       )}
+      </div>
 
       {/* Destructive confirm: locked copy, destructive-styled confirm button. */}
       <ConfirmDialog

@@ -246,6 +246,7 @@ describe('AntiCheatWarnings render', () => {
       />,
     )
     expect(html).toContain('RPDEF')
-    expect(html).toContain('4,1σ')
+    expect(html).toContain('bem acima do normal')
+    expect(html).toContain('6 jogadores comparados')
   })
 })

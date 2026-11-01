@@ -55,12 +55,26 @@ const HIDDEN_STAT_VALUE = '—'
 // One object URL per showcase photo path for the page's lifetime. The carousel
 // mounts every card three times (loop copies) and every class rotates through,
 // so a URL per mount would re-create and re-measure the same photo endlessly.
-// Bounded by the number of photos on the landing; a failed fetch is evicted.
+// H6: bounded LRU (60 entries) — evicted URLs are revoked so long sessions
+// don't leak object URLs.
 const publicPhotoUrls = new Map<string, Promise<string | null>>()
+const MAX_PUBLIC_PHOTO_URLS = 60
+
+function evictOldestPublicPhotoUrl(): void {
+  const oldest = publicPhotoUrls.keys().next()
+  if (oldest.done) return
+  const key = oldest.value
+  const pending = publicPhotoUrls.get(key)
+  publicPhotoUrls.delete(key)
+  void pending?.then((url) => {
+    if (url !== null) URL.revokeObjectURL(url)
+  })
+}
 
 function publicPhotoUrl(path: string): Promise<string | null> {
   const cached = publicPhotoUrls.get(path)
   if (cached !== undefined) return cached
+  if (publicPhotoUrls.size >= MAX_PUBLIC_PHOTO_URLS) evictOldestPublicPhotoUrl()
   const request = fetchCardPhotoByPathPublic(path).then((blob) =>
     blob === null ? null : URL.createObjectURL(blob),
   )

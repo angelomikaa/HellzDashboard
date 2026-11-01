@@ -92,9 +92,32 @@ export function RequestStatusPage({ initialHandle = '', onBack }: RequestStatusP
         {view !== null && (
           <div
             aria-live="polite"
-            className="mt-4 rounded-md border border-line bg-dominant px-3 py-3"
+            className={`mt-4 rounded-md border px-3 py-3 ${
+              view.tone === 'approved'
+                ? 'border-success/60 bg-success/10'
+                : view.tone === 'rejected'
+                  ? 'border-error/60 bg-error/10'
+                  : view.tone === 'pending'
+                    ? 'border-accent/60 bg-accent/10'
+                    : 'border-line bg-dominant'
+            }`}
           >
-            <p className="text-base font-semibold text-content">{view.title}</p>
+            <p
+              className={`text-base font-semibold ${
+                view.tone === 'approved'
+                  ? 'text-success'
+                  : view.tone === 'rejected'
+                    ? 'text-error'
+                    : view.tone === 'pending'
+                      ? 'text-accent'
+                      : 'text-content'
+              }`}
+            >
+              {view.tone === 'pending' && '● '}
+              {view.tone === 'approved' && '✓ '}
+              {view.tone === 'rejected' && '✕ '}
+              {view.title}
+            </p>
             {view.detail !== null && <p className="mt-1 text-sm text-muted">{view.detail}</p>}
           </div>
         )}
