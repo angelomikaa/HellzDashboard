@@ -63,17 +63,25 @@
 // the number of its meta builds that currently have Impecáveis.
 //
 // Owner gate round 2 (07.1-02): the showcase is the premium register — only
-// Impecável (top-band) cards appear. Display-layer tier filter over the
+// Impecável (top-band) cards appear, with the per-build non-platinum fallback
+// added by the owner on 2026-11-01 (below). Display-layer tier filter over the
 // fetched payload, server order preserved (filter, never sort), sections left
 // empty are dropped. tierForOvr is the unit-locked banding function. Because
 // the server takes the top 3 by OVR first, this filter yields exactly the top 3
 // platinum cards of each meta cohort (a cohort with fewer than 3 platinum shows
 // what it has).
+//
+// Owner exception 2026-11-01: "incluir os não platinas, caso não hajam platinas
+// habilitados na categoria". The gate is now per BUILD (function): a build with
+// at least one platinum card keeps ONLY its platinum cards; a build with none
+// falls back to the server-ranked top 3 so its carousel still exists (the empty
+// meta cohorts primed at OVR 83 used to disappear entirely). selectShowcaseCards
+// owns that rule; it never crosses builds (a platinum Summoner mdps cannot
+// suppress an all-gold suporte).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { NeoFootSession } from '../auth/session'
 import { ApiError, fetchPromotionPublic, type PromotionSection } from '../../lib/api'
-import { groupCardsByBuild, mergeCohortSections } from './buildGroups'
-import { tierForOvr } from '../dashboard/presentation'
+import { groupCardsByBuild, mergeCohortSections, selectShowcaseCards } from './buildGroups'
 import { classLabel } from '../../lib/classLabels'
 import { HighlightsCarousel } from './HighlightsCarousel'
 import { AUTO_ADVANCE_MS, clampClassIndex, wrapClassIndex } from './carousel'
@@ -202,14 +210,14 @@ export function PromotionShowcase({ session }: { session?: NeoFootSession }) {
   // that already answers one section per class this is a pass-through.
   const classSections = mergeCohortSections(sections)
 
-  const impecavelSections = classSections.flatMap((section) => {
-    const cards = section.cards.filter(
-      (card) => tierForOvr(Math.round(card.ovr)) === 'platinum',
-    )
+  // Per build: platinum cards when the build has any, else the server-ranked
+  // top 3 (owner 2026-11-01). A class survives when at least one build does.
+  const showcaseSections = classSections.flatMap((section) => {
+    const cards = selectShowcaseCards(section.cards)
     return cards.length > 0 ? [{ ...section, cards }] : []
   })
 
-  if (impecavelSections.length === 0) {
+  if (showcaseSections.length === 0) {
     return (
       <ShowcaseShell>
         <p className="text-center text-sm text-muted">
@@ -226,7 +234,7 @@ export function PromotionShowcase({ session }: { session?: NeoFootSession }) {
           arrows) and the cards float directly on the page's neon grid.
           Round 6: one class holds the showcase at a time, rotating
           (ClassRotation below). Server order preserved (no client re-sort). */}
-      <ClassRotation sections={impecavelSections} showRealStats={showRealStats} />
+      <ClassRotation sections={showcaseSections} showRealStats={showRealStats} />
     </ShowcaseShell>
   )
 }
@@ -333,7 +341,8 @@ function ClassRotation({
   const clampedIndex = clampClassIndex(activeIndex, total)
   const section = sections[clampedIndex]
   if (section === undefined) return null
-  // 10.2: the class's Impecável cards, split by META build (function). The
+  // 10.2: the class's showcase cards (Impecável, or the whole build when it has
+  // no platinum), split by META build (function). The
   // builds are the class's tokens; the carousel shows the pressed one (the
   // first by default). A build with no Impecáveis produces no token at all, and
   // groupCardsByBuild keeps every card in its exact server position.

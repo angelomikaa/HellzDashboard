@@ -2,7 +2,13 @@
 // request 2026-10-29). Node-env vitest — pure functions, no DOM/React.
 import { describe, expect, it } from 'vitest'
 import type { PromotionCardRow, PromotionSection } from '../../lib/api'
-import { BUILD_ORDER, buildLabel, groupCardsByBuild, mergeCohortSections } from './buildGroups'
+import {
+  BUILD_ORDER,
+  buildLabel,
+  groupCardsByBuild,
+  mergeCohortSections,
+  selectShowcaseCards,
+} from './buildGroups'
 
 function card(
   display_name: string,
@@ -246,5 +252,57 @@ describe('merge + group — the showcase row count per class', () => {
     const merged = mergeCohortSections([section('High Priest', [card('Ahrya', 'suporte')], 'suporte')])
 
     expect(groupCardsByBuild(merged[0].cards).map((g) => g.fn)).toEqual(['suporte'])
+  })
+})
+
+// --- Início gate: Impecável first, non-platinum fallback per build (2026-11-01) ---
+
+describe('selectShowcaseCards — platinum, with a per-build fallback', () => {
+  it('keeps only the platinum cards when the build has any (>= 85)', () => {
+    const kept = selectShowcaseCards([
+      card('real', 'dps', 99),
+      card('primer-a', 'dps', 96.62),
+      card('primer-b', 'dps', 84.4),
+    ])
+
+    expect(kept.map((c) => c.display_name)).toEqual(['real', 'primer-a'])
+  })
+
+  it('falls back to the whole ranked build when it has no platinum at all', () => {
+    // The five empty meta builds primed at OVR 83: none is platinum, so all
+    // three server-ranked cards stay and the carousel exists.
+    const kept = selectShowcaseCards([
+      card('Smoke Um', 'suporte', 83),
+      card('Smoke Dois', 'suporte', 81.18),
+      card('Smoke Tres', 'suporte', 79.68),
+    ])
+
+    expect(kept.map((c) => c.display_name)).toEqual(['Smoke Um', 'Smoke Dois', 'Smoke Tres'])
+  })
+
+  it('decides per build: a platinum build never suppresses a non-platinum sibling', () => {
+    const kept = selectShowcaseCards([
+      card('mdps-real', 'mdps', 97),
+      card('mdps-primer', 'mdps', 84),
+      card('sup-primer-1', 'suporte', 83),
+      card('sup-primer-2', 'suporte', 81),
+    ])
+
+    expect(kept.map((c) => c.display_name)).toEqual([
+      'mdps-real',
+      'sup-primer-1',
+      'sup-primer-2',
+    ])
+  })
+
+  it('preserves server order and returns an empty array for no cards', () => {
+    const kept = selectShowcaseCards([
+      card('a', 'dps', 90),
+      card('b', 'dps', 86),
+      card('c', 'dps', 95),
+    ])
+
+    expect(kept.map((c) => c.display_name)).toEqual(['a', 'b', 'c'])
+    expect(selectShowcaseCards([])).toEqual([])
   })
 })

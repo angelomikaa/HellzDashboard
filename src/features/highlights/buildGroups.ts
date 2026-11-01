@@ -37,6 +37,7 @@
 // respects the server's own ordering in both shapes.
 import type { PromotionCardRow, PromotionSection } from '../../lib/api'
 import { FUNCTION_LABELS } from '../../lib/groups'
+import { tierForOvr } from '../dashboard/presentation'
 
 /** Canonical build order, the FUNCTION_LABELS key order — the order the staff
  *  form, the dashboard and the submit flow already present them in. */
@@ -105,6 +106,35 @@ export function mergeCohortSections(
   }
 
   return [...merged.values()]
+}
+
+/**
+ * Início card gate — Impecável first, per BUILD, with a non-platinum fallback.
+ *
+ * 07.1-02 locked the showcase to the top band (platinum), and owner 2026-11-01
+ * added the exception: "incluir os não platinas, caso não hajam platinas
+ * habilitados na categoria". So a build shows ONLY its platinum cards; when
+ * that build has NO platinum card at all, it falls back to the cards the
+ * server already ranked (top 3), so the build still gets a carousel instead of
+ * vanishing from the landing.
+ *
+ * The decision is scoped to the BUILD (char_function), never to the class: one
+ * strong build must not hide a weak sibling (Summoner mdps being platinum must
+ * not suppress an all-gold suporte). Server order is preserved and no value is
+ * recomputed — this is a display filter, never rank math.
+ */
+export function selectShowcaseCards(
+  cards: readonly PromotionCardRow[],
+): PromotionCardRow[] {
+  const platinumFns = new Set(
+    cards
+      .filter((card) => tierForOvr(Math.round(card.ovr)) === 'platinum')
+      .map((card) => String(card?.char_function ?? '').trim()),
+  )
+  return cards.filter((card) => {
+    const fn = String(card?.char_function ?? '').trim()
+    return tierForOvr(Math.round(card.ovr)) === 'platinum' || !platinumFns.has(fn)
+  })
 }
 
 /**
