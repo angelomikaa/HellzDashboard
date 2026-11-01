@@ -108,32 +108,61 @@ export function mergeCohortSections(
   return [...merged.values()]
 }
 
+/** Build key of a card — the same normalization groupCardsByBuild uses, so a
+ *  malformed/missing function still lands in ONE group instead of throwing. */
+function cardBuildKey(card: PromotionCardRow): string {
+  return String(card?.char_function ?? '').trim()
+}
+
+function isPlatinumCard(card: PromotionCardRow): boolean {
+  return tierForOvr(Math.round(card.ovr)) === 'platinum'
+}
+
 /**
- * Início card gate — Impecável first, per BUILD, with a non-platinum fallback.
+ * Início card gate — per BUILD: hide smoke-only cohorts, then Impecável with a
+ * non-platinum fallback.
  *
- * 07.1-02 locked the showcase to the top band (platinum), and owner 2026-11-01
- * added the exception: "incluir os não platinas, caso não hajam platinas
- * habilitados na categoria". So a build shows ONLY its platinum cards; when
- * that build has NO platinum card at all, it falls back to the cards the
- * server already ranked (top 3), so the build still gets a carousel instead of
- * vanishing from the landing.
+ * Owner 2026-11-01 (first ruling): "incluir os não platinas, caso não hajam
+ * platinas habilitados na categoria" — a build with no platinum card shows its
+ * server-ranked top 3 instead of vanishing.
  *
- * The decision is scoped to the BUILD (char_function), never to the class: one
- * strong build must not hide a weak sibling (Summoner mdps being platinum must
- * not suppress an all-gold suporte). Server order is preserved and no value is
- * recomputed — this is a display filter, never rank math.
+ * Owner 2026-11-01 (second ruling): "ocultar as coortes que até o momento estão
+ * compostas apenas por smokes — as builds são viáveis, a guilda apenas não tem
+ * nenhum jogador na classe nesse momento. Se algum jogador mudar para algoz, a
+ * coorte deve voltar aos destaques imediatamente." So a build whose cards are
+ * ALL placeholders (card.placeholder, migration 0055) is dropped entirely; the
+ * build returns by itself as soon as one real member appears — no re-seed, no
+ * manual flag, no cache. Placeholders stay as FILLERS beside a real player
+ * (e.g. the Mastersmith primers next to Synyster).
+ *
+ * Both decisions are scoped to the BUILD (char_function), never to the class:
+ * one strong build must not hide or suppress a sibling. Server order is
+ * preserved and no value is recomputed — a display filter, never rank math.
  */
 export function selectShowcaseCards(
   cards: readonly PromotionCardRow[],
 ): PromotionCardRow[] {
-  const platinumFns = new Set(
-    cards
-      .filter((card) => tierForOvr(Math.round(card.ovr)) === 'platinum')
-      .map((card) => String(card?.char_function ?? '').trim()),
-  )
+  const builds = new Map<string, PromotionCardRow[]>()
+  for (const card of cards) {
+    const fn = cardBuildKey(card)
+    const bucket = builds.get(fn)
+    if (bucket === undefined) builds.set(fn, [card])
+    else bucket.push(card)
+  }
+
+  const realBuilds = new Set<string>()
+  const platinumBuilds = new Set<string>()
+  for (const [fn, group] of builds) {
+    // Defensive: an older server payload without the 0055 flag is treated as
+    // real, so a deploy-order slip can never blank the whole showcase.
+    if (group.some((card) => card.placeholder !== true)) realBuilds.add(fn)
+    if (group.some(isPlatinumCard)) platinumBuilds.add(fn)
+  }
+
   return cards.filter((card) => {
-    const fn = String(card?.char_function ?? '').trim()
-    return tierForOvr(Math.round(card.ovr)) === 'platinum' || !platinumFns.has(fn)
+    const fn = cardBuildKey(card)
+    if (!realBuilds.has(fn)) return false
+    return isPlatinumCard(card) || !platinumBuilds.has(fn)
   })
 }
 

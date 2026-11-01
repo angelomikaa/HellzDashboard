@@ -14,11 +14,13 @@ function card(
   display_name: string,
   char_function: PromotionCardRow['char_function'],
   ovr = 99,
+  placeholder = false,
 ): PromotionCardRow {
   return {
     display_name,
     char_function,
     ovr,
+    placeholder,
     highlights: [],
     photo_path: `card-photos/${display_name}/card.jpg`,
   }
@@ -268,16 +270,16 @@ describe('selectShowcaseCards — platinum, with a per-build fallback', () => {
     expect(kept.map((c) => c.display_name)).toEqual(['real', 'primer-a'])
   })
 
-  it('falls back to the whole ranked build when it has no platinum at all', () => {
-    // The five empty meta builds primed at OVR 83: none is platinum, so all
-    // three server-ranked cards stay and the carousel exists.
+  it('falls back to the whole ranked build when a real build has no platinum', () => {
+    // A real cohort whose best card is gold: none is platinum, so all three
+    // server-ranked cards stay and the carousel exists.
     const kept = selectShowcaseCards([
-      card('Smoke Um', 'suporte', 83),
-      card('Smoke Dois', 'suporte', 81.18),
-      card('Smoke Tres', 'suporte', 79.68),
+      card('Real Um', 'suporte', 83),
+      card('Real Dois', 'suporte', 81.18),
+      card('Real Tres', 'suporte', 79.68),
     ])
 
-    expect(kept.map((c) => c.display_name)).toEqual(['Smoke Um', 'Smoke Dois', 'Smoke Tres'])
+    expect(kept.map((c) => c.display_name)).toEqual(['Real Um', 'Real Dois', 'Real Tres'])
   })
 
   it('decides per build: a platinum build never suppresses a non-platinum sibling', () => {
@@ -304,5 +306,64 @@ describe('selectShowcaseCards — platinum, with a per-build fallback', () => {
 
     expect(kept.map((c) => c.display_name)).toEqual(['a', 'b', 'c'])
     expect(selectShowcaseCards([])).toEqual([])
+  })
+})
+
+// --- Início gate: smoke-only cohorts hidden (owner 2026-11-01, migration 0055) ---
+
+describe('selectShowcaseCards — hide builds made only of placeholders', () => {
+  it('drops a platinum build whose cards are ALL placeholders (Algoz dps)', () => {
+    const kept = selectShowcaseCards([
+      card('Smoke Algoz Um', 'dps', 91, true),
+      card('Smoke Algoz Dois', 'dps', 88.23, true),
+      card('Smoke Algoz Tres', 'dps', 86.77, true),
+    ])
+
+    expect(kept).toEqual([])
+  })
+
+  it('keeps a build with a real player and treats placeholders as fillers (Mestre-Ferreiro)', () => {
+    const kept = selectShowcaseCards([
+      card('Synyster', 'dps', 99, false),
+      card('Smoke Mestre-Ferreiro Um', 'dps', 96.62, true),
+      card('Smoke Mestre-Ferreiro Dois', 'dps', 94.15, true),
+    ])
+
+    expect(kept.map((c) => c.display_name)).toEqual([
+      'Synyster',
+      'Smoke Mestre-Ferreiro Um',
+      'Smoke Mestre-Ferreiro Dois',
+    ])
+  })
+
+  it('hides only the smoke-only build of a class, keeping the real sibling', () => {
+    const kept = selectShowcaseCards([
+      card('Smoke Summoner Suporte', 'suporte', 83, true),
+      card('Caladoh', 'dps', 98.17, false),
+      card('Sylveon', 'dps', 96.28, false),
+    ])
+
+    expect(kept.map((c) => c.display_name)).toEqual(['Caladoh', 'Sylveon'])
+  })
+
+  it('keeps a real non-platinum build with placeholder fillers (fallback still applies)', () => {
+    const kept = selectShowcaseCards([
+      card('Real Gold', 'mdps', 80, false),
+      card('Smoke Filler', 'mdps', 78, true),
+    ])
+
+    expect(kept.map((c) => c.display_name)).toEqual(['Real Gold', 'Smoke Filler'])
+  })
+
+  it('treats a card without the 0055 flag as real (deploy-order safety)', () => {
+    const withoutFlag: PromotionCardRow = {
+      display_name: 'Legacy',
+      char_function: 'dps',
+      ovr: 90,
+      highlights: [],
+      photo_path: 'card-photos/legacy/card.jpg',
+    }
+
+    expect(selectShowcaseCards([withoutFlag]).map((c) => c.display_name)).toEqual(['Legacy'])
   })
 })

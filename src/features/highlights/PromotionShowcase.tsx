@@ -71,13 +71,14 @@
 // platinum cards of each meta cohort (a cohort with fewer than 3 platinum shows
 // what it has).
 //
-// Owner exception 2026-11-01: "incluir os não platinas, caso não hajam platinas
-// habilitados na categoria". The gate is now per BUILD (function): a build with
-// at least one platinum card keeps ONLY its platinum cards; a build with none
-// falls back to the server-ranked top 3 so its carousel still exists (the empty
-// meta cohorts primed at OVR 83 used to disappear entirely). selectShowcaseCards
-// owns that rule; it never crosses builds (a platinum Summoner mdps cannot
-// suppress an all-gold suporte).
+// Owner exceptions 2026-11-01: "incluir os não platinas, caso não hajam platinas
+// habilitados na categoria" — a build with no platinum card falls back to the
+// server-ranked top 3 instead of vanishing — and "ocultar as coortes que até o
+// momento estão compostas apenas por smokes" — a build whose cards are ALL
+// placeholders (card.placeholder, migration 0055) is hidden and returns by
+// itself once a real member joins. The gate is per BUILD (function): a build
+// never hides or suppresses a sibling (a platinum Summoner mdps cannot suppress
+// an all-gold suporte). selectShowcaseCards owns both rules.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { NeoFootSession } from '../auth/session'
 import { ApiError, fetchPromotionPublic, type PromotionSection } from '../../lib/api'

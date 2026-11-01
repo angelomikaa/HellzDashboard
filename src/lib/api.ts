@@ -675,6 +675,12 @@ export interface PromotionCardRow {
   // omits it, and the card falls back to the section's class.
   char_class?: string
   ovr: number // floor-51 value; tier band derived client-side via tierForOvr
+  // 0055 (owner 2026-11-01): true when the member is a smoke fixture
+  // (members.discord_handle like 'smoke%'). The client uses it to hide a BUILD
+  // whose cards are all placeholders — the cohort has no real player yet and
+  // returns to the showcase automatically when one appears. Optional so a
+  // payload from a server before 0055 keeps rendering (absent = real).
+  placeholder?: boolean
   // 07.2 D-13 supersession: highlights are the class's KEY STATS (same set as
   // the member's Painel card strip, ordered by label) — no longer top-6-by-
   // points. CLOSED field list {stat_key,label,label_short,value_type,value,
@@ -704,9 +710,10 @@ export interface PromotionSection {
   // (class, function) cohort — non-viable cohorts never appear, and a class
   // with several meta cohorts (e.g. Assassin Cross dps + mdps) keeps ONE
   // section carrying up to 3 cards per cohort, ordered by OVR desc. Classes
-  // with insufficient data are OMITTED server-side (D-13). The client still
-  // drops non-platinum cards (tierForOvr), so Início only ever shows the
-  // "Impecáveis".
+  // with insufficient data are OMITTED server-side (D-13). Display gate
+  // (07.1-02 + owner 2026-11-01): per build, keep the platinum cards
+  // (tierForOvr); a build with none falls back to its top 3, and a build made
+  // only of placeholders (card.placeholder, migration 0055) is hidden.
   //
   // 10.2 client half: the section's cards are split by `char_function` at
   // render time (highlights/buildGroups.groupCardsByBuild) so each build owns
