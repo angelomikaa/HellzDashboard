@@ -21,6 +21,7 @@ import {
   fetchStaffRequests,
   asLineupsPayload,
   fetchLineups,
+  setLineupAbsence,
   setLineupPartyCounts,
   setLineupPartyLabel,
   setLineupRaidCount,
@@ -499,6 +500,7 @@ const lineupPayload = {
     { battlefield: 'ruinscape', raid_index: 2, parties: [] },
   ],
   roster: [{ member_id: 'm1', display_name: 'Lanaya', char_class: 'Bard', char_function: 'dps' }],
+  absences: [],
 }
 
 const emperiumPayload = {
@@ -586,6 +588,17 @@ describe('lineup RPC wrappers (phase 10.4 / 0056 / 0057, LNUP-01..03)', () => {
     expect(JSON.parse(calls[0].init.body as string)).toEqual({
       p_war_mode: 'emperium',
       p_counts: [6, 6, 4],
+    })
+  })
+
+  it('setLineupAbsence POSTs the member and absence flag', async () => {
+    nextResponse = () => res(200, JSON.stringify(emperiumPayload))
+    await setLineupAbsence(session, 'emperium', 'm1', true)
+    expect(calls[0].url).toBe('https://test-project.supabase.co/rest/v1/rpc/set_lineup_absence')
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      p_war_mode: 'emperium',
+      p_member: 'm1',
+      p_absent: true,
     })
   })
 

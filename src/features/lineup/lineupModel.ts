@@ -44,6 +44,16 @@ export const TOTAL_PARTIES = 16
 export const MAX_PARTIES_PER_RAID = 8
 export const MIN_PARTIES_PER_RAID = 1
 
+/**
+ * Five active absences make one full 5-slot party droppable. This is a MINIMUM,
+ * not a forced total: the officer may keep all 16 parties with empty slots.
+ * Mirrors the server's _emperium_min_parties().
+ */
+export function minPartyCount(absentCount: number): number {
+  const released = Math.floor(Math.max(0, absentCount) / SLOTS_PER_PARTY)
+  return Math.max(MIN_RAIDS, TOTAL_PARTIES - released)
+}
+
 export const BATTLEFIELD_IDS: readonly BattlefieldId[] = ['vigrid_field', 'ruinscape']
 
 /** Titles are the owner's words (CONTEXT D-03/D-05). `fileSlug` names the JPG. */
@@ -96,30 +106,82 @@ export function totalPartyCount(raids: readonly { parties: readonly LineupParty[
 
 /**
  * Deterministic default distribution used when the officer changes the raid
- * count. Mirrors the server's _default_emperium_party_counts():
- * 3 raids -> 6/6/4 (the current guild layout), 2 -> 8/8, otherwise balanced.
+ * count. Mirrors the server's _default_emperium_party_counts(raids, total):
+ * 16 parties / 3 raids -> 6/6/4; 16 / 2 -> 8/8; otherwise balanced.
  */
-export function defaultEmperiumPartyCounts(raidCount: number): number[] {
-  if (raidCount === 2) return [8, 8]
-  if (raidCount === 3) return [6, 6, 4]
-  const base = Math.floor(TOTAL_PARTIES / raidCount)
-  const remainder = TOTAL_PARTIES % raidCount
+export function defaultEmperiumPartyCounts(
+  raidCount: number,
+  total: number = TOTAL_PARTIES,
+): number[] {
+  if (total === TOTAL_PARTIES && raidCount === 2) return [8, 8]
+  if (total === TOTAL_PARTIES && raidCount === 3) return [6, 6, 4]
+  const base = Math.floor(total / raidCount)
+  const remainder = total % raidCount
   return Array.from({ length: raidCount }, (_, index) => base + (index < remainder ? 1 : 0))
 }
 
-/** True when a distribution respects the Emperium invariant. */
-export function isValidPartyCounts(counts: readonly number[]): boolean {
+/**
+ * True when a distribution is valid: 2..8 raids, 1..8 parties each, and a total
+ * between the absence-adjusted minimum and 16 (the officer may keep all 16
+ * parties and simply have some parties with fewer players).
+ */
+export function isValidPartyCounts(
+  counts: readonly number[],
+  minTotal: number = TOTAL_PARTIES,
+  maxTotal: number = TOTAL_PARTIES,
+): boolean {
+  const total = counts.reduce((sum, count) => sum + count, 0)
   return (
     counts.length >= MIN_RAIDS &&
     counts.length <= MAX_RAIDS &&
+    total >= minTotal &&
+    total <= maxTotal &&
     counts.every(
       (count) =>
         Number.isInteger(count) &&
         count >= MIN_PARTIES_PER_RAID &&
         count <= MAX_PARTIES_PER_RAID,
-    ) &&
-    counts.reduce((sum, count) => sum + count, 0) === TOTAL_PARTIES
+    )
   )
+}
+
+/**
+ * Seated players inside the trailing parties that would be dropped when the
+ * total goes from the current count down to `newTotal`. A reduction is only
+ * allowed when this is zero (the officer left those parties empty).
+ */
+export function filledInDroppedParties(
+  raids: readonly { parties: readonly LineupParty[] }[],
+  newTotal: number,
+): number {
+  const flat = raids.flatMap((raid) => raid.parties)
+  return flat.slice(newTotal).reduce((sum, party) => sum + partyFilledCount(party), 0)
+}
+
+/**
+ * The available side panel: active roster members with no slot in the current
+ * mode and no absence row.
+ */
+export function availableRoster(
+  roster: readonly LineupRosterMember[],
+  assignments: ReadonlyMap<string, LineupAssignment>,
+  absentIds: ReadonlySet<string>,
+): LineupRosterMember[] {
+  return roster
+    .filter((member) => !assignments.has(member.member_id) && !absentIds.has(member.member_id))
+    .slice()
+    .sort((a, b) => a.display_name.localeCompare(b.display_name, 'pt-BR'))
+}
+
+/** The absences side panel: active roster members marked absent. */
+export function absentRoster(
+  roster: readonly LineupRosterMember[],
+  absentIds: ReadonlySet<string>,
+): LineupRosterMember[] {
+  return roster
+    .filter((member) => absentIds.has(member.member_id))
+    .slice()
+    .sort((a, b) => a.display_name.localeCompare(b.display_name, 'pt-BR'))
 }
 
 /** Role-label presets offered to officers (CONTEXT D-03). */
@@ -284,6 +346,9 @@ export function lineupErrorCopy(err: unknown, mode: 'read' | 'write' = 'write'):
       ? 'Você não tem permissão para ver a escalação.'
       : 'Você não tem permissão para alterar a escalação.'
   }
+  if (message.includes('member_absent')) {
+    return 'Este jogador está marcado como ausente. Torne-o disponível antes de escalá-lo.'
+  }
   if (message.includes('invalid_lineup_member')) {
     return 'Este jogador não pode ser escalado (inativo ou fora da lista).'
   }
@@ -298,6 +363,9 @@ export function lineupErrorCopy(err: unknown, mode: 'read' | 'write' = 'write'):
     message.includes('invalid_lineup_party_count')
   ) {
     return `A distribuição deve somar ${TOTAL_PARTIES} parties, com ${MIN_PARTIES_PER_RAID} a ${MAX_PARTIES_PER_RAID} por raid.`
+  }
+  if (message.includes('lineup_party_not_empty')) {
+    return 'Esvazie as últimas parties antes de reduzir o total.'
   }
   if (message.includes('lineup_raid_not_empty')) {
     return 'Esvazie a raid antes de removê-la.'

@@ -62,6 +62,7 @@ const payload: LineupsPayload = {
     { member_id: 'm2', display_name: 'Tifa', char_class: 'Gypsy', char_function: 'dps' },
     { member_id: 'm3', display_name: 'Kiom', char_class: null, char_function: 'dps' },
   ],
+  absences: [],
 }
 
 const emperiumPayload: LineupsPayload = {
@@ -84,11 +85,14 @@ function grid(session: NeoFootSession, warMode: WarMode = 'vigrid') {
     <BattlefieldGrid
       raid={raid}
       warMode={warMode}
-      payload={data}
       memberId={session.member_id}
       isStaff={session.member_role !== 'member'}
       saving={false}
-      onAssign={noop}
+      selectedMemberId={null}
+      onSlotClick={noop}
+      onSlotDrop={noop}
+      onSlotDragStart={noop}
+      onSlotDragEnd={noop}
       onLabel={noop}
     />,
   )
@@ -174,8 +178,10 @@ describe('lineupErrorCopy', () => {
     expect(lineupErrorCopy(new ApiError(401, 'unauthorized', 'device_mismatch'))).toContain('sessão expirou')
     expect(lineupErrorCopy(new Error('HTTP 500: forbidden'))).toContain('permissão')
     expect(lineupErrorCopy(new Error('HTTP 500: invalid_lineup_member'))).toContain('não pode ser escalado')
+    expect(lineupErrorCopy(new Error('HTTP 500: member_absent'))).toContain('marcado como ausente')
     expect(lineupErrorCopy(new Error('HTTP 500: invalid_lineup_raid_count'))).toContain('entre 2 e 8 raids')
     expect(lineupErrorCopy(new Error('HTTP 500: invalid_lineup_party_counts'))).toContain('16 parties')
+    expect(lineupErrorCopy(new Error('HTTP 500: lineup_party_not_empty'))).toContain('últimas parties')
     expect(lineupErrorCopy(new Error('HTTP 500: lineup_raid_not_empty'))).toContain('Esvazie a raid')
     expect(lineupErrorCopy(new ApiError(0, 'network', 'offline'))).toContain('conectar')
     expect(lineupErrorCopy(new Error('boom'))).toContain('Tente novamente')

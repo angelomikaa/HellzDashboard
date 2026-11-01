@@ -18,11 +18,15 @@
  *   C. member writes denied: slot/label/raid-count -> forbidden; direct table
  *      PATCH denied; direct table SELECT allowed.
  *   D. officer writes (Vigrid): smoke member rejected (invalid_lineup_member);
- *      swap two slots; clear a slot (N/5 -> 4/5); cross-raid move; label edit +
+ *      moving into an occupied slot displaces the target occupant to available
+ *      (no swap); clear a slot (N/5 -> 4/5); cross-raid move; label edit +
  *      clear; over-long label rejected (invalid_lineup_label). Emperium: grow to
  *      4 raids (4/4/4/4), set a custom 5/5/3/3, seat a member, shrink to 3
  *      (6/6/4) while preserving the seat, refuse invalid distributions and
- *      below the two-raid minimum.
+ *      below the two-raid minimum; mark five members absent (still 16 parties
+ *      by default), refuse seating an absent member, refuse dropping a
+ *      non-empty trailing party, drop an empty one to 15, unmark one absence
+ *      (back to 16, 6/6/4) and seat them again.
  *   E. restore: live lineup identical to the pre-run snapshot (zero residue).
  *
  * Credentials come from smoke-config.mjs (env or .env). Never prints token,
@@ -125,7 +129,10 @@ async function snapshot() {
       `from lineup_parties order by war_mode, battlefield, party_index;`,
   )
   const config = await mgmt(`select war_mode, raid_count from lineup_war_config order by war_mode;`)
-  return { slots, parties, config }
+  const absences = await mgmt(
+    `select war_mode, member_id from lineup_absences order by war_mode, member_id;`,
+  )
+  return { slots, parties, config, absences }
 }
 
 function slotMember(snap, bf, party, slot, warMode = 'vigrid') {
@@ -141,33 +148,36 @@ function slotMember(snap, bf, party, slot, warMode = 'vigrid') {
 }
 
 async function restore(snap) {
-  const stmts = ['update lineup_slots set member_id = null where true;']
-  const emperium = snap.config.find((c) => c.war_mode === 'emperium')
-  const maxRaid = emperium?.raid_count ?? 3
-  stmts.push(`delete from lineup_parties where war_mode='emperium' and raid_index > ${maxRaid};`)
+  // Full rebuild from the snapshot: absences can change the party total, so
+  // deleting/reinserting every party (slots cascade) is the only exact restore.
+  const stmts = [
+    'delete from lineup_absences where true;',
+    'delete from lineup_parties where true;',
+  ]
 
   for (const p of snap.parties) {
     const label = p.role_label === null ? 'null' : `'${p.role_label.replace(/'/g, "''")}'`
     stmts.push(
       `insert into lineup_parties (war_mode, battlefield, raid_index, party_index, role_label) ` +
-        `values ('${p.war_mode}', '${p.battlefield}', ${p.raid_index}, ${p.party_index}, ${label}) ` +
-        `on conflict (war_mode, battlefield, party_index) do update ` +
-        `set raid_index = excluded.raid_index, role_label = excluded.role_label;`,
+        `values ('${p.war_mode}', '${p.battlefield}', ${p.raid_index}, ${p.party_index}, ${label});`,
     )
   }
   for (const s of snap.slots) {
     const member = s.member_id ? `'${s.member_id}'` : 'null'
     stmts.push(
       `insert into lineup_slots (war_mode, battlefield, raid_index, party_index, slot_index, member_id) ` +
-        `values ('${s.war_mode}', '${s.battlefield}', ${s.raid_index}, ${s.party_index}, ${s.slot_index}, ${member}) ` +
-        `on conflict (war_mode, battlefield, party_index, slot_index) do update ` +
-        `set raid_index = excluded.raid_index, member_id = excluded.member_id;`,
+        `values ('${s.war_mode}', '${s.battlefield}', ${s.raid_index}, ${s.party_index}, ${s.slot_index}, ${member});`,
     )
   }
   for (const c of snap.config) {
     stmts.push(
       `insert into lineup_war_config (war_mode, raid_count) values ('${c.war_mode}', ${c.raid_count}) ` +
         `on conflict (war_mode) do update set raid_count = excluded.raid_count;`,
+    )
+  }
+  for (const a of snap.absences) {
+    stmts.push(
+      `insert into lineup_absences (war_mode, member_id) values ('${a.war_mode}', '${a.member_id}');`,
     )
   }
   await mgmt(stmts.join('\n'))
@@ -275,7 +285,15 @@ async function main() {
     const p = read.json || {}
     check(
       'B2 top-level fields closed to the mode payload + roster',
-      fieldsExact(p, ['war_mode', 'raid_count', 'min_raids', 'max_raids', 'battlefields', 'roster']),
+      fieldsExact(p, [
+        'war_mode',
+        'raid_count',
+        'min_raids',
+        'max_raids',
+        'battlefields',
+        'roster',
+        'absences',
+      ]),
       `keys=${Object.keys(p).join(',')}`,
     )
     const bfs = p.battlefields || []
@@ -369,16 +387,24 @@ async function main() {
 
     const txxx = slotMember(snap0, 'vigrid_field', 1, 2)
     const lanaya = slotMember(snap0, 'vigrid_field', 1, 3)
-    const swap = await rest('/rpc/set_lineup_slot', {
+    const move = await rest('/rpc/set_lineup_slot', {
       method: 'POST', session: officer, body: { p_battlefield: 'vigrid_field', p_party: 1, p_slot: 2, p_member: lanaya },
     })
-    const afterSwap = await mgmt(
+    const afterMove = await mgmt(
       `select party_index, slot_index, member_id from lineup_slots where battlefield='vigrid_field' and party_index=1 and slot_index in (2,3) order by slot_index;`,
     )
+    const displacedStillSeated = (
+      await mgmt(
+        `select count(*)::int as n from lineup_slots where war_mode='vigrid' and member_id='${txxx}';`,
+      )
+    )[0].n
     check(
-      'D2 officer swap moves both members (atomic)',
-      swap.status === 200 && afterSwap[0].member_id === lanaya && afterSwap[1].member_id === txxx,
-      `status=${swap.status}`,
+      'D2 officer move displaces the target occupant to available (no swap)',
+      move.status === 200 &&
+        afterMove[0].member_id === lanaya &&
+        afterMove[1].member_id === null &&
+        displacedStillSeated === 0,
+      `status=${move.status} source=${afterMove[1]?.member_id === null ? 'vago' : 'ocupado'} displaced=${displacedStillSeated}`,
     )
 
     const clear = await rest('/rpc/set_lineup_slot', {
@@ -502,6 +528,130 @@ async function main() {
       'D13 below the two-raid minimum is refused (invalid_lineup_raid_count)',
       !tooFew.ok && tooFew.text.includes('invalid_lineup_raid_count'),
       `status=${tooFew.status}`,
+    )
+
+    // ---- Absences: reduction is optional and requires an empty party (0059) -
+    await mgmt(`update lineup_slots set member_id = null where war_mode = 'emperium';`)
+    const absentees = (p.roster || []).slice(0, 5).map((member) => member.member_id)
+    const availableMember = (p.roster || []).find(
+      (member) => !absentees.includes(member.member_id),
+    )?.member_id
+    let absencePayload = null
+    for (const member of absentees) {
+      const res = await rest('/rpc/set_lineup_absence', {
+        method: 'POST', session: officer,
+        body: { p_war_mode: 'emperium', p_member: member, p_absent: true },
+      })
+      if (!res.ok) throw new Error(`mark absent failed: ${res.status} ${res.text.slice(0, 120)}`)
+      absencePayload = res.json
+    }
+    check(
+      'D14 five absences keep 16 parties by default (reduction is optional)',
+      absencePayload?.absences?.length === 5 &&
+        totalParties(absencePayload) === 16 &&
+        JSON.stringify(partyCounts(absencePayload)) === JSON.stringify([6, 6, 4]),
+      `absences=${absencePayload?.absences?.length} total=${totalParties(absencePayload)} counts=${partyCounts(absencePayload).join('/')}`,
+    )
+
+    const absentSeat = await rest('/rpc/set_lineup_slot_mode', {
+      method: 'POST', session: officer,
+      body: {
+        p_war_mode: 'emperium',
+        p_battlefield: 'emperium_raid_1',
+        p_party: 1,
+        p_slot: 1,
+        p_member: absentees[0],
+      },
+    })
+    check(
+      'D15 an absent member cannot be seated (member_absent)',
+      !absentSeat.ok && absentSeat.text.includes('member_absent'),
+      `status=${absentSeat.status}`,
+    )
+
+    // Fill the trailing party (Raid 3 G4) and try to drop it.
+    const tailSeat = await rest('/rpc/set_lineup_slot_mode', {
+      method: 'POST', session: officer,
+      body: {
+        p_war_mode: 'emperium',
+        p_battlefield: 'emperium_raid_3',
+        p_party: 4,
+        p_slot: 1,
+        p_member: availableMember,
+      },
+    })
+    const blockedDrop = await rest('/rpc/set_lineup_party_counts', {
+      method: 'POST', session: officer,
+      body: { p_war_mode: 'emperium', p_counts: [6, 6, 3] },
+    })
+    const tailClear = await rest('/rpc/set_lineup_slot_mode', {
+      method: 'POST', session: officer,
+      body: {
+        p_war_mode: 'emperium',
+        p_battlefield: 'emperium_raid_3',
+        p_party: 4,
+        p_slot: 1,
+        p_member: null,
+      },
+    })
+    check(
+      'D16 a non-empty trailing party cannot be dropped (lineup_party_not_empty)',
+      tailSeat.status === 200 &&
+        !blockedDrop.ok &&
+        blockedDrop.text.includes('lineup_party_not_empty') &&
+        tailClear.status === 200,
+      `seat=${tailSeat.status} drop=${blockedDrop.status} clear=${tailClear.status}`,
+    )
+
+    const drop = await rest('/rpc/set_lineup_party_counts', {
+      method: 'POST', session: officer,
+      body: { p_war_mode: 'emperium', p_counts: [6, 6, 3] },
+    })
+    check(
+      'D17 dropping an empty trailing party to 15 is allowed',
+      drop.status === 200 &&
+        totalParties(drop.json) === 15 &&
+        JSON.stringify(partyCounts(drop.json)) === JSON.stringify([6, 6, 3]),
+      `status=${drop.status} total=${totalParties(drop.json)} counts=${partyCounts(drop.json).join('/')}`,
+    )
+
+    const restoredAbsence = await rest('/rpc/set_lineup_absence', {
+      method: 'POST', session: officer,
+      body: { p_war_mode: 'emperium', p_member: absentees[0], p_absent: false },
+    })
+    check(
+      'D18 unmarking one absence raises the total back to 16 (6/6/4)',
+      restoredAbsence.status === 200 &&
+        restoredAbsence.json?.absences?.length === 4 &&
+        totalParties(restoredAbsence.json) === 16 &&
+        JSON.stringify(partyCounts(restoredAbsence.json)) === JSON.stringify([6, 6, 4]),
+      `status=${restoredAbsence.status} absences=${restoredAbsence.json?.absences?.length} total=${totalParties(restoredAbsence.json)}`,
+    )
+
+    const availableSeat = await rest('/rpc/set_lineup_slot_mode', {
+      method: 'POST', session: officer,
+      body: {
+        p_war_mode: 'emperium',
+        p_battlefield: 'emperium_raid_1',
+        p_party: 1,
+        p_slot: 1,
+        p_member: absentees[0],
+      },
+    })
+    const availableClear = await rest('/rpc/set_lineup_slot_mode', {
+      method: 'POST', session: officer,
+      body: {
+        p_war_mode: 'emperium',
+        p_battlefield: 'emperium_raid_1',
+        p_party: 1,
+        p_slot: 1,
+        p_member: null,
+      },
+    })
+    check(
+      'D19 the unmarked member can be seated again',
+      availableSeat.status === 200 && availableClear.status === 200,
+      `seat=${availableSeat.status} clear=${availableClear.status}`,
     )
   } catch (err) {
     check('unexpected error during probes', false, err.message)

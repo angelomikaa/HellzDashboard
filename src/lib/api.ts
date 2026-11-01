@@ -1866,6 +1866,8 @@ export interface LineupsPayload {
   max_raids: number
   battlefields: BattlefieldLineup[]
   roster: LineupRosterMember[]
+  /** Active members marked absent in this war mode (already unseated). */
+  absences: string[]
 }
 
 const EMPERIUM_BATTLEFIELD_RE = /^emperium_raid_([1-8])$/
@@ -1971,6 +1973,15 @@ export function asLineupsPayload(value: unknown): LineupsPayload {
   })
   const raid_count =
     typeof value.raid_count === 'number' ? value.raid_count : Math.max(2, battlefields.length)
+  if (value.absences !== undefined && !Array.isArray(value.absences)) {
+    throw new ApiError(0, 'server', 'malformed get_lineups absences')
+  }
+  const absences = (value.absences ?? []).filter(
+    (memberId): memberId is string => typeof memberId === 'string',
+  )
+  if (Array.isArray(value.absences) && absences.length !== value.absences.length) {
+    throw new ApiError(0, 'server', 'malformed get_lineups absences')
+  }
   return {
     war_mode,
     raid_count,
@@ -1978,6 +1989,7 @@ export function asLineupsPayload(value: unknown): LineupsPayload {
     max_raids: typeof value.max_raids === 'number' ? value.max_raids : 8,
     battlefields,
     roster,
+    absences,
   }
 }
 
@@ -2053,9 +2065,28 @@ export async function setLineupRaidCount(
   return asLineupsPayload(await parseBody<unknown>(res))
 }
 
+/** Mark or unmark a member absent in one war mode (officer/owner). */
+export async function setLineupAbsence(
+  session: NeoFootSession,
+  warMode: WarMode,
+  memberId: string,
+  absent: boolean,
+): Promise<LineupsPayload> {
+  const res = await restFetch(session, '/rpc/set_lineup_absence', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_war_mode: warMode,
+      p_member: memberId,
+      p_absent: absent,
+    }),
+  })
+  return asLineupsPayload(await parseBody<unknown>(res))
+}
+
 /**
  * Set the Emperium party distribution (officer/owner). The server requires
- * 2..8 raids, 1..8 parties per raid and exactly 16 parties total.
+ * 2..8 raids, 1..8 parties per raid and a sum equal to the current required
+ * total (16 minus one party per five active absences, minimum 2).
  */
 export async function setLineupPartyCounts(
   session: NeoFootSession,

@@ -1,17 +1,20 @@
-// Escalação — war modes (phase 10.4 / 0056, LNUP-01..03).
+// Escalação — war modes + drag-and-drop roster (phase 10.4 / 0056 / 0058).
 //
-// Vingança de Vigrid keeps the two fixed battlefields (Vigrid Field = Raid 1,
-// Ruinscape = Raid 2), 8 parties x 5 slots each. Guerra do Emperium uses 2..8
-// raids with the same 8x5 structure; officers can add/remove raids (empty ones
-// only). Members see a read-only grid with their own party/slot highlighted
-// ("Sua PT") and their current raid in the callout. Officers and the owner
-// additionally edit any slot (searchable picker, cross-party move/swap
-// indicator, "Limpar slot") and any party role label. Every write goes through
-// a device-bound SECURITY DEFINER RPC (migrations 0040/0044/0056); isStaff only
-// decides which controls render. It is UX-only, never the security boundary.
+// Vingança de Vigrid keeps the two fixed battlefields (8 parties x 5 slots
+// each). Guerra do Emperium uses 2..8 raids and always exactly 16 parties,
+// except that every 5 active absences frees one full party (16 -> 15 -> ...,
+// minimum 2). Officers drag players between the "Disponíveis" list, the
+// "Ausências" list and the party slots; assigning to an occupied slot moves
+// the previous occupant to "Disponíveis" (no swaps). Members see the same
+// read-only grid with their own party/slot/raid highlighted.
+//
+// Every write goes through a device-bound SECURITY DEFINER RPC (migrations
+// 0040/0044/0056/0057/0058); isStaff only decides which controls render. It is
+// UX-only, never the security boundary.
 import { useEffect, useRef, useState } from 'react'
 import {
   fetchLineups,
+  setLineupAbsence,
   setLineupPartyCounts,
   setLineupPartyLabel,
   setLineupRaidCount,
@@ -28,19 +31,21 @@ import { ClassCrest } from '../assets/ClassCrest'
 import { downloadLineupJpg } from './lineupExport'
 import { classLabel } from '../../lib/classLabels'
 import {
+  absentRoster,
   assignmentCallout,
-  assignmentBadge,
+  availableRoster,
   battlefieldFilledCount,
   buildAssignmentMap,
   classAccentHex,
   defaultEmperiumPartyCounts,
-  filterAssignableRoster,
+  filledInDroppedParties,
   findMemberAssignment,
   isPartyFull,
   isValidPartyCounts,
   lineupErrorCopy,
   MAX_PARTIES_PER_RAID,
   MIN_PARTIES_PER_RAID,
+  minPartyCount,
   normalizeRoleLabel,
   partyFilledCount,
   raidCapacity,
@@ -52,13 +57,19 @@ import {
   totalPartyCount,
   WAR_MODES,
   WAR_MODE_META,
-  type LineupAssignment,
 } from './lineupModel'
 
 type Mutation = (session: NeoFootSession) => Promise<LineupsPayload>
 
 /** Which JPG button is busy: one raid id, or all raids ("todas"). */
 type ExportScope = string
+
+type PlayerSource = 'available' | 'slot' | 'absent'
+
+interface PlayerSelection {
+  memberId: string
+  source: PlayerSource
+}
 
 /** Enumeration-safe copy for a failed JPG render/download (no internals). */
 const EXPORT_ERROR_COPY = 'Não foi possível gerar o JPG. Tente novamente.'
@@ -75,6 +86,9 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
   const [saving, setSaving] = useState(false)
   const [selectedRaid, setSelectedRaid] = useState(1)
   const [stacked, setStacked] = useState(false)
+  const [selected, setSelected] = useState<PlayerSelection | null>(null)
+  const [drag, setDrag] = useState<PlayerSelection | null>(null)
+  const [availableQuery, setAvailableQuery] = useState('')
   const [distOpen, setDistOpen] = useState(false)
   const [distCounts, setDistCounts] = useState<number[]>([])
   const [exporting, setExporting] = useState<ExportScope | null>(null)
@@ -158,16 +172,151 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
     return <p className="text-base text-muted">Carregando…</p>
   }
 
+  const currentMode = payload.war_mode
   const own = findMemberAssignment(payload, session.member_id)
+  const ownAbsent = payload.absences.includes(session.member_id)
   const raids = payload.battlefields
+  const assignments = buildAssignmentMap(payload)
+  const absentIds = new Set(payload.absences)
+  const absentMembers = absentRoster(payload.roster, absentIds)
+  const availableMembers = availableRoster(payload.roster, assignments, absentIds)
+  const absentCount = absentMembers.length
+  const minParties =
+    payload.war_mode === 'emperium' ? minPartyCount(absentCount) : TOTAL_PARTIES
+  const releasedParties = TOTAL_PARTIES - minParties
+  const partiesTotal = totalPartyCount(raids)
   const activeRaid = raids.find((raid) => raid.raid_index === selectedRaid) ?? raids[0] ?? null
   const visible: BattlefieldLineup[] = stacked ? raids : activeRaid === null ? [] : [activeRaid]
   const modeMeta = WAR_MODE_META[payload.war_mode]
-  const partiesTotal = totalPartyCount(raids)
   const canRemoveRaid = payload.war_mode === 'emperium' && payload.raid_count > payload.min_raids
-  const canAddRaid = payload.war_mode === 'emperium' && payload.raid_count < payload.max_raids
+  const maxRaidCount = Math.min(payload.max_raids, partiesTotal)
+  const canAddRaid = payload.war_mode === 'emperium' && payload.raid_count < maxRaidCount
   const distTotal = distCounts.reduce((sum, count) => sum + count, 0)
-  const distValid = isValidPartyCounts(distCounts)
+  const distTotalValid = distTotal >= minParties && distTotal <= TOTAL_PARTIES
+  const canDropParties = distTotal >= partiesTotal || filledInDroppedParties(raids, distTotal) === 0
+  const distValid =
+    isValidPartyCounts(distCounts, minParties, TOTAL_PARTIES) && canDropParties
+  const query = availableQuery.trim().toLocaleLowerCase('pt-BR')
+  const filteredAvailable =
+    query === ''
+      ? availableMembers
+      : availableMembers.filter((member) =>
+          member.display_name.toLocaleLowerCase('pt-BR').includes(query),
+        )
+
+  function resetSelection() {
+    setSelected(null)
+    setDrag(null)
+  }
+
+  function assignMember(
+    memberId: string,
+    battlefield: BattlefieldLineup['battlefield'],
+    party: number,
+    slot: number,
+  ) {
+    if (saving) return
+    if (absentIds.has(memberId)) {
+      setActionError('Este jogador está marcado como ausente. Torne-o disponível antes de escalá-lo.')
+      return
+    }
+    resetSelection()
+    void runMutation((s) =>
+      setLineupSlot(s, currentMode, battlefield, party, slot, memberId),
+    )
+  }
+
+  function moveToAvailable(selection: PlayerSelection) {
+    if (saving) return
+    const assignment = assignments.get(selection.memberId)
+    resetSelection()
+    if (assignment) {
+      void runMutation((s) =>
+        setLineupSlot(
+          s,
+          currentMode,
+          assignment.battlefield,
+          assignment.party_index,
+          assignment.slot_index,
+          null,
+        ),
+      )
+    } else if (absentIds.has(selection.memberId)) {
+      setDistOpen(false)
+      void runMutation((s) =>
+        setLineupAbsence(s, currentMode, selection.memberId, false),
+      )
+    }
+  }
+
+  function markAbsent(memberId: string) {
+    if (saving || absentIds.has(memberId)) return
+    resetSelection()
+    setDistOpen(false)
+    void runMutation((s) => setLineupAbsence(s, currentMode, memberId, true))
+  }
+
+  function selectPlayer(memberId: string, source: PlayerSource) {
+    setSelected((current) =>
+      current !== null && current.memberId === memberId && current.source === source
+        ? null
+        : { memberId, source },
+    )
+  }
+
+  function startDrag(memberId: string, source: PlayerSource) {
+    setDrag({ memberId, source })
+  }
+
+  function handleSlotClick(
+    battlefield: BattlefieldLineup['battlefield'],
+    partyIndex: number,
+    slotIndex: number,
+    seatedMemberId: string | null,
+  ) {
+    if (!isStaff) return
+    if (selected !== null) {
+      if (selected.source === 'absent') {
+        setActionError(
+          'Este jogador está marcado como ausente. Torne-o disponível antes de escalá-lo.',
+        )
+        return
+      }
+      assignMember(selected.memberId, battlefield, partyIndex, slotIndex)
+      return
+    }
+    if (seatedMemberId !== null) {
+      setSelected({ memberId: seatedMemberId, source: 'slot' })
+    }
+  }
+
+  function handleSlotDrop(
+    battlefield: BattlefieldLineup['battlefield'],
+    partyIndex: number,
+    slotIndex: number,
+  ) {
+    const current = drag ?? selected
+    if (current === null) return
+    if (current.source === 'absent') {
+      setActionError(
+        'Este jogador está marcado como ausente. Torne-o disponível antes de escalá-lo.',
+      )
+      return
+    }
+    assignMember(current.memberId, battlefield, partyIndex, slotIndex)
+  }
+
+  function handleAvailableDrop() {
+    const current = drag ?? selected
+    if (current === null || current.source === 'available') return
+    moveToAvailable(current)
+  }
+
+  function handleAbsencesDrop() {
+    const current = drag ?? selected
+    if (current === null || current.source === 'absent') return
+    markAbsent(current.memberId)
+  }
 
   function openDistribution() {
     setDistCounts(raids.map((raid) => raid.parties.length))
@@ -207,6 +356,8 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
                 aria-selected={active}
                 onClick={() => {
                   setStacked(false)
+                  setDistOpen(false)
+                  resetSelection()
                   setMode(warMode)
                 }}
                 className={`h-11 rounded-md border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
@@ -226,6 +377,11 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
             <span className="font-semibold">Você está em:</span> {assignmentCallout(own)}
           </p>
         )}
+        {own === null && ownAbsent && (
+          <p className="rounded-md border border-amber-400 bg-surface px-3 py-2 text-sm text-amber-400">
+            <span className="font-semibold">Você está marcado como ausente nesta guerra.</span>
+          </p>
+        )}
 
         {payload.war_mode === 'emperium' && (
           <div className="flex flex-col gap-2 rounded-md border border-line bg-surface px-3 py-2">
@@ -234,10 +390,20 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
                 Raids: {payload.raid_count} / {payload.max_raids}
               </span>
               <span
-                className={`text-sm font-semibold ${partiesTotal === TOTAL_PARTIES ? 'text-success' : 'text-error'}`}
+                className={`text-sm font-semibold ${partiesTotal >= minParties && partiesTotal <= TOTAL_PARTIES ? 'text-success' : 'text-error'}`}
               >
                 Parties: {partiesTotal} / {TOTAL_PARTIES}
               </span>
+              {minParties < TOTAL_PARTIES && (
+                <span className="rounded-full border border-line px-2 py-0.5 text-xs font-semibold text-muted">
+                  mín. {minParties}
+                </span>
+              )}
+              {releasedParties > 0 && (
+                <span className="rounded-full border border-amber-400 px-2 py-0.5 text-xs font-semibold text-amber-400">
+                  {absentCount} ausência(s) • {releasedParties} party(s) podem ser liberadas
+                </span>
+              )}
               {isStaff && (
                 <>
                   <button
@@ -280,8 +446,8 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
               )}
               {!isStaff && (
                 <span className="text-sm text-muted">
-                  {payload.min_raids} a {payload.max_raids} raids, até{' '}
-                  {MAX_PARTIES_PER_RAID} parties por raid.
+                  {payload.min_raids} a {maxRaidCount} raids, até {MAX_PARTIES_PER_RAID} parties
+                  por raid.
                 </span>
               )}
             </div>
@@ -290,7 +456,8 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
               <div className="flex flex-col gap-2 rounded-md border border-line bg-dominant p-2">
                 <p className="text-xs text-muted">
                   Cada raid aceita de {MIN_PARTIES_PER_RAID} a {MAX_PARTIES_PER_RAID} parties. O
-                  total precisa ser {TOTAL_PARTIES}.
+                  total pode ficar entre {minParties} e {TOTAL_PARTIES}. Para reduzir, esvazie as
+                  últimas parties.
                 </p>
                 <div className="flex flex-wrap gap-3">
                   {raids.map((raid, index) => (
@@ -313,10 +480,15 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span
-                    className={`text-sm font-semibold ${distTotal === TOTAL_PARTIES ? 'text-success' : 'text-error'}`}
+                    className={`text-sm font-semibold ${distTotalValid ? 'text-success' : 'text-error'}`}
                   >
                     Total: {distTotal} / {TOTAL_PARTIES}
                   </span>
+                  {!canDropParties && (
+                    <span className="text-xs text-error">
+                      Esvazie as últimas parties para reduzir o total.
+                    </span>
+                  )}
                   <button
                     type="button"
                     disabled={saving || !distValid}
@@ -329,7 +501,12 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
                     type="button"
                     disabled={saving}
                     onClick={() =>
-                      setDistCounts(defaultEmperiumPartyCounts(payload.raid_count))
+                      setDistCounts(
+                        defaultEmperiumPartyCounts(
+                          payload.raid_count,
+                          Math.max(minParties, Math.min(TOTAL_PARTIES, partiesTotal)),
+                        ),
+                      )
                     }
                     className="h-11 rounded-md border border-line px-3 text-sm text-content hover-control disabled:opacity-50"
                   >
@@ -386,101 +563,348 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
             {exportError}
           </p>
         )}
+        {actionError !== null && (
+          <p role="alert" className="rounded-md border border-line bg-surface px-3 py-2 text-sm text-content">
+            {actionError}
+          </p>
+        )}
       </header>
 
-      <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Raids">
-        {raids.map((raid) => {
-          const meta = raidMeta(payload.war_mode, raid.raid_index)
-          const filled = battlefieldFilledCount(raid)
-          const capacity = raidCapacity(raid)
-          const active = !stacked && activeRaid?.raid_index === raid.raid_index
-          return (
-            <button
-              key={raid.battlefield}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => {
-                setStacked(false)
-                setSelectedRaid(raid.raid_index)
+      {isStaff ? (
+        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="flex flex-col gap-3 lg:sticky lg:top-4 lg:self-start">
+            <RosterPanel
+              title="Disponíveis"
+              count={availableMembers.length}
+              members={filteredAvailable}
+              source="available"
+              selected={selected}
+              disabled={saving}
+              search={availableQuery}
+              onSearch={setAvailableQuery}
+              emptyText="Nenhum jogador disponível."
+              actionLabel="Ausente"
+              onAction={markAbsent}
+              onSelect={(memberId) => selectPlayer(memberId, 'available')}
+              onDragStart={(memberId) => startDrag(memberId, 'available')}
+              onDragEnd={() => setDrag(null)}
+              onHeaderClick={() => {
+                if (selected !== null && selected.source !== 'available') {
+                  moveToAvailable(selected)
+                }
               }}
-              className={`h-11 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                active ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
-              }`}
-            >
-              {payload.war_mode === 'emperium' ? meta.subtitle : `${meta.title} (${meta.subtitle})`}{' '}
-              <span className="ml-1 text-muted">{filled}/{capacity}</span>
-            </button>
-          )
-        })}
-        {raids.length > 1 && (
-          <button
-            type="button"
-            onClick={() => setStacked((value) => !value)}
-            aria-pressed={stacked}
-            className="hidden h-11 rounded-md border border-line px-3 text-sm text-content hover-control md:inline-flex md:items-center"
-          >
-            {stacked ? 'Ver uma raid' : 'Ver todas'}
-          </button>
-        )}
-      </div>
+              onDrop={handleAvailableDrop}
+            />
+            <RosterPanel
+              title="Ausências"
+              count={absentMembers.length}
+              members={absentMembers}
+              source="absent"
+              selected={selected}
+              disabled={saving}
+              emptyText="Nenhuma ausência marcada."
+              subtitle={
+                payload.war_mode === 'emperium'
+                  ? `Cada ${SLOTS_PER_PARTY} ausências permite liberar 1 party (opcional).`
+                  : undefined
+              }
+              actionLabel="Disponível"
+              onAction={(memberId) => moveToAvailable({ memberId, source: 'absent' })}
+              onSelect={(memberId) => selectPlayer(memberId, 'absent')}
+              onDragStart={(memberId) => startDrag(memberId, 'absent')}
+              onDragEnd={() => setDrag(null)}
+              onHeaderClick={() => {
+                if (selected !== null && selected.source !== 'absent') {
+                  markAbsent(selected.memberId)
+                }
+              }}
+              onDrop={handleAbsencesDrop}
+            />
+            <p className="text-xs text-muted">
+              Arraste um jogador para uma PT, para “Disponíveis” ou para “Ausências”. Também é
+              possível selecionar um jogador e clicar no destino.
+            </p>
+          </aside>
 
-      {actionError !== null && (
-        <p role="alert" className="rounded-md border border-line bg-surface px-3 py-2 text-sm text-content">
-          {actionError}
-        </p>
+          <div className="flex flex-col gap-4">
+            <RaidTabs
+              raids={raids}
+              warMode={payload.war_mode}
+              stacked={stacked}
+              activeRaid={activeRaid}
+              onSelect={(raidIndex) => {
+                setStacked(false)
+                setSelectedRaid(raidIndex)
+              }}
+              onToggleStacked={() => setStacked((value) => !value)}
+            />
+            {visible.map((raid) => (
+              <BattlefieldGrid
+                key={raid.battlefield}
+                raid={raid}
+                warMode={payload.war_mode}
+                memberId={session.member_id}
+                isStaff={isStaff}
+                saving={saving}
+                selectedMemberId={selected?.memberId ?? null}
+                onSlotClick={handleSlotClick}
+                onSlotDrop={handleSlotDrop}
+                onSlotDragStart={(memberId) => startDrag(memberId, 'slot')}
+                onSlotDragEnd={() => setDrag(null)}
+                onLabel={(party, label) =>
+                  void runMutation((s) =>
+                    setLineupPartyLabel(s, currentMode, raid.battlefield, party, label),
+                  )
+                }
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <RaidTabs
+            raids={raids}
+            warMode={payload.war_mode}
+            stacked={stacked}
+            activeRaid={activeRaid}
+            onSelect={(raidIndex) => {
+              setStacked(false)
+              setSelectedRaid(raidIndex)
+            }}
+            onToggleStacked={() => setStacked((value) => !value)}
+          />
+          {visible.map((raid) => (
+            <BattlefieldGrid
+              key={raid.battlefield}
+              raid={raid}
+              warMode={payload.war_mode}
+              memberId={session.member_id}
+              isStaff={isStaff}
+              saving={saving}
+              selectedMemberId={null}
+              onSlotClick={handleSlotClick}
+              onSlotDrop={handleSlotDrop}
+              onSlotDragStart={() => {}}
+              onSlotDragEnd={() => {}}
+              onLabel={() => {}}
+            />
+          ))}
+        </div>
       )}
-
-      {visible.map((raid) => (
-        <BattlefieldGrid
-          key={raid.battlefield}
-          raid={raid}
-          warMode={payload.war_mode}
-          payload={payload}
-          memberId={session.member_id}
-          isStaff={isStaff}
-          saving={saving}
-          onAssign={(party, slot, memberId) =>
-            void runMutation((s) =>
-              setLineupSlot(s, payload.war_mode, raid.battlefield, party, slot, memberId),
-            )
-          }
-          onLabel={(party, label) =>
-            void runMutation((s) =>
-              setLineupPartyLabel(s, payload.war_mode, raid.battlefield, party, label),
-            )
-          }
-        />
-      ))}
     </section>
   )
 }
 
-/** Pure grid for one raid: 8 party cards, responsive. Exported for tests. */
+/** Raid tab strip shared by staff and member layouts. */
+function RaidTabs({
+  raids,
+  warMode,
+  stacked,
+  activeRaid,
+  onSelect,
+  onToggleStacked,
+}: {
+  raids: BattlefieldLineup[]
+  warMode: WarMode
+  stacked: boolean
+  activeRaid: BattlefieldLineup | null
+  onSelect: (raidIndex: number) => void
+  onToggleStacked: () => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Raids">
+      {raids.map((raid) => {
+        const meta = raidMeta(warMode, raid.raid_index)
+        const filled = battlefieldFilledCount(raid)
+        const capacity = raidCapacity(raid)
+        const active = !stacked && activeRaid?.raid_index === raid.raid_index
+        return (
+          <button
+            key={raid.battlefield}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onSelect(raid.raid_index)}
+            className={`h-11 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+              active
+                ? 'border-accent text-content glow-accent-soft'
+                : 'border-transparent text-muted hover:border-line hover:text-content'
+            }`}
+          >
+            {warMode === 'emperium' ? meta.subtitle : `${meta.title} (${meta.subtitle})`}{' '}
+            <span className="ml-1 text-muted">
+              {filled}/{capacity}
+            </span>
+          </button>
+        )
+      })}
+      {raids.length > 1 && (
+        <button
+          type="button"
+          onClick={onToggleStacked}
+          aria-pressed={stacked}
+          className="hidden h-11 rounded-md border border-line px-3 text-sm text-content hover-control md:inline-flex md:items-center"
+        >
+          {stacked ? 'Ver uma raid' : 'Ver todas'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** The left "Disponíveis" / "Ausências" list. Draggable items + click target. */
+function RosterPanel({
+  title,
+  count,
+  members,
+  source,
+  selected,
+  disabled,
+  search,
+  onSearch,
+  emptyText,
+  subtitle,
+  actionLabel,
+  onAction,
+  onSelect,
+  onDragStart,
+  onDragEnd,
+  onHeaderClick,
+  onDrop,
+}: {
+  title: string
+  count: number
+  members: LineupRosterMember[]
+  source: 'available' | 'absent'
+  selected: PlayerSelection | null
+  disabled: boolean
+  search?: string
+  onSearch?: (value: string) => void
+  emptyText: string
+  subtitle?: string
+  actionLabel: string
+  onAction: (memberId: string) => void
+  onSelect: (memberId: string) => void
+  onDragStart: (memberId: string) => void
+  onDragEnd: () => void
+  onHeaderClick: () => void
+  onDrop: () => void
+}) {
+  return (
+    <section
+      aria-label={title}
+      onDragOver={(event) => {
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+      }}
+      onDrop={(event) => {
+        event.preventDefault()
+        onDrop()
+      }}
+      className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3"
+    >
+      <button
+        type="button"
+        onClick={onHeaderClick}
+        title="Clique para mover o jogador selecionado para cá"
+        className="text-left font-display text-lg font-bold text-content hover:text-accent"
+      >
+        {title} ({count})
+      </button>
+      {subtitle !== undefined && <p className="text-xs text-muted">{subtitle}</p>}
+      {onSearch !== undefined && (
+        <input
+          type="search"
+          aria-label={`Buscar em ${title}`}
+          placeholder="Buscar jogador…"
+          value={search ?? ''}
+          onChange={(event) => onSearch(event.target.value)}
+          className="h-11 rounded-md border border-line bg-dominant px-3 text-sm text-content"
+        />
+      )}
+      <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+        {members.map((member) => {
+          const active = selected?.memberId === member.member_id && selected.source === source
+          return (
+            <li key={member.member_id} className="flex items-center gap-1">
+              <button
+                type="button"
+                draggable={!disabled}
+                disabled={disabled}
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = 'move'
+                  event.dataTransfer.setData('text/plain', member.member_id)
+                  onDragStart(member.member_id)
+                }}
+                onDragEnd={onDragEnd}
+                onClick={() => onSelect(member.member_id)}
+                aria-pressed={active}
+                className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md border px-2 py-1 text-left text-content hover-control disabled:opacity-60 ${
+                  active ? 'border-accent glow-accent-soft' : 'border-line'
+                }`}
+              >
+                <ClassCrest charClass={member.char_class} size="sm" />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-semibold">{member.display_name}</span>
+                  <span className="truncate text-xs text-muted">{classLabel(member.char_class)}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onAction(member.member_id)}
+                className="h-11 shrink-0 rounded-md border border-line px-2 text-xs text-content hover-control disabled:opacity-50"
+              >
+                {actionLabel}
+              </button>
+            </li>
+          )
+        })}
+        {members.length === 0 && <li className="px-2 py-2 text-sm text-muted">{emptyText}</li>}
+      </ul>
+    </section>
+  )
+}
+
+/** Pure grid for one raid: party cards, responsive. Exported for tests. */
 export function BattlefieldGrid({
   raid,
   warMode,
-  payload,
   memberId,
   isStaff,
   saving,
-  onAssign,
+  selectedMemberId,
+  onSlotClick,
+  onSlotDrop,
+  onSlotDragStart,
+  onSlotDragEnd,
   onLabel,
 }: {
   raid: BattlefieldLineup
   warMode: WarMode
-  payload: LineupsPayload
   memberId: string
   isStaff: boolean
   saving: boolean
-  onAssign: (partyIndex: number, slotIndex: number, memberId: string | null) => void
+  selectedMemberId: string | null
+  onSlotClick: (
+    battlefield: BattlefieldLineup['battlefield'],
+    partyIndex: number,
+    slotIndex: number,
+    seatedMemberId: string | null,
+  ) => void
+  onSlotDrop: (
+    battlefield: BattlefieldLineup['battlefield'],
+    partyIndex: number,
+    slotIndex: number,
+  ) => void
+  onSlotDragStart: (memberId: string) => void
+  onSlotDragEnd: () => void
   onLabel: (partyIndex: number, label: string | null) => void
 }) {
   const meta = raidMeta(warMode, raid.raid_index)
   const parties = raid.parties
   const filled = battlefieldFilledCount(raid)
   const capacity = raidCapacity(raid)
-  const assignments = buildAssignmentMap(payload)
   const ownRaid = parties.some((party) => party.slots.some((slot) => slot.member_id === memberId))
 
   return (
@@ -498,17 +922,23 @@ export function BattlefieldGrid({
           {filled}/{capacity} escalados
         </span>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {parties.map((party) => (
           <PartyCard
             key={party.party_index}
             party={party}
-            roster={payload.roster}
-            assignments={assignments}
             memberId={memberId}
             isStaff={isStaff}
             saving={saving}
-            onAssign={(slotIndex, target) => onAssign(party.party_index, slotIndex, target)}
+            selectedMemberId={selectedMemberId}
+            onSlotClick={(slotIndex, seatedMemberId) =>
+              onSlotClick(raid.battlefield, party.party_index, slotIndex, seatedMemberId)
+            }
+            onSlotDrop={(slotIndex) =>
+              onSlotDrop(raid.battlefield, party.party_index, slotIndex)
+            }
+            onSlotDragStart={onSlotDragStart}
+            onSlotDragEnd={onSlotDragEnd}
             onLabel={(label) => onLabel(party.party_index, label)}
           />
         ))}
@@ -519,24 +949,27 @@ export function BattlefieldGrid({
 
 function PartyCard({
   party,
-  roster,
-  assignments,
   memberId,
   isStaff,
   saving,
-  onAssign,
+  selectedMemberId,
+  onSlotClick,
+  onSlotDrop,
+  onSlotDragStart,
+  onSlotDragEnd,
   onLabel,
 }: {
   party: LineupParty
-  roster: LineupRosterMember[]
-  assignments: ReadonlyMap<string, LineupAssignment>
   memberId: string
   isStaff: boolean
   saving: boolean
-  onAssign: (slotIndex: number, memberId: string | null) => void
+  selectedMemberId: string | null
+  onSlotClick: (slotIndex: number, seatedMemberId: string | null) => void
+  onSlotDrop: (slotIndex: number) => void
+  onSlotDragStart: (memberId: string) => void
+  onSlotDragEnd: () => void
   onLabel: (label: string | null) => void
 }) {
-  const [openSlot, setOpenSlot] = useState<number | null>(null)
   const ownParty = party.slots.some((s) => s.member_id === memberId)
   const full = isPartyFull(party)
   const count = partyFilledCount(party)
@@ -561,22 +994,15 @@ function PartyCard({
               partyIndex={party.party_index}
               own={slot.member_id !== null && slot.member_id === memberId}
               isStaff={isStaff}
-              open={openSlot === slot.slot_index}
-              onToggle={() => setOpenSlot((cur) => (cur === slot.slot_index ? null : slot.slot_index))}
+              selected={slot.member_id !== null && slot.member_id === selectedMemberId}
+              saving={saving}
+              onClick={() => onSlotClick(slot.slot_index, slot.member_id)}
+              onDrop={() => onSlotDrop(slot.slot_index)}
+              onDragStart={() => {
+                if (slot.member_id !== null) onSlotDragStart(slot.member_id)
+              }}
+              onDragEnd={onSlotDragEnd}
             />
-            {isStaff && openSlot === slot.slot_index && (
-              <SlotPicker
-                roster={roster}
-                assignments={assignments}
-                currentMemberId={slot.member_id}
-                saving={saving}
-                onPick={(target) => {
-                  setOpenSlot(null)
-                  onAssign(slot.slot_index, target)
-                }}
-                onClose={() => setOpenSlot(null)}
-              />
-            )}
           </li>
         ))}
       </ol>
@@ -599,15 +1025,23 @@ function SlotRow({
   partyIndex,
   own,
   isStaff,
-  open,
-  onToggle,
+  selected,
+  saving,
+  onClick,
+  onDrop,
+  onDragStart,
+  onDragEnd,
 }: {
   slot: LineupSlot
   partyIndex: number
   own: boolean
   isStaff: boolean
-  open: boolean
-  onToggle: () => void
+  selected: boolean
+  saving: boolean
+  onClick: () => void
+  onDrop: () => void
+  onDragStart: () => void
+  onDragEnd: () => void
 }) {
   const leader = slot.slot_index === 1
   const vacant = slot.member_id === null
@@ -627,7 +1061,7 @@ function SlotRow({
     </>
   )
   const base = `relative flex items-center gap-2 overflow-hidden rounded-md border py-1.5 pl-3 pr-2 ${
-    own ? 'border-accent glow-accent-soft' : 'border-line'
+    selected ? 'border-accent glow-accent-soft' : own ? 'border-accent glow-accent-soft' : 'border-line'
   } ${leader ? 'bg-dominant' : 'bg-surface'}`
   const tint = vacant ? undefined : { backgroundImage: `linear-gradient(90deg, ${accent}24, transparent 70%)` }
 
@@ -641,88 +1075,30 @@ function SlotRow({
   return (
     <button
       type="button"
-      onClick={onToggle}
-      aria-expanded={open}
+      disabled={saving}
+      draggable={!saving && !vacant}
+      onClick={onClick}
+      onDragStart={(event) => {
+        if (vacant) return
+        event.dataTransfer.effectAllowed = 'move'
+        event.dataTransfer.setData('text/plain', slot.member_id ?? '')
+        onDragStart()
+      }}
+      onDragEnd={onDragEnd}
+      onDragOver={(event) => {
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+      }}
+      onDrop={(event) => {
+        event.preventDefault()
+        onDrop()
+      }}
       aria-label={`Editar slot ${slot.slot_index} da G${partyIndex}`}
-      className={`${base} w-full text-left hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+      className={`${base} w-full text-left hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-70`}
       style={tint}
     >
       {body}
     </button>
-  )
-}
-
-function SlotPicker({
-  roster,
-  assignments,
-  currentMemberId,
-  saving,
-  onPick,
-  onClose,
-}: {
-  roster: LineupRosterMember[]
-  assignments: ReadonlyMap<string, LineupAssignment>
-  currentMemberId: string | null
-  saving: boolean
-  onPick: (memberId: string | null) => void
-  onClose: () => void
-}) {
-  const [query, setQuery] = useState('')
-  const entries = filterAssignableRoster(roster, assignments, query)
-
-  return (
-    <div className="mt-1 flex flex-col gap-2 rounded-md border border-line bg-dominant p-2">
-      <div className="flex items-center gap-2">
-        <input
-          type="search"
-          aria-label="Buscar jogador"
-          placeholder="Buscar jogador…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-11 min-w-0 flex-1 rounded-md border border-line bg-surface px-3 text-sm text-content"
-        />
-        <button type="button" onClick={onClose} className="h-11 rounded-md border border-line px-3 text-sm text-content hover-control">
-          Fechar
-        </button>
-      </div>
-      <button
-        type="button"
-        disabled={saving || currentMemberId === null}
-        onClick={() => onPick(null)}
-        className="h-11 rounded-md border border-line px-3 text-left text-sm text-content hover-control disabled:opacity-50"
-      >
-        Limpar slot
-      </button>
-      <ul aria-label="Jogadores disponíveis" className="flex max-h-72 flex-col gap-1 overflow-y-auto">
-        {entries.map(({ member, assignment }) => {
-          const isCurrent = member.member_id === currentMemberId
-          return (
-            <li key={member.member_id}>
-              <button
-                type="button"
-                disabled={saving || isCurrent}
-                onClick={() => onPick(member.member_id)}
-                className="flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-content hover-control disabled:opacity-60"
-              >
-                {/* Two-line label: the name keeps the remaining width and never
-                    collapses to a single letter when the class + move badge are
-                    long (owner report 2026-10-30: "Ahrya" rendered as "A…"). */}
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-semibold">{member.display_name}</span>
-                  <span className="truncate text-xs text-muted">{classLabel(member.char_class)}</span>
-                </span>
-                {assignment !== null && (
-                  <span className="shrink-0 whitespace-nowrap rounded border border-line px-1.5 text-xs text-amber-400">
-                    {assignmentBadge(assignment)} → mover
-                  </span>
-                )}
-              </button>
-            </li>
-          )
-        })}
-        {entries.length === 0 && <li className="px-2 py-2 text-sm text-muted">Nenhum jogador encontrado.</li>}
-      </ul>
-    </div>
   )
 }
 

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { LineupParty, LineupsPayload, LineupRosterMember } from '../../lib/api'
 import {
+  absentRoster,
   assignmentBadge,
   assignmentCallout,
+  availableRoster,
   battlefieldFilledCount,
   battlefieldForRaid,
   buildAssignmentMap,
@@ -10,6 +12,7 @@ import {
   CLASS_ACCENT_HEX,
   BATTLEFIELD_META,
   defaultEmperiumPartyCounts,
+  filledInDroppedParties,
   filterAssignableRoster,
   findMemberAssignment,
   isPartyFull,
@@ -17,6 +20,7 @@ import {
   MAX_PARTIES_PER_RAID,
   MAX_RAIDS,
   MIN_RAIDS,
+  minPartyCount,
   NULL_CLASS_ACCENT_HEX,
   normalizeRoleLabel,
   partyFilledCount,
@@ -71,6 +75,7 @@ const payload: LineupsPayload = {
     },
   ],
   roster,
+  absences: [],
 }
 
 describe('lineupModel metadata', () => {
@@ -153,7 +158,7 @@ describe('Emperium party distribution invariant', () => {
     }
   })
 
-  it('accepts only 2..8 raids, 1..8 parties each, summing to 16', () => {
+  it('accepts only 2..8 raids, 1..8 parties each, within the allowed total', () => {
     expect(isValidPartyCounts([6, 6, 4])).toBe(true)
     expect(isValidPartyCounts([8, 8])).toBe(true)
     expect(isValidPartyCounts([7, 5, 4])).toBe(true)
@@ -162,6 +167,53 @@ describe('Emperium party distribution invariant', () => {
     expect(isValidPartyCounts([6, 6])).toBe(false)
     expect(isValidPartyCounts([5, 5, 5])).toBe(false)
     expect(isValidPartyCounts([2])).toBe(false)
+    // With five absences the officer may keep 16 or deliberately drop to 15.
+    expect(isValidPartyCounts([6, 6, 4], 15, 16)).toBe(true)
+    expect(isValidPartyCounts([6, 6, 3], 15, 16)).toBe(true)
+    expect(isValidPartyCounts([5, 5, 5], 15, 16)).toBe(true)
+    expect(isValidPartyCounts([5, 5, 4], 15, 16)).toBe(false)
+    expect(isValidPartyCounts([6, 6, 5], 15, 16)).toBe(false)
+  })
+
+  it('counts only the trailing parties that a reduction would drop', () => {
+    const current = [
+      { parties: [party(1, ['a', 'b'])] },
+      { parties: [party(1, ['c']), party(2, [])] },
+    ]
+    // Dropping to 1 party removes the filled then the empty trailing party.
+    expect(filledInDroppedParties(current, 1)).toBe(1)
+    // Dropping to 2 removes only the empty trailing party.
+    expect(filledInDroppedParties(current, 2)).toBe(0)
+  })
+})
+
+describe('absence-adjusted party count and roster split', () => {
+  it('allows one party per five active absences, with a two-party floor', () => {
+    expect(minPartyCount(0)).toBe(16)
+    expect(minPartyCount(4)).toBe(16)
+    expect(minPartyCount(5)).toBe(15)
+    expect(minPartyCount(9)).toBe(15)
+    expect(minPartyCount(10)).toBe(14)
+    expect(minPartyCount(75)).toBe(2)
+    expect(minPartyCount(80)).toBe(2)
+  })
+
+  it('splits the roster into available and absent members', () => {
+    const assignments = new Map([
+      [
+        'a',
+        {
+          war_mode: 'emperium' as const,
+          battlefield: 'emperium_raid_1' as const,
+          raid_index: 1,
+          party_index: 1,
+          slot_index: 1,
+        },
+      ],
+    ])
+    const absent = new Set(['b'])
+    expect(availableRoster(roster, assignments, absent).map((m) => m.member_id)).toEqual(['c'])
+    expect(absentRoster(roster, absent).map((m) => m.member_id)).toEqual(['b'])
   })
 })
 
