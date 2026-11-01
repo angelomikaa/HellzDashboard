@@ -285,21 +285,16 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
     seatedMemberId: string | null,
   ) {
     if (!isStaff) return
-    if (selected !== null) {
-      if (selected.source === 'absent') {
-        setActionError(
-          'Este jogador está marcado como ausente. Torne-o disponível antes de escalá-lo.',
-        )
-        return
-      }
-      assignMember(selected.memberId, battlefield, partyIndex, slotIndex)
-      return
-    }
     if (seatedMemberId !== null) {
-      setSelected({ memberId: seatedMemberId, source: 'slot' })
+      // Clicking a SEATED card selects that member (so the officer can then
+      // drag them or drop them on another card). A seated click never moves
+      // anyone by itself.
+      selectPlayer(seatedMemberId, 'slot')
       return
     }
-    // Empty slot: offer the available roster for that exact seat.
+    // Empty slot: ALWAYS open the available-player picker. A leftover
+    // selection from a previous click must never turn this into a silent
+    // move — that made the list unreachable and shuffled one player around.
     setPicker({ battlefield, partyIndex, slotIndex })
   }
 
@@ -308,6 +303,20 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
     const target = picker
     setPicker(null)
     assignMember(memberId, target.battlefield, target.partyIndex, target.slotIndex)
+  }
+
+  /** Place the member that was selected before opening the picker. */
+  function placeSelectedInPicker() {
+    if (picker === null || selected === null) return
+    if (selected.source === 'absent') {
+      setActionError(
+        'Este jogador está marcado como ausente. Torne-o disponível antes de escalá-lo.',
+      )
+      return
+    }
+    const target = picker
+    setPicker(null)
+    assignMember(selected.memberId, target.battlefield, target.partyIndex, target.slotIndex)
   }
 
   function handleSlotDrop(
@@ -689,6 +698,13 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
           }
           members={availableMembers}
           disabled={saving}
+          selectedName={
+            selected !== null && selected.source !== 'absent'
+              ? (payload.roster.find((m) => m.member_id === selected.memberId)?.display_name ??
+                'jogador selecionado')
+              : null
+          }
+          onPlaceSelected={placeSelectedInPicker}
           onPick={pickForSlot}
           onClose={() => setPicker(null)}
         />
@@ -895,12 +911,18 @@ export function SlotOfferDialog({
   title,
   members,
   disabled,
+  selectedName = null,
+  onPlaceSelected,
   onPick,
   onClose,
 }: {
   title: string
   members: LineupRosterMember[]
   disabled: boolean
+  /** Name of a member the officer selected before opening the picker — offered
+   *  as a one-click placement so select-then-place still works. */
+  selectedName?: string | null
+  onPlaceSelected?: () => void
   onPick: (memberId: string) => void
   onClose: () => void
 }) {
@@ -950,6 +972,24 @@ export function SlotOfferDialog({
           onChange={(event) => setQuery(event.target.value)}
           className="h-11 rounded-md border border-line bg-dominant px-3 text-sm text-content"
         />
+        {selectedName !== null && onPlaceSelected !== undefined && (
+          <div className="flex items-center justify-between gap-2 rounded-md border border-accent/60 bg-accent/10 px-3 py-2">
+            <p className="min-w-0 text-sm text-content">
+              <span className="font-semibold">{selectedName}</span>
+              <span className="text-muted"> está selecionado.</span>
+            </p>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                onPlaceSelected()
+              }}
+              className="h-9 shrink-0 rounded-md bg-accent px-3 text-sm font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
+            >
+              Colocar aqui
+            </button>
+          </div>
+        )}
         <ul
           aria-label="Jogadores disponíveis"
           className="flex max-h-80 flex-col gap-1 overflow-y-auto"

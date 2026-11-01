@@ -196,6 +196,40 @@ describe('SlotOfferDialog', () => {
     )
     expect(html).toContain('Nenhum jogador disponível.')
   })
+
+  it('offers the pre-selected member as a one-click placement, keeping the list', () => {
+    const html = renderToStaticMarkup(
+      <SlotOfferDialog
+        title="Escolher jogador — Raid 2 G1 · Slot 3"
+        members={payload.roster}
+        disabled={false}
+        selectedName="Tifa"
+        onPlaceSelected={noop}
+        onPick={noop}
+        onClose={noop}
+      />,
+    )
+    // The sticky selection is an ADDITIONAL action, never a replacement for
+    // the available list (the regression this pins: the picker used to be
+    // unreachable while a member was selected).
+    expect(html).toContain('Colocar aqui')
+    expect(html).toContain('está selecionado')
+    expect(html).toContain('Jogadores disponíveis')
+    expect(html).toContain('Kiom')
+  })
+
+  it('omits the placement bar when nothing is selected', () => {
+    const html = renderToStaticMarkup(
+      <SlotOfferDialog
+        title="Escolher jogador"
+        members={payload.roster}
+        disabled={false}
+        onPick={noop}
+        onClose={noop}
+      />,
+    )
+    expect(html).not.toContain('Colocar aqui')
+  })
 })
 
 describe('LineupPage initial render', () => {
