@@ -9,9 +9,10 @@
  * against that snapshot.
  *
  * Probes:
- *   A. seed shape: 16 Vigrid parties / 80 filled slots / 40 per raid; the 3
- *      seeded Emperium raids with 6/6/4 parties (16 parties / 80 empty slots);
- *      role labels; zero smoke/dummy members in any lineup.
+ *   A. shape: 16 Vigrid parties / 80 filled slots / 40 per raid; the 3 Emperium
+ *      raids with 6/6/4 parties (16 parties / 80 slots, any fill state since the
+ *      initial formation is officer-editable); role labels; zero smoke/dummy
+ *      members in any lineup.
  *   B. member read: get_lineups() + get_lineups_mode('emperium') 200 with a
  *      closed field list (no ovr, points, stats, key-stat config, pin_hash);
  *      roster count equals the live assignable roster; fixture members absent.
@@ -241,11 +242,12 @@ async function main() {
         `where war_mode='emperium' group by raid_index order by raid_index;`,
     )
     check(
-      'A5 Emperium seeded as 3 empty raids with 6/6/4 parties (16 parties / 80 slots)',
+      'A5 Emperium is the 6/6/4 structure (16 parties / 80 slots, any fill state)',
       emperiumShape.parties === 16 &&
         emperiumShape.raids === 3 &&
         emperiumShape.slots === 80 &&
-        emperiumShape.filled === 0 &&
+        emperiumShape.filled >= 0 &&
+        emperiumShape.filled <= 80 &&
         emperiumShape.configured === 3 &&
         JSON.stringify(emperiumCounts.map((r) => r.parties)) === JSON.stringify([6, 6, 4]),
       `parties=${emperiumShape.parties} raids=${emperiumShape.raids} slots=${emperiumShape.slots} filled=${emperiumShape.filled} config=${emperiumShape.configured} counts=${emperiumCounts.map((r) => r.parties).join('/')}`,
@@ -444,6 +446,9 @@ async function main() {
     check('D7 officer clears a label to null', unlabel.status === 200 && unlabel.json?.battlefields?.[0]?.parties?.[1]?.role_label === null)
 
     // ---- Emperium party-distribution invariant (0057) ---------------------
+    // The live board now starts with the owner's formation; clear it for the
+    // distribution mechanics below. The finally snapshot restore puts it back.
+    await mgmt(`update lineup_slots set member_id = null where war_mode = 'emperium';`)
     const partyCounts = (payload) => payload?.battlefields?.map((b) => b.parties.length) ?? []
     const totalParties = (payload) => partyCounts(payload).reduce((sum, n) => sum + n, 0)
 
