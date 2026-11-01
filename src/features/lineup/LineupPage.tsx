@@ -570,9 +570,9 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
         )}
       </header>
 
-      {isStaff ? (
-        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="flex flex-col gap-3 lg:sticky lg:top-4 lg:self-start">
+      {isStaff && (
+        <>
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <RosterPanel
               title="Disponíveis"
               count={availableMembers.length}
@@ -620,77 +620,50 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
               }}
               onDrop={handleAbsencesDrop}
             />
-            <p className="text-xs text-muted">
-              Arraste um jogador para uma PT, para “Disponíveis” ou para “Ausências”. Também é
-              possível selecionar um jogador e clicar no destino.
-            </p>
-          </aside>
-
-          <div className="flex flex-col gap-4">
-            <RaidTabs
-              raids={raids}
-              warMode={payload.war_mode}
-              stacked={stacked}
-              activeRaid={activeRaid}
-              onSelect={(raidIndex) => {
-                setStacked(false)
-                setSelectedRaid(raidIndex)
-              }}
-              onToggleStacked={() => setStacked((value) => !value)}
-            />
-            {visible.map((raid) => (
-              <BattlefieldGrid
-                key={raid.battlefield}
-                raid={raid}
-                warMode={payload.war_mode}
-                memberId={session.member_id}
-                isStaff={isStaff}
-                saving={saving}
-                selectedMemberId={selected?.memberId ?? null}
-                onSlotClick={handleSlotClick}
-                onSlotDrop={handleSlotDrop}
-                onSlotDragStart={(memberId) => startDrag(memberId, 'slot')}
-                onSlotDragEnd={() => setDrag(null)}
-                onLabel={(party, label) =>
-                  void runMutation((s) =>
-                    setLineupPartyLabel(s, currentMode, raid.battlefield, party, label),
-                  )
-                }
-              />
-            ))}
           </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          <RaidTabs
-            raids={raids}
-            warMode={payload.war_mode}
-            stacked={stacked}
-            activeRaid={activeRaid}
-            onSelect={(raidIndex) => {
-              setStacked(false)
-              setSelectedRaid(raidIndex)
-            }}
-            onToggleStacked={() => setStacked((value) => !value)}
-          />
-          {visible.map((raid) => (
-            <BattlefieldGrid
-              key={raid.battlefield}
-              raid={raid}
-              warMode={payload.war_mode}
-              memberId={session.member_id}
-              isStaff={isStaff}
-              saving={saving}
-              selectedMemberId={null}
-              onSlotClick={handleSlotClick}
-              onSlotDrop={handleSlotDrop}
-              onSlotDragStart={() => {}}
-              onSlotDragEnd={() => {}}
-              onLabel={() => {}}
-            />
-          ))}
-        </div>
+          <p className="text-xs text-muted">
+            Arraste um jogador para uma PT, para “Disponíveis” ou para “Ausências”. Também é
+            possível selecionar um jogador e clicar no destino.
+          </p>
+        </>
       )}
+
+      <div className="flex flex-col gap-4">
+        <RaidTabs
+          raids={raids}
+          warMode={payload.war_mode}
+          stacked={stacked}
+          activeRaid={activeRaid}
+          onSelect={(raidIndex) => {
+            setStacked(false)
+            setSelectedRaid(raidIndex)
+          }}
+          onToggleStacked={() => setStacked((value) => !value)}
+        />
+        {visible.map((raid) => (
+          <BattlefieldGrid
+            key={raid.battlefield}
+            raid={raid}
+            warMode={payload.war_mode}
+            memberId={session.member_id}
+            isStaff={isStaff}
+            saving={saving}
+            selectedMemberId={isStaff ? (selected?.memberId ?? null) : null}
+            onSlotClick={handleSlotClick}
+            onSlotDrop={handleSlotDrop}
+            onSlotDragStart={isStaff ? (memberId) => startDrag(memberId, 'slot') : () => {}}
+            onSlotDragEnd={isStaff ? () => setDrag(null) : () => {}}
+            onLabel={
+              isStaff
+                ? (party, label) =>
+                    void runMutation((s) =>
+                      setLineupPartyLabel(s, currentMode, raid.battlefield, party, label),
+                    )
+                : () => {}
+            }
+          />
+        ))}
+      </div>
     </section>
   )
 }
@@ -801,17 +774,19 @@ function RosterPanel({
         event.preventDefault()
         onDrop()
       }}
-      className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3"
+      className="flex min-w-0 flex-col gap-2 rounded-lg border border-line bg-surface p-3"
     >
-      <button
-        type="button"
-        onClick={onHeaderClick}
-        title="Clique para mover o jogador selecionado para cá"
-        className="text-left font-display text-lg font-bold text-content hover:text-accent"
-      >
-        {title} ({count})
-      </button>
-      {subtitle !== undefined && <p className="text-xs text-muted">{subtitle}</p>}
+      <div className="flex flex-wrap items-baseline gap-2">
+        <button
+          type="button"
+          onClick={onHeaderClick}
+          title="Clique para mover o jogador selecionado para cá"
+          className="text-left font-display text-lg font-bold text-content hover:text-accent"
+        >
+          {title} ({count})
+        </button>
+        {subtitle !== undefined && <p className="text-xs text-muted">{subtitle}</p>}
+      </div>
       {onSearch !== undefined && (
         <input
           type="search"
@@ -819,14 +794,14 @@ function RosterPanel({
           placeholder="Buscar jogador…"
           value={search ?? ''}
           onChange={(event) => onSearch(event.target.value)}
-          className="h-11 rounded-md border border-line bg-dominant px-3 text-sm text-content"
+          className="h-11 w-full max-w-sm rounded-md border border-line bg-dominant px-3 text-sm text-content"
         />
       )}
-      <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+      <ul className="flex min-w-0 gap-1 overflow-x-auto pb-1">
         {members.map((member) => {
           const active = selected?.memberId === member.member_id && selected.source === source
           return (
-            <li key={member.member_id} className="flex items-center gap-1">
+            <li key={member.member_id} className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
                 draggable={!disabled}
@@ -839,7 +814,7 @@ function RosterPanel({
                 onDragEnd={onDragEnd}
                 onClick={() => onSelect(member.member_id)}
                 aria-pressed={active}
-                className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md border px-2 py-1 text-left text-content hover-control disabled:opacity-60 ${
+                className={`flex min-h-11 w-48 items-center gap-2 rounded-md border px-2 py-1 text-left text-content hover-control disabled:opacity-60 ${
                   active ? 'border-accent glow-accent-soft' : 'border-line'
                 }`}
               >
@@ -860,7 +835,9 @@ function RosterPanel({
             </li>
           )
         })}
-        {members.length === 0 && <li className="px-2 py-2 text-sm text-muted">{emptyText}</li>}
+        {members.length === 0 && (
+          <li className="shrink-0 px-2 py-2 text-sm text-muted">{emptyText}</li>
+        )}
       </ul>
     </section>
   )
