@@ -1,23 +1,27 @@
 #!/usr/bin/env node
 /**
- * NeoFoot battlefield lineup smoke (plan 10.4-01 task 2, LNUP-01..04).
+ * NeoFoot Escalação smoke (plan 10.4-01 task 2 + 0056, LNUP-01..04).
  *
- * Live probes against migration 0040. Throwaway fixtures (smoke_lineup_officer,
- * smoke_lineup_member) are created per run and removed in finally. The live
- * lineup is mutated only through the real RPCs and is restored from a snapshot
- * taken before the run; the final state is compared against that snapshot.
+ * Live probes against migrations 0040/0044/0056. Throwaway fixtures
+ * (smoke_lineup_officer, smoke_lineup_member) are created per run and removed
+ * in finally. The live escalação is mutated only through the real RPCs and is
+ * restored from a snapshot taken before the run; the final state is compared
+ * against that snapshot.
  *
  * Probes:
- *   A. seed shape: 16 parties, 80 filled slots, 40/40 per raid, 4 role labels,
- *      zero smoke/dummy members in the lineup.
- *   B. member read: get_lineups() 200 with a closed field list (no ovr, points,
- *      stats, key-stat config, pin_hash); roster count equals the live assignable
- *      roster; fixture members absent.
- *   C. member writes denied: set_lineup_slot / set_lineup_party_label -> forbidden;
- *      direct table PATCH denied; direct table SELECT allowed.
- *   D. officer writes: smoke member rejected (invalid_lineup_member); swap two
- *      slots; clear a slot (N/5 -> 4/5); cross-raid move; label edit + clear;
- *      over-long label rejected (invalid_lineup_label).
+ *   A. seed shape: 16 Vigrid parties / 80 filled slots / 40 per raid; the 3
+ *      seeded Emperium raids (24 parties / 120 empty slots); role labels;
+ *      zero smoke/dummy members in any lineup.
+ *   B. member read: get_lineups() + get_lineups_mode('emperium') 200 with a
+ *      closed field list (no ovr, points, stats, key-stat config, pin_hash);
+ *      roster count equals the live assignable roster; fixture members absent.
+ *   C. member writes denied: slot/label/raid-count -> forbidden; direct table
+ *      PATCH denied; direct table SELECT allowed.
+ *   D. officer writes (Vigrid): smoke member rejected (invalid_lineup_member);
+ *      swap two slots; clear a slot (N/5 -> 4/5); cross-raid move; label edit +
+ *      clear; over-long label rejected (invalid_lineup_label). Emperium: grow to
+ *      4 raids, seat a member, refuse removing a non-empty raid, clear + shrink
+ *      to 3, refuse below the two-raid minimum.
  *   E. restore: live lineup identical to the pre-run snapshot (zero residue).
  *
  * Credentials come from smoke-config.mjs (env or .env). Never prints token,
@@ -112,30 +116,57 @@ async function mgmt(sql) {
 
 async function snapshot() {
   const slots = await mgmt(
-    `select battlefield, party_index, slot_index, member_id from lineup_slots order by battlefield, party_index, slot_index;`,
+    `select war_mode, battlefield, raid_index, party_index, slot_index, member_id ` +
+      `from lineup_slots order by war_mode, battlefield, party_index, slot_index;`,
   )
   const parties = await mgmt(
-    `select battlefield, party_index, role_label from lineup_parties order by battlefield, party_index;`,
+    `select war_mode, battlefield, raid_index, party_index, role_label ` +
+      `from lineup_parties order by war_mode, battlefield, party_index;`,
   )
-  return { slots, parties }
+  const config = await mgmt(`select war_mode, raid_count from lineup_war_config order by war_mode;`)
+  return { slots, parties, config }
 }
 
-function slotMember(snap, bf, party, slot) {
-  return snap.slots.find((s) => s.battlefield === bf && s.party_index === party && s.slot_index === slot)?.member_id ?? null
+function slotMember(snap, bf, party, slot, warMode = 'vigrid') {
+  return (
+    snap.slots.find(
+      (s) =>
+        s.war_mode === warMode &&
+        s.battlefield === bf &&
+        s.party_index === party &&
+        s.slot_index === slot,
+    )?.member_id ?? null
+  )
 }
 
 async function restore(snap) {
   const stmts = ['update lineup_slots set member_id = null where true;']
-  for (const s of snap.slots) {
-    const v = s.member_id ? `'${s.member_id}'` : 'null'
+  const emperium = snap.config.find((c) => c.war_mode === 'emperium')
+  const maxRaid = emperium?.raid_count ?? 3
+  stmts.push(`delete from lineup_parties where war_mode='emperium' and raid_index > ${maxRaid};`)
+
+  for (const p of snap.parties) {
+    const label = p.role_label === null ? 'null' : `'${p.role_label.replace(/'/g, "''")}'`
     stmts.push(
-      `update lineup_slots set member_id = ${v} where battlefield='${s.battlefield}' and party_index=${s.party_index} and slot_index=${s.slot_index};`,
+      `insert into lineup_parties (war_mode, battlefield, raid_index, party_index, role_label) ` +
+        `values ('${p.war_mode}', '${p.battlefield}', ${p.raid_index}, ${p.party_index}, ${label}) ` +
+        `on conflict (war_mode, battlefield, party_index) do update ` +
+        `set raid_index = excluded.raid_index, role_label = excluded.role_label;`,
     )
   }
-  for (const p of snap.parties) {
-    const v = p.role_label === null ? 'null' : `'${p.role_label.replace(/'/g, "''")}'`
+  for (const s of snap.slots) {
+    const member = s.member_id ? `'${s.member_id}'` : 'null'
     stmts.push(
-      `update lineup_parties set role_label = ${v} where battlefield='${p.battlefield}' and party_index=${p.party_index};`,
+      `insert into lineup_slots (war_mode, battlefield, raid_index, party_index, slot_index, member_id) ` +
+        `values ('${s.war_mode}', '${s.battlefield}', ${s.raid_index}, ${s.party_index}, ${s.slot_index}, ${member}) ` +
+        `on conflict (war_mode, battlefield, party_index, slot_index) do update ` +
+        `set raid_index = excluded.raid_index, member_id = excluded.member_id;`,
+    )
+  }
+  for (const c of snap.config) {
+    stmts.push(
+      `insert into lineup_war_config (war_mode, raid_count) values ('${c.war_mode}', ${c.raid_count}) ` +
+        `on conflict (war_mode) do update set raid_count = excluded.raid_count;`,
     )
   }
   await mgmt(stmts.join('\n'))
@@ -169,25 +200,53 @@ async function main() {
 
   try {
     // ---- A. seed shape ----------------------------------------------------
-    const partyCount = (await mgmt(`select count(*)::int as n from lineup_parties;`))[0].n
+    const partyCount = (
+      await mgmt(`select count(*)::int as n from lineup_parties where war_mode='vigrid';`)
+    )[0].n
     const slotRows = await mgmt(
       `select count(*)::int as total, count(member_id)::int as filled, ` +
         `count(*) filter (where battlefield='vigrid_field' and member_id is not null)::int as vigrid, ` +
-        `count(*) filter (where battlefield='ruinscape' and member_id is not null)::int as ruin from lineup_slots;`,
+        `count(*) filter (where battlefield='ruinscape' and member_id is not null)::int as ruin ` +
+        `from lineup_slots where war_mode='vigrid';`,
     )
-    check('A1 16 parties seeded', partyCount === 16, `parties=${partyCount}`)
+    check('A1 16 Vigrid parties seeded', partyCount === 16, `parties=${partyCount}`)
     check(
-      'A2 80 slots, all filled, 40 per raid',
+      'A2 80 Vigrid slots, all filled, 40 per raid',
       slotRows[0].total === 80 && slotRows[0].filled === 80 && slotRows[0].vigrid === 40 && slotRows[0].ruin === 40,
       `total=${slotRows[0].total} filled=${slotRows[0].filled} vigrid=${slotRows[0].vigrid} ruin=${slotRows[0].ruin}`,
     )
-    const labelMap = Object.fromEntries(
-      snap0.parties.filter((p) => p.role_label !== null).map((p) => [`${p.battlefield}:${p.party_index}`, p.role_label]),
-    )
-    const sortedJson = (o) => JSON.stringify(Object.keys(o).sort().map((k) => [k, o[k]]))
+    const emperiumShape = (
+      await mgmt(
+        `select ` +
+          `(select count(*)::int from lineup_parties where war_mode='emperium') as parties, ` +
+          `(select count(distinct raid_index)::int from lineup_parties where war_mode='emperium') as raids, ` +
+          `(select count(*)::int from lineup_slots where war_mode='emperium') as slots, ` +
+          `(select count(member_id)::int from lineup_slots where war_mode='emperium') as filled, ` +
+          `(select raid_count::int from lineup_war_config where war_mode='emperium') as configured;`,
+      )
+    )[0]
     check(
-      'A3 default role labels on Raid 1 G5/G6 and Raid 2 G3/G4 only',
-      sortedJson(labelMap) === sortedJson(EXPECTED_LABELS),
+      'A5 Emperium seeded with 3 empty raids x 8 parties (24 parties / 120 slots)',
+      emperiumShape.parties === 24 &&
+        emperiumShape.raids === 3 &&
+        emperiumShape.slots === 120 &&
+        emperiumShape.filled === 0 &&
+        emperiumShape.configured === 3,
+      `parties=${emperiumShape.parties} raids=${emperiumShape.raids} slots=${emperiumShape.slots} filled=${emperiumShape.filled} config=${emperiumShape.configured}`,
+    )
+    const labelMap = Object.fromEntries(
+      snap0.parties
+        .filter((p) => p.war_mode === 'vigrid' && p.role_label !== null)
+        .map((p) => [`${p.battlefield}:${p.party_index}`, p.role_label]),
+    )
+    // The owner may add extra labels over time, so assert the seeded four are
+    // still in place instead of pinning the whole label map.
+    const seededLabelsOk = Object.entries(EXPECTED_LABELS).every(
+      ([key, value]) => labelMap[key] === value,
+    )
+    check(
+      'A3 default role labels still present on Raid 1 G5/G6 and Raid 2 G3/G4',
+      seededLabelsOk,
       `labels=${Object.keys(labelMap).length}`,
     )
     const smokeInLineup = (
@@ -208,9 +267,21 @@ async function main() {
     const read = await rest('/rpc/get_lineups', { method: 'POST', session: member, body: {} })
     check('B1 member get_lineups HTTP 200', read.status === 200, `status=${read.status}`)
     const p = read.json || {}
-    check('B2 top-level fields closed to battlefields + roster', fieldsExact(p, ['battlefields', 'roster']), `keys=${Object.keys(p).join(',')}`)
+    check(
+      'B2 top-level fields closed to the mode payload + roster',
+      fieldsExact(p, ['war_mode', 'raid_count', 'min_raids', 'max_raids', 'battlefields', 'roster']),
+      `keys=${Object.keys(p).join(',')}`,
+    )
     const bfs = p.battlefields || []
-    check('B3 two battlefields x 8 parties', bfs.length === 2 && bfs.every((b) => b.parties.length === 8), `bfs=${bfs.length}`)
+    check(
+      'B3 two Vigrid raids x 8 parties with raid_index',
+      p.war_mode === 'vigrid' &&
+        p.raid_count === 2 &&
+        bfs.length === 2 &&
+        bfs.every((b) => b.parties.length === 8 && typeof b.raid_index === 'number') &&
+        bfs.every((b) => fieldsExact(b, ['battlefield', 'raid_index', 'parties'])),
+      `bfs=${bfs.length}`,
+    )
     const partyKeysOk = bfs.every((b) => b.parties.every((pt) => fieldsExact(pt, ['party_index', 'role_label', 'filled', 'slots'])))
     const slotKeysOk = bfs.every((b) => b.parties.every((pt) => pt.slots.length === 5 && pt.slots.every((sl) => fieldsExact(sl, ['slot_index', 'member_id', 'display_name', 'char_class', 'char_function']))))
     check('B4 party and slot objects use the closed field list', partyKeysOk && slotKeysOk)
@@ -225,6 +296,19 @@ async function main() {
     const fixtureIdSet = new Set(Object.values(fixtureIds))
     const fixtureLeak = (p.roster || []).some((r) => fixtureIdSet.has(r.member_id))
     check('B8 smoke fixture members absent from the roster', !fixtureLeak)
+    const empRead = await rest('/rpc/get_lineups_mode', {
+      method: 'POST', session: member, body: { p_war_mode: 'emperium' },
+    })
+    const ep = empRead.json || {}
+    check(
+      'B9 member reads the 3 Emperium raids via get_lineups_mode',
+      empRead.status === 200 &&
+        ep.war_mode === 'emperium' &&
+        ep.raid_count === 3 &&
+        ep.battlefields?.length === 3 &&
+        ep.battlefields.every((b) => b.parties.length === 8 && typeof b.raid_index === 'number'),
+      `status=${empRead.status} raids=${ep.battlefields?.length}`,
+    )
 
     // ---- C. member writes denied, reads allowed ---------------------------
     const memberSlot = await rest('/rpc/set_lineup_slot', {
@@ -244,6 +328,10 @@ async function main() {
     check('C3 member direct table write denied (slot unchanged)', !directWrite.ok && stillSeated, `status=${directWrite.status}`)
     const directRead = await rest('/lineup_slots?select=slot_index&limit=5', { session: member })
     check('C4 member direct table read allowed (active member)', directRead.status === 200 && Array.isArray(directRead.json) && directRead.json.length === 5, `status=${directRead.status}`)
+    const memberRaids = await rest('/rpc/set_lineup_raid_count', {
+      method: 'POST', session: member, body: { p_war_mode: 'emperium', p_raid_count: 4 },
+    })
+    check('C5 member set_lineup_raid_count forbidden', !memberRaids.ok && memberRaids.text.includes('forbidden'), `status=${memberRaids.status}`)
 
     // ---- D. officer writes ------------------------------------------------
     // Device guard (0041 / 0024 design): a wrong or missing X-Device-Fingerprint
@@ -319,6 +407,74 @@ async function main() {
       method: 'POST', session: officer, body: { p_battlefield: 'vigrid_field', p_party: 2, p_label: null },
     })
     check('D7 officer clears a label to null', unlabel.status === 200 && unlabel.json?.battlefields?.[0]?.parties?.[1]?.role_label === null)
+
+    // ---- Emperium raid management (0056) ----------------------------------
+    const grow = await rest('/rpc/set_lineup_raid_count', {
+      method: 'POST', session: officer, body: { p_war_mode: 'emperium', p_raid_count: 4 },
+    })
+    check(
+      'D8 officer grows Emperium to 4 raids (4 x 8 parties returned)',
+      grow.status === 200 &&
+        grow.json?.war_mode === 'emperium' &&
+        grow.json?.raid_count === 4 &&
+        grow.json?.battlefields?.length === 4 &&
+        grow.json?.battlefields?.every((b) => b.parties.length === 8),
+      `status=${grow.status} raids=${grow.json?.battlefields?.length}`,
+    )
+
+    const emperiumMember = grow.json?.roster?.[0]?.member_id
+    const seat = await rest('/rpc/set_lineup_slot_mode', {
+      method: 'POST', session: officer,
+      body: {
+        p_war_mode: 'emperium',
+        p_battlefield: 'emperium_raid_4',
+        p_party: 1,
+        p_slot: 1,
+        p_member: emperiumMember,
+      },
+    })
+    check(
+      'D9 officer seats a member in Emperium Raid 4',
+      seat.status === 200 && seat.json?.battlefields?.[3]?.parties?.[0]?.filled === 1,
+      `status=${seat.status}`,
+    )
+
+    const blockedShrink = await rest('/rpc/set_lineup_raid_count', {
+      method: 'POST', session: officer, body: { p_war_mode: 'emperium', p_raid_count: 3 },
+    })
+    check(
+      'D10 removing a non-empty raid is refused (lineup_raid_not_empty)',
+      !blockedShrink.ok && blockedShrink.text.includes('lineup_raid_not_empty'),
+      `status=${blockedShrink.status}`,
+    )
+
+    const clearEmp = await rest('/rpc/set_lineup_slot_mode', {
+      method: 'POST', session: officer,
+      body: {
+        p_war_mode: 'emperium',
+        p_battlefield: 'emperium_raid_4',
+        p_party: 1,
+        p_slot: 1,
+        p_member: null,
+      },
+    })
+    const shrink = await rest('/rpc/set_lineup_raid_count', {
+      method: 'POST', session: officer, body: { p_war_mode: 'emperium', p_raid_count: 3 },
+    })
+    check(
+      'D11 officer clears and shrinks Emperium back to 3 raids',
+      clearEmp.status === 200 && shrink.status === 200 && shrink.json?.raid_count === 3 && shrink.json?.battlefields?.length === 3,
+      `status=${shrink.status} raids=${shrink.json?.battlefields?.length}`,
+    )
+
+    const tooFew = await rest('/rpc/set_lineup_raid_count', {
+      method: 'POST', session: officer, body: { p_war_mode: 'emperium', p_raid_count: 1 },
+    })
+    check(
+      'D12 below the two-raid minimum is refused (invalid_lineup_raid_count)',
+      !tooFew.ok && tooFew.text.includes('invalid_lineup_raid_count'),
+      `status=${tooFew.status}`,
+    )
   } catch (err) {
     check('unexpected error during probes', false, err.message)
   } finally {

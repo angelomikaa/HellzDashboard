@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { ApiError, type LineupParty, type LineupsPayload } from '../../lib/api'
+import { ApiError, type LineupParty, type LineupsPayload, type WarMode } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { BattlefieldGrid, LineupPage } from './LineupPage'
 import { lineupErrorCopy } from './lineupModel'
@@ -43,9 +43,13 @@ parties[0].filled = 2
 parties[4].role_label = 'MOBS CIMA/BAIXO'
 
 const payload: LineupsPayload = {
+  war_mode: 'vigrid',
+  raid_count: 2,
+  min_raids: 2,
+  max_raids: 8,
   battlefields: [
-    { battlefield: 'vigrid_field', parties },
-    { battlefield: 'ruinscape', parties: emptyParties() },
+    { battlefield: 'vigrid_field', raid_index: 1, parties },
+    { battlefield: 'ruinscape', raid_index: 2, parties: emptyParties() },
   ],
   roster: [
     { member_id: 'm1', display_name: 'Lanaya', char_class: 'Bard', char_function: 'dps' },
@@ -54,13 +58,27 @@ const payload: LineupsPayload = {
   ],
 }
 
+const emperiumPayload: LineupsPayload = {
+  ...payload,
+  war_mode: 'emperium',
+  raid_count: 3,
+  battlefields: [
+    { battlefield: 'emperium_raid_1', raid_index: 1, parties: emptyParties() },
+    { battlefield: 'emperium_raid_2', raid_index: 2, parties: emptyParties() },
+    { battlefield: 'emperium_raid_3', raid_index: 3, parties },
+  ],
+}
+
 const noop = () => {}
 
-function grid(session: NeoFootSession) {
+function grid(session: NeoFootSession, warMode: WarMode = 'vigrid') {
+  const data = warMode === 'emperium' ? emperiumPayload : payload
+  const raid = data.battlefields[warMode === 'emperium' ? 2 : 0]
   return renderToStaticMarkup(
     <BattlefieldGrid
-      battlefield="vigrid_field"
-      payload={payload}
+      raid={raid}
+      warMode={warMode}
+      payload={data}
       memberId={session.member_id}
       isStaff={session.member_role !== 'member'}
       saving={false}
@@ -108,6 +126,14 @@ describe('LineupPage member read-only view', () => {
     expect(html).not.toContain('Função da PT')
     expect(html).not.toContain('Editar função')
   })
+
+  it('marks the viewer current Emperium raid and keeps the own highlights', () => {
+    const html = grid(memberSession, 'emperium')
+    expect(html).toContain('Raid 3')
+    expect(html).toContain('Sua Raid')
+    expect(html).toContain('Sua PT')
+    expect(html).toContain('Você')
+  })
 })
 
 describe('LineupPage officer editing controls', () => {
@@ -138,6 +164,8 @@ describe('lineupErrorCopy', () => {
     expect(lineupErrorCopy(new ApiError(401, 'unauthorized', 'device_mismatch'))).toContain('sessão expirou')
     expect(lineupErrorCopy(new Error('HTTP 500: forbidden'))).toContain('permissão')
     expect(lineupErrorCopy(new Error('HTTP 500: invalid_lineup_member'))).toContain('não pode ser escalado')
+    expect(lineupErrorCopy(new Error('HTTP 500: invalid_lineup_raid_count'))).toContain('entre 2 e 8 raids')
+    expect(lineupErrorCopy(new Error('HTTP 500: lineup_raid_not_empty'))).toContain('Esvazie a raid')
     expect(lineupErrorCopy(new ApiError(0, 'network', 'offline'))).toContain('conectar')
     expect(lineupErrorCopy(new Error('boom'))).toContain('Tente novamente')
   })

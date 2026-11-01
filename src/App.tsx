@@ -130,9 +130,9 @@ function App() {
         const showRanking = tab === 'ranking' && isStaff
         // Enviar Status is for EVERY role (members submit their own stats).
         const showSubmit = tab === 'submit'
-        // Lineup (phase 10.4, LNUP-01..03): every active member sees the tab.
-        // Reads are RLS/RPC-gated; writes are officer/owner RPCs inside the
-        // page, so this flag is UX-only (no staff gate on the tab itself).
+        // Escalação (phase 10.4 / 0056, LNUP-01..03): every active member sees
+        // the tab. Reads are RLS/RPC-gated; writes are officer/owner RPCs
+        // inside the page, so this flag is UX-only (no staff gate on the tab).
         const showLineup = tab === 'lineup'
         // Início (Phase 10, HOME-01 + round 9): the guild landing page —
         // the Impecáveis showcase, identical for members and visitors (the
@@ -203,7 +203,7 @@ function App() {
                         showLineup ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
                       }`}
                     >
-                      Lineup
+                      Escalação
                     </button>
                     {isStaff && (
                       <ValidacoesTab

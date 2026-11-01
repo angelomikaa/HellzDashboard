@@ -8,19 +8,69 @@ import {
   type LineupRosterMember,
   type LineupSlot,
   type LineupsPayload,
+  type WarMode,
 } from '../../lib/api'
+
+/** War modes in display order (owner 2026-11-01). */
+export const WAR_MODES: readonly WarMode[] = ['vigrid', 'emperium']
+
+export const WAR_MODE_META: Readonly<
+  Record<WarMode, { title: string; shortTitle: string; description: string }>
+> = {
+  vigrid: {
+    title: 'Vingança de Vigrid',
+    shortTitle: 'Vigrid',
+    description: 'Dois campos fixos de 8 parties.',
+  },
+  emperium: {
+    title: 'Guerra do Emperium',
+    shortTitle: 'Emperium',
+    description: 'De 2 a 8 raids, cada uma com 8 parties.',
+  },
+}
+
+/** Raid bounds: the Emperium mode requires at least two and allows up to eight. */
+export const MIN_RAIDS = 2
+export const MAX_RAIDS = 8
+export const VIGRID_RAIDS = 2
+export const DEFAULT_EMPERIUM_RAIDS = 3
 
 export const BATTLEFIELD_IDS: readonly BattlefieldId[] = ['vigrid_field', 'ruinscape']
 
 /** Titles are the owner's words (CONTEXT D-03/D-05). `fileSlug` names the JPG. */
 export const BATTLEFIELD_META: Readonly<
-  Record<BattlefieldId, { title: string; subtitle: string; fileSlug: string }>
+  Record<'vigrid_field' | 'ruinscape', { title: string; subtitle: string; fileSlug: string }>
 > = {
   vigrid_field: { title: 'Vigrid Field', subtitle: 'Raid 1', fileSlug: 'vigrid-field' },
   ruinscape: { title: 'Ruinscape', subtitle: 'Raid 2', fileSlug: 'ruinscape' },
 }
 
-/** Full slot capacity: 8 parties x 5 slots per battlefield (CONTEXT D-03). */
+export interface RaidMeta {
+  title: string
+  subtitle: string
+  fileSlug: string
+}
+
+/** Owner-facing title/subtitle/file slug for one raid of a war mode. */
+export function raidMeta(warMode: WarMode, raidIndex: number): RaidMeta {
+  if (warMode === 'emperium') {
+    return {
+      title: 'Guerra do Emperium',
+      subtitle: `Raid ${raidIndex}`,
+      fileSlug: `emperium-raid-${raidIndex}`,
+    }
+  }
+  if (raidIndex === 1) return BATTLEFIELD_META.vigrid_field
+  return BATTLEFIELD_META.ruinscape
+}
+
+/** Server battlefield id for a raid position in a war mode. */
+export function battlefieldForRaid(warMode: WarMode, raidIndex: number): BattlefieldId {
+  if (warMode === 'emperium') return `emperium_raid_${raidIndex}` as BattlefieldId
+  return raidIndex === 1 ? 'vigrid_field' : 'ruinscape'
+}
+
+/** Full slot capacity: 8 parties x 5 slots per raid (CONTEXT D-03). */
 export const PARTIES_PER_BATTLEFIELD = 8
 export const SLOTS_PER_PARTY = 5
 export const TOTAL_CAPACITY_PER_BATTLEFIELD = PARTIES_PER_BATTLEFIELD * SLOTS_PER_PARTY
@@ -64,7 +114,9 @@ export function classAccentHex(charClass: string | null | undefined): string {
 
 /** Where a roster member currently sits (null = unassigned). */
 export interface LineupAssignment {
+  war_mode: WarMode
   battlefield: BattlefieldId
+  raid_index: number
   party_index: number
   slot_index: number
 }
@@ -92,7 +144,9 @@ export function buildAssignmentMap(payload: LineupsPayload): ReadonlyMap<string,
       for (const slot of party.slots) {
         if (slot.member_id !== null) {
           map.set(slot.member_id, {
+            war_mode: payload.war_mode,
             battlefield: bf.battlefield,
+            raid_index: bf.raid_index,
             party_index: party.party_index,
             slot_index: slot.slot_index,
           })
@@ -113,13 +167,13 @@ export function findMemberAssignment(
 
 /** `Raid 1 · G3` badge text for an assignment (the swap/move indicator). */
 export function assignmentBadge(assignment: LineupAssignment): string {
-  const meta = BATTLEFIELD_META[assignment.battlefield]
+  const meta = raidMeta(assignment.war_mode, assignment.raid_index)
   return `${meta.subtitle} · G${assignment.party_index}`
 }
 
-/** Full callout text: `Vigrid Field (Raid 1) — G7 (Slot 5)`. */
+/** Full callout text: `Guerra do Emperium (Raid 3) — G7 (Slot 5)`. */
 export function assignmentCallout(assignment: LineupAssignment): string {
-  const meta = BATTLEFIELD_META[assignment.battlefield]
+  const meta = raidMeta(assignment.war_mode, assignment.raid_index)
   return `${meta.title} (${meta.subtitle}) — G${assignment.party_index} (Slot ${assignment.slot_index})`
 }
 
@@ -168,10 +222,10 @@ const NETWORK_ERROR =
   'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 const SESSION_ERROR = 'Sua sessão expirou ou você não tem permissão. Entre novamente.'
 const SAVE_ERROR = 'Não foi possível salvar a alteração. Tente novamente.'
-const LOAD_ERROR = 'Não foi possível carregar a lineup. Tente novamente.'
+const LOAD_ERROR = 'Não foi possível carregar a escalação. Tente novamente.'
 
 /**
- * pt-BR copy for a failed lineup read/write (maps server tokens, never raw
+ * pt-BR copy for a failed escalação read/write (maps server tokens, never raw
  * text). `mode` distinguishes a failed LOAD from a failed SAVE so a read error
  * never claims it could not save (10.4 code review WR-07).
  */
@@ -180,14 +234,23 @@ export function lineupErrorCopy(err: unknown, mode: 'read' | 'write' = 'write'):
   if (message.includes('device_mismatch')) return SESSION_ERROR
   if (message.includes('forbidden')) {
     return mode === 'read'
-      ? 'Você não tem permissão para ver a lineup.'
-      : 'Você não tem permissão para alterar a lineup.'
+      ? 'Você não tem permissão para ver a escalação.'
+      : 'Você não tem permissão para alterar a escalação.'
   }
   if (message.includes('invalid_lineup_member')) {
     return 'Este jogador não pode ser escalado (inativo ou fora da lista).'
   }
   if (message.includes('invalid_lineup_label')) {
     return `A função deve ter no máximo ${ROLE_LABEL_MAX} caracteres.`
+  }
+  if (message.includes('invalid_lineup_raid_count') || message.includes('invalid_war_mode')) {
+    return `A guerra deve ter entre ${MIN_RAIDS} e ${MAX_RAIDS} raids.`
+  }
+  if (message.includes('lineup_raid_not_empty')) {
+    return 'Esvazie a raid antes de removê-la.'
+  }
+  if (message.includes('invalid_lineup_party') || message.includes('invalid_lineup_slot')) {
+    return 'Essa posição não existe mais. Recarregue a escalação.'
   }
   if (err instanceof ApiError && err.kind === 'network') return NETWORK_ERROR
   if (err instanceof ApiError && err.kind === 'unauthorized') return SESSION_ERROR

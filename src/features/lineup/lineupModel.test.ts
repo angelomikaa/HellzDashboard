@@ -4,6 +4,7 @@ import {
   assignmentBadge,
   assignmentCallout,
   battlefieldFilledCount,
+  battlefieldForRaid,
   buildAssignmentMap,
   classAccentHex,
   CLASS_ACCENT_HEX,
@@ -11,9 +12,13 @@ import {
   filterAssignableRoster,
   findMemberAssignment,
   isPartyFull,
+  MAX_RAIDS,
+  MIN_RAIDS,
   NULL_CLASS_ACCENT_HEX,
   normalizeRoleLabel,
   partyFilledCount,
+  raidMeta,
+  WAR_MODE_META,
 } from './lineupModel'
 
 function slot(index: number, memberId: string | null, name: string | null = null) {
@@ -43,13 +48,19 @@ const roster: LineupRosterMember[] = [
 ]
 
 const payload: LineupsPayload = {
+  war_mode: 'vigrid',
+  raid_count: 2,
+  min_raids: 2,
+  max_raids: 8,
   battlefields: [
     {
       battlefield: 'vigrid_field',
+      raid_index: 1,
       parties: [party(1, ['a', 'b', null, null, null]), party(2, ['c', null, null, null, null])],
     },
     {
       battlefield: 'ruinscape',
+      raid_index: 2,
       parties: [party(1, [null, null, null, null, null])],
     },
   ],
@@ -60,6 +71,26 @@ describe('lineupModel metadata', () => {
   it('names both battlefields with the owner titles and raid subtitles', () => {
     expect(BATTLEFIELD_META.vigrid_field).toEqual({ title: 'Vigrid Field', subtitle: 'Raid 1', fileSlug: 'vigrid-field' })
     expect(BATTLEFIELD_META.ruinscape).toEqual({ title: 'Ruinscape', subtitle: 'Raid 2', fileSlug: 'ruinscape' })
+  })
+
+  it('names the two war modes and their raid bounds', () => {
+    expect(WAR_MODE_META.vigrid.title).toBe('Vingança de Vigrid')
+    expect(WAR_MODE_META.emperium.title).toBe('Guerra do Emperium')
+    expect(MIN_RAIDS).toBe(2)
+    expect(MAX_RAIDS).toBe(8)
+  })
+
+  it('maps each raid to its owner-facing title and filename slug', () => {
+    expect(raidMeta('vigrid', 1)).toEqual({ title: 'Vigrid Field', subtitle: 'Raid 1', fileSlug: 'vigrid-field' })
+    expect(raidMeta('vigrid', 2)).toEqual({ title: 'Ruinscape', subtitle: 'Raid 2', fileSlug: 'ruinscape' })
+    expect(raidMeta('emperium', 3)).toEqual({
+      title: 'Guerra do Emperium',
+      subtitle: 'Raid 3',
+      fileSlug: 'emperium-raid-3',
+    })
+    expect(battlefieldForRaid('vigrid', 1)).toBe('vigrid_field')
+    expect(battlefieldForRaid('vigrid', 2)).toBe('ruinscape')
+    expect(battlefieldForRaid('emperium', 5)).toBe('emperium_raid_5')
   })
 })
 
@@ -95,20 +126,48 @@ describe('party and battlefield counts', () => {
 
 describe('member assignment lookup', () => {
   it('finds where a member sits, or null when unassigned', () => {
-    expect(findMemberAssignment(payload, 'b')).toEqual({ battlefield: 'vigrid_field', party_index: 1, slot_index: 2 })
+    expect(findMemberAssignment(payload, 'b')).toEqual({
+      war_mode: 'vigrid',
+      battlefield: 'vigrid_field',
+      raid_index: 1,
+      party_index: 1,
+      slot_index: 2,
+    })
     expect(findMemberAssignment(payload, 'zzz')).toBeNull()
   })
 
   it('builds one map entry per seated member', () => {
     const map = buildAssignmentMap(payload)
     expect(map.size).toBe(3)
-    expect(map.get('c')).toEqual({ battlefield: 'vigrid_field', party_index: 2, slot_index: 1 })
+    expect(map.get('c')).toEqual({
+      war_mode: 'vigrid',
+      battlefield: 'vigrid_field',
+      raid_index: 1,
+      party_index: 2,
+      slot_index: 1,
+    })
   })
 
-  it('renders the raid badge and the full callout', () => {
-    const at = { battlefield: 'vigrid_field' as const, party_index: 7, slot_index: 5 }
+  it('renders the raid badge and the full callout for both war modes', () => {
+    const at = {
+      war_mode: 'vigrid' as const,
+      battlefield: 'vigrid_field' as const,
+      raid_index: 1,
+      party_index: 7,
+      slot_index: 5,
+    }
     expect(assignmentBadge(at)).toBe('Raid 1 · G7')
     expect(assignmentCallout(at)).toBe('Vigrid Field (Raid 1) — G7 (Slot 5)')
+
+    const emperium = {
+      war_mode: 'emperium' as const,
+      battlefield: 'emperium_raid_3' as const,
+      raid_index: 3,
+      party_index: 2,
+      slot_index: 4,
+    }
+    expect(assignmentBadge(emperium)).toBe('Raid 3 · G2')
+    expect(assignmentCallout(emperium)).toBe('Guerra do Emperium (Raid 3) — G2 (Slot 4)')
   })
 })
 
@@ -123,10 +182,27 @@ describe('filterAssignableRoster', () => {
   })
 
   it('puts unassigned members before assigned ones', () => {
-    const onlyZetaAssigned = new Map([['a', { battlefield: 'ruinscape' as const, party_index: 1, slot_index: 1 }]])
+    const onlyZetaAssigned = new Map([
+      [
+        'a',
+        {
+          war_mode: 'vigrid' as const,
+          battlefield: 'ruinscape' as const,
+          raid_index: 2,
+          party_index: 1,
+          slot_index: 1,
+        },
+      ],
+    ])
     const entries = filterAssignableRoster(roster, onlyZetaAssigned, '')
     expect(entries.map((e) => e.member.display_name)).toEqual(['alpha', 'Mike', 'Zeta'])
-    expect(entries[2].assignment).toEqual({ battlefield: 'ruinscape', party_index: 1, slot_index: 1 })
+    expect(entries[2].assignment).toEqual({
+      war_mode: 'vigrid',
+      battlefield: 'ruinscape',
+      raid_index: 2,
+      party_index: 1,
+      slot_index: 1,
+    })
     expect(entries[0].assignment).toBeNull()
   })
 

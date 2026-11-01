@@ -5,6 +5,13 @@ import { describe, expect, it } from 'vitest'
 import type { BattlefieldId, BattlefieldLineup, LineupParty } from '../../lib/api'
 import { buildLineupExportPlan, LINEUP_EXPORT_HEIGHT, LINEUP_EXPORT_WIDTH, lineupFilename } from './lineupExport'
 
+/** Raid position for the battlefield id used by the tests. */
+function raidIndexFor(battlefield: BattlefieldId): number {
+  if (battlefield === 'vigrid_field') return 1
+  if (battlefield === 'ruinscape') return 2
+  return Number(battlefield.replace('emperium_raid_', ''))
+}
+
 /** A battlefield with all 8 parties; `seated(party, slot)` decides occupancy. */
 function lineup(
   battlefield: BattlefieldId,
@@ -31,7 +38,7 @@ function lineup(
       slots,
     }
   })
-  return { battlefield, parties }
+  return { battlefield, raid_index: raidIndexFor(battlefield), parties }
 }
 
 describe('buildLineupExportPlan — canvas and grid geometry', () => {
@@ -158,16 +165,22 @@ describe('buildLineupExportPlan — labels, title and filenames', () => {
     expect(plan.columns[2].roleLabel).toBeNull()
   })
 
-  it('titles each battlefield with its owner-facing name and raid', () => {
+  it('titles each raid with its owner-facing name and war mode', () => {
     expect(buildLineupExportPlan(lineup('vigrid_field')).header.title.text).toBe('VIGRID FIELD — RAID 1')
     expect(buildLineupExportPlan(lineup('ruinscape')).header.title.text).toBe('RUINSCAPE — RAID 2')
-    expect(buildLineupExportPlan(lineup('vigrid_field')).header.kicker.text).toBe('HELLZ — PAINEL GERAL')
+    expect(buildLineupExportPlan(lineup('emperium_raid_3'), 'emperium').header.title.text).toBe(
+      'GUERRA DO EMPERIUM — RAID 3',
+    )
+    expect(buildLineupExportPlan(lineup('vigrid_field')).header.kicker.text).toBe('HELLZ — ESCALAÇÃO')
   })
 
-  it('names the download hellz-lineup-<battlefield>.jpg', () => {
-    expect(buildLineupExportPlan(lineup('vigrid_field')).fileName).toBe('hellz-lineup-vigrid-field.jpg')
-    expect(buildLineupExportPlan(lineup('ruinscape')).fileName).toBe('hellz-lineup-ruinscape.jpg')
-    expect(lineupFilename(lineup('ruinscape'))).toBe('hellz-lineup-ruinscape.jpg')
+  it('names the download hellz-escalacao-<raid>.jpg', () => {
+    expect(buildLineupExportPlan(lineup('vigrid_field')).fileName).toBe('hellz-escalacao-vigrid-field.jpg')
+    expect(buildLineupExportPlan(lineup('ruinscape')).fileName).toBe('hellz-escalacao-ruinscape.jpg')
+    expect(buildLineupExportPlan(lineup('emperium_raid_3'), 'emperium').fileName).toBe(
+      'hellz-escalacao-emperium-raid-3.jpg',
+    )
+    expect(lineupFilename(lineup('ruinscape'))).toBe('hellz-escalacao-ruinscape.jpg')
   })
 
   it('builds a class colour legend with one entry per catalog class', () => {
@@ -177,7 +190,7 @@ describe('buildLineupExportPlan — labels, title and filenames', () => {
   })
 
   it('renders a missing party as five vacant slots instead of dropping the column', () => {
-    const partial: BattlefieldLineup = { battlefield: 'ruinscape', parties: [] }
+    const partial: BattlefieldLineup = { battlefield: 'ruinscape', raid_index: 2, parties: [] }
     const plan = buildLineupExportPlan(partial)
     expect(plan.columns).toHaveLength(8)
     expect(plan.columns.every((c) => c.slots.length === 5 && c.footer.filled === 0)).toBe(true)

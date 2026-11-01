@@ -1,21 +1,26 @@
-// Lineup — Campos de Batalha (phase 10.4, LNUP-01..03).
+// Escalação — war modes (phase 10.4 / 0056, LNUP-01..03).
 //
-// Members see a read-only grid of both battlefields with their own party/slot
-// highlighted ("Sua PT"). Officers and the owner additionally edit any slot
-// (searchable member picker, cross-party move/swap indicator, "Limpar slot")
-// and any party's role label. Every write goes through a device-bound
-// SECURITY DEFINER RPC (migration 0040/0041); the isStaff flag only decides
-// which controls render. It is UX-only, never the security boundary.
-import { useEffect, useState } from 'react'
+// Vingança de Vigrid keeps the two fixed battlefields (Vigrid Field = Raid 1,
+// Ruinscape = Raid 2), 8 parties x 5 slots each. Guerra do Emperium uses 2..8
+// raids with the same 8x5 structure; officers can add/remove raids (empty ones
+// only). Members see a read-only grid with their own party/slot highlighted
+// ("Sua PT") and their current raid in the callout. Officers and the owner
+// additionally edit any slot (searchable picker, cross-party move/swap
+// indicator, "Limpar slot") and any party role label. Every write goes through
+// a device-bound SECURITY DEFINER RPC (migrations 0040/0044/0056); isStaff only
+// decides which controls render. It is UX-only, never the security boundary.
+import { useEffect, useRef, useState } from 'react'
 import {
   fetchLineups,
   setLineupPartyLabel,
+  setLineupRaidCount,
   setLineupSlot,
-  type BattlefieldId,
+  type BattlefieldLineup,
   type LineupParty,
   type LineupRosterMember,
   type LineupSlot,
   type LineupsPayload,
+  type WarMode,
 } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { ClassCrest } from '../assets/ClassCrest'
@@ -25,8 +30,6 @@ import {
   assignmentCallout,
   assignmentBadge,
   battlefieldFilledCount,
-  BATTLEFIELD_IDS,
-  BATTLEFIELD_META,
   buildAssignmentMap,
   classAccentHex,
   filterAssignableRoster,
@@ -35,19 +38,20 @@ import {
   lineupErrorCopy,
   normalizeRoleLabel,
   partyFilledCount,
+  raidMeta,
   ROLE_LABEL_MAX,
   ROLE_LABEL_PRESETS,
   SLOTS_PER_PARTY,
   TOTAL_CAPACITY_PER_BATTLEFIELD,
+  WAR_MODES,
+  WAR_MODE_META,
   type LineupAssignment,
 } from './lineupModel'
 
-type Mutation = (
-  session: NeoFootSession,
-) => Promise<LineupsPayload>
+type Mutation = (session: NeoFootSession) => Promise<LineupsPayload>
 
-/** Which JPG button is busy: one battlefield, or both ("Baixar ambas"). */
-type ExportScope = BattlefieldId | 'both'
+/** Which JPG button is busy: one raid id, or all raids ("todas"). */
+type ExportScope = string
 
 /** Enumeration-safe copy for a failed JPG render/download (no internals). */
 const EXPORT_ERROR_COPY = 'Não foi possível gerar o JPG. Tente novamente.'
@@ -55,34 +59,62 @@ const EXPORT_ERROR_COPY = 'Não foi possível gerar o JPG. Tente novamente.'
 export function LineupPage({ session }: { session: NeoFootSession }) {
   const isStaff = session.member_role === 'officer' || session.member_role === 'owner'
 
+  const [mode, setMode] = useState<WarMode>('vigrid')
+  const modeRef = useRef<WarMode>(mode)
   const [payload, setPayload] = useState<LineupsPayload | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadingMode, setLoadingMode] = useState(true)
   const [actionError, setActionError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [battlefield, setBattlefield] = useState<BattlefieldId>('vigrid_field')
+  const [selectedRaid, setSelectedRaid] = useState(1)
   const [stacked, setStacked] = useState(false)
   const [exporting, setExporting] = useState<ExportScope | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
 
   useEffect(() => {
+    modeRef.current = mode
+  }, [mode])
+
+  useEffect(() => {
     let cancelled = false
-    fetchLineups(session)
+    setLoadingMode(true)
+    setLoadError(null)
+    fetchLineups(session, mode)
       .then((data) => {
-        if (!cancelled) setPayload(data)
+        if (cancelled) return
+        setPayload(data)
+        setSelectedRaid((current) =>
+          data.battlefields.some((raid) => raid.raid_index === current)
+            ? current
+            : (data.battlefields[0]?.raid_index ?? 1),
+        )
       })
       .catch((err: unknown) => {
         if (!cancelled) setLoadError(lineupErrorCopy(err, 'read'))
       })
+      .finally(() => {
+        if (!cancelled) setLoadingMode(false)
+      })
     return () => {
       cancelled = true
     }
-  }, [session])
+  }, [session, mode])
 
   async function runMutation(mutation: Mutation) {
     setSaving(true)
     setActionError(null)
     try {
-      setPayload(await mutation(session))
+      const next = await mutation(session)
+      // A mode switch may have landed while this write was in flight; the new
+      // mode's effect already owns the payload, so never overwrite it with the
+      // old mode's response.
+      if (next.war_mode !== modeRef.current) return
+      setPayload(next)
+      setSelectedRaid((current) =>
+        next.battlefields.some((raid) => raid.raid_index === current)
+          ? current
+          : (next.battlefields[next.battlefields.length - 1]?.raid_index ?? 1),
+      )
     } catch (err) {
       setActionError(lineupErrorCopy(err))
     } finally {
@@ -91,17 +123,13 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
   }
 
   // Sequential, not parallel: browsers block a burst of programmatic downloads.
-  async function exportJpgs(ids: BattlefieldId[]) {
-    if (payload === null) return
-    setExporting(ids.length === 1 ? ids[0] : 'both')
+  async function exportJpgs(raids: BattlefieldLineup[]) {
+    if (payload === null || raids.length === 0) return
+    setExporting(raids.length === 1 ? raids[0].battlefield : 'todas')
     setExportError(null)
     try {
-      for (const id of ids) {
-        const lineup = payload.battlefields.find((b) => b.battlefield === id) ?? {
-          battlefield: id,
-          parties: [],
-        }
-        await downloadLineupJpg(lineup)
+      for (const raid of raids) {
+        await downloadLineupJpg(raid, payload.war_mode)
       }
     } catch {
       setExportError(EXPORT_ERROR_COPY)
@@ -117,52 +145,141 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
       </p>
     )
   }
-  if (payload === null) {
+  if (payload === null || payload.war_mode !== mode || loadingMode) {
     return <p className="text-base text-muted">Carregando…</p>
   }
 
   const own = findMemberAssignment(payload, session.member_id)
-  const visible: BattlefieldId[] = stacked ? [...BATTLEFIELD_IDS] : [battlefield]
+  const raids = payload.battlefields
+  const activeRaid = raids.find((raid) => raid.raid_index === selectedRaid) ?? raids[0] ?? null
+  const visible: BattlefieldLineup[] = stacked ? raids : activeRaid === null ? [] : [activeRaid]
+  const modeMeta = WAR_MODE_META[payload.war_mode]
+  const lastRaid = raids[raids.length - 1]
+  const lastRaidFilled = lastRaid === undefined ? 0 : battlefieldFilledCount(lastRaid)
+  const canRemoveRaid =
+    payload.war_mode === 'emperium' && payload.raid_count > payload.min_raids && lastRaidFilled === 0
+  const canAddRaid = payload.war_mode === 'emperium' && payload.raid_count < payload.max_raids
 
   return (
     <section aria-labelledby="lineup-title" className="flex flex-col gap-4">
       <header className="flex flex-col gap-3">
         <h1 id="lineup-title" className="font-display text-2xl font-bold text-content">
-          Lineup — Campos de Batalha
+          Escalação — {modeMeta.title}
         </h1>
+        <p className="text-sm text-muted">{modeMeta.description}</p>
+
+        <div role="tablist" aria-label="Modo de guerra" className="flex flex-wrap gap-2">
+          {WAR_MODES.map((warMode) => {
+            const active = mode === warMode
+            return (
+              <button
+                key={warMode}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => {
+                  setStacked(false)
+                  setMode(warMode)
+                }}
+                className={`h-11 rounded-md border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  active
+                    ? 'border-accent text-content glow-accent-soft'
+                    : 'border-line text-muted hover-control hover:text-content'
+                }`}
+              >
+                {WAR_MODE_META[warMode].title}
+              </button>
+            )
+          })}
+        </div>
+
         {own !== null && (
           <p className="rounded-md border border-accent bg-surface px-3 py-2 text-sm text-content glow-accent-soft">
             <span className="font-semibold">Você está em:</span> {assignmentCallout(own)}
           </p>
         )}
+
+        {payload.war_mode === 'emperium' && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-3 py-2">
+            <span className="text-sm font-semibold text-content">
+              Raids: {payload.raid_count} / {payload.max_raids}
+            </span>
+            {isStaff && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Remover raid"
+                  disabled={saving || !canRemoveRaid}
+                  title={
+                    lastRaidFilled > 0
+                      ? `Esvazie a ${lastRaid === undefined ? 'última raid' : raidMeta(payload.war_mode, lastRaid.raid_index).subtitle} antes de removê-la.`
+                      : 'Remover a última raid'
+                  }
+                  onClick={() =>
+                    void runMutation((s) => setLineupRaidCount(s, 'emperium', payload.raid_count - 1))
+                  }
+                  className="h-11 min-w-11 rounded-md border border-line px-3 text-lg font-bold text-content hover-control disabled:opacity-40"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  aria-label="Adicionar raid"
+                  disabled={saving || !canAddRaid}
+                  onClick={() =>
+                    void runMutation((s) => setLineupRaidCount(s, 'emperium', payload.raid_count + 1))
+                  }
+                  className="h-11 min-w-11 rounded-md border border-accent px-3 text-lg font-bold text-content hover-control disabled:opacity-40"
+                >
+                  +
+                </button>
+              </>
+            )}
+            {!isStaff && (
+              <span className="text-sm text-muted">
+                Mínimo {payload.min_raids}, máximo {payload.max_raids}.
+              </span>
+            )}
+            {isStaff && !canRemoveRaid && payload.raid_count > payload.min_raids && lastRaidFilled > 0 && (
+              <span className="text-xs text-muted">
+                Esvazie a {lastRaid === undefined ? 'última raid' : raidMeta(payload.war_mode, lastRaid.raid_index).subtitle} para removê-la.
+              </span>
+            )}
+          </div>
+        )}
+
         <div role="group" aria-label="Baixar JPG" className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={exporting !== null}
-            aria-busy={exporting === 'vigrid_field'}
-            onClick={() => void exportJpgs(['vigrid_field'])}
-            className="h-11 rounded-md border border-line px-3 text-sm text-content hover-control disabled:opacity-60"
-          >
-            {exporting === 'vigrid_field' ? 'Gerando JPG…' : 'Baixar JPG — Vigrid Field (Raid 1)'}
-          </button>
-          <button
-            type="button"
-            disabled={exporting !== null}
-            aria-busy={exporting === 'ruinscape'}
-            onClick={() => void exportJpgs(['ruinscape'])}
-            className="h-11 rounded-md border border-line px-3 text-sm text-content hover-control disabled:opacity-60"
-          >
-            {exporting === 'ruinscape' ? 'Gerando JPG…' : 'Baixar JPG — Ruinscape (Raid 2)'}
-          </button>
-          <button
-            type="button"
-            disabled={exporting !== null}
-            aria-busy={exporting === 'both'}
-            onClick={() => void exportJpgs(['vigrid_field', 'ruinscape'])}
-            className="h-11 rounded-md border border-accent px-3 text-sm font-semibold text-content hover-control disabled:opacity-60"
-          >
-            {exporting === 'both' ? 'Gerando JPG…' : 'Baixar ambas (JPG)'}
-          </button>
+          {raids.map((raid) => {
+            const meta = raidMeta(payload.war_mode, raid.raid_index)
+            const busy = exporting === raid.battlefield
+            return (
+              <button
+                key={raid.battlefield}
+                type="button"
+                disabled={exporting !== null}
+                aria-busy={busy}
+                onClick={() => void exportJpgs([raid])}
+                className="h-11 rounded-md border border-line px-3 text-sm text-content hover-control disabled:opacity-60"
+              >
+                {busy
+                  ? 'Gerando JPG…'
+                  : payload.war_mode === 'emperium'
+                    ? `Baixar JPG — ${meta.subtitle}`
+                    : `Baixar JPG — ${meta.title} (${meta.subtitle})`}
+              </button>
+            )
+          })}
+          {raids.length > 1 && (
+            <button
+              type="button"
+              disabled={exporting !== null}
+              aria-busy={exporting === 'todas'}
+              onClick={() => void exportJpgs(raids)}
+              className="h-11 rounded-md border border-accent px-3 text-sm font-semibold text-content hover-control disabled:opacity-60"
+            >
+              {exporting === 'todas' ? 'Gerando JPG…' : 'Baixar todas (JPG)'}
+            </button>
+          )}
         </div>
         {exportError !== null && (
           <p role="alert" className="rounded-md border border-line bg-surface px-3 py-2 text-sm text-content">
@@ -171,39 +288,40 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
         )}
       </header>
 
-      <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Campos de batalha">
-        {BATTLEFIELD_IDS.map((bf) => {
-          const meta = BATTLEFIELD_META[bf]
-          const filled = battlefieldFilledCount(
-            payload.battlefields.find((b) => b.battlefield === bf) ?? { parties: [] },
-          )
-          const active = !stacked && battlefield === bf
+      <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Raids">
+        {raids.map((raid) => {
+          const meta = raidMeta(payload.war_mode, raid.raid_index)
+          const filled = battlefieldFilledCount(raid)
+          const active = !stacked && activeRaid?.raid_index === raid.raid_index
           return (
             <button
-              key={bf}
+              key={raid.battlefield}
               type="button"
               role="tab"
               aria-selected={active}
               onClick={() => {
                 setStacked(false)
-                setBattlefield(bf)
+                setSelectedRaid(raid.raid_index)
               }}
               className={`h-11 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                 active ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
               }`}
             >
-              {meta.title} ({meta.subtitle}) <span className="ml-1 text-muted">{filled}/{TOTAL_CAPACITY_PER_BATTLEFIELD}</span>
+              {payload.war_mode === 'emperium' ? meta.subtitle : `${meta.title} (${meta.subtitle})`}{' '}
+              <span className="ml-1 text-muted">{filled}/{TOTAL_CAPACITY_PER_BATTLEFIELD}</span>
             </button>
           )
         })}
-        <button
-          type="button"
-          onClick={() => setStacked((v) => !v)}
-          aria-pressed={stacked}
-          className="hidden h-11 rounded-md border border-line px-3 text-sm text-content hover-control md:inline-flex md:items-center"
-        >
-          {stacked ? 'Ver um campo' : 'Ver ambas'}
-        </button>
+        {raids.length > 1 && (
+          <button
+            type="button"
+            onClick={() => setStacked((value) => !value)}
+            aria-pressed={stacked}
+            className="hidden h-11 rounded-md border border-line px-3 text-sm text-content hover-control md:inline-flex md:items-center"
+          >
+            {stacked ? 'Ver uma raid' : 'Ver todas'}
+          </button>
+        )}
       </div>
 
       {actionError !== null && (
@@ -212,27 +330,35 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
         </p>
       )}
 
-      {visible.map((bf) => (
+      {visible.map((raid) => (
         <BattlefieldGrid
-          key={bf}
-          battlefield={bf}
+          key={raid.battlefield}
+          raid={raid}
+          warMode={payload.war_mode}
           payload={payload}
           memberId={session.member_id}
           isStaff={isStaff}
           saving={saving}
           onAssign={(party, slot, memberId) =>
-            void runMutation((s) => setLineupSlot(s, bf, party, slot, memberId))
+            void runMutation((s) =>
+              setLineupSlot(s, payload.war_mode, raid.battlefield, party, slot, memberId),
+            )
           }
-          onLabel={(party, label) => void runMutation((s) => setLineupPartyLabel(s, bf, party, label))}
+          onLabel={(party, label) =>
+            void runMutation((s) =>
+              setLineupPartyLabel(s, payload.war_mode, raid.battlefield, party, label),
+            )
+          }
         />
       ))}
     </section>
   )
 }
 
-/** Pure grid for one battlefield: 8 party cards, responsive. Exported for tests. */
+/** Pure grid for one raid: 8 party cards, responsive. Exported for tests. */
 export function BattlefieldGrid({
-  battlefield,
+  raid,
+  warMode,
   payload,
   memberId,
   isStaff,
@@ -240,7 +366,8 @@ export function BattlefieldGrid({
   onAssign,
   onLabel,
 }: {
-  battlefield: BattlefieldId
+  raid: BattlefieldLineup
+  warMode: WarMode
   payload: LineupsPayload
   memberId: string
   isStaff: boolean
@@ -248,18 +375,23 @@ export function BattlefieldGrid({
   onAssign: (partyIndex: number, slotIndex: number, memberId: string | null) => void
   onLabel: (partyIndex: number, label: string | null) => void
 }) {
-  const meta = BATTLEFIELD_META[battlefield]
-  const lineup = payload.battlefields.find((b) => b.battlefield === battlefield)
-  const parties = lineup?.parties ?? []
-  const filled = battlefieldFilledCount({ parties })
+  const meta = raidMeta(warMode, raid.raid_index)
+  const parties = raid.parties
+  const filled = battlefieldFilledCount(raid)
   const assignments = buildAssignmentMap(payload)
+  const ownRaid = parties.some((party) => party.slots.some((slot) => slot.member_id === memberId))
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline gap-3">
         <h2 className="font-display text-xl font-bold text-content">
-          {meta.title} — {meta.subtitle}
+          {warMode === 'emperium' ? meta.subtitle : `${meta.title} — ${meta.subtitle}`}
         </h2>
+        {ownRaid && (
+          <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
+            Sua Raid
+          </span>
+        )}
         <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
           {filled}/{TOTAL_CAPACITY_PER_BATTLEFIELD} escalados
         </span>
@@ -479,7 +611,7 @@ function SlotPicker({
                 </span>
                 {assignment !== null && (
                   <span className="shrink-0 whitespace-nowrap rounded border border-line px-1.5 text-xs text-amber-400">
-                    {assignmentBadge(assignment)} · mover
+                    {assignmentBadge(assignment)} → mover
                   </span>
                 )}
               </button>

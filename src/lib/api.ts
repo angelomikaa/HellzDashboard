@@ -1816,16 +1816,19 @@ export async function deleteIdentityProof(
 }
 
 // ---------------------------------------------------------------------------
-// Phase 10.4 (LNUP-01..03) — battlefield lineups. Three SECURITY DEFINER RPCs
-// from migration 0040 (get_lineups read; set_lineup_slot and
-// set_lineup_party_label officer/owner writes, device-bound). The server gates
+// Phase 10.4 / 0056 — Escalação (Vigrid + Emperium). SECURITY DEFINER RPCs
+// from migration 0040 (lineup tables) and 0056 (war modes): get_lineups_mode
+// read; set_lineup_slot_mode, set_lineup_party_label_mode and
+// set_lineup_raid_count officer/owner writes, device-bound. The server gates
 // everything; these wrappers add NO enforcement. The payload is a CLOSED field
 // list: display-only roster fields, never stats, points, OVR, key-stat config
 // or pin_hash. Each wrapper validates the shape so a broken deploy surfaces as
 // ApiError instead of a crash in the grid render path.
 // ---------------------------------------------------------------------------
 
-export type BattlefieldId = 'vigrid_field' | 'ruinscape'
+export type WarMode = 'vigrid' | 'emperium'
+
+export type BattlefieldId = 'vigrid_field' | 'ruinscape' | `emperium_raid_${number}`
 
 export interface LineupRosterMember {
   member_id: string
@@ -1851,15 +1854,21 @@ export interface LineupParty {
 
 export interface BattlefieldLineup {
   battlefield: BattlefieldId
+  /** 1-based raid position inside the war mode (1..8). */
+  raid_index: number
   parties: LineupParty[]
 }
 
 export interface LineupsPayload {
+  war_mode: WarMode
+  raid_count: number
+  min_raids: number
+  max_raids: number
   battlefields: BattlefieldLineup[]
   roster: LineupRosterMember[]
 }
 
-const BATTLEFIELD_IDS: readonly BattlefieldId[] = ['vigrid_field', 'ruinscape']
+const EMPERIUM_BATTLEFIELD_RE = /^emperium_raid_([1-8])$/
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -1867,6 +1876,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function nullableString(value: unknown): value is string | null {
   return value === null || typeof value === 'string'
+}
+
+/** Derive the raid position for a legacy payload that predates raid_index. */
+function raidIndexFromBattlefield(warMode: WarMode, battlefield: string): number | null {
+  if (warMode === 'vigrid') {
+    if (battlefield === 'vigrid_field') return 1
+    if (battlefield === 'ruinscape') return 2
+    return null
+  }
+  const match = EMPERIUM_BATTLEFIELD_RE.exec(battlefield)
+  return match === null ? null : Number(match[1])
 }
 
 function asLineupSlot(value: unknown): LineupSlot {
@@ -1906,22 +1926,30 @@ function asLineupParty(value: unknown): LineupParty {
   }
 }
 
-/** Narrow the get_lineups / set_* jsonb payload; anything else is a broken deploy. */
+/** Narrow the get_lineups_mode / set_* jsonb payload; anything else is a broken deploy. */
 export function asLineupsPayload(value: unknown): LineupsPayload {
   if (!isRecord(value) || !Array.isArray(value.battlefields) || !Array.isArray(value.roster)) {
     throw new ApiError(0, 'server', 'malformed lineups response')
   }
+  const war_mode: WarMode = value.war_mode === 'emperium' ? 'emperium' : 'vigrid'
   const battlefields: BattlefieldLineup[] = value.battlefields.map((bf) => {
+    if (!isRecord(bf) || typeof bf.battlefield !== 'string' || !Array.isArray(bf.parties)) {
+      throw new ApiError(0, 'server', 'malformed get_lineups battlefield')
+    }
+    const derived = raidIndexFromBattlefield(war_mode, bf.battlefield)
+    const raidIndex = typeof bf.raid_index === 'number' ? bf.raid_index : derived
     if (
-      !isRecord(bf) ||
-      typeof bf.battlefield !== 'string' ||
-      !BATTLEFIELD_IDS.includes(bf.battlefield as BattlefieldId) ||
-      !Array.isArray(bf.parties)
+      derived === null ||
+      raidIndex === null ||
+      raidIndex < 1 ||
+      raidIndex > 8 ||
+      derived !== raidIndex
     ) {
       throw new ApiError(0, 'server', 'malformed get_lineups battlefield')
     }
     return {
       battlefield: bf.battlefield as BattlefieldId,
+      raid_index: raidIndex,
       parties: bf.parties.map(asLineupParty),
     }
   })
@@ -1941,33 +1969,48 @@ export function asLineupsPayload(value: unknown): LineupsPayload {
       char_function: m.char_function as LineupRosterMember['char_function'],
     }
   })
-  return { battlefields, roster }
+  const raid_count =
+    typeof value.raid_count === 'number' ? value.raid_count : Math.max(2, battlefields.length)
+  return {
+    war_mode,
+    raid_count,
+    min_raids: typeof value.min_raids === 'number' ? value.min_raids : 2,
+    max_raids: typeof value.max_raids === 'number' ? value.max_raids : 8,
+    battlefields,
+    roster,
+  }
 }
 
-/** Read both battlefields + the assignable roster (any active member). */
-export async function fetchLineups(session: NeoFootSession): Promise<LineupsPayload> {
-  const res = await restFetch(session, '/rpc/get_lineups', {
+/** Read one war mode + the assignable roster (any active member). */
+export async function fetchLineups(
+  session: NeoFootSession,
+  warMode: WarMode = 'vigrid',
+): Promise<LineupsPayload> {
+  const res = await restFetch(session, '/rpc/get_lineups_mode', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify({ p_war_mode: warMode }),
   })
   return asLineupsPayload(await parseBody<unknown>(res))
 }
 
 /**
  * Set or clear (memberId = null) one slot (officer/owner). The server moves a
- * seated player out of their old slot and swaps when the target was occupied.
- * Errors surface as ApiError: invalid_lineup_member, forbidden, device_mismatch.
+ * seated player out of their old slot inside the same war mode and swaps when
+ * the target was occupied. Errors surface as ApiError: invalid_lineup_member,
+ * forbidden, device_mismatch.
  */
 export async function setLineupSlot(
   session: NeoFootSession,
+  warMode: WarMode,
   battlefield: BattlefieldId,
   partyIndex: number,
   slotIndex: number,
   memberId: string | null,
 ): Promise<LineupsPayload> {
-  const res = await restFetch(session, '/rpc/set_lineup_slot', {
+  const res = await restFetch(session, '/rpc/set_lineup_slot_mode', {
     method: 'POST',
     body: JSON.stringify({
+      p_war_mode: warMode,
       p_battlefield: battlefield,
       p_party: partyIndex,
       p_slot: slotIndex,
@@ -1980,17 +2023,32 @@ export async function setLineupSlot(
 /** Edit or clear (roleLabel = null or blank) a party role label (officer/owner). */
 export async function setLineupPartyLabel(
   session: NeoFootSession,
+  warMode: WarMode,
   battlefield: BattlefieldId,
   partyIndex: number,
   roleLabel: string | null,
 ): Promise<LineupsPayload> {
-  const res = await restFetch(session, '/rpc/set_lineup_party_label', {
+  const res = await restFetch(session, '/rpc/set_lineup_party_label_mode', {
     method: 'POST',
     body: JSON.stringify({
+      p_war_mode: warMode,
       p_battlefield: battlefield,
       p_party: partyIndex,
       p_label: roleLabel,
     }),
+  })
+  return asLineupsPayload(await parseBody<unknown>(res))
+}
+
+/** Change the Emperium raid count (officer/owner; 2..8, empty extras only). */
+export async function setLineupRaidCount(
+  session: NeoFootSession,
+  warMode: WarMode,
+  raidCount: number,
+): Promise<LineupsPayload> {
+  const res = await restFetch(session, '/rpc/set_lineup_raid_count', {
+    method: 'POST',
+    body: JSON.stringify({ p_war_mode: warMode, p_raid_count: raidCount }),
   })
   return asLineupsPayload(await parseBody<unknown>(res))
 }

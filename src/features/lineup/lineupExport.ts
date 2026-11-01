@@ -1,4 +1,4 @@
-// lineupExport.ts — the battlefield lineup JPG export (phase 10.4, LNUP-05).
+// lineupExport.ts — the Escalação JPG export (phase 10.4 / 0056, LNUP-05).
 //
 // Same architecture as the card export (src/features/export/cardExport.ts):
 // a PURE layout planner (buildLineupExportPlan — no canvas, no DOM, testable)
@@ -16,16 +16,15 @@
 // image or a cross-origin URL. The JPEG has no alpha, so the background is
 // painted over the full canvas first.
 //
-// Export content: the battlefield title, the filled/40 counter, the 8 party
-// columns (role banner, 5 slots, N/5 footer) and a class colour legend. No
-// stats, OVR or key-stat config — the closed field list is the roster
-// payload's display fields only.
+// Export content: the raid title, the filled/40 counter, the 8 party columns
+// (role banner, 5 slots, N/5 footer) and a class colour legend. No stats, OVR
+// or key-stat config — the closed field list is the roster payload's display
+// fields only.
 import markUrl from '../../assets/hellz-mark.svg'
-import type { BattlefieldLineup, LineupParty, LineupSlot } from '../../lib/api'
+import type { BattlefieldLineup, LineupParty, LineupSlot, WarMode } from '../../lib/api'
 import { classLabel } from '../../lib/classLabels'
 import { iconSrcFor } from '../assets/ClassCrest'
 import {
-  BATTLEFIELD_META,
   CLASS_ACCENT_HEX,
   PARTIES_PER_BATTLEFIELD,
   SLOTS_PER_PARTY,
@@ -33,6 +32,7 @@ import {
   classAccentHex,
   isPartyFull,
   partyFilledCount,
+  raidMeta,
 } from './lineupModel'
 
 export const LINEUP_EXPORT_WIDTH = 1920
@@ -127,6 +127,7 @@ export interface LineupExportLegendItem {
 export interface LineupExportPlan {
   width: number
   height: number
+  warMode: WarMode
   battlefield: BattlefieldLineup['battlefield']
   fileName: string
   header: {
@@ -215,12 +216,15 @@ function buildColumn(partyIndex: number, party: LineupParty | null, col: number)
 }
 
 /**
- * Build the full 1920×1080 lineup layout plan for one battlefield. PURE — no
+ * Build the full 1920×1080 escalação layout plan for one raid. PURE — no
  * canvas, no DOM, no I/O. Missing parties or slots render as vacant, so the
  * plan always has 8 columns × 5 slots.
  */
-export function buildLineupExportPlan(lineup: BattlefieldLineup): LineupExportPlan {
-  const meta = BATTLEFIELD_META[lineup.battlefield]
+export function buildLineupExportPlan(
+  lineup: BattlefieldLineup,
+  warMode: WarMode = 'vigrid',
+): LineupExportPlan {
+  const meta = raidMeta(warMode, lineup.raid_index)
   const partiesByIndex = new Map(lineup.parties.map((p) => [p.party_index, p]))
 
   const columns = Array.from({ length: PARTIES_PER_BATTLEFIELD }, (_, col) =>
@@ -241,11 +245,12 @@ export function buildLineupExportPlan(lineup: BattlefieldLineup): LineupExportPl
   return {
     width: LINEUP_EXPORT_WIDTH,
     height: LINEUP_EXPORT_HEIGHT,
+    warMode,
     battlefield: lineup.battlefield,
-    fileName: `hellz-lineup-${meta.fileSlug}.jpg`,
+    fileName: `hellz-escalacao-${meta.fileSlug}.jpg`,
     header: {
       mark: { src: markUrl, rect: { x: MARGIN, y: LAYOUT.markY, w: LAYOUT.markSize, h: LAYOUT.markSize } },
-      kicker: { text: 'HELLZ — PAINEL GERAL', x: MARGIN + LAYOUT.markSize + 20, y: 62 },
+      kicker: { text: 'HELLZ — ESCALAÇÃO', x: MARGIN + LAYOUT.markSize + 20, y: 62 },
       title: {
         text: `${meta.title.toUpperCase()} — ${meta.subtitle.toUpperCase()}`,
         x: MARGIN + LAYOUT.markSize + 20,
@@ -262,9 +267,9 @@ export function buildLineupExportPlan(lineup: BattlefieldLineup): LineupExportPl
   }
 }
 
-/** Export filename contract: hellz-lineup-vigrid-field.jpg / hellz-lineup-ruinscape.jpg. */
-export function lineupFilename(lineup: BattlefieldLineup): string {
-  return buildLineupExportPlan(lineup).fileName
+/** Export filename contract: hellz-escalacao-<mode>-<raid>.jpg. */
+export function lineupFilename(lineup: BattlefieldLineup, warMode: WarMode = 'vigrid'): string {
+  return buildLineupExportPlan(lineup, warMode).fileName
 }
 
 // ---------------------------------------------------------------------------
@@ -539,12 +544,15 @@ export async function renderLineupCanvas(canvas: HTMLCanvasElement, plan: Lineup
 }
 
 /**
- * Render one battlefield to a 1920×1080 JPEG and trigger a browser download
- * named by the plan's filename contract. Same-origin images only, so the
- * canvas is never tainted and toBlob succeeds.
+ * Render one raid to a 1920×1080 JPEG and trigger a browser download named by
+ * the plan's filename contract. Same-origin images only, so the canvas is
+ * never tainted and toBlob succeeds.
  */
-export async function downloadLineupJpg(lineup: BattlefieldLineup): Promise<void> {
-  const plan = buildLineupExportPlan(lineup)
+export async function downloadLineupJpg(
+  lineup: BattlefieldLineup,
+  warMode: WarMode = 'vigrid',
+): Promise<void> {
+  const plan = buildLineupExportPlan(lineup, warMode)
   const canvas = document.createElement('canvas')
   canvas.width = plan.width
   canvas.height = plan.height
@@ -552,7 +560,7 @@ export async function downloadLineupJpg(lineup: BattlefieldLineup): Promise<void
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, 'image/jpeg', LINEUP_EXPORT_JPEG_QUALITY),
   )
-  if (blob === null) throw new Error('falha ao gerar o JPG da lineup')
+  if (blob === null) throw new Error('falha ao gerar o JPG da escalação')
   const url = URL.createObjectURL(blob)
   try {
     const a = document.createElement('a')
