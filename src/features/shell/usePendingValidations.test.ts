@@ -4,7 +4,12 @@
 // (0031 added requests — the Solicitações queue the badge missed), and the
 // title prefix must be idempotent across polls.
 import { describe, expect, it } from 'vitest'
-import { pingDelta, pendingTotal, type PendingValidationCount } from './usePendingValidations'
+import {
+  buffedCount,
+  pingDelta,
+  pendingTotal,
+  type PendingValidationCount,
+} from './usePendingValidations'
 
 const counts = (partial: Partial<PendingValidationCount>): PendingValidationCount => ({
   submissions: 0,
@@ -24,6 +29,18 @@ describe('pendingTotal — all three Validações queues sum (0031)', () => {
 
   it('a pending membership REQUEST alone lights the badge (the 0030 gap the owner hit)', () => {
     expect(pendingTotal(counts({ requests: 1 }))).toBe(1)
+  })
+
+  it('buffed is a subset of submissions, never an extra queue (0069)', () => {
+    expect(pendingTotal(counts({ submissions: 3, buffed: 2 }))).toBe(3)
+  })
+})
+
+describe('buffedCount — the 0069 orange pill', () => {
+  it('reads the optional subset and treats an old payload as zero', () => {
+    expect(buffedCount(counts({ submissions: 3, buffed: 2 }))).toBe(2)
+    expect(buffedCount(counts({ submissions: 3 }))).toBe(0)
+    expect(buffedCount(null)).toBe(0)
   })
 })
 

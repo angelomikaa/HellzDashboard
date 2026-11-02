@@ -17,6 +17,7 @@ import {
   fetchKeyStats,
   fetchMyReport,
   fetchMySubmissions,
+  fetchPendingValidationCount,
   fetchPromotionPublic,
   fetchRecentReviews,
   fetchStaffMembers,
@@ -185,6 +186,26 @@ describe('REST client error handling', () => {
   it('fetchRecentReviews rejects a malformed payload', async () => {
     nextResponse = () => res(200, JSON.stringify({ not: 'an array' }))
     await expect(fetchRecentReviews(session)).rejects.toMatchObject({ kind: 'server' })
+  })
+
+  it('fetchPendingValidationCount carries the 0069 buffed subset', async () => {
+    nextResponse = () =>
+      res(
+        200,
+        JSON.stringify({ submissions: 3, identity_proofs: 1, requests: 2, buffed: 2 }),
+      )
+    await expect(fetchPendingValidationCount(session)).resolves.toEqual({
+      submissions: 3,
+      identity_proofs: 1,
+      requests: 2,
+      buffed: 2,
+    })
+  })
+
+  it('fetchPendingValidationCount defaults buffed to 0 against an older server', async () => {
+    nextResponse = () =>
+      res(200, JSON.stringify({ submissions: 1, identity_proofs: 0, requests: 0 }))
+    await expect(fetchPendingValidationCount(session)).resolves.toMatchObject({ buffed: 0 })
   })
 
   it('marks network failures as kind network', async () => {

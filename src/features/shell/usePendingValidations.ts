@@ -25,9 +25,15 @@ export type { PendingValidationCount }
 const POLL_MS = 30_000
 
 export function pendingTotal(counts: PendingValidationCount | null): number {
+  // `buffed` is a SUBSET of submissions (0069), never an extra queue.
   return counts === null
     ? 0
     : counts.submissions + counts.identity_proofs + counts.requests
+}
+
+/** Pending submissions with a known buff signature (0069); 0 when unknown. */
+export function buffedCount(counts: PendingValidationCount | null): number {
+  return counts?.buffed ?? 0
 }
 
 /**

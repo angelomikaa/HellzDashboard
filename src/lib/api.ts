@@ -558,6 +558,10 @@ export interface PendingValidationCount {
   submissions: number
   identity_proofs: number
   requests: number
+  /** 0069: subset of `submissions` whose server-side review category is
+   *  exactly 'buffed'. Optional so a payload from a server before 0069 keeps
+   *  rendering (absent = 0); never an extra queue — pendingTotal ignores it. */
+  buffed?: number
 }
 
 /** Three integers from pending_validation_count (0031). Any failure resolves
@@ -585,6 +589,7 @@ export async function fetchPendingValidationCount(
       submissions: body.submissions,
       identity_proofs: body.identity_proofs,
       requests: body.requests,
+      buffed: typeof body.buffed === 'number' ? body.buffed : 0,
     }
   } catch {
     return null

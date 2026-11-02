@@ -6,7 +6,7 @@ import { RequireAuth } from './features/auth/RequireAuth'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { InicioPage } from './features/dashboard/InicioPage'
 import { PageErrorBoundary } from './features/shell/PageErrorBoundary'
-import { pendingTotal, usePendingValidations } from './features/shell/usePendingValidations'
+import { buffedCount, pendingTotal, usePendingValidations } from './features/shell/usePendingValidations'
 import { fetchMyIdentity } from './lib/api'
 
 // Tabs other than the landing Painel/Início are code-split: a member who only
@@ -331,6 +331,9 @@ function ValidacoesTab({
 }) {
   const { counts, ping, clearPing } = usePendingValidations(session, true)
   const total = pendingTotal(counts)
+  // 0069: a subset of the pending submissions, shown as its own orange pill
+  // so a known buff signature never hides behind a generic count.
+  const buffed = buffedCount(counts)
 
   // (N) title prefix while anything is pending — restored to the app's own
   // title at zero (and by the cleanup on unmount/logout).
@@ -358,7 +361,11 @@ function ValidacoesTab({
         onClick={onSelect}
         aria-current={active ? 'page' : undefined}
         aria-label={
-          total > 0 ? `Validações — ${total} pendente${total === 1 ? '' : 's'}` : 'Validações'
+          total > 0
+            ? `Validações — ${total} pendente${total === 1 ? '' : 's'}${
+                buffed > 0 ? `, ${buffed} com assinatura de buff` : ''
+              }`
+            : 'Validações'
         }
         className={`inline-flex h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
           active ? 'border-accent text-content glow-accent-soft' : 'border-transparent text-muted hover:border-line hover:text-content'
@@ -371,6 +378,14 @@ function ValidacoesTab({
             className="inline-flex h-5 min-w-5 animate-pulse items-center justify-center rounded-full bg-accent px-1 text-xs font-bold leading-none text-accent-foreground"
           >
             {total > 9 ? '9+' : total}
+          </span>
+        )}
+        {buffed > 0 && (
+          <span
+            aria-hidden="true"
+            className="inline-flex h-5 items-center justify-center rounded-full border border-error/60 bg-error/10 px-1.5 text-[10px] font-bold leading-none text-error"
+          >
+            {`⚠${buffed > 9 ? '9+' : buffed}`}
           </span>
         )}
       </button>
