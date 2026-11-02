@@ -84,8 +84,8 @@ export function RequireAuth({ children, initialView }: RequireAuthProps) {
   }
 
   // WR-06: the API layer invalidates a session it can no longer use
-  // (device_mismatch). Without this the guard kept rendering the shell with a
-  // dead token while every request failed.
+  // (device_mismatch, expired/invalid JWT -> any 401). Without this the guard
+  // kept rendering the shell with a dead token while every request failed.
   useEffect(() => onSessionInvalid(invalidate), [])
 
   if (session) return <>{children({ session, invalidate })}</>

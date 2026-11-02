@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NeoFootSession } from '../features/auth/session'
+import { onSessionInvalid } from '../features/auth/session'
 import {
   ApiError,
   addMember,
@@ -52,10 +53,14 @@ function res(status: number, body: string) {
 
 let calls: { url: string; init: RequestInit }[] = []
 let nextResponse: () => ReturnType<typeof res>
+let removeItem: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://test-project.supabase.co')
   vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test-anon-key')
+  // The 401 path now calls invalidateSession() -> clearSession() -> localStorage.
+  removeItem = vi.fn()
+  vi.stubGlobal('localStorage', { removeItem, getItem: () => null, setItem: vi.fn() })
   calls = []
   nextResponse = () => res(200, '[]')
   vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
@@ -140,6 +145,16 @@ describe('REST client error handling', () => {
     expect(err).toBeInstanceOf(ApiError)
     expect(err.status).toBe(401)
     expect(err.kind).toBe('unauthorized')
+  })
+
+  it('invalidates the live session on any 401 (expired/invalid JWT)', async () => {
+    const invalidated = vi.fn()
+    const off = onSessionInvalid(invalidated)
+    nextResponse = () => res(401, 'JWT expired')
+    await expect(fetchMyReport(session)).rejects.toMatchObject({ kind: 'unauthorized' })
+    expect(removeItem).toHaveBeenCalledWith('nefoot_session')
+    expect(invalidated).toHaveBeenCalledTimes(1)
+    off()
   })
 
   it('marks network failures as kind network', async () => {

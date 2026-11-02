@@ -77,18 +77,20 @@ async function restFetch(session: NeoFootSession, path: string, init?: RequestIn
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    // A device-mismatched session will keep failing — invalidate it client-side
-    // so the user lands back on the landing page instead of looping on failed
-    // saves. The server is the real enforcer (assert_device_bound, migration 0041).
-    if (body.includes('device_mismatch')) {
-      // WR-06: drop storage AND the live session (RequireAuth's state), so the
-      // user actually lands back on the landing/login screen instead of a dead
-      // authenticated shell where every call keeps failing.
+    const deviceMismatch = body.includes('device_mismatch')
+    // A device-mismatched session and an expired/invalid JWT (PostgREST answers
+    // 401; RLS denials are 403) are both unrecoverable: drop storage AND the
+    // live session so the user lands back on the login instead of a dead
+    // authenticated shell where every call keeps failing.
+    if (deviceMismatch || res.status === 401) {
       invalidateSession()
-      throw new ApiError(401, 'unauthorized', 'device_mismatch')
+      throw new ApiError(
+        401,
+        'unauthorized',
+        deviceMismatch ? 'device_mismatch' : `HTTP 401: ${body.slice(0, 200)}`,
+      )
     }
-    const kind = res.status === 401 ? 'unauthorized' : 'server'
-    throw new ApiError(res.status, kind, `HTTP ${res.status}: ${body.slice(0, 200)}`)
+    throw new ApiError(res.status, 'server', `HTTP ${res.status}: ${body.slice(0, 200)}`)
   }
   return res
 }
@@ -1026,6 +1028,9 @@ async function storageFetch(session: NeoFootSession, path: string, init?: Reques
   } catch (err) {
     throw new ApiError(0, 'network', err instanceof Error ? err.message : 'network error')
   }
+  // Storage shares the session: an expired JWT here is the same dead session
+  // as a REST 401, so drop it before the caller renders a photo error.
+  if (res.status === 401) invalidateSession()
   return res
 }
 
