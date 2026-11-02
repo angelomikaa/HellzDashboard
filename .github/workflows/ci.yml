@@ -1,0 +1,52 @@
+name: CI
+
+# The project's gate is "build green / suite green", but it was only ever run
+# by hand. This workflow locks the fast half on every push/PR:
+#   lint -> types -> migration manifest -> offline schema guards -> unit tests -> build
+# The exhaustive OCR harness (npm run test:ocr, ~7 min, needs the local sample
+# corpus) stays a manual/nightly step — see the README.
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      # Build-time placeholders only: the bundle inlines them and CI never
+      # talks to Supabase.
+      VITE_SUPABASE_URL: https://ci.supabase.co
+      VITE_SUPABASE_ANON_KEY: ci-anon-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Types
+        run: npx tsc -b
+
+      - name: Migration manifest is current
+        run: npm run migrations:check
+
+      - name: Offline schema guards
+        run: node scripts/verify-schema.mjs --offline
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build

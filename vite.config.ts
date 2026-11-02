@@ -60,6 +60,26 @@ function supabaseEnv(): Plugin {
 export default defineConfig({
   plugins: [supabaseEnv(), react(), tailwindcss()],
   test: {
-    environment: 'node',
+    // Two projects so the default loop stays fast: `npm test` runs the unit
+    // suite (src + the credential smoke), while `npm run test:ocr` runs the
+    // exhaustive OCR harness (real samples through tesseract, ~7 minutes).
+    // `npm run test:all` runs both — the phase gate.
+    projects: [
+      {
+        test: {
+          name: 'unit',
+          environment: 'node',
+          include: ['src/**/*.test.{ts,tsx}', 'scripts/smoke-config.test.mjs'],
+        },
+      },
+      {
+        test: {
+          name: 'ocr',
+          environment: 'node',
+          include: ['scripts/ocr-*.test.mjs'],
+          testTimeout: 600_000,
+        },
+      },
+    ],
   },
 })

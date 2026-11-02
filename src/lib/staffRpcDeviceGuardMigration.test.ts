@@ -101,7 +101,10 @@ describe('migration 0064 — staff RPC bodies + device guard', () => {
     for (const name of FUNCTIONS) {
       const latest = latestDefinition(name)
       expect(latest, name).not.toBeNull()
-      expect(latest?.file, name).toBe('0064_staff_rpc_bodies_and_device_guard.sql')
+      // A later migration may supersede the body (0066 does for add_member);
+      // what must hold is that the newest definition keeps the guard.
+      const version = Number.parseInt(latest?.file.slice(0, 4) ?? '0', 10)
+      expect(version, name).toBeGreaterThanOrEqual(64)
       const block = latest === null ? null : functionBlock(latest.body, name)
       expect(block, name).not.toBeNull()
       expect(block, name).toContain('perform public.assert_device_bound();')
