@@ -28,6 +28,7 @@ describe('CharactersPage helpers', () => {
   it('maps add member errors', () => {
     expect(addMemberErrorFor({ message: 'already_member' } as any)).toContain('ativo')
     expect(addMemberErrorFor({ message: 'dummy_handle' } as any)).toContain('teste')
+    expect(addMemberErrorFor({ message: 'duplicate_nickname' } as any)).toContain('nick')
   })
 
   it('owner resets members and officers, officer resets members only', () => {
@@ -70,6 +71,7 @@ describe('CharactersPage helpers', () => {
 
   it('maps identity duplicate', () => {
     expect(identityErrorFor({ message: 'duplicate_char_id' } as any)).toContain('duplicate_char_id')
+    expect(identityErrorFor({ message: 'duplicate_nickname' } as any)).toContain('nick')
   })
 
   it('maps step-up failures for role changes', () => {

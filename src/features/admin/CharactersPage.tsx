@@ -1162,6 +1162,8 @@ export function addMemberErrorFor(error: unknown): string {
       ? (error as { message: string }).message
       : String(error ?? '')
   if (message.includes('already_member')) return 'Este handle já está ativo.'
+  if (message.includes('duplicate_nickname'))
+    return 'Já existe um membro ativo com esse nick. Escolha outro.'
   if (message.includes('dummy_handle')) return 'Handle reservado para dados de teste.'
   if (error instanceof ApiError && (error.kind === 'unauthorized' || message.includes('forbidden')))
     return SESSION_ERROR
@@ -1175,6 +1177,8 @@ export function identityErrorFor(error: unknown): string {
       : String(error ?? '')
   if (message.includes('duplicate_char_id'))
     return 'Este ID ja esta em uso (duplicate_char_id).'
+  if (message.includes('duplicate_nickname'))
+    return 'Já existe um membro ativo com esse nick. Escolha outro.'
   if (error instanceof ApiError && (error.kind === 'unauthorized' || message.includes('forbidden')))
     return SESSION_ERROR
   return SAVE_ERROR
