@@ -11,6 +11,7 @@ import {
   type NeoFootSession,
 } from '../features/auth/session'
 import { computeDeviceFingerprintClient } from '../features/auth/session'
+import { fetchWithTimeout } from './http'
 import type { SubmissionIdentity } from '../features/submit/identity'
 
 export class ApiError extends Error {
@@ -61,7 +62,7 @@ async function restFetch(session: NeoFootSession, path: string, init?: RequestIn
   const deviceFp = await computeDeviceFingerprintClient()
   let res: Response
   try {
-    res = await fetch(`${supabaseUrl}/rest/v1${path}`, {
+    res = await fetchWithTimeout(`${supabaseUrl}/rest/v1${path}`, {
       ...init,
       headers: {
         apikey: anonKey,
@@ -124,7 +125,7 @@ export async function fetchPublicCatalog(): Promise<StatCatalogEntry[]> {
   }
   let res: Response
   try {
-    res = await fetch(
+    res = await fetchWithTimeout(
       `${supabaseUrl}/rest/v1/stat_catalog?select=stat_key,label,label_short,group_name,value_type&order=stat_key`,
       {
         headers: {
@@ -592,7 +593,7 @@ export async function requestStepUp(
   const { supabaseUrl, anonKey } = anonEnv()
   let res: Response
   try {
-    res = await fetch(`${supabaseUrl}/functions/v1/step-up`, {
+    res = await fetchWithTimeout(`${supabaseUrl}/functions/v1/step-up`, {
       method: 'POST',
       headers: {
         apikey: anonKey,
@@ -734,7 +735,7 @@ export async function fetchPromotionPublic(
   }
   let res: Response
   try {
-    res = await fetch(`${supabaseUrl}/rest/v1/rpc/get_promotion_public`, {
+    res = await fetchWithTimeout(`${supabaseUrl}/rest/v1/rpc/get_promotion_public`, {
       method: 'POST',
       headers: {
         apikey: anonKey,
@@ -1014,7 +1015,7 @@ async function storageFetch(session: NeoFootSession, path: string, init?: Reques
   }
   let res: Response
   try {
-    res = await fetch(`${supabaseUrl}/storage/v1/object/${path}`, {
+    res = await fetchWithTimeout(`${supabaseUrl}/storage/v1/object/${path}`, {
       ...init,
       headers: {
         apikey: anonKey,
@@ -1099,7 +1100,7 @@ export function fetchCardPhotoByPathPublic(path: string): Promise<Blob | null> {
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
     if (!supabaseUrl || !anonKey) return null
     try {
-      const res = await fetch(`${supabaseUrl}/storage/v1/object/${path}`, {
+      const res = await fetchWithTimeout(`${supabaseUrl}/storage/v1/object/${path}`, {
         headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
       })
       if (!res.ok) return null
@@ -1272,7 +1273,7 @@ async function edgeFetch<T>(
   const { supabaseUrl, anonKey } = anonEnv()
   let res: Response
   try {
-    res = await fetch(`${supabaseUrl}/functions/v1/${fn}`, {
+    res = await fetchWithTimeout(`${supabaseUrl}/functions/v1/${fn}`, {
       method: 'POST',
       headers: {
         apikey: anonKey,
@@ -1466,7 +1467,7 @@ export async function fetchRequestStatus(discordHandle: string): Promise<Request
   const { supabaseUrl, anonKey } = anonEnv()
   let res: Response
   try {
-    res = await fetch(`${supabaseUrl}/rest/v1/rpc/request_status`, {
+    res = await fetchWithTimeout(`${supabaseUrl}/rest/v1/rpc/request_status`, {
       method: 'POST',
       headers: {
         apikey: anonKey,
