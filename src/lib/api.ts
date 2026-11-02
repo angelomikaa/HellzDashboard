@@ -169,22 +169,6 @@ export async function fetchMyIdentity(session: NeoFootSession): Promise<MyIdenti
   return identity
 }
 
-export async function updateCharacter(
-  session: NeoFootSession,
-  id: string,
-  patch: Partial<Pick<MemberRow, 'display_name' | 'char_class' | 'char_function'>>,
-): Promise<void> {
-  // Column grants allow updating display_name/char_class/char_function ONLY —
-  // role/pin_hash are ungranted and fail server-side. RLS: staff policy.
-  // The id is URL-encoded (interpolation hardening, same standard as
-  // fetchKeyStats): the signature accepts any string, and a crafted value
-  // must not be able to inject PostgREST query operators.
-  await restFetch(session, `/members?id=eq.${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(patch),
-  })
-}
-
 /**
  * Anti-cheat OCR audit entry (migration 0046). `source` says whether the value
  * the OCR printed was submitted as-is or edited by the player afterwards;

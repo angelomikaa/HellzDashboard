@@ -5,9 +5,11 @@
 // ONLY the explicit safe projection in api.ts: the PIN hash column is
 // ungranted at the DB (migration 0005), so it can never appear in any
 // payload this file touches — and it is never named or referenced here.
-// The edit form likewise sends ONLY {display_name, char_class,
-// char_function} (T-02-10): the column grants make every other column
-// unwritable even for a crafted request.
+// The card's single "Editar" action writes through correctIdentity (IDEN-03,
+// D-21/D-22): it APPENDS a member_identity_history row and updates the member
+// pointers (nickname, char_id, class, function) in one server-side call, so
+// there is no second, divergent edit path. The id/classes edits of 02-02 were
+// folded into it (2026-11-01).
 //
 // Staff controls (AUTH-03/AUTH-04, 06-UI-SPEC Surface 3): role/active are
 // ungranted for client UPDATE (migration 0005:30–33) — ALL role and
@@ -30,7 +32,6 @@ import {
   correctIdentity,
   setMemberActive,
   setMemberRole,
-  updateCharacter,
   type MemberRow,
   type StaffMember,
   type IdentityHistoryRow,
@@ -43,7 +44,6 @@ import {
   groupLabel,
   isVirtualClassGroup as isClassGroup,
   mergedClassOptions,
-  playableClassOptions,
 } from '../../lib/classGroups'
 import { validateIdentityDraft, OFFICIAL_CLASSES } from '../submit/identity'
 import type { CharFunction } from '../submit/identity'
@@ -88,13 +88,16 @@ const IDENTITY_SOURCE_LABELS: Record<IdentityHistoryRow['source'], string> = {
   request: 'solicitação aprovada',
 }
 
-// In-edit draft for one member row (REG-01). charClass '' is the display-only
+// In-edit draft for one member row (IDEN-03). charClass '' is the display-only
 // '—' option: saving is blocked client-side — a character must have a class.
-interface Draft {
+// The same draft feeds the identity correction (history) and the registry
+// pointers, because correct_identity writes both in one call.
+interface EditDraft {
   memberId: string
-  displayName: string
-  charClass: string
-  charFunction: 'dps' | 'mdps' | 'suporte'
+  char_id: string
+  nickname: string
+  char_class: string
+  char_function: CharFunction
 }
 
 // Per-row feedback for the shared state machine: the success text differs per
@@ -226,9 +229,16 @@ export function CharactersPage({
   const [data, setData] = useState<{ members: StaffMember[]; classes: string[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Inline edit (REG-01) — a single row is editable at a time. The same
-  // per-row state machine + single-flight lock serves the staff controls.
-  const [draft, setDraft] = useState<Draft | null>(null)
+  // Edit (single action, IDEN-03) — one row at a time. Saving writes the
+  // identity correction (history + registry pointers) in ONE server call; the
+  // same per-row state machine + single-flight lock serves the staff controls.
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState<EditDraft | null>(null)
+  const [editHistory, setEditHistory] = useState<IdentityHistoryRow[] | null>(null)
+  const [editLoading, setEditLoading] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editFeedback, setEditFeedback] = useState<string | null>(null)
   const [savingRowId, setSavingRowId] = useState<string | null>(null)
   const [savedRow, setSavedRow] = useState<RowFeedback | null>(null)
   const [saveError, setSaveError] = useState<RowFeedback | null>(null)
@@ -265,20 +275,6 @@ export function CharactersPage({
     | { kind: 'error'; message: string }
   >({ kind: 'idle' })
 
-  // Identity correction panel (IDEN-03).
-  const [identityMemberId, setIdentityMemberId] = useState<string | null>(null)
-  const [identityDraft, setIdentityDraft] = useState<{
-    char_id: string
-    nickname: string
-    char_class: string
-    char_function: CharFunction
-  } | null>(null)
-  const [identityHistory, setIdentityHistory] = useState<IdentityHistoryRow[] | null>(null)
-  const [identityLoading, setIdentityLoading] = useState(false)
-  const [identityError, setIdentityError] = useState<string | null>(null)
-  const [identitySaving, setIdentitySaving] = useState(false)
-  const [identityFeedback, setIdentityFeedback] = useState<string | null>(null)
-
   const load = useCallback(async () => {
     const [members, classes] = await Promise.all([fetchStaffMembers(session), fetchClasses(session)])
     setData({ members, classes })
@@ -298,7 +294,7 @@ export function CharactersPage({
   }, [load])
 
   // Any in-flight request disables every CTA on the page.
-  const busy = savingRowId !== null
+  const busy = savingRowId !== null || editSaving
 
   // View aid only (owner feedback): apply the token filters to the loaded
   // roster; null char_class rows match the "Todas" class filter only.
@@ -331,44 +327,82 @@ export function CharactersPage({
     pendingAction !== null &&
     (pendingAction.kind === 'promote' || pendingAction.kind === 'demote')
 
-  function startEdit(member: MemberRow) {
+  // The ONLY character edit path (2026-11-01 consolidation): one form, one
+  // server call. correct_identity appends the history row AND refreshes the
+  // registry pointers (nickname/ID/class/function), so the old registry PATCH
+  // is gone instead of staying a second, divergent write.
+  function openEdit(member: StaffMember) {
     setSavedRow(null)
     setSaveError(null)
-    setDraft({
+    setEditingMemberId(member.id)
+    setEditDraft({
       memberId: member.id,
-      displayName: member.display_name,
-      charClass: member.char_class ?? '',
-      charFunction: member.char_function,
+      char_id: member.char_id ?? member.identity?.char_id ?? '',
+      nickname: member.identity?.nickname ?? member.display_name,
+      char_class: member.identity?.char_class ?? member.char_class ?? '',
+      char_function: (member.identity?.char_function ?? member.char_function) as CharFunction,
     })
+    setEditHistory(null)
+    setEditError(null)
+    setEditFeedback(null)
+    setEditLoading(true)
+    fetchIdentityHistory(session, member.id)
+      .then((rows) => setEditHistory(sortIdentityHistory(rows)))
+      .catch((err: unknown) => {
+        setEditError(err instanceof ApiError && err.kind === 'unauthorized' ? SESSION_ERROR : NETWORK_ERROR)
+      })
+      .finally(() => setEditLoading(false))
   }
 
-  async function handleSave() {
-    if (draft === null || busy) return
-    const memberId = draft.memberId
-    const displayName = draft.displayName.trim()
-    // A character must have a class: the '—' option is display-only.
-    if (displayName === '' || draft.charClass === '') return
-    setSavingRowId(memberId)
-    setSaveError(null)
+  function closeEdit() {
+    setEditingMemberId(null)
+    setEditDraft(null)
+    setEditHistory(null)
+    setEditError(null)
+    setEditFeedback(null)
+    setEditLoading(false)
+  }
+
+  async function handleEditSave() {
+    if (editingMemberId === null || editDraft === null || editSaving) return
+    const problems = validateIdentityDraft({
+      char_id: editDraft.char_id,
+      nickname: editDraft.nickname,
+      char_class: editDraft.char_class,
+      char_function: editDraft.char_function,
+    })
+    if (problems.length > 0) {
+      setEditError(problems[0])
+      return
+    }
+    setEditSaving(true)
+    setEditError(null)
+    setEditFeedback(null)
     try {
-      await updateCharacter(session, memberId, {
-        display_name: displayName,
-        char_class: draft.charClass,
-        char_function: draft.charFunction,
+      await correctIdentity(session, editingMemberId, {
+        char_id: editDraft.char_id.trim(),
+        nickname: editDraft.nickname.trim(),
+        char_class: editDraft.char_class.trim(),
+        char_function: editDraft.char_function,
       })
-      setDraft(null)
-      setSavedRow({ id: memberId, text: 'Salvo.' })
-      // Refresh the member list so the change persists on screen. A refresh
-      // failure keeps the stale rows — the save itself succeeded.
+      setEditFeedback('Salvo.')
+      // Refresh the roster so the corrected name/class/function persists on
+      // screen. A refresh failure keeps the stale rows — the write succeeded.
       try {
         await load()
       } catch {
         /* stale list; Salvo. still shown */
       }
-    } catch {
-      setSaveError({ id: memberId, text: SAVE_ERROR })
+      // The correction appended a history row: re-read it for the panel.
+      try {
+        setEditHistory(sortIdentityHistory(await fetchIdentityHistory(session, editingMemberId)))
+      } catch {
+        /* keep the previous history list */
+      }
+    } catch (err) {
+      setEditError(identityErrorFor(err))
     } finally {
-      setSavingRowId(null)
+      setEditSaving(false)
     }
   }
 
@@ -476,67 +510,6 @@ export function CharactersPage({
         kind: 'error',
         message: addMemberErrorFor(err),
       })
-    }
-  }
-
-  function openIdentityPanel(member: StaffMember) {
-    setIdentityMemberId(member.id)
-    setIdentityDraft({
-      char_id: member.char_id ?? member.identity?.char_id ?? '',
-      nickname: member.identity?.nickname ?? member.display_name,
-      char_class: member.identity?.char_class ?? member.char_class ?? '',
-      char_function: (member.identity?.char_function ?? member.char_function) as CharFunction,
-    })
-    setIdentityHistory(null)
-    setIdentityError(null)
-    setIdentityFeedback(null)
-    setIdentityLoading(true)
-    fetchIdentityHistory(session, member.id)
-      .then((rows) => setIdentityHistory(rows))
-      .catch((err: unknown) => {
-        setIdentityError(err instanceof ApiError && err.kind === 'unauthorized' ? SESSION_ERROR : NETWORK_ERROR)
-      })
-      .finally(() => setIdentityLoading(false))
-  }
-
-  async function handleIdentitySave() {
-    if (identityMemberId === null || identityDraft === null || identitySaving) return
-    const problems = validateIdentityDraft({
-      char_id: identityDraft.char_id,
-      nickname: identityDraft.nickname,
-      char_class: identityDraft.char_class,
-      char_function: identityDraft.char_function,
-    })
-    if (problems.length > 0) {
-      setIdentityError(problems[0])
-      return
-    }
-    setIdentitySaving(true)
-    setIdentityError(null)
-    try {
-      await correctIdentity(session, identityMemberId, {
-        char_id: identityDraft.char_id.trim(),
-        nickname: identityDraft.nickname.trim(),
-        char_class: identityDraft.char_class.trim(),
-        char_function: identityDraft.char_function,
-      })
-      setIdentityFeedback('Identidade atualizada.')
-      try {
-        await load()
-      } catch {
-        /* stale */
-      }
-      // refresh history
-      try {
-        const rows = await fetchIdentityHistory(session, identityMemberId)
-        setIdentityHistory(rows)
-      } catch {
-        /* ignore */
-      }
-    } catch (err) {
-      setIdentityError(identityErrorFor(err))
-    } finally {
-      setIdentitySaving(false)
     }
   }
 
@@ -756,7 +729,7 @@ export function CharactersPage({
                   comfortable field widths. Mobile/tablet stay 1-up exactly as
                   before. */}
               {visibleMembers.map((member) => {
-                const editing = draft?.memberId === member.id
+                const editing = editingMemberId === member.id
                 const saving = savingRowId === member.id
                 // Staff controls (06-UI-SPEC Surface 3, D-08 matrix): owner
                 // rows are untouchable for every viewer; officer viewers get
@@ -773,181 +746,60 @@ export function CharactersPage({
                       member.active ? '' : ' opacity-60'
                     }${editing ? ' xl:col-span-2' : ''}`}
                   >
-                    {editing && draft ? (
-                      <>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
-                            {ROLE_LABELS[member.role]}
-                          </span>
-                          <span className="text-sm text-muted">{member.discord_handle}</span>
-                        </div>
-                        <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                          <div className="flex flex-col gap-1">
-                            <label
-                              htmlFor={`edit-name-${member.id}`}
-                              className="text-sm font-semibold text-content"
-                            >
-                              Nome do personagem
-                            </label>
-                            <input
-                              id={`edit-name-${member.id}`}
-                              type="text"
-                              autoComplete="off"
-                              value={draft.displayName}
-                              onChange={(e) => setDraft({ ...draft, displayName: e.target.value })}
-                              disabled={saving}
-                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label
-                              htmlFor={`edit-class-${member.id}`}
-                              className="text-sm font-semibold text-content"
-                            >
-                              Classe
-                            </label>
-                            <select
-                              id={`edit-class-${member.id}`}
-                              value={draft.charClass}
-                              onChange={(e) => setDraft({ ...draft, charClass: e.target.value })}
-                              disabled={saving}
-                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {/* Display-only '—' (maps to null); saving with it
-                                  selected is blocked client-side below. */}
-                              <option value="">—</option>
-                              {/* 10.3: PLAYABLE classes only — a merged group
-                                  (Artista) is a stats identity, never a
-                                  member's class, so a Bard keeps registering as
-                                  Bard. */}
-                              {playableClassOptions(data.classes).map((className) => (
-                                <option key={className} value={className}>
-                                  {classLabel(className)}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label
-                              htmlFor={`edit-function-${member.id}`}
-                              className="text-sm font-semibold text-content"
-                            >
-                              Função
-                            </label>
-                            <select
-                              id={`edit-function-${member.id}`}
-                              value={draft.charFunction}
-                              onChange={(e) =>
-                                setDraft({
-                                  ...draft,
-                                  // The three <option> values below are
-                                  // exactly the union — the cast is total.
-                                  // Values mirror the DB CHECK (migration
-                                  // 0012: char_function in ('dps','mdps',
-                                  // 'suporte')); the server CHECK is the
-                                  // real boundary (T-07-05), this is
-                                  // UX-only.
-                                  charFunction: e.target.value as Draft['charFunction'],
-                                })
-                              }
-                              disabled={saving}
-                              className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {(Object.keys(FUNCTION_LABELS) as Array<
-                                keyof typeof FUNCTION_LABELS
-                              >).map((role) => (
-                                <option key={role} value={role}>
-                                  {FUNCTION_LABELS[role]}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                        {/* 07.2-06 D-17: leading class icon (decorative; the
-                            class name still renders as text below). */}
-                        <ClassCrest charClass={member.char_class} size="sm" />
-                        <span className="text-base font-semibold text-content">
-                          {member.display_name}
-                        </span>
-                        {member.char_id && (
-                          <span className="font-mono text-sm text-muted">{member.char_id}</span>
-                        )}
-                        {member.identity?.nickname && member.identity.nickname !== member.display_name && (
-                          <span className="text-sm text-muted">{member.identity.nickname}</span>
-                        )}
-                        <span
-                          className={`rounded-full border border-line px-2 py-0.5 text-sm font-semibold ${
-                            member.pin_set ? 'text-muted' : 'text-amber-400'
-                          }`}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      {/* 07.2-06 D-17: leading class icon (decorative; the
+                          class name still renders as text below). */}
+                      <ClassCrest charClass={member.char_class} size="sm" />
+                      <span className="text-base font-semibold text-content">
+                        {member.display_name}
+                      </span>
+                      {member.char_id && (
+                        <span className="font-mono text-sm text-muted">{member.char_id}</span>
+                      )}
+                      {member.identity?.nickname && member.identity.nickname !== member.display_name && (
+                        <span className="text-sm text-muted">{member.identity.nickname}</span>
+                      )}
+                      <span
+                        className={`rounded-full border border-line px-2 py-0.5 text-sm font-semibold ${
+                          member.pin_set ? 'text-muted' : 'text-amber-400'
+                        }`}
+                      >
+                        {member.pin_set ? 'PIN ativo' : 'PIN pendente'}
+                      </span>
+                      {member.has_pending_proof && (
+                        <button
+                          type="button"
+                          onClick={onOpenIdentityReview}
+                          className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-amber-400 hover-control"
                         >
-                          {member.pin_set ? 'PIN ativo' : 'PIN pendente'}
-                        </span>
-                        {member.has_pending_proof && (
-                          <button
-                            type="button"
-                            onClick={onOpenIdentityReview}
-                            className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-amber-400 hover-control"
-                          >
-                            Identidade pendente
-                          </button>
-                        )}
-                        <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
-                          {ROLE_LABELS[member.role]}
-                        </span>
-                        <span className="text-sm text-muted">{member.discord_handle}</span>
-                        <span className="text-sm text-muted">
-                          Classe: <span className="text-content">{classLabel(member.char_class)}</span>
-                        </span>
-                        <span className="text-sm text-muted">
-                          Função: <span className="text-content">{FUNCTION_LABELS[member.char_function]}</span>
-                        </span>
-                      </div>
-                    )}
+                          Identidade pendente
+                        </button>
+                      )}
+                      <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
+                        {ROLE_LABELS[member.role]}
+                      </span>
+                      <span className="text-sm text-muted">{member.discord_handle}</span>
+                      <span className="text-sm text-muted">
+                        Classe: <span className="text-content">{classLabel(member.char_class)}</span>
+                      </span>
+                      <span className="text-sm text-muted">
+                        Função: <span className="text-content">{FUNCTION_LABELS[member.char_function]}</span>
+                      </span>
+                    </div>
                     {/* Controls BELOW the character (owner round 4 request),
                         kept out of the info's way by the card divider. Role
                         buttons — OWNER viewer only (AUTH-03/D-08); the RPC
                         re-checks the owner-only gate server-side. */}
                     <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
-                      {editing && draft ? (
+                      {isStaff && !editing && (
                         <button
                           type="button"
-                          onClick={() => void handleSave()}
-                          disabled={
-                            saving || busy || draft.charClass === '' || draft.displayName.trim() === ''
-                          }
-                          className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={() => openEdit(member)}
+                          disabled={busy}
+                          className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Salvar
+                          Editar
                         </button>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => startEdit(member)}
-                            disabled={busy}
-                            className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            Editar
-                          </button>
-                          {isStaff && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                identityMemberId === member.id
-                                  ? setIdentityMemberId(null)
-                                  : openIdentityPanel(member)
-                              }
-                              aria-expanded={identityMemberId === member.id}
-                              disabled={busy}
-                              className="h-11 rounded-md border border-line px-4 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Identidade
-                            </button>
-                          )}
-                        </>
                       )}
                       {!editing && hasStaffControls && (
                         <>
@@ -1023,126 +875,165 @@ export function CharactersPage({
                         </span>
                       )}
                     </div>
-                    {/* Identity panel INLINE with the character (owner
-                        decision 2026-10-21): opening "Identidade" expands
-                        the correction form + history right under the row,
-                        not at the bottom of the page. */}
-                    {identityMemberId === member.id && (
+                    {/* The single character edit panel (2026-11-01
+                        consolidation): the old "Identidade" panel and the
+                        registry inline form are ONE action now. It expands
+                        inline with the character (owner decision 2026-10-21)
+                        and saves through correct_identity, which appends the
+                        history row and updates the registry in one call. */}
+                    {editing && editDraft && (
                       <div className="mt-4 border-t border-line pt-4">
-                        <h3 className="text-base font-semibold text-content">Identidade</h3>
-                        {identityLoading ? (
-                          <p className="mt-2 text-sm text-muted">Carregando…</p>
-                        ) : (
-                          <>
-                            <div className="mt-3 grid gap-3 md:grid-cols-2">
-                              <div className="flex flex-col gap-1">
-                                <label className="text-sm font-semibold text-content">ID</label>
-                                <input
-                                  type="text"
-                                  value={identityDraft?.char_id ?? ''}
-                                  onChange={(e) =>
-                                    setIdentityDraft((d) => (d ? { ...d, char_id: e.target.value } : d))
-                                  }
-                                  className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-sm font-semibold text-content">Nick</label>
-                                <input
-                                  type="text"
-                                  value={identityDraft?.nickname ?? ''}
-                                  onChange={(e) =>
-                                    setIdentityDraft((d) => (d ? { ...d, nickname: e.target.value } : d))
-                                  }
-                                  className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-sm font-semibold text-content">Classe</label>
-                                <select
-                                  value={identityDraft?.char_class ?? ''}
-                                  onChange={(e) =>
-                                    setIdentityDraft((d) => (d ? { ...d, char_class: e.target.value } : d))
-                                  }
-                                  className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
-                                >
-                                  <option value="">—</option>
-                                  {OFFICIAL_CLASSES.map((c) => (
-                                    <option key={c} value={c}>
-                                      {classLabel(c)}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-sm font-semibold text-content">Função</label>
-                                <select
-                                  value={identityDraft?.char_function ?? 'dps'}
-                                  onChange={(e) =>
-                                    setIdentityDraft((d) =>
-                                      d ? { ...d, char_function: e.target.value as CharFunction } : d,
-                                    )
-                                  }
-                                  className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content"
-                                >
-                                  {(Object.keys(FUNCTION_LABELS) as Array<keyof typeof FUNCTION_LABELS>).map(
-                                    (role) => (
-                                      <option key={role} value={role}>
-                                        {FUNCTION_LABELS[role]}
-                                      </option>
-                                    ),
-                                  )}
-                                </select>
-                              </div>
-                            </div>
-                            {identityError && (
-                              <p role="alert" className="mt-2 text-sm font-semibold text-error">
-                                {identityError}
-                              </p>
-                            )}
-                            {identityFeedback && (
-                              <p className="mt-2 text-sm font-semibold text-success">
-                                {identityFeedback}
-                              </p>
-                            )}
-                            <div className="mt-4 flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => void handleIdentitySave()}
-                                disabled={identitySaving}
-                                className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground"
-                              >
-                                Salvar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setIdentityMemberId(null)}
-                                className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content"
-                              >
-                                Fechar
-                              </button>
-                            </div>
-                            <div className="mt-4">
-                              <h4 className="text-sm font-semibold text-content">Histórico</h4>
-                              {identityHistory === null ? (
-                                <p className="text-sm text-muted">—</p>
-                              ) : identityHistory.length === 0 ? (
-                                <p className="text-sm text-muted">Sem histórico.</p>
-                              ) : (
-                                <ul className="mt-2 space-y-1">
-                                  {identityHistory.map((h) => (
-                                    <li key={h.id} className="text-sm text-muted">
-                                      <span className="font-mono">{h.char_id}</span> — {h.nickname} —{' '}
-                                      {classLabel(h.char_class)} —{' '}
-                                      {h.char_function === null ? '—' : FUNCTION_LABELS[h.char_function]} —{' '}
-                                      {IDENTITY_SOURCE_LABELS[h.source]}
-                                    </li>
-                                  ))}
-                                </ul>
+                        <h3 className="text-base font-semibold text-content">Editar personagem</h3>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <div className="flex flex-col gap-1">
+                            <label
+                              htmlFor={`edit-id-${member.id}`}
+                              className="text-sm font-semibold text-content"
+                            >
+                              ID
+                            </label>
+                            <input
+                              id={`edit-id-${member.id}`}
+                              type="text"
+                              inputMode="numeric"
+                              autoComplete="off"
+                              value={editDraft.char_id}
+                              onChange={(e) =>
+                                setEditDraft((d) => (d ? { ...d, char_id: e.target.value } : d))
+                              }
+                              disabled={editSaving}
+                              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label
+                              htmlFor={`edit-nickname-${member.id}`}
+                              className="text-sm font-semibold text-content"
+                            >
+                              Nick
+                            </label>
+                            <input
+                              id={`edit-nickname-${member.id}`}
+                              type="text"
+                              autoComplete="off"
+                              value={editDraft.nickname}
+                              onChange={(e) =>
+                                setEditDraft((d) => (d ? { ...d, nickname: e.target.value } : d))
+                              }
+                              disabled={editSaving}
+                              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label
+                              htmlFor={`edit-class-${member.id}`}
+                              className="text-sm font-semibold text-content"
+                            >
+                              Classe
+                            </label>
+                            <select
+                              id={`edit-class-${member.id}`}
+                              value={editDraft.char_class}
+                              onChange={(e) =>
+                                setEditDraft((d) => (d ? { ...d, char_class: e.target.value } : d))
+                              }
+                              disabled={editSaving}
+                              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {/* Display-only '—'; a character must have a
+                                  class, so saving with it is blocked by
+                                  validateIdentityDraft. */}
+                              <option value="">—</option>
+                              {/* 10.3: PLAYABLE classes only — a merged group
+                                  (Artista) is a stats identity, never a
+                                  member's class, so a Bard keeps registering as
+                                  Bard. */}
+                              {OFFICIAL_CLASSES.map((c) => (
+                                <option key={c} value={c}>
+                                  {classLabel(c)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label
+                              htmlFor={`edit-function-${member.id}`}
+                              className="text-sm font-semibold text-content"
+                            >
+                              Função
+                            </label>
+                            <select
+                              id={`edit-function-${member.id}`}
+                              value={editDraft.char_function}
+                              onChange={(e) =>
+                                setEditDraft((d) =>
+                                  d
+                                    ? { ...d, char_function: e.target.value as CharFunction }
+                                    : d,
+                                )
+                              }
+                              disabled={editSaving}
+                              className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {(Object.keys(FUNCTION_LABELS) as Array<keyof typeof FUNCTION_LABELS>).map(
+                                (role) => (
+                                  <option key={role} value={role}>
+                                    {FUNCTION_LABELS[role]}
+                                  </option>
+                                ),
                               )}
-                            </div>
-                          </>
+                            </select>
+                          </div>
+                        </div>
+                        {editError && (
+                          <p role="alert" className="mt-2 text-sm font-semibold text-error">
+                            {editError}
+                          </p>
                         )}
+                        {editFeedback && (
+                          <p aria-live="polite" className="mt-2 text-sm font-semibold text-success">
+                            {editFeedback}
+                          </p>
+                        )}
+                        <div className="mt-4 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleEditSave()}
+                            disabled={editSaving}
+                            className="h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Salvar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={closeEdit}
+                            disabled={editSaving}
+                            className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                        <div className="mt-4">
+                          <h4 className="text-sm font-semibold text-content">Histórico</h4>
+                          {editLoading ? (
+                            <p className="text-sm text-muted">Carregando…</p>
+                          ) : editHistory === null ? (
+                            <p className="text-sm text-muted">—</p>
+                          ) : editHistory.length === 0 ? (
+                            <p className="text-sm text-muted">Sem histórico.</p>
+                          ) : (
+                            <ul className="mt-2 space-y-1">
+                              {editHistory.map((h) => (
+                                <li key={h.id} className="text-sm text-muted">
+                                  <span className="font-mono">{h.char_id}</span> — {h.nickname} —{' '}
+                                  {classLabel(h.char_class)} —{' '}
+                                  {h.char_function === null ? '—' : FUNCTION_LABELS[h.char_function]} —{' '}
+                                  {IDENTITY_SOURCE_LABELS[h.source]}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
                       </div>
                     )}
                   </article>

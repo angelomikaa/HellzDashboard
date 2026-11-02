@@ -30,7 +30,6 @@ import {
   resetMemberPin,
   reviewIdentity,
   setKeyStat,
-  updateCharacter,
 } from './api'
 
 // Plan 02-01 task 3: the REST data layer rides the proven 01-02 gateway
@@ -78,9 +77,8 @@ describe('REST client gateway contract (both headers, every call)', () => {
     await fetchClasses(session)
     await fetchMySubmissions(session)
     await createSubmission(session, [{ stat_key: 'crit', value: 16 }])
-    await updateCharacter(session, session.member_id, { char_class: 'Assassin' })
 
-    expect(calls.length).toBe(5)
+    expect(calls.length).toBe(4)
     for (const call of calls) {
       const headers = call.init.headers as Record<string, string>
       expect(headers.apikey).toBe('test-anon-key')
@@ -99,19 +97,6 @@ describe('REST client gateway contract (both headers, every call)', () => {
     await createSubmission(session, [{ stat_key: 'crit', value: 16 }])
     expect(calls[1].url).toBe('https://test-project.supabase.co/rest/v1/rpc/create_submission')
     expect(calls[1].init.method).toBe('POST')
-
-    await updateCharacter(session, session.member_id, { char_class: 'Assassin' })
-    expect(calls[2].url).toBe(
-      `https://test-project.supabase.co/rest/v1/members?id=eq.${session.member_id}`,
-    )
-    expect(calls[2].init.method).toBe('PATCH')
-  })
-
-  it('updateCharacter URL-encodes the id (interpolation hardening)', async () => {
-    nextResponse = () => res(200, '')
-    // A crafted id must not be able to inject PostgREST query operators.
-    await updateCharacter(session, 'abc def/1', { char_class: 'Assassin' })
-    expect(calls[0].url).toContain('/members?id=eq.abc%20def%2F1')
   })
 
   it('parses catalog entries and maps classes to string[]', async () => {
