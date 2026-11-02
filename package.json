@@ -16,6 +16,7 @@
     "verify:schema": "node scripts/verify-schema.mjs",
     "migrations:manifest": "node scripts/build-migration-manifest.mjs",
     "migrations:check": "node scripts/build-migration-manifest.mjs --check",
+    "pwa:icons": "node scripts/build-pwa-icons.mjs",
     "preview": "vite preview",
     "ocr:assets": "node scripts/copy-ocr-assets.mjs",
     "predev": "npm run ocr:assets",
