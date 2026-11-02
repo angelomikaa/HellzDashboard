@@ -89,19 +89,26 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-content">Revisão anti-cheat</h4>
-        {display !== null ? (
-          <span
-            className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${display.badge}`}
-          >
-            {display.label}
-          </span>
-        ) : flags.flagged ? (
-          <span className="rounded-full bg-error/15 px-2 py-0.5 text-xs font-semibold text-error">
-            Revisar antes de validar
-          </span>
-        ) : (
-          <span className="text-xs text-muted">Sem alerta bloqueante</span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {display !== null ? (
+            <span
+              className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${display.badge}`}
+            >
+              {display.label}
+            </span>
+          ) : flags.flagged ? (
+            <span className="rounded-full bg-error/15 px-2 py-0.5 text-xs font-semibold text-error">
+              Revisar antes de validar
+            </span>
+          ) : (
+            <span className="text-xs text-muted">Sem alerta bloqueante</span>
+          )}
+          {review !== null && review.history_sample_size === 0 && (
+            <span className="rounded-full border border-tier-gold/60 bg-tier-gold/10 px-2 py-0.5 text-xs font-semibold text-tier-gold">
+              Primeira submissão
+            </span>
+          )}
+        </div>
       </div>
 
       {review !== null && review.reasons.length > 0 && (
@@ -114,6 +121,12 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
 
       {review !== null && (
         <p className="mt-2 text-xs text-muted">{coverageNote(review, cohortSample)}</p>
+      )}
+
+      {review !== null && review.history_sample_size === 0 && (
+        <p className="mt-1 text-xs text-muted">
+          Primeira submissão: confira a coorte no Ranking antes de validar.
+        </p>
       )}
 
       {spikes.length > 0 && (
@@ -131,6 +144,11 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
                 <span className="font-mono">
                   {formatStatValue(spike.value, spike.value_type)}
                 </span>
+                {spike.signature === 'defense' && (
+                  <span className="rounded-full border border-error/60 bg-error/10 px-2 py-0.5 text-xs font-semibold text-error">
+                    Angelus/Assumptio
+                  </span>
+                )}
                 <span className="text-muted">
                   {`· mediana ${spike.median === null || spike.median === undefined ? '—' : formatStatValue(spike.median, spike.value_type)}`}
                   {spike.z !== null && spike.z !== undefined ? ` · ${sigma(spike.z)}` : ''}

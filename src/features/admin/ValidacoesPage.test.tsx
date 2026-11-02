@@ -297,6 +297,81 @@ describe('AntiCheatPanel', () => {
     expect(html).not.toContain('Nenhum valor fora da curva')
   })
 
+  it('marks a first submission with no validated history', () => {
+    const html = renderToStaticMarkup(
+      <AntiCheatPanel
+        flags={{
+          flagged: false,
+          review: {
+            category: 'consistent',
+            cohort_available: true,
+            history_available: false,
+            history_sample_size: 0,
+            reasons: ['Dentro das referências disponíveis (coorte/histórico).'],
+          },
+          defense_spikes: [],
+          ocr_overrides: [],
+          ocr_filled_count: 0,
+          ocr_edited_count: 0,
+          ovr_swing: {
+            previous: null,
+            projected: null,
+            delta: null,
+            class_changed: false,
+            function_changed: false,
+          },
+        }}
+      />,
+    )
+    expect(html).toContain('Primeira submissão')
+    expect(html).toContain('confira a coorte no Ranking')
+  })
+
+  it('labels a cohort-level Angelus/Assumptio signature (0071)', () => {
+    const html = renderToStaticMarkup(
+      <AntiCheatPanel
+        flags={{
+          flagged: true,
+          review: {
+            category: 'buffed',
+            cohort_available: true,
+            history_available: false,
+            history_sample_size: 0,
+            reasons: ['Angelus/Assumptio em Equip. PDEF % (96 p.p. acima da mediana)'],
+          },
+          defense_spikes: [
+            {
+              stat_key: 'equip_pdef_pct',
+              label: 'Equip. PDEF %',
+              value_type: 'percentual',
+              value: 118,
+              baseline: 20,
+              ratio: 5.9,
+              sample_size: 7,
+              median: 22,
+              mad: 3,
+              z: 30,
+              reason: 'sigma',
+              signature: 'defense',
+            },
+          ],
+          ocr_overrides: [],
+          ocr_filled_count: 0,
+          ocr_edited_count: 0,
+          ovr_swing: {
+            previous: null,
+            projected: null,
+            delta: null,
+            class_changed: false,
+            function_changed: false,
+          },
+        }}
+      />,
+    )
+    expect(html).toContain('Angelus/Assumptio')
+    expect(html).toContain('Primeira submissão')
+  })
+
   it('renders nothing without flags (old server during deploy)', () => {
     expect(renderToStaticMarkup(<AntiCheatPanel flags={undefined} />)).toBe('')
   })

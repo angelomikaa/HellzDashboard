@@ -353,6 +353,9 @@ export interface AntiCheatDefenseSpike {
   mad?: number | null
   z?: number | null
   reason?: 'ratio' | 'sigma' | 'both' | null
+  /** 0071: known Angelus/Assumptio shape vs the cohort median (first
+   *  submission included). Additive: a pre-0071 server omits it. */
+  signature?: 'defense' | null
 }
 
 /**

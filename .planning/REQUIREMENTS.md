@@ -154,6 +154,9 @@ same drift fails CI instead of reaching production silently.
 - **CHEAT-06** (0067): the generic `history_jump` requires a robust z **and** a material change vs the previous validated row (≥ 5 p.p. on a percent, ≥ 3% on a flat); an identical resubmission is no longer flagged.
 - **CHEAT-07** (0068): a clean pending row with **either** a cohort curve (n≥5) or the member's own validated history is `consistent`; `inconclusive` is reserved for no reference at all (or an anomaly).
 - **CHEAT-08** (0069): `pending_validation_count` returns `buffed` (a subset of pending submissions, same category as the row chip) and the Validações nav shows it as an orange warning pill.
+- **CHEAT-09** (0070): `curve_deviation` flags an isolated equipment-% inflation (pct ≥ cohort median + 20 p.p., z_pct ≥ 2, z_base ≤ −1.5) as `reason=curve` — an inconclusive review signal, never a known buff label.
+- **CHEAT-10** (0071): the known Angelus/Assumptio shape measured against the **cohort median** (defense % +80..110 p.p. or rpdef/rmdef ×1.6..2.3) makes a **first** submission `buffed`, with an explicit reason.
+- **CHEAT-11**: the AntiCheatPanel marks a `Primeira submissão` when the member has no validated history, tells the officer to compare with the cohort in Ranking, and labels cohort-level defense signatures.
 
 ## v2 Requirements
 

@@ -61,7 +61,9 @@ describe('migration 0068 — consistent may rely on self-history', () => {
 
   it('is the latest definition and is in the manifest', () => {
     const latest = latestDefinition('submission_anti_cheat')
-    expect(latest?.file).toBe('0068_consistent_with_history.sql')
+    const version = Number.parseInt(latest?.file.slice(0, 4) ?? '0', 10)
+    // 0071 supersedes the body; the 0068 category rule must survive.
+    expect(version).toBeGreaterThanOrEqual(68)
     expect(latest?.body).toContain(
       'not (v_cohort_available or v_history_available)',
     )
