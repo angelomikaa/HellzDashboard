@@ -372,6 +372,57 @@ describe('AntiCheatPanel', () => {
     expect(html).toContain('Primeira submissão')
   })
 
+  it('shows the PDEF/MDEF regression and the x-shift Assumptio hypothesis (0072)', () => {
+    const html = renderToStaticMarkup(
+      <AntiCheatPanel
+        flags={{
+          flagged: true,
+          review: {
+            category: 'inconclusive',
+            cohort_available: true,
+            history_available: false,
+            history_sample_size: 0,
+            reasons: [
+              'Defesa (PDEF/MDEF) fora da curva — a hipótese Assumptio (+95 p.p. / ÷1,95) explica o desvio.',
+            ],
+          },
+          defense_spikes: [],
+          defense_curves: [
+            {
+              available: true,
+              flat_stat: 'rpdef',
+              pct_stat: 'equip_pdef_pct',
+              flat_label: 'RPDEF',
+              pct_label: 'Equip. PDEF %',
+              flat_value: 3996,
+              pct_value: 102.2,
+              sample_size: 8,
+              r2: 0.72,
+              expected_flat: 7061.93,
+              z_residual: -32.62,
+              x_shift_possible: true,
+              y_scale_possible: false,
+            },
+          ],
+          ocr_overrides: [],
+          ocr_filled_count: 0,
+          ocr_edited_count: 0,
+          ovr_swing: {
+            previous: null,
+            projected: null,
+            delta: null,
+            class_changed: false,
+            function_changed: false,
+          },
+        }}
+      />,
+    )
+    expect(html).toContain('Curva de defesa (PDEF/MDEF)')
+    expect(html).toContain('RPDEF × Equip. PDEF %')
+    expect(html).toContain('Assumptio +95 p.p. no % (x)')
+    expect(html).toContain('esperado 7.061,93')
+  })
+
   it('renders nothing without flags (old server during deploy)', () => {
     expect(renderToStaticMarkup(<AntiCheatPanel flags={undefined} />)).toBe('')
   })

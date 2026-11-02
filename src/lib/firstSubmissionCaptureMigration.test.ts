@@ -68,7 +68,9 @@ describe('migration 0071 — cohort-level defense signature', () => {
 
   it('is the latest definition and is in the manifest', () => {
     const latest = latestDefinition('submission_anti_cheat')
-    expect(latest?.file).toBe('0071_defense_cohort_signature.sql')
+    const version = Number.parseInt(latest?.file.slice(0, 4) ?? '0', 10)
+    // 0072 supersedes the body; the cohort defense signature must survive.
+    expect(version).toBeGreaterThanOrEqual(71)
     expect(latest?.body).toContain("e->>'signature' = 'defense'")
     const manifest = JSON.parse(
       readFileSync('supabase/migrations/manifest.json', 'utf8'),

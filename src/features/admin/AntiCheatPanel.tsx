@@ -63,6 +63,7 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
 
   const spikes = flags.defense_spikes ?? []
   const curves = flags.curve_deviations ?? []
+  const defenseCurves = flags.defense_curves ?? []
   const history = flags.history_deviations ?? []
   const overrides = flags.ocr_overrides ?? []
   const swing = flags.ovr_swing
@@ -215,12 +216,72 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
         </div>
       )}
 
+      {defenseCurves.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-content">Curva de defesa (PDEF/MDEF)</p>
+          <ul className="mt-1 flex flex-col gap-2">
+            {defenseCurves.map((curve) => {
+              const flagged =
+                (curve.x_shift_possible ?? false) || (curve.y_scale_possible ?? false)
+              return (
+                <li key={curve.flat_stat} className="text-sm text-content">
+                  {!curve.available ? (
+                    <span className="text-muted">
+                      {`${curve.flat_label ?? curve.flat_stat} / ${curve.pct_label ?? curve.pct_stat}: modelo indisponível (n=${curve.sample_size}${
+                        curve.r2 !== null && curve.r2 !== undefined
+                          ? ` · R²=${number.format(curve.r2)}`
+                          : ''
+                      })`}
+                    </span>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap items-baseline gap-x-2">
+                        <span
+                          className={
+                            flagged ? 'font-semibold text-error' : 'font-semibold text-content'
+                          }
+                        >
+                          {`${curve.flat_label ?? curve.flat_stat} × ${curve.pct_label ?? curve.pct_stat}`}
+                        </span>
+                        <span className="font-mono">
+                          {`${fmt(curve.flat_value, 'flat')} @ ${fmt(curve.pct_value, 'percentual')}`}
+                        </span>
+                        <span className="text-muted">
+                          {`· esperado ${fmt(curve.expected_flat, 'flat')} · ${sigma(curve.z_residual)} · n=${curve.sample_size} · R²=${number.format(curve.r2 ?? 0)}`}
+                        </span>
+                      </div>
+                      {(curve.x_shift_possible || curve.y_scale_possible) && (
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {curve.x_shift_possible && (
+                            <span className="rounded-full border border-error/60 bg-error/10 px-2 py-0.5 text-xs font-semibold text-error">
+                              Assumptio +95 p.p. no % (x)
+                            </span>
+                          )}
+                          {curve.y_scale_possible && (
+                            <span className="rounded-full border border-error/60 bg-error/10 px-2 py-0.5 text-xs font-semibold text-error">
+                              {`Assumptio ×1,95 no ${curve.flat_label ?? curve.flat_stat} (y)`}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+          <p className="mt-1 text-xs text-muted">
+            Assumptio desloca o par: +95 p.p. no % (x) ou ×1,95 no RPDEF/RMDEF (y). A regressão é
+            exploratória (R² ≥ 0,25); o selo “Buffado” só aparece com a assinatura conhecida.
+          </p>
+        </div>
+      )}
+
       {history.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-semibold text-error">
             Desvio vs. histórico validado do jogador
-          </p>
-          <p className="text-xs text-muted">
+          </p>          <p className="text-xs text-muted">
             Compara com o último envio validado; funciona mesmo quando a coorte tem menos de
             5 membros.
           </p>

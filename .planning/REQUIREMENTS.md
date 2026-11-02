@@ -157,6 +157,8 @@ same drift fails CI instead of reaching production silently.
 - **CHEAT-09** (0070): `curve_deviation` flags an isolated equipment-% inflation (pct ≥ cohort median + 20 p.p., z_pct ≥ 2, z_base ≤ −1.5) as `reason=curve` — an inconclusive review signal, never a known buff label.
 - **CHEAT-10** (0071): the known Angelus/Assumptio shape measured against the **cohort median** (defense % +80..110 p.p. or rpdef/rmdef ×1.6..2.3) makes a **first** submission `buffed`, with an explicit reason.
 - **CHEAT-11**: the AntiCheatPanel marks a `Primeira submissão` when the member has no validated history, tells the officer to compare with the cohort in Ranking, and labels cohort-level defense signatures.
+- **CHEAT-12** (0072): `defense_curve()` fits RPDEF × PDEF% and RMDEF × MDEF% over the cohort and tests **both** Assumptio hypotheses (x-shift +95 p.p. on the %, y-scale ×1.95 on the raw defense); a strong residual is an `inconclusive` anomaly with an explicit reason, never an accusation.
+- **CHEAT-13**: the Validações panel shows `Curva de defesa (PDEF/MDEF)` with observed/expected/residual, n, R² and the x/y Assumptio badges, so the post-submit review is no longer ATK/MATK-only.
 
 ## v2 Requirements
 

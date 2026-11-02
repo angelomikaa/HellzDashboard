@@ -391,6 +391,37 @@ export interface AntiCheatCurveDeviation {
   sample_size: number
 }
 
+/** One defense regression pair (0072): RPDEF/RMDEF x Equip. PDEF/MDEF %. */
+export interface AntiCheatDefenseCurve {
+  available: boolean
+  flat_stat: string
+  pct_stat: string
+  flat_label: string | null
+  pct_label: string | null
+  flat_value: number | null
+  pct_value: number | null
+  sample_size: number
+  /** OLS fit quality (0072 only considers the model above 0.25). */
+  r2?: number | null
+  slope?: number | null
+  intercept?: number | null
+  expected_flat?: number | null
+  residual?: number | null
+  z_residual?: number | null
+  /** Assumptio on the percentage: +95 p.p. (the raw defense stays). */
+  x_shift_expected?: number | null
+  x_shift_residual?: number | null
+  x_shift_score?: number | null
+  x_shift_possible?: boolean
+  /** Assumptio on the raw defense: x1.95. */
+  y_scale_expected?: number | null
+  y_scale_residual?: number | null
+  y_scale_score?: number | null
+  y_scale_possible?: boolean
+  /** Known +80..110 p.p. / x1.6..2.3 shape vs the cohort median. */
+  signature?: 'defense' | null
+}
+
 /** One input the OCR read filled and the player changed afterwards (0046). */
 export interface AntiCheatOcrOverride {
   input_key: string
@@ -446,6 +477,9 @@ export interface AntiCheatFlags {
   defense_spikes: AntiCheatDefenseSpike[]
   /** 0049: PATK/MATK curve verdicts (always two entries; `available` says whether n >= 5). */
   curve_deviations?: AntiCheatCurveDeviation[]
+  /** 0072: PDEF/MDEF regression pairs (RPDEF x PDEF%, RMDEF x MDEF%) with
+   *  both Assumptio hypotheses. Optional so a pre-0072 payload keeps rendering. */
+  defense_curves?: AntiCheatDefenseCurve[]
   /** 0053: pending vs the member's own validated history (known buff signatures). */
   history_deviations?: AntiCheatHistoryDeviation[]
   ocr_overrides: AntiCheatOcrOverride[]
