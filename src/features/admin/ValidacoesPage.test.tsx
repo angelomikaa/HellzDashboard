@@ -246,7 +246,55 @@ describe('AntiCheatPanel', () => {
         }}
       />,
     )
-    expect(html).toContain('Nenhum valor fora da curva')
+    expect(html).toContain('Nenhuma anomalia nas referências disponíveis.')
+  })
+
+  it('says there is no statistical baseline instead of implying a clean check (0068)', () => {
+    const html = renderToStaticMarkup(
+      <AntiCheatPanel
+        flags={{
+          flagged: true,
+          review: {
+            category: 'inconclusive',
+            cohort_available: false,
+            history_available: false,
+            history_sample_size: 0,
+            reasons: ['Sem baseline de coorte (n<5) nem histórico validado.'],
+          },
+          defense_spikes: [],
+          curve_deviations: [
+            {
+              available: false,
+              flagged: false,
+              reason: null,
+              flat_stat: 'matk',
+              pct_stat: 'equip_matk_pct',
+              flat_label: 'MATK',
+              pct_label: 'Equip. MATK %',
+              flat_value_type: 'flat',
+              pct_value_type: 'percentual',
+              flat_value: 1000,
+              pct_value: 50,
+              sample_size: 4,
+            },
+          ],
+          ocr_overrides: [],
+          ocr_filled_count: 0,
+          ocr_edited_count: 0,
+          ovr_swing: {
+            previous: null,
+            projected: null,
+            delta: null,
+            class_changed: false,
+            function_changed: false,
+          },
+        }}
+      />,
+    )
+    expect(html).toContain('Sem base estatística')
+    expect(html).toContain('n = 4')
+    expect(html).toContain('não por ausência de anomalia')
+    expect(html).not.toContain('Nenhum valor fora da curva')
   })
 
   it('renders nothing without flags (old server during deploy)', () => {

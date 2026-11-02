@@ -151,6 +151,9 @@ same drift fails CI instead of reaching production silently.
 - **REL-01** (`src/lib/http.ts`): every network call has a 15 s deadline.
 - **AUTH-07**: any 401 (expired/invalid JWT) invalidates the session and returns to the landing.
 - **DEVOPS-01**: Vitest `unit`/`ocr` projects (`npm test` ~40 s vs ~7 min) and a CI workflow (lint, types, manifest, offline schema, unit tests, build).
+- **CHEAT-06** (0067): the generic `history_jump` requires a robust z **and** a material change vs the previous validated row (≥ 5 p.p. on a percent, ≥ 3% on a flat); an identical resubmission is no longer flagged.
+- **CHEAT-07** (0068): a clean pending row with **either** a cohort curve (n≥5) or the member's own validated history is `consistent`; `inconclusive` is reserved for no reference at all (or an anomaly).
+- **CHEAT-08** (0069): `pending_validation_count` returns `buffed` (a subset of pending submissions, same category as the row chip) and the Validações nav shows it as an orange warning pill.
 
 ## v2 Requirements
 
