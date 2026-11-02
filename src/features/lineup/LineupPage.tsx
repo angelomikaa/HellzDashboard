@@ -43,6 +43,7 @@ import {
   isPartyFull,
   isValidPartyCounts,
   lineupErrorCopy,
+  lineupWarnings,
   MAX_PARTIES_PER_RAID,
   MIN_PARTIES_PER_RAID,
   minPartyCount,
@@ -183,6 +184,7 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
   const ownAbsent = payload.absences.includes(session.member_id)
   const raids = payload.battlefields
   const assignments = buildAssignmentMap(payload)
+  const warnings = lineupWarnings(payload)
   const absentIds = new Set(payload.absences)
   const absentMembers = absentRoster(payload.roster, absentIds)
   const availableMembers = availableRoster(payload.roster, assignments, absentIds)
@@ -590,6 +592,23 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
           </p>
         )}
       </header>
+
+      {warnings.length > 0 && (
+        <ul aria-label="Avisos da escalação" className="flex flex-wrap gap-2">
+          {warnings.map((warning) => (
+            <li
+              key={warning.id}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                warning.tone === 'warn'
+                  ? 'border-error/40 bg-error/10 text-error'
+                  : 'border-line bg-surface text-muted'
+              }`}
+            >
+              {warning.message}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {isStaff && (
         <>

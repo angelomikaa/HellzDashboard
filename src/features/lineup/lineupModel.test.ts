@@ -26,6 +26,7 @@ import {
   partyFilledCount,
   raidCapacity,
   raidMeta,
+  lineupWarnings,
   TOTAL_PARTIES,
   totalPartyCount,
   WAR_MODE_META,
@@ -374,5 +375,65 @@ describe('normalizeRoleLabel', () => {
     expect(normalizeRoleLabel('  MOBS CIMA/BAIXO  ')).toBe('MOBS CIMA/BAIXO')
     expect(normalizeRoleLabel('   ')).toBeNull()
     expect(normalizeRoleLabel('x'.repeat(60))).toHaveLength(40)
+  })
+})
+
+describe('lineupWarnings', () => {
+  it('flags a raid with no support and its incomplete parties', () => {
+    const warnings = lineupWarnings(payload)
+    const byId = new Map(warnings.map((warning) => [warning.id, warning]))
+    // Raid 1 has seated players but all of them are dps in the fixture.
+    expect(byId.get('no-suporte-1')?.tone).toBe('warn')
+    expect(byId.get('incomplete-1')?.tone).toBe('info')
+    // Raid 2 is empty: no composition verdict at all.
+    expect(byId.has('no-suporte-2')).toBe(false)
+  })
+
+  it('surfaces unassigned actives and marked absences', () => {
+    const sparse: LineupsPayload = {
+      ...payload,
+      roster: [
+        ...roster,
+        { member_id: 'd', display_name: 'Delta', char_class: null, char_function: 'mdps' },
+        { member_id: 'e', display_name: 'Echo', char_class: null, char_function: 'dps' },
+      ],
+      absences: ['d'],
+    }
+    const ids = lineupWarnings(sparse).map((warning) => warning.id)
+    expect(ids).toContain('unassigned') // Echo
+    expect(ids).toContain('absences') // Delta
+  })
+
+  it('clears the support warning once a suporte is seated', () => {
+    const supportRaid = {
+      battlefield: 'vigrid_field' as const,
+      raid_index: 1,
+      parties: [
+        {
+          party_index: 1,
+          role_label: null,
+          filled: 1,
+          slots: [
+            {
+              slot_index: 1,
+              member_id: 'c',
+              display_name: 'Mike',
+              char_class: 'Gypsy',
+              char_function: 'suporte' as const,
+            },
+            slot(2, null),
+            slot(3, null),
+            slot(4, null),
+            slot(5, null),
+          ],
+        },
+        party(2, [null, null, null, null, null]),
+      ],
+    }
+    const ids = lineupWarnings({ ...payload, battlefields: [supportRaid] }).map(
+      (warning) => warning.id,
+    )
+    expect(ids).not.toContain('no-suporte-1')
+    expect(ids).toContain('empty-1')
   })
 })

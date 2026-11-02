@@ -399,3 +399,80 @@ export function normalizeRoleLabel(input: string): string | null {
   if (trimmed === '') return null
   return trimmed.slice(0, ROLE_LABEL_MAX)
 }
+
+/** One composition advisory shown above the lineup board. */
+export interface LineupWarning {
+  id: string
+  tone: 'warn' | 'info'
+  message: string
+}
+
+/**
+ * Composition advisories (display-only, derived from the payload the server
+ * already returned). Never a rule enforced by the UI: officers keep full
+ * control, these just surface the usual pre-war mistakes — an unseated active
+ * player, a raid with zero supports, empty or half-filled parties.
+ */
+export function lineupWarnings(payload: LineupsPayload): LineupWarning[] {
+  const warnings: LineupWarning[] = []
+  const assignments = buildAssignmentMap(payload)
+  const absentIds = new Set(payload.absences)
+
+  const unassigned = availableRoster(payload.roster, assignments, absentIds)
+  if (unassigned.length > 0) {
+    warnings.push({
+      id: 'unassigned',
+      tone: 'warn',
+      message: `${unassigned.length} ativo${unassigned.length === 1 ? '' : 's'} fora da escalação (nem escalado, nem ausente).`,
+    })
+  }
+
+  const absent = absentRoster(payload.roster, absentIds)
+  if (absent.length > 0) {
+    warnings.push({
+      id: 'absences',
+      tone: 'info',
+      message: `${absent.length} ausência${absent.length === 1 ? '' : 's'} marcada${absent.length === 1 ? '' : 's'}.`,
+    })
+  }
+
+  for (const raid of payload.battlefields) {
+    const meta = raidMeta(payload.war_mode, raid.raid_index)
+    const seated = raid.parties
+      .flatMap((party) => party.slots)
+      .filter((slot) => slot.member_id !== null)
+    // An empty raid is simply not in use — no composition verdict.
+    if (seated.length === 0) continue
+
+    if (!seated.some((slot) => slot.char_function === 'suporte')) {
+      warnings.push({
+        id: `no-suporte-${raid.raid_index}`,
+        tone: 'warn',
+        message: `${meta.subtitle} sem suporte escalado.`,
+      })
+    }
+
+    const empty = raid.parties.filter((party) => partyFilledCount(party) === 0).length
+    if (empty > 0) {
+      warnings.push({
+        id: `empty-${raid.raid_index}`,
+        tone: 'info',
+        message: `${meta.subtitle}: ${empty} PT${empty === 1 ? '' : 's'} vazia${empty === 1 ? '' : 's'}.`,
+      })
+    }
+
+    const incomplete = raid.parties.filter((party) => {
+      const filled = partyFilledCount(party)
+      return filled > 0 && filled < SLOTS_PER_PARTY
+    }).length
+    if (incomplete > 0) {
+      warnings.push({
+        id: `incomplete-${raid.raid_index}`,
+        tone: 'info',
+        message: `${meta.subtitle}: ${incomplete} PT${incomplete === 1 ? '' : 's'} incompleta${incomplete === 1 ? '' : 's'}.`,
+      })
+    }
+  }
+
+  return warnings
+}
