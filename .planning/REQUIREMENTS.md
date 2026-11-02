@@ -138,6 +138,20 @@ Added 2026-10-30 to replace the external spreadsheet workflow for raid party man
 - [x] **LNUP-04**: All new real players present in the owner's Raid 1 / Raid 2 reference lineups are pre-registered into `members` as active unclaimed rows (`pin_hash = null`, `char_class = null` — no guessed classes on ambiguous spreadsheet colors) so they appear immediately in `Personagens` and populate the default seeded lineups for Vigrid Field and Ruinscape
 - [x] **LNUP-05**: Users can generate and download a high-resolution **JPG** (`image/jpeg`) per battlefield (`hellz-lineup-vigrid-field.jpg`, `hellz-lineup-ruinscape.jpg`, plus a "Baixar ambas" action) rendered via native Canvas 2D in the Hellz dark/neon visual system (`#141414`/`#1E1E1E`, red neon accents, Orbitron/Bebas Neue typography, Hellz mark, `G1`–`G8` columns, party assignment headers, leader highlight on slot 1, class icon + class color accent per slot, and `N/5` party counters)
 
+## Reliability & Integrity Corrections (2026-11-02)
+
+Live-applied while preparing Phase 11. Each item ships with a static lock so the
+same drift fails CI instead of reaching production silently.
+
+- **SEC-07** (0063): `get_promotion_public` withholds every raw highlight value unless the caller is an ACTIVE member. 0045 had been superseded by 0055 without the gate; live anon received 360/360 values and only the client masked them.
+- **SEC-08** (0064): `set_member_role`, `set_member_active`, `reset_member_pin` and `add_member` carry their real bodies + `assert_device_bound()` + a pinned `search_path`. 0024 shipped stub bodies and the guard was absent live, so SEC-04 was recorded complete without the control.
+- **DATA-01** (`supabase/migrations/manifest.json`, `scripts/verify-schema.mjs`): canonical apply order, retired-file list (0024 stub, 0032, 0033, 0045), bookkeeping drift, retired replay, `search_path` and critical-gate checks.
+- **AUD-01** (0065): append-only `submission_reviews` records officer, decision and timestamp on every validation; staff-only "Histórico" tab.
+- **AUTH-06** (0066): `login_key` is a generated column, unique among ACTIVE rows; `add_member`/`correct_identity` raise `duplicate_nickname`.
+- **REL-01** (`src/lib/http.ts`): every network call has a 15 s deadline.
+- **AUTH-07**: any 401 (expired/invalid JWT) invalidates the session and returns to the landing.
+- **DEVOPS-01**: Vitest `unit`/`ocr` projects (`npm test` ~40 s vs ~7 min) and a CI workflow (lint, types, manifest, offline schema, unit tests, build).
+
 ## v2 Requirements
 
 Deferred to a future release. Tracked but not in the v1.1 roadmap.
@@ -156,7 +170,7 @@ Deferred to a future release. Tracked but not in the v1.1 roadmap.
 
 - **CAT-01**: Stat catalog self-service additions by admins
 - **OCRX-01**: OCR confidence surfacing — auto-flag low-confidence fields for review
-- **SHAR-01**: Shareable card image export — render stat card to PNG for Discord/WhatsApp
+- **SHAR-01**: Shareable card image export — render stat card to PNG for Discord/WhatsApp — **DELIVERED in 07.2** (transparent PNG through the shared card contract; kept here for history)
 
 ## Out of Scope
 

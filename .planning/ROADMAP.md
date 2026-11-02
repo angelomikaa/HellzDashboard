@@ -39,6 +39,7 @@
 - [x] Phase 10.9: Ranking UI Reorganization (INSERTED 2026-10-31) — the staff Ranking tab becomes three sibling sections (Ranking OVR / Explorador de stats / Análise estatística) with one tablist, the 59-stat player detail moves into an accessible modal, the stat explorer gains a searchable picker plus class/function/name filters, and methodology/reference validation collapse by default; client-only, no migration
 - [x] Phase 10.10: Início Non-Platinum Fallback (INSERTED 2026-11-01) — the showcase keeps the Impecável gate per build, but a meta build with no platinum card at all now falls back to its server-ranked top 3, so the five empty builds primed at OVR 83 no longer vanish from the landing; client-only, no migration
 - [x] Phase 10.11: Smoke-Only Cohort Hiding (INSERTED 2026-11-01) — a build whose Início cards are ALL smoke fixtures is hidden (migration 0055 adds `card.placeholder`), so Algoz and the other empty cohorts leave the rotation; the moment a real member joins, the build returns by itself (compute-on-read). Placeholders remain as fillers beside a real player
+- [x] Phase 10.12: Emperium War Lineups (INSERTED 2026-11-01) — the Escalação tab gains Guerra do Emperium: 2–8 raids with a fixed total of 16 parties, officer-editable party distribution, absences/no-swap assignment, drag-and-drop board and JPG export; migrations 0056–0062 seed the owner's formation (78/80 seats), pre-register "Same" and repair the identity fallout — completed 2026-11-01
 - [ ] Phase 11: Verified Access — Claim Authorization & Discord OAuth — first access is manual-fill and officer-validated since 0034 (DSCD-01 holds via claim/registration request approvals, no print anywhere); Phase 11 replaces the manual trust with the real anchor: one-time officer-confirmed Discord↔character link, server-side bot-token role check, custom access token hook keeping every RLS policy intact, device-binding re-decision, PIN retirement path (INSERTED 2026-10-26)
 
 </details>
@@ -409,7 +410,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 → 10.6 → 10.7 → 10.8 → 10.9 → 10.10 → 10.11 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
+Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 → 10.6 → 10.7 → 10.8 → 10.9 → 10.10 → 10.11 → 10.12 → 11 (8 is independent and could interleave with 7; 9 depends on 7's vocabulary/catalog/seed; 9.1 depends on 9's migration 0018 applied live; 10 depends on 9's `last_validated_at`; **10.1 is the URGENT rating-unification fix inserted 2026-10-27 — it lands BEFORE Phase 11 per owner call and can run as soon as Phase 10's deploy window allows**; 11 builds on 8/08.1 + 0034)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|------------|
@@ -420,11 +421,11 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 
 | 5. OCR Auto-Read Layer | v1.0 | 5/5 | Complete | 2026-10-12 |
 | 6. Trust & Celebration — Officer Tools & Promotion Page | v1.0 | 7/7 | Complete | 2026-10-13 |
 | 7. Dummy-Data Seed & Catalog Alignment | v1.1 | 4/4 | Complete | 2026-10-15 |
-| 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 3/6 | In Progress|  |
+| 8. Whitelist Lifecycle, Self-Request & Character Identity | v1.1 | 9/9 | Executed — pending owner UAT |  |
 | 08.10. pt-BR OCR Identity (hotfix) | v1.1 | 1/1 | Complete | 2026-10-22 |
 | 9. Fine Ranks — Value-Proportional Scale & Role-Differentiated Key Stats | v1.1 | 5/5 | Complete | 2026-10-22 |
 | 9.1. Hidden Raw Defenses (RPDEF/RMDEF) | v1.1 | 2/2 | Complete    | 2026-10-24 |
-| 10. Personalized Home Landing Tab | v1.1 | 3/3 | Planned | - |
+| 10. Personalized Home Landing Tab | v1.1 | 3/3 | Complete | 2026-10-25 |
 | 10.1 Universal Rating Unification (urgent fix, inserted) | v1.1 | 2/2 | Complete    | 2026-10-27 |
 | 10.2 Meta vs Non-Viable Cohorts (inserted) | v1.1 | - | Complete | 2026-10-29 |
 | 10.3 Artista Merged Cohort (inserted) | v1.1 | - | Complete | 2026-10-29 |
@@ -436,8 +437,9 @@ Phases execute in numeric order: 7 → 8 → 9 → 9.1 → 10 → 10.1 → 10.5 
 | 10.9 Ranking UI Reorganization (inserted) | v1.1 | 1/1 | Complete (client-only) | 2026-10-31 |
 | 10.10 Início Non-Platinum Fallback (inserted) | v1.1 | 1/1 | Complete (client-only) | 2026-11-01 |
 | 10.11 Smoke-Only Cohort Hiding (inserted) | v1.1 | 1/1 | Complete (0055 live) | 2026-11-01 |
+| 10.12 Emperium War Lineups (inserted) | v1.1 | — | Complete (0056..0062 live) | 2026-11-01 |
 | 11. Verified Access — Claim Authorization & Discord OAuth | v1.1 | 0/? | Planned | - |
 
 ---
-*Roadmap created: 2026-10-07 · v1.0 archived 2026-10-13 · v1.1 roadmap created 2026-10-13 · revised 2026-10-22 (added Phase 9.1 Hidden Raw Defenses — 5 phases, DEF-01..DEF-06 requirements) · revised 2026-10-27 (inserted Phase 10.1 Universal Rating Unification as an URGENT fix before Phase 11 — owner report of cross-surface OVR inconsistency; investigation in `.planning/phases/10.1-universal-rating-unification/10.1-CONTEXT.md`; UNIF-01..04 requirements) · revised 2026-10-29 (recorded Phase 10.2 meta/non-viable split and inserted Phase 10.3 Artista merged cohort — owner ruling that Menestrel and Cigana are one class for stats; 0038 rehearsed, not live) · revised 2026-10-31 (inserted Phase 10.9 Ranking UI Reorganization — three sibling sections, player-stats modal, explorer filters; client-only) · revised 2026-11-01 (inserted Phase 10.10 Início Non-Platinum Fallback — per-build fallback for builds without a platinum card; client-only) · revised 2026-11-01 (inserted Phase 10.11 Smoke-Only Cohort Hiding — migration 0055 adds a server-side placeholder flag; smoke-only builds leave the showcase and return automatically when a real member joins)*
+*Roadmap created: 2026-10-07 · v1.0 archived 2026-10-13 · v1.1 roadmap created 2026-10-13 · revised 2026-10-22 (added Phase 9.1 Hidden Raw Defenses — 5 phases, DEF-01..DEF-06 requirements) · revised 2026-10-27 (inserted Phase 10.1 Universal Rating Unification as an URGENT fix before Phase 11 — owner report of cross-surface OVR inconsistency; investigation in `.planning/phases/10.1-universal-rating-unification/10.1-CONTEXT.md`; UNIF-01..04 requirements) · revised 2026-10-29 (recorded Phase 10.2 meta/non-viable split and inserted Phase 10.3 Artista merged cohort — owner ruling that Menestrel and Cigana are one class for stats; 0038 rehearsed, not live) · revised 2026-10-31 (inserted Phase 10.9 Ranking UI Reorganization — three sibling sections, player-stats modal, explorer filters; client-only) · revised 2026-11-01 (inserted Phase 10.10 Início Non-Platinum Fallback — per-build fallback for builds without a platinum card; client-only) · revised 2026-11-01 (inserted Phase 10.11 Smoke-Only Cohort Hiding — migration 0055 adds a server-side placeholder flag; smoke-only builds leave the showcase and return automatically when a real member joins)* · revised 2026-11-02 (bookkeeping: Phase 10.12 recorded; reliability/security pass 0063–0066 — public stat gate restored, real staff RPC bodies + device binding, canonical migration manifest + drift guard, validation audit trail, unique active login key; CI + unit/OCR test split)*
 
