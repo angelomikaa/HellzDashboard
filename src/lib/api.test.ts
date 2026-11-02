@@ -18,6 +18,7 @@ import {
   fetchMyReport,
   fetchMySubmissions,
   fetchPromotionPublic,
+  fetchRecentReviews,
   fetchStaffMembers,
   fetchStaffRequests,
   asLineupsPayload,
@@ -155,6 +156,35 @@ describe('REST client error handling', () => {
     expect(removeItem).toHaveBeenCalledWith('nefoot_session')
     expect(invalidated).toHaveBeenCalledTimes(1)
     off()
+  })
+
+  it('fetchRecentReviews sends the limit and returns the audit rows', async () => {
+    nextResponse = () =>
+      res(
+        200,
+        JSON.stringify([
+          {
+            review_id: 1,
+            submission_id: '22222222-2222-2222-2222-222222222222',
+            decision: 'validated',
+            note: null,
+            created_at: '2026-11-02T00:00:00Z',
+            officer_name: 'Ahrya',
+            member_name: 'Gohan',
+            char_class: 'Gypsy',
+          },
+        ]),
+      )
+    const rows = await fetchRecentReviews(session, 25)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].decision).toBe('validated')
+    expect(calls[0].url).toContain('/rpc/recent_submission_reviews')
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ p_limit: 25 })
+  })
+
+  it('fetchRecentReviews rejects a malformed payload', async () => {
+    nextResponse = () => res(200, JSON.stringify({ not: 'an array' }))
+    await expect(fetchRecentReviews(session)).rejects.toMatchObject({ kind: 'server' })
   })
 
   it('marks network failures as kind network', async () => {

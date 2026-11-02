@@ -518,6 +518,38 @@ export async function setSubmissionStatus(
   return parseBody<number>(res)
 }
 
+/** One recorded officer decision (0065). Append-only, staff-read only. */
+export interface SubmissionReviewRow {
+  review_id: number
+  submission_id: string
+  decision: 'validated' | 'rejected' | 'reopened'
+  note: string | null
+  created_at: string
+  officer_name: string | null
+  member_name: string | null
+  char_class: string | null
+}
+
+/**
+ * Recent validation decisions (0065): officer, member, decision, class and
+ * timestamp, newest first, capped server-side at 200. Staff-only gate inside
+ * the RPC (a member JWT raises 'forbidden'); the table itself has no grants.
+ */
+export async function fetchRecentReviews(
+  session: NeoFootSession,
+  limit = 50,
+): Promise<SubmissionReviewRow[]> {
+  const res = await restFetch(session, '/rpc/recent_submission_reviews', {
+    method: 'POST',
+    body: JSON.stringify({ p_limit: limit }),
+  })
+  const rows = await parseBody<SubmissionReviewRow[]>(res)
+  if (!Array.isArray(rows)) {
+    throw new ApiError(0, 'server', 'malformed recent_submission_reviews response')
+  }
+  return rows
+}
+
 // --- Round 9 (owner 2026-10-25): the Validações tab badge counts all THREE
 //     pending queues without dragging their payloads. 0031 added `requests`
 //     after the owner reported requests never lit the badge. ---

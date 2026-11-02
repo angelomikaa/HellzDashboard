@@ -22,6 +22,7 @@ import { reviewDisplay } from './reviewDisplay'
 import { ConfirmDialog } from './ConfirmDialog'
 import { IdentityReview } from './IdentityReview'
 import { RequestReview } from './RequestReview'
+import { ReviewHistory } from './ReviewHistory'
 import type { NeoFootSession } from '../auth/session'
 
 // Enumeration-safe pt-BR copy (UI contract): never expose HTTP codes, gateway
@@ -47,7 +48,7 @@ const DEFAULT_OPEN_GROUPS: Record<GroupKey, boolean> = {
   special: false,
 }
 
-export type ValidacoesTab = 'envios' | 'solicitacoes' | 'identidades'
+export type ValidacoesTab = 'envios' | 'solicitacoes' | 'identidades' | 'historico'
 
 export function ValidacoesPage({ session }: { session: NeoFootSession }) {
   const [tab, setTab] = useState<ValidacoesTab>('envios')
@@ -164,8 +165,8 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
       <p className="mt-1 text-sm text-muted">Revise e valide os envios pendentes da guilda.</p>
 
       <div className="mt-4 flex gap-2" role="tablist" aria-label="Validações">
-        {(['envios', 'solicitacoes', 'identidades'] as ValidacoesTab[]).map((t) => {
-          const label = t === 'envios' ? 'Envios' : t === 'solicitacoes' ? 'Solicitações' : 'Identidades'
+        {(['envios', 'solicitacoes', 'identidades', 'historico'] as ValidacoesTab[]).map((t) => {
+          const label = validacoesTabLabel(t)
           return (
             <button
               key={t}
@@ -377,6 +378,12 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
           <IdentityReview session={session} />
         </div>
       )}
+
+      {tab === 'historico' && (
+        <div role="none">
+          <ReviewHistory session={session} />
+        </div>
+      )}
       </div>
 
       {/* Destructive confirm: locked copy, destructive-styled confirm button. */}
@@ -404,6 +411,7 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
 export function validacoesTabLabel(tab: ValidacoesTab): string {
   if (tab === 'envios') return 'Envios'
   if (tab === 'solicitacoes') return 'Solicitações'
+  if (tab === 'historico') return 'Histórico'
   return 'Identidades'
 }
 

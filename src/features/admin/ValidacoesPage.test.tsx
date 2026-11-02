@@ -22,6 +22,7 @@ describe('ValidacoesPage helpers', () => {
     expect(validacoesTabLabel('envios')).toBe('Envios')
     expect(validacoesTabLabel('solicitacoes')).toBe('Solicitações')
     expect(validacoesTabLabel('identidades')).toBe('Identidades')
+    expect(validacoesTabLabel('historico')).toBe('Histórico')
   })
 
   it('request type badge', () => {
