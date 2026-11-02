@@ -175,7 +175,7 @@ Full decision log lives in PROJECT.md Key Decisions and the archived phase docum
 
 ### Blockers/Concerns (open — carry to next milestone)
 
-- **[Pending live op] Migration 0045 (public showcase stat gate) is NOT applied live** — ship the client first (it already sends the member JWT on the same RPC), then `node scripts/apply-seed.mjs supabase/migrations/0045_promotion_public_stat_gate.sql`. Until then the anon payload still carries the values and only the client mask hides them.
+- **[RESOLVED 2026-11-02] Public showcase stat gate** — 0045 was never applied live and 0055 re-created `get_promotion_public()` from the pre-0045 body (live anon received 360/360 raw values). Migration **0063_public_promotion_stat_gate.sql** restores the gate on the 0055 body (mechanical diff: only `v_show_values` + the gated `value` expression changed), APPLIED LIVE via apply-seed.mjs. Live verification: anon → 360 highlights / 0 non-null; active-member claim simulation → 360/360 non-null; `supabase_migrations` = 0055 + 0063. Static guard `src/lib/publicStatGateMigration.test.ts` (5 tests) locks the LATEST repo definition, so a future supersession that drops the gate goes red. Do NOT re-apply 0045 (it would drop the `placeholder` flag).
 
 - **[Pre-release] HARD GATE (SEED-02): run the dummy purge before ANY release** — `node scripts/apply-seed.mjs supabase/seeds/dummy/purge-dummies.sql` then the zero-dummy verification query (four zeros across members/submissions/submission_stats/pin_login_attempts). Dummies are LIVE and resident by owner decision 7; shipping without the purge exposes dummy names on Destaques and distorts every real member's ranks.
 - **[Operational] Do NOT revoke JWT signing key 6f7657c3** (standby) — revoking it kills every member session instantly
