@@ -21,7 +21,7 @@ import {
   OVR_SWING_POINTS,
   ovrSwingFlagged,
 } from '../submit/antiCheat'
-import { reviewDisplay } from './reviewDisplay'
+import { coverageNote, reviewDisplay } from './reviewDisplay'
 
 const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
 const ratio = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
@@ -73,6 +73,8 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
     spikes.length > 0 || overrides.length > 0 || swingFlagged || curveFlagged || historyFlagged
   const review = flags.review ?? null
   const display = reviewDisplay(review?.category)
+  // The curve entries carry the same cohort n the server used for the gate.
+  const cohortSample = curves[0]?.sample_size ?? null
 
   return (
     <section
@@ -108,6 +110,10 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
             <li key={reason}>{reason}</li>
           ))}
         </ul>
+      )}
+
+      {review !== null && (
+        <p className="mt-2 text-xs text-muted">{coverageNote(review, cohortSample)}</p>
       )}
 
       {spikes.length > 0 && (
@@ -303,8 +309,9 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
 
       {!hasAny && (
         <p className="mt-2 text-sm text-muted">
-          Nenhum valor fora da curva, nenhuma edição de OCR, nenhum desvio vs. histórico e
-          nenhum OVR fora do esperado.
+          {review !== null && (!review.cohort_available || !review.history_available)
+            ? 'Nenhuma anomalia nas referências disponíveis — o veredito segue limitado pela cobertura acima.'
+            : 'Nenhuma anomalia nas referências disponíveis.'}
         </p>
       )}
     </section>
