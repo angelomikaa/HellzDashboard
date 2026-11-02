@@ -30,8 +30,10 @@ import {
   fetchCardPhoto,
   fetchMyCard,
   fetchMyReport,
+  fetchMySubmissions,
   type MyCard,
   type MyReport,
+  type SubmissionRow,
 } from '../../lib/api'
 import { GROUP_LABELS, GROUP_ORDER, type GroupKey } from '../../lib/groups'
 import type { NeoFootSession } from '../auth/session'
@@ -43,6 +45,7 @@ import { TierLegend } from './TierLegend'
 import { FocusStrip } from './FocusStrip'
 import { CollapsibleGroup } from './CollapsibleGroup'
 import { CardPhotoUpload } from './CardPhotoUpload'
+import { FirstStepsCard } from './FirstStepsCard'
 import { keyStatStripModel, priorityKeySet } from './keyStatStrip'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { portraitSrcFor } from '../assets/ClassCrest'
@@ -55,9 +58,6 @@ import { cardFilename, downloadCard, type CardExportData } from '../export/cardE
 const NETWORK_ERROR =
   'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
 const SESSION_ERROR = 'Sua sessão expirou ou você não tem permissão. Entre novamente.'
-const EMPTY_TITLE = 'Nenhum status enviado ainda'
-const EMPTY_BODY =
-  'Envie seus status para ver seus cards, sua posição na classe e o que melhorar.'
 const STRIP_EXPLAINER =
   'Seus stats-chave aparecem aqui assim que a configuração da sua classe estiver completa.'
 const DOWNLOAD_ERROR = 'Não foi possível gerar o card. Tente novamente.'
@@ -79,6 +79,11 @@ export function DashboardPage({
   // the page owns this state so focus jumps can expand a target group.
   const [report, setReport] = useState<MyReport | null>(null)
   const [myCard, setMyCard] = useState<MyCard | null>(null)
+  // Own submission states for the empty-state copy: a pending row means
+  // "waiting for an officer", a rejected one means "send again". Null while
+  // the mount fetch is in flight (the empty state defaults to the first-visit
+  // copy, which is the safe read).
+  const [submissions, setSubmissions] = useState<SubmissionRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [openGroups, setOpenGroups] = useState<Record<GroupKey, boolean>>({ general: true, quasi: false, special: false })
 
@@ -127,11 +132,15 @@ export function DashboardPage({
         (blob) => ({ blob, failed: false }),
         () => ({ blob: null, failed: true }),
       ),
+      // Own submission history (RLS-scoped) for the empty-state copy. A
+      // failure degrades to [] — the card then uses the first-visit wording.
+      fetchMySubmissions(session).catch(() => [] as SubmissionRow[]),
     ])
-      .then(([r, card, photo]) => {
+      .then(([r, card, photo, ownSubmissions]) => {
         if (cancelled) return
         setReport(r)
         setMyCard(card)
+        setSubmissions(ownSubmissions)
         setPhotoLoadFailed(photo.failed)
         if (!photo.failed) replacePhoto(photo.blob)
       })
@@ -234,17 +243,11 @@ export function DashboardPage({
       ) : report === null ? (
         <p className="text-base text-muted">Carregando…</p>
       ) : report.stats.every((s) => s.own_value === null) ? (
-        <section className="rounded-lg border border-line bg-surface p-6">
-          <h2 className="text-xl font-semibold text-content">{EMPTY_TITLE}</h2>
-          <p className="mt-2 text-base text-muted">{EMPTY_BODY}</p>
-          <button
-            type="button"
-            onClick={() => onNavigate('submit')}
-            className="mt-6 h-11 rounded-md bg-accent px-4 text-base font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Enviar Status
-          </button>
-        </section>
+        <FirstStepsCard
+          hasPending={submissions?.some((row) => row.status === 'pending') ?? false}
+          hasRejected={submissions?.some((row) => row.status === 'rejected') ?? false}
+          onNavigate={onNavigate}
+        />
       ) : (
         <>
           {/* Owner checkpoint rounds 4-7: the member's own player card (sized
