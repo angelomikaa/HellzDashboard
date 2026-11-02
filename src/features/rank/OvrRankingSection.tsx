@@ -17,6 +17,7 @@ import {
 import { ClassCrest } from '../assets/ClassCrest'
 import { PlayerCell } from './PlayerCell'
 import { PlayerStatsModal } from './PlayerStatsModal'
+import { csvFilename, downloadCsv, toCsv } from './csv'
 import {
   applyViewSort,
   filterRankRows,
@@ -157,6 +158,30 @@ export function OvrRankingSection({
             aria-label="Buscar jogador por nome ou ID"
             className="h-11 min-w-56 flex-1 rounded-md border border-line bg-surface px-3 text-sm text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           />
+
+          <button
+            type="button"
+            onClick={() => {
+              const header = ['Nome', 'ID', 'Classe', 'Função', 'OVR']
+              const csvRows = displayRows.map((row) => [
+                row.display_name,
+                row.char_id ?? '',
+                isClassGroup(row.char_class)
+                  ? groupLabel(row.char_class)
+                  : classLabel(row.char_class),
+                FUNCTION_LABELS[row.char_function],
+                row.ovr ?? '',
+              ])
+              downloadCsv(
+                csvFilename(['ovr', board, boardClass === '' ? 'todas' : boardClass]),
+                toCsv(header, csvRows),
+              )
+            }}
+            disabled={displayRows.length === 0}
+            className="h-11 rounded-md border border-line px-3 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Baixar CSV
+          </button>
         </div>
 
         {rows !== null && error === null && (

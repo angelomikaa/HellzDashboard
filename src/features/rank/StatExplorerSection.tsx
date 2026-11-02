@@ -19,6 +19,7 @@ import { formatStatValue } from '../../lib/parseStatValue'
 import { ClassCrest } from '../assets/ClassCrest'
 import { PlayerCell } from './PlayerCell'
 import { StatPicker } from './StatPicker'
+import { csvFilename, downloadCsv, toCsv } from './csv'
 import {
   filterStatRows,
   orderStatRows,
@@ -155,6 +156,42 @@ export function StatExplorerSection({
           className="h-11 rounded-md border border-line px-3 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           {statOrder === 'desc' ? 'Maior primeiro' : 'Menor primeiro'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (overview === null) return
+            const header = [
+              'Nome',
+              'ID',
+              'Classe',
+              'Função',
+              'Valor',
+              'Mediana da coorte',
+              'n',
+              'Nσ',
+              'Fora da curva',
+              'Último envio (ISO)',
+            ]
+            const rows = orderedRows.map((row) => [
+              row.display_name,
+              row.char_id ?? '',
+              row.char_class === null ? '' : classLabel(row.char_class),
+              row.char_function === null ? '' : FUNCTION_LABELS[row.char_function],
+              row.value ?? '',
+              row.class_median ?? '',
+              row.class_sample_size ?? '',
+              row.class_z ?? '',
+              row.class_sigma_outlier ? 'sim' : 'nao',
+              row.submitted_at ?? '',
+            ])
+            downloadCsv(csvFilename(['stat', overview.stat_key]), toCsv(header, rows))
+          }}
+          disabled={overview === null || orderedRows.length === 0}
+          className="h-11 rounded-md border border-line px-3 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Baixar CSV
         </button>
 
         {hasFilters && (
