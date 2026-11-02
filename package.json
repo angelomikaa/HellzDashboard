@@ -17,7 +17,8 @@
     "prebuild": "npm run ocr:assets",
     "ocr:spike": "node scripts/ocr-spike.mjs",
     "ocr:spike:self-test": "node scripts/ocr-spike.mjs --self-test",
-    "ocr:spike:info": "node scripts/ocr-spike.mjs --info"
+    "ocr:spike:info": "node scripts/ocr-spike.mjs --info",
+    "lineup:check": "npx vite build --config scripts/lineup-render-check/vite.config.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

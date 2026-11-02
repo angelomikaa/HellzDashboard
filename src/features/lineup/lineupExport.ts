@@ -415,97 +415,189 @@ function paintText(ctx: CanvasRenderingContext2D, text: string, x: number, y: nu
   ctx.fillText(shown, x, y)
 }
 
+/** Rounded-rect path (the UI uses rounded-md cards and rounded-lg panels).
+ *  Uses the native roundRect when present, else the arcTo equivalent. */
+function roundedRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radius: number,
+): void {
+  const r = Math.max(0, Math.min(radius, Math.min(w, h) / 2))
+  ctx.beginPath()
+  const native = (ctx as CanvasRenderingContext2D & { roundRect?: Function }).roundRect
+  if (typeof native === 'function') {
+    native.call(ctx, x, y, w, h, r)
+    return
+  }
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
+/** Pill: the UI's rounded-full chips (role label, N/5 counter, Líder badge). */
+function pillPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+  roundedRectPath(ctx, x, y, w, h, h / 2)
+}
+
+const SLOT_RADIUS = 9
+const CARD_RADIUS = 12
+/** Left class bar: 3px in the UI card, scaled to the 448px export card. */
+const CLASS_BAR_W = 5
+
+/** Slot geometry shared by the seated and vacant drawings. */
+function slotNameBaseline(r: LineupRect): number {
+  return r.y + 30
+}
+
 function drawSlot(ctx: CanvasRenderingContext2D, slot: LineupExportSlot, icon: HTMLImageElement | null): void {
   const r = slot.rect
+
   if (slot.vacant) {
+    // UI: a dashed outline on the darker page colour, no class fill at all.
+    roundedRectPath(ctx, r.x, r.y, r.w, r.h, SLOT_RADIUS)
     ctx.fillStyle = COLORS.background
-    ctx.fillRect(r.x, r.y, r.w, r.h)
+    ctx.fill()
     ctx.save()
-    ctx.setLineDash([6, 4])
+    ctx.setLineDash([7, 5])
     ctx.strokeStyle = COLORS.line
-    ctx.lineWidth = 2
-    ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2)
+    ctx.lineWidth = 1.5
+    roundedRectPath(ctx, r.x + 0.75, r.y + 0.75, r.w - 1.5, r.h - 1.5, SLOT_RADIUS)
+    ctx.stroke()
     ctx.restore()
-    paintText(ctx, '— VAGO —', r.x + r.w / 2, r.y + r.h / 2 + 8, r.w - 16, {
-      family: FONT.condensed,
-      weight: 400,
-      size: 24,
+
+    const tile = 40
+    const tx0 = r.x + 12
+    const ty0 = r.y + (r.h - tile) / 2
+    roundedRectPath(ctx, tx0, ty0, tile, tile, 7)
+    ctx.fillStyle = COLORS.column
+    ctx.fill()
+    ctx.strokeStyle = COLORS.line
+    ctx.lineWidth = 1
+    ctx.stroke()
+    paintText(ctx, '—', tx0 + tile / 2, ty0 + tile / 2 + 7, tile - 10, {
+      family: FONT.display,
+      weight: 600,
+      size: 18,
       color: COLORS.muted,
       align: 'center',
+    })
+    paintText(ctx, '— Vago —', tx0 + tile + 14, slotNameBaseline(r), r.x + r.w - 14 - (tx0 + tile + 14), {
+      family: FONT.body,
+      weight: 600,
+      size: 21,
+      color: COLORS.muted,
     })
     return
   }
 
-  // Surface, then the class tint over it (22% — a seated card reads as a
-  // coloured card at a glance), then the 8px class bar.
+  // --- Card shell: rounded, surface base, then the SAME horizontal class
+  // gradient the web slot paints (26% → 12% → 7%), so the JPG card and the
+  // on-screen card read as the same object.
+  roundedRectPath(ctx, r.x, r.y, r.w, r.h, SLOT_RADIUS)
   ctx.fillStyle = COLORS.column
-  ctx.fillRect(r.x, r.y, r.w, r.h)
-  ctx.fillStyle = withAlpha(slot.accent, 0.22)
-  ctx.fillRect(r.x, r.y, r.w, r.h)
+  ctx.fill()
+
+  const tint = ctx.createLinearGradient(r.x, r.y, r.x + r.w, r.y)
+  tint.addColorStop(0, withAlpha(slot.accent, 0x42 / 255))
+  tint.addColorStop(0.55, withAlpha(slot.accent, 0x1f / 255))
+  tint.addColorStop(1, withAlpha(slot.accent, 0x12 / 255))
+  ctx.fillStyle = tint
+  ctx.fill()
+
+  // 3px-in-the-UI class bar, clipped to the rounded shell.
+  ctx.save()
+  roundedRectPath(ctx, r.x, r.y, r.w, r.h, SLOT_RADIUS)
+  ctx.clip()
   ctx.fillStyle = slot.accent
-  ctx.fillRect(r.x, r.y, 8, r.h)
+  ctx.fillRect(r.x, r.y, CLASS_BAR_W, r.h)
+  ctx.restore()
 
   ctx.lineWidth = slot.leader ? 2 : 1
   ctx.strokeStyle = slot.leader ? COLORS.leader : COLORS.line
-  ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1)
+  roundedRectPath(ctx, r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1, SLOT_RADIUS)
+  ctx.stroke()
 
-  // Vertical rhythm inside the slot: one dominant name line, the class line
-  // pinned to the bottom, and the leader mark as a compact corner glyph — so
-  // three lines never fight for the same 56px band.
-  const iconSize = 42
-  const ix = r.x + 12
-  const iy = r.y + (r.h - iconSize) / 2
+  // --- Class tile: the UI renders a 32px rounded bordered img on surface.
+  const tile = 40
+  const ix = r.x + CLASS_BAR_W + 7
+  const iy = r.y + (r.h - tile) / 2
+  roundedRectPath(ctx, ix, iy, tile, tile, 7)
+  ctx.fillStyle = COLORS.column
+  ctx.fill()
+  ctx.strokeStyle = COLORS.line
+  ctx.lineWidth = 1
+  ctx.stroke()
   if (icon !== null) {
-    // Dark tile behind the icon so light class art reads on any tint.
-    ctx.fillStyle = 'rgba(0,0,0,0.45)'
-    ctx.fillRect(ix - 3, iy - 3, iconSize + 6, iconSize + 6)
-    ctx.drawImage(icon, ix, iy, iconSize, iconSize)
-    ctx.strokeStyle = withAlpha(slot.accent, 0.8)
-    ctx.lineWidth = 1.5
-    ctx.strokeRect(ix - 3.5, iy - 3.5, iconSize + 7, iconSize + 7)
+    // object-contain inside the tile (the committed icons are square).
+    const inset = 3
+    const box = tile - inset * 2
+    const scale = Math.min(box / icon.width, box / icon.height)
+    const dw = icon.width * scale
+    const dh = icon.height * scale
+    ctx.save()
+    roundedRectPath(ctx, ix, iy, tile, tile, 7)
+    ctx.clip()
+    ctx.drawImage(icon, ix + (tile - dw) / 2, iy + (tile - dh) / 2, dw, dh)
+    ctx.restore()
   } else {
-    ctx.fillStyle = COLORS.background
-    ctx.fillRect(ix, iy, iconSize, iconSize)
-    ctx.strokeStyle = COLORS.line
-    ctx.strokeRect(ix + 0.5, iy + 0.5, iconSize - 1, iconSize - 1)
-    paintText(ctx, slot.monogram, ix + iconSize / 2, iy + iconSize / 2 + 7, iconSize - 10, {
+    paintText(ctx, slot.monogram, ix + tile / 2, iy + tile / 2 + 7, tile - 10, {
       family: FONT.display,
-      weight: 700,
-      size: 20,
+      weight: 600,
+      size: 18,
       color: COLORS.muted,
       align: 'center',
     })
   }
 
-  const tx = ix + iconSize + 14
-  const maxW = r.x + r.w - 12 - tx
-  // Name: larger + soft shadow so it pops over the tinted surface.
-  ctx.save()
-  ctx.shadowColor = 'rgba(0,0,0,0.85)'
-  ctx.shadowBlur = 6
-  ctx.shadowOffsetY = 2
-  paintText(ctx, slot.name ?? '', tx, r.y + 29, maxW, {
-    family: FONT.display,
-    weight: 700,
-    size: 23,
-    color: '#FFFFFF',
-  })
-  ctx.restore()
-  if (slot.classText !== '') {
-    paintText(ctx, slot.classText.toUpperCase(), tx, r.y + r.h - 8, maxW, {
-      family: FONT.condensed,
-      weight: 400,
-      size: 16,
-      color: '#D8CECE',
-    })
-  }
+  // --- Leader badge: the UI's amber "Líder" chip, right-aligned on the name
+  // line so the name keeps the full left column.
+  const chipH = 22
+  let chipW = 0
   if (slot.leader) {
-    paintText(ctx, '★', r.x + r.w - 12, r.y + 16, 20, {
+    ctx.font = `700 13px ${FONT.body}`
+    chipW = ctx.measureText('LÍDER').width + 16
+    const chipX = r.x + r.w - 12 - chipW
+    const chipY = r.y + 8
+    pillPath(ctx, chipX, chipY, chipW, chipH)
+    ctx.fillStyle = COLORS.leader
+    ctx.fill()
+    paintText(ctx, 'LÍDER', chipX + chipW / 2, chipY + chipH / 2 + 5, chipW - 10, {
       family: FONT.body,
       weight: 700,
-      size: 14,
-      color: COLORS.leader,
-      align: 'right',
+      size: 13,
+      color: '#000000',
+      align: 'center',
+    })
+  }
+
+  const tx = ix + tile + 12
+  const maxW = r.x + r.w - 14 - tx - (chipW > 0 ? chipW + 8 : 0)
+  // Name: the UI's own type (system sans, semibold) — content colour with a
+  // soft shadow so it survives the class tint at print size.
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.75)'
+  ctx.shadowBlur = 5
+  ctx.shadowOffsetY = 1
+  paintText(ctx, slot.name ?? '', tx, slotNameBaseline(r), maxW, {
+    family: FONT.body,
+    weight: slot.leader ? 700 : 600,
+    size: 24,
+    color: COLORS.content,
+  })
+  ctx.restore()
+
+  if (slot.classText !== '') {
+    paintText(ctx, slot.classText, tx, r.y + r.h - 9, maxW, {
+      family: FONT.body,
+      weight: 400,
+      size: 17,
+      color: COLORS.muted,
     })
   }
 }
@@ -550,9 +642,10 @@ export async function renderLineupCanvas(canvas: HTMLCanvasElement, plan: Lineup
     color: COLORS.content,
   })
   const pill = plan.header.status.rect
+  pillPath(ctx, pill.x + 1, pill.y + 1, pill.w - 2, pill.h - 2)
   ctx.strokeStyle = COLORS.accent
   ctx.lineWidth = 2
-  ctx.strokeRect(pill.x + 1, pill.y + 1, pill.w - 2, pill.h - 2)
+  ctx.stroke()
   paintText(ctx, plan.header.status.text, pill.x + pill.w / 2, pill.y + pill.h / 2 + 9, pill.w - 24, {
     family: FONT.condensed,
     weight: 400,
@@ -578,17 +671,20 @@ export async function renderLineupCanvas(canvas: HTMLCanvasElement, plan: Lineup
   const icons = new Map(iconSrcs.map((src, i) => [src, loaded[i] ?? null] as const))
 
   for (const col of plan.columns) {
-    // Column body + hairline.
+    // Party card: rounded-lg shell + hairline, exactly like the web PartyCard
+    // (no red header bar — the UI card has none; the red rule lives in the
+    // page header only).
+    roundedRectPath(ctx, col.rect.x, col.rect.y, col.rect.w, col.rect.h, CARD_RADIUS)
     ctx.fillStyle = COLORS.column
-    ctx.fillRect(col.rect.x, col.rect.y, col.rect.w, col.rect.h)
+    ctx.fill()
     ctx.strokeStyle = COLORS.line
     ctx.lineWidth = 1
-    ctx.strokeRect(col.rect.x + 0.5, col.rect.y + 0.5, col.rect.w - 1, col.rect.h - 1)
+    roundedRectPath(ctx, col.rect.x + 0.5, col.rect.y + 0.5, col.rect.w - 1, col.rect.h - 1, CARD_RADIUS)
+    ctx.stroke()
 
-    // Header band: red accent line + G# label + role pill on the right.
-    ctx.fillStyle = COLORS.accent
-    ctx.fillRect(col.header.rect.x, col.header.rect.y, col.header.rect.w, 4)
-    paintText(ctx, col.header.label, col.header.rect.x + 14, col.header.rect.y + 28, 70, {
+    // Header row: G# title left, optional role pill right (the UI's amber
+    // rounded-full "Função da PT" chip).
+    paintText(ctx, col.header.label, col.header.rect.x + 16, col.header.rect.y + 28, 90, {
       family: FONT.display,
       weight: 700,
       size: 22,
@@ -596,15 +692,20 @@ export async function renderLineupCanvas(canvas: HTMLCanvasElement, plan: Lineup
     })
     if (col.roleLabel !== null) {
       const rl = col.roleLabel.rect
-      ctx.fillStyle = 'rgba(0,0,0,0.5)'
-      ctx.fillRect(rl.x, rl.y, rl.w, rl.h)
+      const chipH = 24
+      const chipY = rl.y + (rl.h - chipH) / 2
+      ctx.font = `700 14px ${FONT.body}`
+      const wanted = ctx.measureText(col.roleLabel.text).width + 22
+      const chipW = Math.min(Math.max(60, wanted), rl.w)
+      const chipX = rl.x + rl.w - chipW
+      pillPath(ctx, chipX, chipY, chipW, chipH)
       ctx.strokeStyle = COLORS.warning
       ctx.lineWidth = 1.5
-      ctx.strokeRect(rl.x + 0.5, rl.y + 0.5, rl.w - 1, rl.h - 1)
-      paintText(ctx, col.roleLabel.text, rl.x + rl.w / 2, rl.y + rl.h / 2 + 6, rl.w - 12, {
-        family: FONT.condensed,
-        weight: 400,
-        size: 19,
+      ctx.stroke()
+      paintText(ctx, col.roleLabel.text, chipX + chipW / 2, chipY + chipH / 2 + 5, chipW - 14, {
+        family: FONT.body,
+        weight: 700,
+        size: 14,
         color: COLORS.warning,
         align: 'center',
       })
@@ -614,15 +715,18 @@ export async function renderLineupCanvas(canvas: HTMLCanvasElement, plan: Lineup
       drawSlot(ctx, slot, slot.iconSrc === null ? null : (icons.get(slot.iconSrc) ?? null))
     }
 
-    // N/5 footer pill.
+    // N/5 footer pill: the UI's rounded-full counter in the success/amber ink.
     const f = col.footer.rect
-    ctx.fillStyle = withAlpha(col.footer.color, 0.14)
-    ctx.fillRect(f.x, f.y, f.w, f.h)
+    ctx.font = `700 16px ${FONT.body}`
+    const footerTextW = ctx.measureText(col.footer.text).width + 26
+    const fw = Math.min(Math.max(56, footerTextW), f.w)
+    const fx = f.x + f.w - fw
+    pillPath(ctx, fx, f.y, fw, f.h)
     ctx.strokeStyle = col.footer.color
     ctx.lineWidth = 2
-    ctx.strokeRect(f.x + 1, f.y + 1, f.w - 2, f.h - 2)
-    paintText(ctx, col.footer.text, f.x + f.w / 2, f.y + f.h / 2 + 6, f.w - 16, {
-      family: FONT.display,
+    ctx.stroke()
+    paintText(ctx, col.footer.text, fx + fw / 2, f.y + f.h / 2 + 6, fw - 12, {
+      family: FONT.body,
       weight: 700,
       size: 16,
       color: col.footer.color,
@@ -630,14 +734,17 @@ export async function renderLineupCanvas(canvas: HTMLCanvasElement, plan: Lineup
     })
   }
 
-  // Class colour legend strip.
+  // Class colour legend strip. The swatch is rounded like the UI's chips and
+  // the label gets a hard budget so one long pt-BR name can never run into the
+  // next swatch.
   for (const item of plan.legend) {
+    roundedRectPath(ctx, item.rect.x, item.rect.y + 6, 13, 13, 4)
     ctx.fillStyle = item.color
-    ctx.fillRect(item.rect.x, item.rect.y + 5, 14, 14)
-    paintText(ctx, item.label, item.rect.x + 20, item.rect.y + 17, item.rect.w - 24, {
+    ctx.fill()
+    paintText(ctx, item.label, item.rect.x + 19, item.rect.y + 17, item.rect.w - 26, {
       family: FONT.body,
       weight: 400,
-      size: 14,
+      size: 13,
       color: COLORS.muted,
     })
   }
