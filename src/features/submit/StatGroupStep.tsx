@@ -22,6 +22,7 @@ import type { StatCatalogEntry } from '../../lib/api'
 import { ExampleShot } from './ExampleShot'
 import type { GroupInputs, WizardGroup } from './wizard'
 import { INVALID_HINT, isFieldEngaged, statFieldFeedback } from './fieldValidation'
+import { statExample, type StatAverages } from './statExamples'
 
 // Locked UI-SPEC copy (definition site, exported for the step-1 combat_power
 // field in SubmitPage — the single definition site codebase-wide; comments
@@ -55,9 +56,15 @@ interface StatGroupStepProps {
    *  RIGHT rail under the example shot — the wizard reads
    *  example + upload | fields, never upload above fields. */
   capture?: ReactNode
+  /** Per-field example source (owner request 2026-11-03): the member's
+   *  class+function averages. When PROVIDED (even as an empty map), labels show
+   *  only real per-field values — a field with no average gets no hint at all.
+   *  When OMITTED (prospect wizard, which has no member report), the legacy
+   *  value-type hint is kept. */
+  averages?: StatAverages
 }
 
-export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, failedFields, ocrFilledFields, capture }: StatGroupStepProps) {
+export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, failedFields, ocrFilledFields, capture, averages }: StatGroupStepProps) {
   // Hints appear after the first blur of a field; from then on the feedback
   // updates live so fixing a bad value immediately clears the error.
   const [blurred, setBlurred] = useState<Record<string, boolean>>({})
@@ -86,13 +93,26 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
           const engaged = isFieldEngaged(entry.stat_key, blurred, ocrFilledFields)
           const feedback = statFieldFeedback(raw, entry.value_type, engaged)
           const percentual = entry.value_type === 'percentual'
+          // Real per-field example when the caller supplied averages; the
+          // legacy generic hint survives only for callers without a report
+          // (prospect wizard). A provided map with no value for this key means
+          // "no average for the cohort" -> no hint (never a made-up number).
+          const example =
+            averages === undefined
+              ? percentual
+                ? '12,5%'
+                : '1.234.567'
+              : statExample(averages, entry)
           return (
             <div key={entry.stat_key} className="flex flex-col gap-1">
               <label htmlFor={fieldId(entry.stat_key)} className="text-sm font-semibold text-content">
-                {entry.label}{' '}
-                <span className="font-normal text-muted">
-                  {percentual ? '(ex.: 12,5%)' : '(ex.: 1.234.567)'}
-                </span>
+                {entry.label}
+                {example !== null && (
+                  <>
+                    {' '}
+                    <span className="font-normal text-muted">(ex.: {example})</span>
+                  </>
+                )}
               </label>
               <div className="relative">
                 <input

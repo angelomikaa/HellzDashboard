@@ -18,6 +18,7 @@ import { OcrCapture } from './OcrCapture'
 import type { OcrFieldOutcome } from './ocr/recognize'
 import { OCR_FIELD_FAILURE } from './StatGroupStep'
 import { INVALID_HINT, statFieldFeedback } from './fieldValidation'
+import { equipmentExample, type StatAverages } from './statExamples'
 import {
   withDerivedDefenses,
   EQUIPMENT_RAW_KEYS,
@@ -35,6 +36,12 @@ interface DefenseStepProps {
     origin: 'user' | 'ocr' | 'ocr_failed',
   ) => void
   disabled: boolean
+  /** Per-field example source (owner request 2026-11-03) — the member's
+   *  class+function averages. PROVIDED: the equipment placeholder is the value
+   *  that produces the cohort's average raw defense at its average percentage
+   *  (no average -> no placeholder). OMITTED (prospect wizard): the legacy
+   *  generic placeholder stays. */
+  averages?: StatAverages
 }
 
 const CARDS: RawDefenseCard[] = [
@@ -58,7 +65,7 @@ const CARDS: RawDefenseCard[] = [
   },
 ]
 
-export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStepProps) {
+export function DefenseStep({ inputs, onEquipmentChange, disabled, averages }: DefenseStepProps) {
   const derived = useMemo(() => withDerivedDefenses(inputs), [inputs])
 
   // Per-capture OCR state — local so one tooltip read never blanks the other.
@@ -135,6 +142,13 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
           const feedback = statFieldFeedback(equipRaw, 'flat', equipmentEngaged(card.equipmentKey))
           const isRunning = cardIsRunning(card)
           const isFailed = cardIsFailed(card)
+          // The equipment value is transient (never submitted), so its example
+          // is derived from the two stored averages: the raw defense average
+          // and the equipment percentage average.
+          const placeholder =
+            averages === undefined
+              ? '4913'
+              : (equipmentExample(averages, card.rawKey, card.pctKey) ?? undefined)
           return (
             <div
               key={card.rawKey}
@@ -200,7 +214,7 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled }: DefenseStep
                     onBlur={() => handleEquipmentBlur(card.equipmentKey)}
                     disabled={disabled || isRunning}
                     className="h-10 rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="4913"
+                    placeholder={placeholder}
                   />
                   {feedback.invalid && (
                     <p role="alert" aria-live="polite" className="text-xs font-semibold text-error">

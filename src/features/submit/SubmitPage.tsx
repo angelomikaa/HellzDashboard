@@ -24,6 +24,7 @@ import {
   fetchCatalog,
   fetchDefenseBaselines,
   fetchMyIdentity,
+  fetchMyReport,
   type DefenseBaseline,
   type MyIdentity,
   type StatCatalogEntry,
@@ -67,6 +68,11 @@ import {
   provenanceInputKeys,
 } from './antiCheat'
 import { AntiCheatWarnings } from './AntiCheatWarnings'
+import {
+  averagesFromReport,
+  statExample,
+  type StatAverages,
+} from './statExamples'
 
 // Enumeration-safe copy (UI contract): never expose HTTP codes or internals.
 const NETWORK_ERROR =
@@ -194,6 +200,10 @@ interface SubmitLoad {
   // 0046 anti-cheat baselines (aggregates only). A failed read leaves [] and
   // never blocks the wizard.
   baselines: DefenseBaseline[]
+  // Owner request 2026-11-03: per-field examples come from the member's
+  // class+function averages (the same "Média" the Painel shows). A failed read
+  // leaves {} — fields then show no example instead of a generic number.
+  averages: StatAverages
 }
 
 export function SubmitPage({ session }: SubmitPageProps) {
@@ -285,14 +295,21 @@ export function SubmitPage({ session }: SubmitPageProps) {
     let cancelled = false
     ;(async () => {
       try {
-        const [identity, catalog, baselines] = await Promise.all([
+        const [identity, catalog, baselines, report] = await Promise.all([
           fetchMyIdentity(session),
           fetchCatalog(session),
           // Advisory only: a baseline failure must never block submission.
           fetchDefenseBaselines(session).catch(() => [] as DefenseBaseline[]),
+          // Advisory only: examples degrade to "no hint" on failure.
+          fetchMyReport(session).catch(() => null),
         ])
         if (!cancelled) {
-          setData({ self: identity, catalog, baselines })
+          setData({
+            self: identity,
+            catalog,
+            baselines,
+            averages: averagesFromReport(report),
+          })
           // Registry values are the starting point only: never overwrite a
           // field the player already edited while the load was in flight.
           setIdentity((current) => ({
@@ -532,8 +549,14 @@ export function SubmitPage({ session }: SubmitPageProps) {
     )
   }
 
-  const { self, catalog } = data
+  const { self, catalog, averages } = data
   const me = self
+  // Real per-field example for the step-1 combat_power field (owner request
+  // 2026-11-03) — the same class+function average the stat rows use.
+  const combatPowerExample = statExample(averages, {
+    stat_key: 'combat_power',
+    value_type: 'flat',
+  })
 
   // Blocked state: no registered character (no char_class) — UX gate only.
   if (me.char_class === null) {
@@ -791,6 +814,14 @@ export function SubmitPage({ session }: SubmitPageProps) {
                 <div className="flex flex-col gap-1">
                   <label htmlFor="combat-power" className="text-sm font-semibold text-content">
                     Poder de Combate
+                    {combatPowerExample !== null && (
+                      <>
+                        {' '}
+                        <span className="font-normal text-muted">
+                          (ex.: {combatPowerExample})
+                        </span>
+                      </>
+                    )}
                   </label>
                   <input
                     id="combat-power"
@@ -844,6 +875,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                 ocrRunning={ocrRunningStep === step}
                 failedFields={failedFields[step]}
                 ocrFilledFields={ocrFilledFields[step]}
+                averages={averages}
                 capture={
                   <OcrCapture
                     capture={STEP_GROUP[step]}
@@ -873,6 +905,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     setStepVerified((v) => ({ ...v, 4: false }))
                   }}
                   disabled={submitting || ocrRunningStep === 4}
+                  averages={averages}
                 />
               )}
               <AntiCheatWarnings warnings={curveWarnings} />
