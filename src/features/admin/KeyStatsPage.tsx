@@ -90,7 +90,7 @@ export const INCOMPLETE_KEYS_ERROR =
   'Selecione os 6 stats-chave antes de alterar os relevantes.'
 // 0073: keys are the card highlights; keys + relevants feed the OVR.
 const TIER_LEGEND =
-  'Vermelho = chave (destaque na cartinha) · Roxo = relevante (entra no OVR)'
+  'Vermelho = chave (destaque na cartinha) · Roxo = relevante (também entra no OVR)'
 
 export type BuildRole = 'dps' | 'mdps' | 'suporte'
 
