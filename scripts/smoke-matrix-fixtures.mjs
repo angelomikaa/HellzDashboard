@@ -1,43 +1,36 @@
 #!/usr/bin/env node
 /**
- * NeoFoot smoke fixtures: TWO cohort primers per META (class, function) combo —
- * owner decision 2026-10-28.
+ * NeoFoot smoke fixtures: TWO cohort primers for EVERY meta (class, function)
+ * combo — owner decision 2026-11-05 (supersedes the 2026-10-28 skip rule).
  *
  * Which combos: the persisted split in public.class_cohorts (migration 0037) is
- * the ONE authority. `meta = true` = a currently playable build (23 combos) and
- * the only ones this script seeds; `meta = false` = keyed-but-non-viable builds
- * the owner forgot "until second order" — they get no primers and their existing
- * primers are wiped by the namespace clean at the top of every run. A meta combo
- * also needs its 6 usable keys (selection_order <= 6) or its OVR could never
- * compute, so that stays a hard requirement.
+ * the ONE authority. `meta = true` = a currently playable build and the only ones
+ * this script seeds; `meta = false` = keyed-but-non-viable builds the owner
+ * forgot "until second order" — they get no primers and their existing primers
+ * are wiped by the namespace clean at the top of every run. A meta combo also
+ * needs its 6 usable keys (selection_order <= 6) or its OVR could never compute,
+ * so that stays a hard requirement.
  *
- * Why: an OVR needs n >= 3 submitters per (class, function) cohort. Real data
- * only exists in a handful of cohorts, so a real player who signs in for any
- * other meta combo gets a data-insufficient card (no overall). Two primers raise
- * an empty cohort to n=2, so the FIRST real player who submits reaches n=3 and
- * immediately sees their own OVR. Combos that already have >= 3 validated
- * submitters are skipped (already primed by their own dedicated fixtures or by
- * real players) — pass --all to include them anyway.
+ * Why: an OVR needs n >= 3 submitters per (class, function) cohort. Two primers
+ * per meta combo mean (a) the FIRST real player who submits reaches n=3 and
+ * immediately sees their own OVR, and (b) the cohort keeps an OVR when ONE real
+ * submitter is excluded (rejected/discarded submission or deactivated member):
+ * 2 primers + n_real - 1 >= 3 for any n_real >= 2, and a cohort with a single
+ * real submitter still sits at exactly n=3.
  *
  * Owner decisions:
- *   - 2026-10-28: TWO primers per target combo where real players exist (the
- *     third member is meant to be a REAL player);
- *   - 2026-10-29 ("you can create smokes for cohorts that are meta but have no
- *     members registered yet"): a meta cohort with NO real member — the census
- *     of 2026-10-29 found ten of them (Assassin Cross dps/mdps, Biochemist dps,
- *     Champion dps, High Wizard suporte, Lord Knight dps, Mastersmith dps,
- *     Paladin suporte, Stalker dps, Summoner suporte — all sitting at n=2 with
- *     nothing but primers) — gets a THIRD primer, so the cohort reaches n=3 on
- *     its own: a real OVR, a tier, and its own row on the Início showcase
- *     (383/0037: one carousel per meta build). It deliberately does NOT touch a
- *     cohort that has real members registered-but-not-yet-submitting (Bard
- *     suporte, Biochemist mdps, Professor suporte) — those players are the
- *     intended third.
- *   - primers are a BASIS, never competitors: each primer must sit at or BELOW
- *     the cohort's WORST real player on every stat, pushed a further 5% / 10% /
- *     15% down (owner 2026-10-28: "they must now be lower than the lowest member
- *     of the cohort, as they are just a basis and are not meant to be
- *     competitive");
+ *   - 2026-10-28: primers are a BASIS, never competitors (floor rule below);
+ *   - 2026-10-29: cohorts with no real member also get primers;
+ *   - 2026-11-05 (owner: "vamos criar 2 smokes para cada classe meta, mesmo as
+ *     que já atingiram n>=3; eu percebi que caso haja uma exclusão, a coorte
+ *     some, o que não é ideal. A coorte só deve sumir caso não haja players
+ *     reais nela"): EVERY meta combo gets exactly TWO primers, whether it
+ *     already has >= 3 validated submitters or not. There is no skip list and no
+ *     `--all` flag any more. A cohort with NO real member ends at n=2 on
+ *     purpose: its cards are all placeholders, so the showcase hides it
+ *     (Phase 10.11) — the cohort only comes back when a real player submits.
+ *     That is exactly the "only disappears when there is no real player in it"
+ *     rule.
  *   - non-meta combos are out of scope (no keys and/or not viable).
  *
  * Stat base per combo (never invented per class):
@@ -71,9 +64,9 @@
  * value is at or below the worst real value it was derived from (the floor
  * invariant that keeps primers non-competitive), a live post-seed re-check of
  * the same floor against the stored rows, cohort census before/after, OVR reads,
- * and ONE self-cleaning probe on an empty cohort that proves the claim behind
- * the whole script: with a third submitter present the cohort becomes
- * data-sufficient and the report carries a real OVR.
+ * a COVERAGE check (exactly two primers for every targeted meta combo) and the
+ * exclusion-buffer report (real submitters vs. the n >= 3 gate, i.e. how many
+ * exclusions each cohort can absorb before it loses its OVR).
  *
  * Owner: fixtures MAY STAY LIVE until second order. Pre-release purge:
  *   node scripts/smoke-matrix-fixtures.mjs --purge
@@ -118,7 +111,6 @@ function loadEnvFile() {
 
 const envFile = loadEnvFile()
 const APPLY = !process.argv.includes('--purge')
-const INCLUDE_PRIMED = process.argv.includes('--all')
 const DRY_RUN = process.argv.includes('--dry-run')
 
 const SUPABASE_URL = process.env.SUPABASE_URL || envFile.VITE_SUPABASE_URL
@@ -142,7 +134,6 @@ if (missing.length) {
 }
 
 const SENTINEL = 'smoke-mtx'
-const PROBE_HANDLE = 'smoke-mtx-probe'
 // Optional single-combo refresh: --combo=mastersmith-dps (classSlug-function).
 const COMBO = (() => {
   const arg = process.argv.find((value) => value.startsWith('--combo='))
@@ -174,12 +165,11 @@ const CLASS_LABELS = {
 }
 const FUNCTION_LABELS = { dps: 'Físico', mdps: 'Mágico', suporte: 'Suporte' }
 // Distance BELOW the cohort's worst real value, as a fraction of that value.
-// Primer 1 sits 5% further down, primer 2 10%, primer 3 (owner 2026-10-29, only
-// for a cohort with NO real member) 15% — so the trio is ordered and every one
-// of them stays strictly under every real player (owner 2026-10-28: primers are
-// a basis, not competitors).
-const GAPS = [0.05, 0.1, 0.15]
-const SUFFIXES = ['Um', 'Dois', 'Três']
+// Primer 1 sits 5% further down, primer 2 10% — an ordered pair, and both stay
+// strictly under every real player (owner 2026-10-28: primers are a basis, not
+// competitors). Exactly two per meta combo (owner 2026-11-05).
+const GAPS = [0.05, 0.1]
+const SUFFIXES = ['Um', 'Dois']
 
 function classLabel(name) {
   return CLASS_LABELS[name] ?? name
@@ -271,15 +261,16 @@ let cohortClass = (expr) => expr
 
 // Three different filters matter here, and they answer three different
 // questions:
-//   - the SKIP count ignores this script's own namespace (smoke-mtx-%) so a
-//     re-run never mistakes a previous primer for real coverage, while still
-//     honouring the dedicated per-class fixture scripts (smoke-bio-, smoke-hp-,
+//   - the CENSUS `validators` ignores this script's own namespace (smoke-mtx-%)
+//     so a re-run never mistakes a previous primer for real coverage, while still
+//     counting the dedicated per-class fixture scripts (smoke-bio-, smoke-hp-,
 //     smoke-sum-) as coverage;
-//   - the ANCHOR ignores every smoke fixture (smoke%) — a primer must always be
-//     derived from a REAL player's submission, never from another primer;
-//   - real_members (owner 2026-10-29) counts active members of the cohort that
-//     are NOT any kind of smoke fixture: 0 means the cohort has no member
-//     registered yet, which is what earns the combo a THIRD primer.
+//   - `real_validators` / `real_members` ignore EVERY smoke fixture (smoke%):
+//     they are the real players behind the floor and the exclusion-buffer
+//     report (how many exclusions a cohort can absorb before it drops under the
+//     n >= 3 gate);
+//   - the ANCHOR is the newest real validated submitter: a primer must always be
+//     derived from a REAL player's submission, never from another primer.
 const targetsSql = () => `
 with combo as (
   select cc.class_name, cc.char_function
@@ -304,6 +295,14 @@ census as (
              and m.active
              and s.status = 'validated'
              and m.discord_handle not like '${SENTINEL}-%') as validators,
+         (select count(distinct s.member_id)
+            from submissions s
+            join members m on m.id = s.member_id
+           where ${cohortClass('m.char_class')} = ${cohortClass('c.class_name')}
+             and m.char_function = c.char_function
+             and m.active
+             and s.status = 'validated'
+             and m.discord_handle not like 'smoke%') as real_validators,
          (select count(distinct m.id)
             from members m
            where ${cohortClass('m.char_class')} = ${cohortClass('c.class_name')}
@@ -324,6 +323,7 @@ census as (
   ) a on true
 )
 select class_name, char_function, coalesce(validators, 0) as validators,
+       coalesce(real_validators, 0) as real_validators,
        coalesce(real_members, 0) as real_members,
        anchor_id, anchor_display
 from census
@@ -333,8 +333,9 @@ order by class_name, char_function;
 const CATALOG_COUNT_SQL = `select count(*)::int as n from stat_catalog;`
 
 const statsNotNull = `
--- Latest validated value per (real member, stat). Smoke fixtures are excluded
--- so a re-run is deterministic and never feeds on its own output.
+-- Latest value per (real member, stat) over the SAME submissions the rank math
+-- reads (not rejected/discarded). Smoke fixtures are excluded so a re-run is
+-- deterministic and never feeds on its own output.
 create temp table mtx_live (member_id uuid, stat_key text, value numeric) on commit drop;
 insert into mtx_live
 select distinct on (sub.member_id, ss.stat_key) sub.member_id, ss.stat_key, ss.value
@@ -381,9 +382,12 @@ left join mtx_global_worst gw on gw.stat_key = sc.stat_key
 left join (values ('crit_dmg', 155::numeric), ('fixed_ct', -90::numeric), ('variable_ct', -35::numeric))
   as fb(stat_key, fallback_value) on fb.stat_key = sc.stat_key
 left join lateral (
-  -- The combo's OWN worst real submitter, direction-aware. 'and m.active' plus
-  -- the smoke% exclusion keep this honest: a primer must be derived from a real
-  -- player of the same cohort, never from another fixture.
+  -- The combo's OWN worst real submitter, direction-aware, using the SAME cohort
+  -- definition as the rank math: the latest value per member over submissions
+  -- that are not rejected/discarded (pending included — the ranking reads it, so
+  -- a primer must sit below it too). 'and m.active' plus the smoke% exclusion
+  -- keep this honest: a primer is derived from a real player of the same cohort,
+  -- never from another fixture.
   select case sc.stat_direction when 'lower' then max(l.value) else min(l.value) end as worst_value
   from (
     select distinct on (s.member_id, ss.stat_key) ss.value
@@ -396,7 +400,7 @@ left join lateral (
         and m.active
         and m.discord_handle not like 'smoke%'
     )
-      and s.status = 'validated'
+      and s.status not in ('rejected', 'discarded')
       and ss.stat_key = sc.stat_key
     order by s.member_id, ss.stat_key, s.submitted_at desc
   ) l
@@ -594,8 +598,10 @@ where m.discord_handle like '${CLEAN_PATTERN}'
 order by 1, 2, 3;
 `
 
-const CENSUS_SQL = `
-select m.char_class as class_name, m.char_function,
+// Census AFTER the seed, scoped by the cohort identity (0038: merged classes are
+// one group) so a merged cohort reports one row instead of one per member class.
+const censusSql = () => `
+select ${cohortClass('m.char_class')} as class_name, m.char_function,
        count(distinct m.id) filter (where m.active) as active_members,
        count(distinct s.member_id) filter (where s.status = 'validated' and m.active) as validators
 from members m
@@ -605,48 +611,9 @@ group by 1, 2
 order by 1, 2;
 `
 
-// The probe proves the objective: a third submitter completes an empty cohort.
-// It must NOT touch the matrix fixtures, so it only purges its own namespace.
-function probeSql(probe) {
-  return `
-begin;
-${PROBE_PURGE_SQL}
-${statsNotNull}
-create temp table mtx_fixtures (handle text, display text, class_name text, char_function text, gap numeric, anchor_id uuid) on commit drop;
--- gap = 0: the probe sits exactly ON the guild floor, i.e. the weakest possible
--- "just arrived" submitter. If even that unlocks a real OVR, any real player
--- does — that is the claim this probe makes.
-insert into mtx_fixtures values
-  ('${probe.handle}', '${probe.display}', '${probe.className}', '${probe.charFunction}', 0.000, null::uuid);
-${worstAndBaseSql()}
-insert into members (discord_handle, display_name, pin_hash, role, active, char_class, char_function)
-select handle, display, '${bcrypt.hashSync(FIXTURE_PIN, 10)}', 'member', true, class_name, char_function
-from mtx_fixtures;
-insert into submissions (member_id, status, submitted_at)
-select m.id, 'validated', now() - interval '1 hour'
-from mtx_fixtures f join members m on m.discord_handle = f.handle;
-insert into submission_stats (submission_id, stat_key, value)
-select s.id, b.stat_key,
-       case when sc.value_type = 'percentual' then round(b.base_value, 1)
-            else round(b.base_value) end
-from mtx_fixtures f
-join members m on m.discord_handle = f.handle
-join submissions s on s.member_id = m.id and s.status = 'validated'
-join mtx_fixture_base b on b.handle = f.handle
-join stat_catalog sc on sc.stat_key = b.stat_key;
-commit;
-`
-}
-
-const PROBE_PURGE_SQL = `
-delete from pin_login_attempts where discord_handle like '${PROBE_HANDLE}%'
-   or discord_handle in (select id::text from members where discord_handle like '${PROBE_HANDLE}%');
-delete from submission_stats where submission_id in (
-  select s.id from submissions s join members m on m.id = s.member_id
-  where m.discord_handle like '${PROBE_HANDLE}%');
-delete from submissions where member_id in (select id from members where discord_handle like '${PROBE_HANDLE}%');
-delete from members where discord_handle like '${PROBE_HANDLE}%';
-`
+// The live self-cleaning probe was retired with the third-primer rule
+// (2026-11-05): a cohort with no real member is meant to stay at n=2 and be
+// hidden by the placeholder rule, so there is nothing to simulate any more.
 
 // ---------------------------------------------------------------------------
 // Main
@@ -696,27 +663,16 @@ async function main() {
       (COMBO ? ` (scoped to --combo=${COMBO})` : ''),
   )
 
-  const skipped = targets.filter((t) => Number(t.validators) >= 3 && !INCLUDE_PRIMED)
-  const selected = targets.filter((t) => Number(t.validators) < 3 || INCLUDE_PRIMED)
-  if (skipped.length) {
-    console.log(
-      `[smoke-matrix] skipping ${skipped.length} already-primed combo(s) (>= 3 validated submitters): ` +
-        skipped.map((s) => `${s.class_name}/${s.char_function} (n=${s.validators})`).join(', ') +
-        ' — pass --all to include them',
-    )
-  }
-
-  // Owner 2026-10-29: a cohort with no real member registered yet earns a THIRD
-  // primer (n=3 on its own → a real OVR → its own Início row). Cohorts that
-  // DO have real members keep TWO — the third slot stays reserved for a real
-  // player (registered-but-not-submitting players already cover it semantically).
-  const primerCount = (t) => (Number(t.real_members) === 0 ? GAPS.length : GAPS.length - 1)
+  // Owner 2026-11-05: EVERY meta combo gets exactly TWO primers — including the
+  // ones that already have >= 3 validated submitters. The pair is the buffer that
+  // keeps the cohort above the n >= 3 OVR gate when one real submitter is
+  // excluded. There is no skip list any more.
+  const selected = targets
   const empty = selected.filter((t) => Number(t.real_members) === 0)
 
   const fixtures = []
   for (const t of selected) {
-    const count = primerCount(t)
-    for (let i = 0; i < count; i += 1) {
+    for (let i = 0; i < GAPS.length; i += 1) {
       fixtures.push({
         handle: `${SENTINEL}-${classSlug(t.class_name)}-${t.char_function}-0${i + 1}`,
         display: `Smoke ${classLabel(t.class_name)} ${FUNCTION_LABELS[t.char_function]} ${SUFFIXES[i]}`,
@@ -734,19 +690,20 @@ async function main() {
   }
   const anchored = selected.filter((t) => t.anchor_id).length
   console.log(
-    `[smoke-matrix] seeding ${fixtures.length} fixtures across ${selected.length} combo(s): ` +
+    `[smoke-matrix] seeding ${fixtures.length} fixtures (2 per combo) across ${selected.length} combo(s): ` +
       `${anchored} under a real cohort's worst member, ${selected.length - anchored} under the guild floor ` +
       `(gaps ${GAPS.map((g) => `${(g * 100).toFixed(0)}%`).join(' / ')} below the floor)`,
   )
   if (empty.length) {
     console.log(
-      `[smoke-matrix] no real member registered yet → THIRD primer for ${empty.length} combo(s): ` +
+      `[smoke-matrix] no real member registered yet (cohort stays at n=2 and is hidden by the ` +
+        `placeholder rule until a real player submits): ` +
         empty.map((t) => `${t.class_name}/${t.char_function}`).join(', '),
     )
   }
 
   // Census before: the coverage that persists between runs (this script's own
-  // primers excluded) — the same number the skip rule uses.
+  // primers excluded).
   const validatorsBefore = (t) => Number(t.validators ?? 0)
 
   if (DRY_RUN) {
@@ -771,6 +728,34 @@ async function main() {
       (wrong.length ? ` — ${wrong.length} with a wrong stat count` : ''),
   )
   if (counts.length !== fixtures.length || wrong.length) process.exitCode = 1
+
+  // Owner 2026-11-05: the pair is the contract, so verify it per combo. The
+  // namespace clean at the top of the seed removes the old set, so anything other
+  // than exactly GAPS.length primers here is a real regression.
+  const primersPerCombo = new Map()
+  for (const row of counts) {
+    const key = `${row.char_class}/${row.char_function}`
+    primersPerCombo.set(key, (primersPerCombo.get(key) ?? 0) + 1)
+  }
+  const underCovered = selected.filter(
+    (t) => (primersPerCombo.get(`${t.class_name}/${t.char_function}`) ?? 0) !== GAPS.length,
+  )
+  if (underCovered.length) {
+    console.log(
+      `[smoke-matrix] FAIL — ${underCovered.length} combo(s) without exactly ${GAPS.length} primers: ` +
+        underCovered
+          .map((t) => {
+            const key = `${t.class_name}/${t.char_function}`
+            return `${key} (${primersPerCombo.get(key) ?? 0})`
+          })
+          .join(', '),
+    )
+    process.exitCode = 1
+  } else {
+    console.log(
+      `[smoke-matrix] coverage: every targeted meta combo carries exactly ${GAPS.length} primers`,
+    )
+  }
 
   const offMeta = (await mgmtQuery(NON_META_PRIMERS_SQL)) ?? []
   if (offMeta.length) {
@@ -812,16 +797,22 @@ async function main() {
   }
 
   const after = new Map(
-    ((await mgmtQuery(CENSUS_SQL)) ?? []).map((r) => [`${r.class_name}/${r.char_function}`, r]),
+    ((await mgmtQuery(censusSql())) ?? []).map((r) => [`${r.class_name}/${r.char_function}`, r]),
   )
   let sufficient = 0
   for (const t of selected) {
     const key = `${t.class_name}/${t.char_function}`
     const now = Number(after.get(key)?.validators ?? 0)
     const beforeN = validatorsBefore(t)
-    const note = now >= 3 ? 'data-sufficient' : `n=${now} — one real submitter away from an OVR`
+    const realN = Number(t.real_validators ?? 0)
+    const note =
+      now >= 3
+        ? `data-sufficient, absorbs ${now - 3} exclusion(s) before dropping under n=3`
+        : `n=${now} — one real submitter away from an OVR`
     if (now >= 3) sufficient += 1
-    console.log(`[smoke-matrix] ${key}: validators ${beforeN} -> ${now} (${note})`)
+    console.log(
+      `[smoke-matrix] ${key}: validators ${beforeN} -> ${now} (${note}; ${realN} real submitter(s))`,
+    )
   }
 
   // Anchored combos reach n >= 3 immediately: read one fixture's own report.
@@ -842,31 +833,27 @@ async function main() {
     if (!ok) process.exitCode = 1
   }
 
-  // Owner 2026-10-29 objective, proved on the ROWS THAT ARE NOW LIVE: a cohort
-  // that had no member registered yet must answer a real OVR by itself, because
-  // it now carries its third primer. The old self-cleaning "third submitter"
-  // probe is gone — that state is now permanent and verified, not simulated.
-  const emptyCombo = empty.find((t) => selected.includes(t))
-  if (emptyCombo) {
-    const comboKey = `${emptyCombo.class_name}/${emptyCombo.char_function}`
-    const fixture = fixtures.find(
-      (f) => f.className === emptyCombo.class_name && f.charFunction === emptyCombo.char_function,
-    )
-    const report = await myReport(await login(fixture.display))
-    const ok =
-      report?.ovr?.data_sufficient === true &&
-      typeof report.ovr.value === 'number' &&
-      report.ovr.value >= 51
+  // Owner 2026-11-05 rule, reported on the rows that are now live: a cohort only
+  // disappears when it has no real player. Cohorts whose only real submitter is
+  // the single one above the primers have no slack — excluding that submitter
+  // leaves nothing real, so they are listed explicitly instead of being promised
+  // a buffer they cannot have.
+  const noSlack = selected.filter((t) => {
+    const key = `${t.class_name}/${t.char_function}`
+    return Number(after.get(key)?.validators ?? 0) === 3 && Number(t.real_validators ?? 0) === 1
+  })
+  if (noSlack.length) {
     console.log(
-      `[smoke-matrix] third-primer probe ${comboKey} (${fixture.display}): ovr=${report?.ovr?.value} ` +
-        `data_sufficient=${report?.ovr?.data_sufficient} -> ${ok ? 'NO-MEMBER COHORT ANSWERS ITS OWN OVR' : 'PROBE FAILED'}`,
+      `[smoke-matrix] note — ${noSlack.length} combo(s) run on exactly 2 primers + 1 real submitter ` +
+        `(no slack: losing that submitter leaves no real data): ` +
+        noSlack.map((t) => `${t.class_name}/${t.char_function}`).join(', '),
     )
-    if (!ok) process.exitCode = 1
   }
 
   console.log(
     `[smoke-matrix] combos data-sufficient now: ${sufficient}/${selected.length} ` +
-      `(${empty.length} of them answered by their own third primer; the rest need one real submitter each)`,
+      `(2 primers per meta combo as the exclusion buffer; a combo with no real submitter stays at n=2 ` +
+      `and is hidden by the placeholder rule until a real player submits)`,
   )
 
   // Owner report 2026-11-01 (Mestre-Ferreiro alone on Início): a primer is a

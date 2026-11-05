@@ -91,9 +91,10 @@ left join smoke_global_worst gw on gw.stat_key = sc.stat_key
 left join (values ${FALLBACK_STATS}) as fb(stat_key, fallback_value)
   on fb.stat_key = sc.stat_key
 left join lateral (
-  -- The cohort's OWN worst real submitter, direction-aware. 'and m.active' and
-  -- the smoke% exclusion keep this honest: a fixture is derived from real
-  -- players of the same cohort, never from another fixture.
+  -- The cohort's OWN worst real submitter, direction-aware, over the SAME
+  -- submissions the rank math reads (not rejected/discarded — pending included).
+  -- 'and m.active' and the smoke% exclusion keep this honest: a fixture is
+  -- derived from real players of the same cohort, never from another fixture.
   select case sc.stat_direction when 'lower' then max(l.value) else min(l.value) end as worst_value
   from (
     select distinct on (s.member_id, ss.stat_key) ss.value
@@ -106,7 +107,7 @@ left join lateral (
         and m.active
         and m.discord_handle not like 'smoke%'
     )
-      and s.status = 'validated'
+      and s.status not in ('rejected', 'discarded')
       and ss.stat_key = sc.stat_key
     order by s.member_id, ss.stat_key, s.submitted_at desc
   ) l
