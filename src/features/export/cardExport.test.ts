@@ -287,16 +287,16 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     expect(backing.photoBBox.h).toBe(CARD_GEOMETRY.cropBBox.h * 2)
   })
 
-  // 2026-10-29 re-export contract: the border layer declares NO gradient and
-  // NO clip, so both render surfaces must paint a SOLID per-tier ring
-  // UNCLIPPED — "largura do arquivo, cor por tier" (owner decision). The plan
-  // 2026-10-29 re-export contract: the owner's current file draws NO border,
-  // so the layer is optional and both surfaces skip it. A border reappearing
-  // (restored round-8 file / first re-export) must still parse — the assertions
-  // are optional-chained so the re-based contract holds either way.
-  it('draws no border in the owner\'s current file (the border layer is optional)', () => {
+  // 2026-11-05 re-seed contract: the border is back as `tier-color-border` — a
+  // SOLID stroke on the plate silhouette, NO gradient and NO clip. Both
+  // surfaces paint it in the tier's own color at the file's width (24).
+  it('draws the owner\'s current tier-color-border ring (solid, width 24, unclipped)', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
-    expect(plan.card.borderStroke).toBeUndefined()
+    expect(plan.card.borderStroke).toBeDefined()
+    expect(plan.card.borderStroke?.width).toBe(24)
+    expect(plan.card.borderStroke?.strokePath).toBe(CARD_GEOMETRY.platePath)
+    expect(plan.card.borderStroke?.line).toBeUndefined()
+    expect(plan.card.borderStroke?.clipPath).toBeUndefined()
   })
 
   it('carries the stats contrast plate through to the plan (geometry + fade from the file)', () => {
@@ -581,11 +581,11 @@ describe('downloadCard — round-7 PNG export contract (recorded paint sequence)
       expect(y).toBeGreaterThanOrEqual(0)
       expect(y + (r.args[3] as number)).toBeLessThanOrEqual(canvas.height)
     }
-    // The plate path paints (tier fill) and text draws. NO stroke: the owner's
-    // current file draws no border at all (2026-10-29), and the stats plate is
-    // a fill, not a stroke.
+    // The plate path paints (tier fill), the border ring strokes the plate
+    // silhouette (2026-11-05 `tier-color-border`), and text draws. The border
+    // is the ONLY stroke — the stats plate is a fill, not a stroke.
     expect(ops.some((o) => o.op === 'fill')).toBe(true)
-    expect(ops.some((o) => o.op === 'stroke')).toBe(false)
+    expect(ops.filter((o) => o.op === 'stroke')).toHaveLength(1)
     expect(ops.filter((o) => o.op === 'fillText').length).toBeGreaterThanOrEqual(2 + 6 * 3 + 1)
   })
 })

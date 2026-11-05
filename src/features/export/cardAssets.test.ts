@@ -54,13 +54,16 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(b.h).toBeGreaterThan(CARD_DESIGN_HEIGHT * 0.85)
   })
 
-  it('draws NO border in the owner\'s current file (the border is optional)', () => {
-    // Owner 2026-10-29: "new card svg: no more border". The layer must be
-    // OPTIONAL in the contract so the round-8 file (gradient ring, width 48,
-    // clipped) and the first re-export (solid ring, width 24, unclipped) still
-    // parse when the owner restores them — and so nothing throws or paints a
-    // phantom ring now.
-    expect(CARD_GEOMETRY.borderStroke).toBeUndefined()
+  it('draws the owner\'s current tier-color-border layer (solid, width 24, unclipped)', () => {
+    // Owner 2026-11-05 re-seed: the border is back as `tier-color-border` — a
+    // solid stroke on the plate silhouette, no gradient and no clip. The layer
+    // stays OPTIONAL in the contract so older/newer files keep parsing.
+    const border = CARD_GEOMETRY.borderStroke
+    expect(border).toBeDefined()
+    expect(border?.width).toBe(24)
+    expect(border?.strokePath).toBe(CARD_GEOMETRY.platePath)
+    expect(border?.line).toBeUndefined()
+    expect(border?.clipPath).toBeUndefined()
   })
 
   it('extracts the STATS CONTRAST PLATE: its path, gradient line and FADE only', () => {

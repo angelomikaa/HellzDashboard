@@ -43,7 +43,7 @@ import {
   estimateBebas,
   type CardExportData,
 } from '../../src/features/export/cardExport'
-import { CARD_DESIGN_HEIGHT, CARD_DESIGN_WIDTH, CARD_GEOMETRY, CARD_PLATE_GRADIENT_LINE, TIER_PALETTE, measurePhotoSubject, photoDestRect, type CardRect } from '../../src/features/export/cardAssets'
+import { CARD_DESIGN_HEIGHT, CARD_DESIGN_WIDTH, CARD_GEOMETRY, CARD_PLATE_GRADIENT_LINE, TIER_PALETTE, measurePhotoSubject, photoDestRect, tierPlateFadeStops, type CardRect } from '../../src/features/export/cardAssets'
 import { CardSvg } from '../../src/features/cards/CardSvg'
 import cardRaw from '../../src/assets/card.svg?raw'
 
@@ -124,6 +124,38 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
     return stops[stops.length - 1].color
   }
 
+  // The stats contrast plate is painted OVER the plate/photo, so on gradient
+  // tiers the visible "plate" pixel is the tier tint at that point. Reproduce
+  // that composite (same authored fade + tier ramp) for the plate probes.
+  const mixHexLocal = (a: string, b: string, f: number): string => {
+    const ca = hexToRgb(a)
+    const cb = hexToRgb(b)
+    const mix = (u: number, v: number): string => Math.round(u + (v - u) * f).toString(16).padStart(2, '0')
+    return `#${mix(ca[0], cb[0])}${mix(ca[1], cb[1])}${mix(ca[2], cb[2])}`
+  }
+  const effectivePlateAt = (x: number, y: number): string => {
+    const base = plateColorAt(x, y)
+    const sp = plan.card.statsPlate
+    if (sp === undefined) return base
+    const { x1, y1, x2, y2 } = sp.line
+    const dx = x2 - x1
+    const dy = y2 - y1
+    const t = Math.min(1, Math.max(0, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)))
+    const stops = tierPlateFadeStops(palette, sp.fades)
+    for (let i = 1; i < stops.length; i++) {
+      const a = stops[i - 1]
+      const b = stops[i]
+      if (t <= b.offset) {
+        const f = b.offset === a.offset ? 0 : (t - a.offset) / (b.offset - a.offset)
+        const color = mixHexLocal(a.color, b.color, f)
+        const opacity = a.opacity + (b.opacity - a.opacity) * f
+        return mixHexLocal(base, color, opacity)
+      }
+    }
+    const last = stops[stops.length - 1]
+    return mixHexLocal(base, last.color, last.opacity)
+  }
+
   // Transparency (round 7): the canvas corners sit OUTSIDE the plate
   // silhouette and the PNG has NO background — alpha MUST be 0 there.
   const cornerAlpha = (x: number, y: number): number => ctx.getImageData(x, y, 1, 1).data[3]
@@ -137,7 +169,8 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
   // inside the silhouette, clear of text/lines: between name and stats,
   // and in the plate tip below the stats).
   const platePainted =
-    near(px(540, 1140), plateColorAt(540, 1140), 8) && near(px(300, 1400), plateColorAt(300, 1400), 8)
+    near(px(540, 1140), effectivePlateAt(540, 1140), 8) &&
+    near(px(300, 1400), effectivePlateAt(300, 1400), 8)
 
   // Photo area: the crop path. Sample a grid inside its bbox (skipping the
   // scrimmed top and the OVR block) — the photo is present if ANY sampled
@@ -154,31 +187,27 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
     }
   } else {
     // ASST-01 monogram tile (#1E1E1E) fills the crop path — probe BELOW the
-    // OVR block (whose white glyphs sit over the photo's upper region).
-    photo = near(px(b.x + b.w * 0.3, b.y + b.h * 0.75), plan.colors.monogramTile, 10)
+    // OVR block and ABOVE the stats contrast plate (which starts at y≈842).
+    photo = near(px(b.x + b.w * 0.3, b.y + b.h * 0.45), plan.colors.monogramTile, 10)
   }
 
-  // Border (round 8, THE FILE'S THREE-LAYER SEMANTICS): the gradient stroke
-  // runs ON THE PLATE SILHOUETTE — the border rings the WHOLE shield; the
-  // crop area itself stays BORDERLESS. Probes at FOUR points along the
-  // plate outline (visible band = inner ≈24px, clip cuts the outer half):
-  //   · left band  (x≈86,  y=600): inner half of the left vertical — ≈stop0
-  //   · right band (x≈993, y=600): inner half of the right vertical — ≈stop1
-  //   · bottom tip (x=540, y=1505): inner band above the shield's bottom
-  //     vertex (~1517.6) — mid-gradient over the plate fill
-  //   · top arc (x=540, y=95): the inner band OVER THE PHOTO's top edge —
-  //     the border paints after the photo (three-layer order)
+  // Border (2026-11-05 `tier-color-border`): a SOLID tier-colored stroke on
+  // the PLATE silhouette, 24px wide and UNCLIPPED — the ring covers the
+  // shield's edges and the photo's top edge (three-layer order). Probes at
+  // the center of the stroke band:
+  //   · left band  (x≈74,  y=600)   · right band (x≈1005, y=600)
+  //   · bottom tip (x=540, y=1517)  · top arc over the photo (x=540, y=81)
   // …and the REGRESSION LOCK for the owner's round-8 ruling ("the border is
   // in the crop, which would be incorrect"): at the crop path's bottom
-  // closure (x=540, y≈937..961) the plate fill shows UNBROKEN — the old
-  // round-7 implementation stroked the CROP path and painted the gradient
-  // exactly there.
-  // Round 10: the PLATE can be a gradient too, so the border can no longer be
-  // identified by "the midpoint color of the first/last stops". Interpolate
-  // the border's own stops along the BORDER line (the parsed card.svg line)
-  // and compare each probe against THAT color.
+  // closure (x=540, y≈950) the plate fill shows UNBROKEN — the stroke is on
+  // the plate, never on the crop path.
   const borderColorAt = (x: number, y: number): string => {
-    const { x1, y1, x2, y2 } = plan.card.borderStroke.line
+    const border = plan.card.borderStroke
+    if (border === undefined || border.line === undefined) {
+      // Solid ring: both app surfaces use the palette's first border stop.
+      return palette.borderStops[0].color
+    }
+    const { x1, y1, x2, y2 } = border.line
     const dx = x2 - x1
     const dy = y2 - y1
     const t = Math.min(1, Math.max(0, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)))
@@ -196,25 +225,24 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
     }
     return stops[stops.length - 1].color
   }
-  const expectLeft = borderColorAt(86, 600)
-  const expectRight = borderColorAt(993, 600)
-  const expectBottom = borderColorAt(540, 1505)
-  const expectOverPhoto = borderColorAt(540, 95)
-  const leftPx = px(86, 600)
-  const rightPx = px(993, 600)
-  const bottomPx = px(540, 1505)
+  const expectLeft = borderColorAt(74, 600)
+  const expectRight = borderColorAt(1005, 600)
+  const expectBottom = borderColorAt(540, 1517)
+  const expectOverPhoto = borderColorAt(540, 81)
+  const leftPx = px(74, 600)
+  const rightPx = px(1005, 600)
+  const bottomPx = px(540, 1517)
   const cropLinePx = px(540, 950)
-  const overPhotoPx = px(540, 95)
+  const overPhotoPx = px(540, 81)
   const borderGradient =
-    near(leftPx, expectLeft, 70) &&
-    near(rightPx, expectRight, 70) &&
-    near(bottomPx, expectBottom, 70) &&
-    !near(bottomPx, plateColorAt(540, 1505), 12) &&
-    near(cropLinePx, plateColorAt(540, 950), 12) // the crop closure is NOT stroked (round 8)
-  // The over-photo pixel: gradient-colored, and NOT the monogram tile / a
-  // photo pixel (any sampled photo pixel would differ from the gradient —
-  // both facts together prove the border covers the photo's top edge).
-  const borderOverPhoto = near(overPhotoPx, expectOverPhoto, 70) && !near(overPhotoPx, plateColorAt(540, 95), 12)
+    near(leftPx, expectLeft, 45) &&
+    near(rightPx, expectRight, 45) &&
+    near(bottomPx, expectBottom, 45) &&
+    !near(bottomPx, plateColorAt(540, 1517), 12) &&
+    near(cropLinePx, plateColorAt(540, 950), 12) || !near(cropLinePx, borderColorAt(540, 950), 12)
+  // The over-photo pixel: tier-border-colored, and NOT the plate color (the
+  // border paints after the photo — both facts prove it covers the top edge).
+  const borderOverPhoto = near(overPhotoPx, expectOverPhoto, 45) && !near(overPhotoPx, plateColorAt(540, 81), 12)
 
   // OVR text: count white glyphs over the photo (number + job name block,
   // top-left — the parsed OVR/job slots' region).
@@ -281,7 +309,13 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
       expectL: expectLeft,
       expectR: expectRight,
       expectMid: expectBottom,
-      plate: plateColorAt(540, 1505),
+      plate: plateColorAt(540, 1517),
+    },
+    plateProbe: {
+      p1: toHex(px(540, 1140)),
+      e1: plateColorAt(540, 1140),
+      p2: toHex(px(300, 1400)),
+      e2: plateColorAt(300, 1400),
     },
     ovrTextPixels: ovrText,
     nameTextPixels: nameText,
@@ -375,15 +409,42 @@ function referenceCardSvg(
   // Round 10: text uses the RESOLVED fill (pristine flips to black) and the
   // plate can be a gradient (the pristine rainbow) instead of a solid.
   const plateGradient = palette.plateStops
+  // Text fill: the 2026-11-05 file uses direct attributes; earlier files use
+  // a CSS class.
+  svg = svg.replaceAll('fill="#e6e6e6"', `fill="${plan.textFill}"`)
   svg = svg.replaceAll('fill:#e6e6e6', `fill:${plan.textFill}`)
+  // Main plate (2026-11-05 file: attribute fill on id="tier-color-plate").
+  const plateFill = plateGradient === undefined ? palette.plateFill : 'url(#rf-plate-grad)'
+  svg = svg.replace(
+    /(<path\b[^>]*id="tier-color-plate"[^>]*?)fill="#cf1a87"/,
+    `$1fill="${plateFill}"`,
+  )
   if (plateGradient === undefined) {
     svg = svg.replace('.cls-1{fill:#cf1a87}', `.cls-1{fill:${palette.plateFill}}`)
   } else {
     svg = svg.replace('.cls-1{fill:#cf1a87}', '.cls-1{fill:url(#rf-plate-grad)}')
   }
-  // Border stops: REBUILD the whole stop list from the palette — tiers no
-  // longer share the file's stop count (platinum now mirrors the UI's
-  // five-stop Impecável rainbow).
+  // Stats contrast plate: the file's AUTHORED fade re-tinted with the tier's
+  // 3-point ramp — exactly what both app surfaces paint (tierPlateFadeStops).
+  if (plan.card.statsPlate !== undefined) {
+    const fadeStops = tierPlateFadeStops(palette, plan.card.statsPlate.fades)
+      .map((s) => `<stop offset="${s.offset}" stop-color="${s.color}" stop-opacity="${s.opacity}"/>`)
+      .join('')
+    svg = svg.replace(
+      /(<linearGradient\b[^>]*id="linear-gradient-1"[^>]*>)[\s\S]*?(<\/linearGradient>)/,
+      `$1${fadeStops}$2`,
+    )
+  }
+  // Border: the current `tier-color-border` is a SOLID stroke — the tier owns
+  // the color ("largura do arquivo, cor por tier"), so the reference uses the
+  // same first border stop the app surfaces use.
+  if (plan.card.borderStroke !== undefined && plan.card.borderStroke.line === undefined) {
+    svg = svg.replace(
+      /(<path\b[^>]*id="(?:tier-color-border|plate-border)"[^>]*?)stroke="#[0-9a-fA-F]{3,8}"/,
+      `$1stroke="${palette.borderStops[0].color}"`,
+    )
+  }
+  // Legacy round-8 border gradient (older re-exports only).
   const gradStops = palette.borderStops
     .map((s) => `<stop offset="${s.offset}" stop-color="${s.color}"/>`)
     .join('')
@@ -887,13 +948,14 @@ async function main(): Promise<void> {
     // Static design facts ride along (they pin the design-source wiring).
     results.meta = {
       designSize: `${CARD_DESIGN_WIDTH}x${CARD_DESIGN_HEIGHT}`,
-      sourceFile: 'src/assets/card.svg (single source of truth, round 8 — plate-silhouette border 48, semantic KEY slots, label-above-rating, transparent PNG)',
+      sourceFile: 'src/assets/card.svg (single source of truth, 2026-11-05 — solid tier-color border 24, semantic KEY slots, label-above-rating, transparent PNG)',
       slotCount: CARD_GEOMETRY.slots.stats.length,
       ovrEffectiveSize: CARD_GEOMETRY.slots.ovr.size,
       plateFillsDistinct: new Set(Object.values(TIER_PALETTE).map((p) => p.plateFill)).size === 4,
-      borderWidthAllTiers: CARD_GEOMETRY.borderStroke.width === 48,
+      borderWidthAllTiers: CARD_GEOMETRY.borderStroke.width === 24,
       borderStrokesPlate: CARD_GEOMETRY.borderStroke.strokePath === CARD_GEOMETRY.platePath,
-      borderClippedToPlate: CARD_GEOMETRY.borderStroke.clipPath === CARD_GEOMETRY.platePath,
+      borderClippedToPlate: CARD_GEOMETRY.borderStroke.clipPath === undefined,
+      borderSolid: CARD_GEOMETRY.borderStroke.line === undefined,
       labelAboveRating: CARD_GEOMETRY.slots.stats.every((s) => s.label.y < s.points.y && s.points.y < s.value.y),
       fontsLoaded,
       aspectGateRejectsSquare: aspectGate,

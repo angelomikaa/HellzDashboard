@@ -107,12 +107,12 @@ export interface CardGradientLine {
 
 export interface CardBorderStroke {
   /** The gradient line (userSpaceOnUse geometry, scaled with everything).
-   *  OPTIONAL since the owner's 2026-10-29 re-export: the current file carries
-   *  a SOLID stroke (plate-border), so there is no gradient to paint — the
+   *  OPTIONAL: the owner's current 2026-11-05 re-seed carries a SOLID
+   *  `tier-color-border` stroke, so there is no gradient to paint — the
    *  renderers fall back to the palette's solid border color. */
   line?: CardGradientLine
   /** Stroke width — read from the file (48 in the round-8 file, 24 in the
-   *  2026-10-29 re-export). */
+   *  2026-10-29 and 2026-11-05 re-exports). */
   width: number
   /** The STROKED path — in the owner's files this IS the plate silhouette
    *  (three-layer semantics: the border rings the whole shield). Parsed
@@ -605,15 +605,20 @@ function statsPlate(svg: string): CardStatsPlate | undefined {
   }
 }
 
-/** The detached border layer, when the file draws one. Returns undefined for
- *  the owner's 2026-10-29 file, which replaced it with the stats plate. */
+/** The detached border layer, when the file draws one. Supports the owner's
+ *  current `tier-color-border` layer (2026-11-05 re-seed: a solid, unclipped
+ *  stroke on the plate silhouette) and the earlier `plate-border` layer. */
 function borderStroke(svg: string): CardBorderStroke | undefined {
   const byId = [...svg.matchAll(/<path\b([^>]*)>/g)]
     .map((m) => attributes(m[1]))
-    .find((a) => a.get('id') === 'plate-border' && a.get('d'))
+    .find(
+      (a) =>
+        (a.get('id') === 'plate-border' || a.get('id') === 'tier-color-border') &&
+        a.get('d'),
+    )
   if (byId) {
     const width = byId.get('stroke-width')?.match(/^([\d.]+)/)
-    if (!width) throw new Error('card.svg: plate-border must declare a stroke-width')
+    if (!width) throw new Error('card.svg: the border path must declare a stroke-width')
     return {
       width: Number(width[1]),
       strokePath: byId.get('d') as string,

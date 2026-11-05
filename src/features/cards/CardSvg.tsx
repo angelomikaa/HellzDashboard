@@ -383,10 +383,11 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           three-layer background: plate → photo → border → text). Round-8 file:
           the tier GRADIENT stroke, CLIPPED to the plate silhouette (clip-path-1)
           — the stroke's outer half is cut, the inner ≈24px band paints over the
-          photo (top/sides) and the plate (bottom). First re-export: a SOLID
-          per-tier ring (the palette's own first border stop — "largura do
-          arquivo, cor por tier") at the file's width, UNCLIPPED. The owner's
-          CURRENT file declares no border, so this layer is omitted. */}
+          photo (top/sides) and the plate (bottom). The owner's current files use
+          a SOLID per-tier ring (the palette's own first border stop — "largura
+          do arquivo, cor por tier") at the file's width, UNCLIPPED — the
+          2026-11-05 re-seed names it `tier-color-border`. The layer is skipped
+          only when the file declares no border. */}
       {plan.card.borderStroke !== undefined && (
         <path
           d={plan.card.borderStroke.strokePath}

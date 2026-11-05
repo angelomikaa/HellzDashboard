@@ -695,10 +695,11 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   // shield; the photo area itself stays BORDERLESS — painted OVER the photo,
   // covering the shield's edges. Round-8 file: the tier GRADIENT stroke
   // clipped to the plate silhouette, so the outer half is cut and only the
-  // inner band paints over the photo/plate (the owner's clip-path-1). First
-  // re-export: plate-border declares NO clipPath and NO gradient — the stroke
-  // paints UNCLIPPED with the palette's solid color at the file's width. The
-  // owner's CURRENT file declares no border at all, so the layer is skipped.
+  // inner band paints over the photo/plate (the owner's clip-path-1). The
+  // current 2026-11-05 file uses `tier-color-border`: NO clipPath and NO
+  // gradient — the stroke paints UNCLIPPED with the palette's solid color at
+  // the file's width. The layer is skipped only when the file declares no
+  // border.
   const border = plan.card.borderStroke
   if (border !== undefined) {
     ctx.save()
