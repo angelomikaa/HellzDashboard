@@ -43,7 +43,7 @@ import {
   estimateBebas,
   type CardExportData,
 } from '../../src/features/export/cardExport'
-import { CARD_DESIGN_HEIGHT, CARD_DESIGN_WIDTH, CARD_GEOMETRY, CARD_PLATE_GRADIENT_LINE, TIER_PALETTE, measurePhotoSubject, photoDestRect, tierPlateFadeStops, type CardRect } from '../../src/features/export/cardAssets'
+import { CARD_DESIGN_HEIGHT, CARD_DESIGN_WIDTH, CARD_GEOMETRY, CARD_PLATE_GRADIENT_LINE, IMPECAVEL_BORDER_STOPS, TIER_PALETTE, measurePhotoSubject, photoDestRect, tierPlateFadeStops, type CardRect } from '../../src/features/export/cardAssets'
 import { CardSvg } from '../../src/features/cards/CardSvg'
 import cardRaw from '../../src/assets/card.svg?raw'
 
@@ -211,7 +211,7 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
     const dx = x2 - x1
     const dy = y2 - y1
     const t = Math.min(1, Math.max(0, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)))
-    const stops = palette.borderStops
+    const stops = border.stops ?? palette.borderStops
     for (let i = 1; i < stops.length; i++) {
       const a = stops[i - 1]
       const b = stops[i]
@@ -240,9 +240,13 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
     near(bottomPx, expectBottom, 45) &&
     !near(bottomPx, plateColorAt(540, 1517), 12) &&
     near(cropLinePx, plateColorAt(540, 950), 12) || !near(cropLinePx, borderColorAt(540, 950), 12)
-  // The over-photo pixel: tier-border-colored, and NOT the plate color (the
-  // border paints after the photo — both facts prove it covers the top edge).
-  const borderOverPhoto = near(overPhotoPx, expectOverPhoto, 45) && !near(overPhotoPx, plateColorAt(540, 81), 12)
+  // The over-photo pixel: the border gradient at the top arc (a photo pixel
+  // could not match that exact color). For a SOLID plate, also prove the pixel
+  // is not the plate color; a gradient plate (platinum) can legitimately share
+  // a stop with the ring, so that extra check would be ambiguous there.
+  const borderOverPhoto =
+    near(overPhotoPx, expectOverPhoto, 45) &&
+    (palette.plateStops !== undefined || !near(overPhotoPx, plateColorAt(540, 81), 12))
 
   // OVR text: count white glyphs over the photo (number + job name block,
   // top-left — the parsed OVR/job slots' region).
@@ -435,14 +439,20 @@ function referenceCardSvg(
       `$1${fadeStops}$2`,
     )
   }
-  // Border: the current `tier-color-border` is a SOLID stroke — the tier owns
-  // the color ("largura do arquivo, cor por tier"), so the reference uses the
-  // same first border stop the app surfaces use.
-  if (plan.card.borderStroke !== undefined && plan.card.borderStroke.line === undefined) {
-    svg = svg.replace(
-      /(<path\b[^>]*id="(?:tier-color-border|plate-border)"[^>]*?)stroke="#[0-9a-fA-F]{3,8}"/,
-      `$1stroke="${palette.borderStops[0].color}"`,
-    )
+  // Border: the 2026-11-05 `tier-color-border` paints the UI's Impecável
+  // rainbow (owner ruling) — the file's `stroke="#d4145a"` is a placeholder.
+  if (plan.card.borderStroke !== undefined) {
+    if (plan.card.borderStroke.line !== undefined) {
+      svg = svg.replace(
+        /(<path\b[^>]*id="(?:tier-color-border|plate-border)"[^>]*?)stroke="[^"]*"/,
+        `$1stroke="url(#rf-border-grad)"`,
+      )
+    } else {
+      svg = svg.replace(
+        /(<path\b[^>]*id="(?:tier-color-border|plate-border)"[^>]*?)stroke="[^"]*"/,
+        `$1stroke="${palette.borderStops[0].color}"`,
+      )
+    }
   }
   // Legacy round-8 border gradient (older re-exports only).
   const gradStops = palette.borderStops
@@ -462,9 +472,21 @@ function referenceCardSvg(
         ` x2="${CARD_PLATE_GRADIENT_LINE.x2}" y2="${CARD_PLATE_GRADIENT_LINE.y2}">` +
         plateGradient.map((s) => `<stop offset="${s.offset}" stop-color="${s.color}"/>`).join('') +
         `</linearGradient>`
+  const border = plan.card.borderStroke
+  const borderGradDef =
+    border === undefined || border.line === undefined
+      ? ''
+      : `<linearGradient id="rf-border-grad" gradientUnits="userSpaceOnUse"` +
+        ` x1="${border.line.x1}" y1="${border.line.y1}"` +
+        ` x2="${border.line.x2}" y2="${border.line.y2}">` +
+        (border.stops ?? palette.borderStops)
+          .map((s) => `<stop offset="${s.offset}" stop-color="${s.color}"/>`)
+          .join('') +
+        `</linearGradient>`
   const defs =
     `<clipPath id="rf-photo-clip"><path d="${plan.card.cropPath}"/></clipPath>` +
     plateGradDef +
+    borderGradDef +
     `<linearGradient id="rf-scrim" gradientUnits="userSpaceOnUse" x1="0" y1="${plan.scrim.y1}" x2="0" y2="${plan.scrim.y2}">` +
     `<stop offset="0" stop-color="#000000" stop-opacity="${plan.scrim.alpha}"/>` +
     `<stop offset="1" stop-color="#000000" stop-opacity="0"/></linearGradient>`
@@ -948,14 +970,14 @@ async function main(): Promise<void> {
     // Static design facts ride along (they pin the design-source wiring).
     results.meta = {
       designSize: `${CARD_DESIGN_WIDTH}x${CARD_DESIGN_HEIGHT}`,
-      sourceFile: 'src/assets/card.svg (single source of truth, 2026-11-05 — solid tier-color border 24, semantic KEY slots, label-above-rating, transparent PNG)',
+      sourceFile: 'src/assets/card.svg (single source of truth, 2026-11-05 — Impecável rainbow border 24, semantic KEY slots, label-above-rating, transparent PNG)',
       slotCount: CARD_GEOMETRY.slots.stats.length,
       ovrEffectiveSize: CARD_GEOMETRY.slots.ovr.size,
       plateFillsDistinct: new Set(Object.values(TIER_PALETTE).map((p) => p.plateFill)).size === 4,
       borderWidthAllTiers: CARD_GEOMETRY.borderStroke.width === 24,
       borderStrokesPlate: CARD_GEOMETRY.borderStroke.strokePath === CARD_GEOMETRY.platePath,
       borderClippedToPlate: CARD_GEOMETRY.borderStroke.clipPath === undefined,
-      borderSolid: CARD_GEOMETRY.borderStroke.line === undefined,
+      borderImpecavel: CARD_GEOMETRY.borderStroke.stops === IMPECAVEL_BORDER_STOPS,
       labelAboveRating: CARD_GEOMETRY.slots.stats.every((s) => s.label.y < s.points.y && s.points.y < s.value.y),
       fontsLoaded,
       aspectGateRejectsSquare: aspectGate,

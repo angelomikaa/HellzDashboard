@@ -107,10 +107,14 @@ export interface CardGradientLine {
 
 export interface CardBorderStroke {
   /** The gradient line (userSpaceOnUse geometry, scaled with everything).
-   *  OPTIONAL: the owner's current 2026-11-05 re-seed carries a SOLID
-   *  `tier-color-border` stroke, so there is no gradient to paint — the
-   *  renderers fall back to the palette's solid border color. */
+   *  PRESENT for the owner's 2026-11-05 re-seed: the `tier-color-border`
+   *  layer is painted with the Impecável rainbow, not the file's placeholder
+   *  color. A legacy solid border declares no line (palette fallback). */
   line?: CardGradientLine
+  /** Gradient stops for the ring. The 2026-11-05 `tier-color-border` carries
+   *  the UI's Impecável rainbow (5 stops); legacy borders omit it and fall
+   *  back to the tier palette's `borderStops`. */
+  stops?: { offset: number; color: string }[]
   /** Stroke width — read from the file (48 in the round-8 file, 24 in the
    *  2026-10-29 and 2026-11-05 re-exports). */
   width: number
@@ -294,6 +298,18 @@ export interface TierPalette {
  *  120°-ish diagonal feel as the UI's tier-impecavel-border. */
 export const CARD_PLATE_GRADIENT_LINE = { x1: 0, y1: 0, x2: 1080, y2: 1600 } as const
 
+/** The UI's Impecável rank rainbow — the SAME five stops as
+ *  `--tier-impecavel-border` (linear-gradient(120deg, …)). Owner ruling
+ *  2026-11-05: the card's `tier-color-border` ring paints THIS rainbow, not
+ *  the file's placeholder color and not the card tier's own accent. */
+export const IMPECAVEL_BORDER_STOPS: { offset: number; color: string }[] = [
+  { offset: 0, color: '#f26d6f' },
+  { offset: 0.25, color: '#e9b44c' },
+  { offset: 0.5, color: '#3fb950' },
+  { offset: 0.75, color: '#58a6ff' },
+  { offset: 1, color: '#b8c0cc' },
+]
+
 export const TIER_PALETTE: Record<Tier, TierPalette> = {
   bronze: {
     plateFill: '#d1a972',
@@ -324,20 +340,8 @@ export const TIER_PALETTE: Record<Tier, TierPalette> = {
     // Same five stops as the UI's tier-impecavel-border gradient
     // (linear-gradient(120deg, #f26d6f, #e9b44c, #3fb950, #58a6ff, #b8c0cc)):
     // the plate mirrors the ring, and the ring mirrors the UI.
-    plateStops: [
-      { offset: 0, color: '#f26d6f' },
-      { offset: 0.25, color: '#e9b44c' },
-      { offset: 0.5, color: '#3fb950' },
-      { offset: 0.75, color: '#58a6ff' },
-      { offset: 1, color: '#b8c0cc' },
-    ],
-    borderStops: [
-      { offset: 0, color: '#f26d6f' },
-      { offset: 0.25, color: '#e9b44c' },
-      { offset: 0.5, color: '#3fb950' },
-      { offset: 0.75, color: '#58a6ff' },
-      { offset: 1, color: '#b8c0cc' },
-    ],
+    plateStops: IMPECAVEL_BORDER_STOPS,
+    borderStops: IMPECAVEL_BORDER_STOPS,
     textFill: '#ffffff',
   },
 }
@@ -605,9 +609,10 @@ function statsPlate(svg: string): CardStatsPlate | undefined {
   }
 }
 
-/** The detached border layer, when the file draws one. Supports the owner's
- *  current `tier-color-border` layer (2026-11-05 re-seed: a solid, unclipped
- *  stroke on the plate silhouette) and the earlier `plate-border` layer. */
+/** The detached border layer, when the file draws one. The owner's current
+ *  `tier-color-border` layer (2026-11-05 re-seed) paints the UI's Impecável
+ *  rainbow on the plate silhouette; the earlier `plate-border` layer is a
+ *  legacy solid ring. */
 function borderStroke(svg: string): CardBorderStroke | undefined {
   const byId = [...svg.matchAll(/<path\b([^>]*)>/g)]
     .map((m) => attributes(m[1]))
@@ -619,12 +624,20 @@ function borderStroke(svg: string): CardBorderStroke | undefined {
   if (byId) {
     const width = byId.get('stroke-width')?.match(/^([\d.]+)/)
     if (!width) throw new Error('card.svg: the border path must declare a stroke-width')
-    return {
+    const base = {
       width: Number(width[1]),
       strokePath: byId.get('d') as string,
-      // No gradient line and no clip in this export: the renderers paint a
-      // solid per-tier ring, unclipped, exactly as the file draws it.
     }
+    if (byId.get('id') === 'tier-color-border') {
+      // Owner 2026-11-05: the placeholder `stroke="#d4145a"` is NOT the
+      // design color — the ring uses the Impecável rank rainbow.
+      return {
+        ...base,
+        line: CARD_PLATE_GRADIENT_LINE,
+        stops: IMPECAVEL_BORDER_STOPS,
+      }
+    }
+    return base
   }
 
   const cls3 = svg.match(/\.cls-3\{([^}]*)\}/)

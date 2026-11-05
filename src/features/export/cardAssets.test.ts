@@ -17,6 +17,8 @@ import {
   CARD_DESIGN_HEIGHT,
   CARD_DESIGN_WIDTH,
   CARD_GEOMETRY,
+  CARD_PLATE_GRADIENT_LINE,
+  IMPECAVEL_BORDER_STOPS,
   PHOTO_FRAME,
   TIER_PALETTE,
   photoDestRect,
@@ -54,15 +56,23 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(b.h).toBeGreaterThan(CARD_DESIGN_HEIGHT * 0.85)
   })
 
-  it('draws the owner\'s current tier-color-border layer (solid, width 24, unclipped)', () => {
-    // Owner 2026-11-05 re-seed: the border is back as `tier-color-border` — a
-    // solid stroke on the plate silhouette, no gradient and no clip. The layer
-    // stays OPTIONAL in the contract so older/newer files keep parsing.
+  it('draws the owner\'s current tier-color-border ring with the Impecável rainbow', () => {
+    // Owner 2026-11-05: the border is `tier-color-border` — a 24px stroke on
+    // the plate silhouette, painted with the UI's Impecável gradient (the
+    // file's `stroke="#d4145a"` is a placeholder, never the design color).
     const border = CARD_GEOMETRY.borderStroke
     expect(border).toBeDefined()
     expect(border?.width).toBe(24)
     expect(border?.strokePath).toBe(CARD_GEOMETRY.platePath)
-    expect(border?.line).toBeUndefined()
+    expect(border?.line).toBe(CARD_PLATE_GRADIENT_LINE)
+    expect(border?.stops).toBe(IMPECAVEL_BORDER_STOPS)
+    expect(border?.stops?.map((s) => s.color)).toEqual([
+      '#f26d6f',
+      '#e9b44c',
+      '#3fb950',
+      '#58a6ff',
+      '#b8c0cc',
+    ])
     expect(border?.clipPath).toBeUndefined()
   })
 

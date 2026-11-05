@@ -542,16 +542,16 @@ function paintFitted(
   ctx.restore()
 }
 
-/** Canvas gradient for the tier palette stops along the parsed border
- *  gradient line (userSpaceOnUse geometry, scaled onto the backing store). */
+/** Canvas gradient for the border stops along the parsed border gradient
+ *  line (userSpaceOnUse geometry, scaled onto the backing store). */
 function applyBorderGradient(
   ctx: CanvasRenderingContext2D,
-  palette: TierPalette,
+  stops: { offset: number; color: string }[],
   line: { x1: number; y1: number; x2: number; y2: number },
   s: number,
 ): CanvasGradient {
   const grad = ctx.createLinearGradient(line.x1 * s, line.y1 * s, line.x2 * s, line.y2 * s)
-  for (const stop of palette.borderStops) grad.addColorStop(Math.min(1, Math.max(0, stop.offset)), stop.color)
+  for (const stop of stops) grad.addColorStop(Math.min(1, Math.max(0, stop.offset)), stop.color)
   return grad
 }
 
@@ -690,16 +690,13 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
     ctx.restore()
   }
 
-  // --- Detached border, WHEN THE FILE DRAWS ONE (round 8 / first re-export):
-  // the tier stroke ON THE PLATE SILHOUETTE — the border rings the WHOLE
-  // shield; the photo area itself stays BORDERLESS — painted OVER the photo,
-  // covering the shield's edges. Round-8 file: the tier GRADIENT stroke
-  // clipped to the plate silhouette, so the outer half is cut and only the
-  // inner band paints over the photo/plate (the owner's clip-path-1). The
-  // current 2026-11-05 file uses `tier-color-border`: NO clipPath and NO
-  // gradient — the stroke paints UNCLIPPED with the palette's solid color at
-  // the file's width. The layer is skipped only when the file declares no
-  // border.
+  // --- Detached border, WHEN THE FILE DRAWS ONE: the stroke ON THE PLATE
+  // SILHOUETTE — the border rings the WHOLE shield; the photo area itself
+  // stays BORDERLESS — painted OVER the photo, covering the shield's edges.
+  // The 2026-11-05 `tier-color-border` layer carries NO clip: the ring paints
+  // UNCLIPPED at the file's width and uses the Impecável rank rainbow (the
+  // file's `stroke="#d4145a"` is a placeholder, never the design color). The
+  // layer is skipped only when the file declares no border.
   const border = plan.card.borderStroke
   if (border !== undefined) {
     ctx.save()
@@ -708,7 +705,7 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
     }
     ctx.strokeStyle =
       border.line !== undefined
-        ? applyBorderGradient(ctx, plan.palette, border.line, s)
+        ? applyBorderGradient(ctx, border.stops ?? plan.palette.borderStops, border.line, s)
         : resolveBorderSolid(plan.palette)
     ctx.lineWidth = border.width * s
     ctx.stroke(new Path2D(scalePath(border.strokePath, s)))

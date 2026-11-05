@@ -50,7 +50,14 @@ import {
   type CardExportData,
   type TextMeasurer,
 } from './cardExport'
-import { contrastRatio, resolveCardTextFill, tierPlateFadeStops, tierPlateRamp } from './cardAssets'
+import {
+  CARD_PLATE_GRADIENT_LINE,
+  IMPECAVEL_BORDER_STOPS,
+  contrastRatio,
+  resolveCardTextFill,
+  tierPlateFadeStops,
+  tierPlateRamp,
+} from './cardAssets'
 
 const data: CardExportData = {
   name: 'Maria Silva',
@@ -287,15 +294,16 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     expect(backing.photoBBox.h).toBe(CARD_GEOMETRY.cropBBox.h * 2)
   })
 
-  // 2026-11-05 re-seed contract: the border is back as `tier-color-border` — a
-  // SOLID stroke on the plate silhouette, NO gradient and NO clip. Both
-  // surfaces paint it in the tier's own color at the file's width (24).
-  it('draws the owner\'s current tier-color-border ring (solid, width 24, unclipped)', () => {
+  // 2026-11-05 re-seed contract: the border is `tier-color-border` — a 24px
+  // stroke on the plate silhouette, unclipped, painted with the UI's
+  // Impecável rainbow (never the file's placeholder color).
+  it('draws the owner\'s current tier-color-border ring with the Impecável rainbow', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     expect(plan.card.borderStroke).toBeDefined()
     expect(plan.card.borderStroke?.width).toBe(24)
     expect(plan.card.borderStroke?.strokePath).toBe(CARD_GEOMETRY.platePath)
-    expect(plan.card.borderStroke?.line).toBeUndefined()
+    expect(plan.card.borderStroke?.line).toEqual(CARD_PLATE_GRADIENT_LINE)
+    expect(plan.card.borderStroke?.stops).toEqual(IMPECAVEL_BORDER_STOPS)
     expect(plan.card.borderStroke?.clipPath).toBeUndefined()
   })
 

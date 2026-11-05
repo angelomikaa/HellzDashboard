@@ -236,10 +236,11 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
       focusable="false"
     >
       <defs>
-        {/* The tier border gradient (parsed geometry + palette stops). Only a
-            border DECLARING a gradient line gets a def; the owner's current
-            file draws no border at all, and a url() to a missing gradient
-            would paint black — so the def and the reference both disappear. */}
+        {/* The border gradient (2026-11-05: the `tier-color-border` ring
+            paints the Impecável rank rainbow; legacy borders fall back to the
+            tier palette stops). A url() to a missing gradient would paint
+            black, so the def and the reference both disappear when the file
+            declares no border. */}
         {plan.card.borderStroke?.line !== undefined && (
           <linearGradient
             id={borderGradId}
@@ -249,7 +250,7 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
             x2={plan.card.borderStroke.line.x2}
             y2={plan.card.borderStroke.line.y2}
           >
-            {plan.palette.borderStops.map((s, i) => (
+            {(plan.card.borderStroke.stops ?? plan.palette.borderStops).map((s, i) => (
               <stop key={i} offset={s.offset} stopColor={s.color} />
             ))}
           </linearGradient>
