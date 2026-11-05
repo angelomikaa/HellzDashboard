@@ -224,14 +224,24 @@ describe('REST client error handling', () => {
 // class_key_stats (staff_select_key_stats policy; a member JWT simply gets
 // [] from RLS, which is NOT an error).
 describe('rank engine client functions (03-03 RPC contracts)', () => {
-  it('fetchKeyStats reads class_key_stats with the encoded class filter and maps to string[]', async () => {
-    nextResponse = () => res(200, JSON.stringify([{ stat_key: 'crit' }, { stat_key: 'atk' }]))
+  it('fetchKeyStats reads class_key_stats with the encoded class filter and keeps selection_order', async () => {
+    nextResponse = () =>
+      res(
+        200,
+        JSON.stringify([
+          { stat_key: 'crit', selection_order: 1 },
+          { stat_key: 'atk', selection_order: 7 },
+        ]),
+      )
     const keys = await fetchKeyStats(session, 'Assassin')
     expect(calls[0].url).toBe(
       'https://test-project.supabase.co/rest/v1/class_key_stats?class_name=eq.Assassin&select=stat_key,selection_order&order=selection_order',
     )
     expect(calls[0].init.method).toBeUndefined() // GET
-    expect(keys).toEqual(['crit', 'atk'])
+    expect(keys).toEqual([
+      { stat_key: 'crit', selection_order: 1 },
+      { stat_key: 'atk', selection_order: 7 },
+    ])
   })
 
   it('fetchKeyStats URL-encodes the class name (interpolation hardening)', async () => {
@@ -243,7 +253,7 @@ describe('rank engine client functions (03-03 RPC contracts)', () => {
   })
 
   it('fetchKeyStats includes char_function filter when a build role is supplied', async () => {
-    nextResponse = () => res(200, JSON.stringify([{ stat_key: 'crit' }]))
+    nextResponse = () => res(200, JSON.stringify([{ stat_key: 'crit', selection_order: 1 }]))
     await fetchKeyStats(session, 'Assassin', 'dps')
     expect(calls[0].url).toContain(
       'class_key_stats?class_name=eq.Assassin&select=stat_key,selection_order&order=selection_order&char_function=eq.dps',

@@ -120,7 +120,7 @@ describe('percentilePoints (Phase 9 SCALE-01 value-proportional, higher-is-bette
   })
 })
 
-describe('ovrFromPoints (D-09 mean of 6, D-10 linear rescale floor 51)', () => {
+describe('ovrFromPoints (0073 mean of configured points, D-10 linear rescale floor 51)', () => {
   it('six 99s -> 99.0 exactly (best in class)', () => {
     expect(ovrFromPoints([99, 99, 99, 99, 99, 99])).toBe(99)
   })
@@ -141,11 +141,16 @@ describe('ovrFromPoints (D-09 mean of 6, D-10 linear rescale floor 51)', () => {
     expect(ovrFromPoints([0, 99, 0, 99, 0, 99])).toBe(75)
   })
 
-  it('throws RangeError on 5 points (D-11 all-6-or-nothing is the caller gate; function is strict)', () => {
-    expect(() => ovrFromPoints([99, 99, 99, 99, 99])).toThrow(RangeError)
+  it('accepts relevants beyond the six keys — 7+ points average over all of them', () => {
+    expect(ovrFromPoints([99, 99, 99, 99, 99, 99, 0])).toBe(51 + ((594 / 7) * 48) / 99)
   })
 
-  it('throws RangeError on 7 points', () => {
-    expect(() => ovrFromPoints([0, 0, 0, 0, 0, 0, 0])).toThrow(RangeError)
+  it('accepts a single available point (0073 "média dos disponíveis")', () => {
+    expect(ovrFromPoints([99])).toBe(99)
+    expect(ovrFromPoints([0])).toBe(51)
+  })
+
+  it('throws RangeError on an EMPTY pool (no computable OVR — never 51)', () => {
+    expect(() => ovrFromPoints([])).toThrow(RangeError)
   })
 })

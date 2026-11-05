@@ -11,10 +11,11 @@
  *
  *   value-proportional points: round(own/best*99,2) clamped [0,99]
  *   higher-is-better: best = max; lower-is-better: best = min (most negative)
- *   OVR = 51 + mean(6 key-stat points) * 48/99: recomputed per new formula
+ *   OVR = 51 + mean(configured stat points) * 48/99: open pool (keys +
+ *   relevants), 6-key gate, available points only (0073)
  *   MIN_COHORT_SIZE = 3 (n=2 -> points null + data_sufficient false)
  *   KEYU ordered set: 7th+ selection = relevant (no key_stat_limit); deselect
- *   key promotes oldest relevant
+ *   a key leaves its slot EMPTY (no relevant promotion — 0073)
  *   last_validated_at present in my_report output
  *   OVR parity: zero change where cohort unchanged, null where n<3 / no role
  *
@@ -501,7 +502,7 @@ async function main() {
 
     // 15. KEYU ordered-set test — runs LAST because it mutates the key set:
     // 7th selection succeeds (no key_stat_limit), becomes a relevant at
-    // selection_order 7; key set stays at 6.
+    // selection_order 7; key set stays at 6 (0073: keys + relevants feed OVR).
     const seventh = await rest('/rpc/set_key_stat_v2', {
       method: 'POST',
       token: officer.access_token,
@@ -513,26 +514,25 @@ async function main() {
       `HTTP ${seventh.status} body=${seventh.text}`,
     )
 
-    // Deselect a key -> oldest relevant ('hit') promoted into the vacated slot.
+    // 0073: deselecting a key leaves its slot EMPTY — the relevant is NOT
+    // promoted. The key set drops to 5, so the OVR goes null until 6 keys exist.
     const disable = await rest('/rpc/set_key_stat_v2', {
       method: 'POST',
       token: officer.access_token,
       body: { p_class: CLASS, p_function: 'dps', p_stat_key: 'hp', p_enabled: false },
     })
     check(
-      'KEYU: deselect key hp -> count 6 (hp removed, hit promoted)',
-      disable.ok && numEq(disable.json, 6),
+      'KEYU: deselect key hp -> count 5 (no promotion — the slot stays empty)',
+      disable.ok && numEq(disable.json, 5),
       `HTTP ${disable.status} body=${disable.text}`,
     )
-    // Promotion consequence, visible on the ordered set: hit is now a key
-    // (n=2 cohort -> OVR goes null for every member), hp is gone entirely.
     const reportB2 = await rest('/rpc/my_report', {
       method: 'POST',
       token: sessions['zz-rank-b'].access_token,
       body: {},
     })
     check(
-      'KEYU: promoted hit (n=2) in the key set -> ovr null (all-6-or-nothing gate)',
+      'KEYU: 5 keys -> ovr null + data_sufficient false (6-key gate)',
       reportB2.ok && reportB2.json.ovr.value === null && reportB2.json.ovr.data_sufficient === false,
       JSON.stringify(reportB2.json && reportB2.json.ovr),
     )

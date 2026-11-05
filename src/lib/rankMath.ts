@@ -51,22 +51,24 @@ export function percentilePoints(
 }
 
 /**
- * Overall rating from exactly 6 key-stat percentile points (D-09 + D-10).
+ * Overall rating from the configured stat points (0073 owner rule, 2026-11-05).
  *
  * OVR = 51 + mean(points) * 48 / 99 — a LINEAR RESCALE, not a clamp (D-10):
  * the worst player in class shows 51, the best 99, and bottom-half players
  * keep differentiation from each other (EAFC bronze→icon feel). Never below 51.
  *
- * Strict length-6 gate (D-11): the all-6-or-nothing decision is enforced by
- * the CALLER (missing any key stat → insufficient-data state); this function
- * itself throws RangeError unless given exactly 6 points.
+ * 0073: the pool is EVERY selected stat of the (class, build-role) config —
+ * the 6 keys + the relevants — over the points that exist ("média dos
+ * disponíveis"). The 6-key config completeness gate stays mandatory and is
+ * enforced by the CALLER/Postgres; this function only requires a non-empty
+ * pool (an empty pool means no computable OVR, never 51).
  *
  * Returns the UNROUNDED decimal — rounding is a Phase 4 display concern.
  */
 export function ovrFromPoints(points: number[]): number {
-  if (points.length !== 6) {
-    throw new RangeError('ovr requires exactly 6 key-stat points')
+  if (points.length === 0) {
+    throw new RangeError('ovr requires at least one configured stat point')
   }
-  const mean = points.reduce((sum, p) => sum + p, 0) / 6
+  const mean = points.reduce((sum, p) => sum + p, 0) / points.length
   return 51 + (mean * 48 / 99)
 }

@@ -1,7 +1,10 @@
 // Stats-Chave — officer/owner key-stat configuration (03-UI, D-01/D-04).
-// Phase 9 (09-02): unified KEYU ordered selection set per (class, build-role):
-// first 6 selected = keys, 7th+ = relevants; deselecting a key promotes the
-// oldest relevant (server-enforced via set_key_stat_v2).
+// 0073 (owner 2026-11-05): keys (slots 1-6) are ONLY the six stats highlighted
+// on the card; the relevants (slots 7+) are the extra stats that, together with
+// the keys, feed the OVR. Removing a key leaves its slot empty (no automatic
+// promotion); the cohort drops out of Início while the key set is incomplete.
+// Relevants already saved stay saved and are LOCKED until the 6 keys exist
+// again (server-enforced via set_key_stat_v2 `key_set_incomplete`).
 //
 // The tab is UX-only gating (App re-checks isStaff at the content level);
 // real enforcement is server-side: the staff_select_key_stats RLS policy
@@ -20,6 +23,7 @@ import {
   fetchKeyStats,
   setKeyStat,
   type ClassTop5Row,
+  type KeyStatSelection,
   type StatCatalogEntry,
 } from '../../lib/api'
 import { FUNCTION_LABELS, GROUP_LABELS, GROUP_ORDER } from '../../lib/groups'
@@ -27,18 +31,21 @@ import { classLabel } from '../../lib/classLabels'
 import { groupLabel, isVirtualClassGroup as isClassGroup, mergedClassOptions } from '../../lib/classGroups'
 import type { NeoFootSession } from '../auth/session'
 
+// 0073: relevants are frozen while the key set is incomplete.
+const LOCKED_RELEVANT_TITLE =
+  'Selecione os 6 stats-chave antes de alterar os relevantes.'
+
 // Renders one ordered-set chip for a catalog entry within a (class, build-role)
-// combo. Phase 9 KEYU: no block-at-7 — chips stay clickable past 6; the 7th+
-// selection becomes a relevant automatically server-side. Keys keep the red
-// accent fill + the `(n)` order suffix (1-6); relevants are marked by the
-// PURPLE fill instead of the retired R1/R2 suffix (owner decision 2026-10-23 —
-// same toggle behavior, visual feedback only).
+// combo. 0073: slots 1-6 are keys (red accent + `(n)` slot suffix); slots 7+
+// are relevants (purple fill, no suffix). Relevants stay visible and saved when
+// a key is removed, but their chips are LOCKED until the six keys exist again.
 function renderStatChip({
   entry,
   selected,
   order,
   isKey,
   busy,
+  locked,
   handleToggle,
 }: {
   entry: StatCatalogEntry
@@ -46,6 +53,7 @@ function renderStatChip({
   order: number
   isKey: boolean
   busy: boolean
+  locked: boolean
   handleToggle: (statKey: string, enabled: boolean) => void
 }) {
   return (
@@ -53,7 +61,8 @@ function renderStatChip({
       key={entry.stat_key}
       type="button"
       aria-pressed={selected}
-      disabled={busy}
+      disabled={busy || locked}
+      title={locked ? LOCKED_RELEVANT_TITLE : undefined}
       onClick={() => void handleToggle(entry.stat_key, !selected)}
       className={`h-9 rounded-full border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
         selected
@@ -77,10 +86,11 @@ const SAVE_ERROR = 'Não foi possível salvar. Tente novamente.'
 const SELECT_CLASS_PROMPT = 'Selecione uma classe e função para configurar.'
 const EMPTY_TOP5 = 'Nenhum jogador com OVR calculado ainda.'
 const INSUFFICIENT_OVR = '— dados insuficientes'
-// Phase 9: block-at-7 and key/relevant gating copy eliminated (KEYU-01).
-// Remaining: SESSION_ERROR / NETWORK_ERROR / SAVE_ERROR only.
+export const INCOMPLETE_KEYS_ERROR =
+  'Selecione os 6 stats-chave antes de alterar os relevantes.'
+// 0073: keys are the card highlights; keys + relevants feed the OVR.
 const TIER_LEGEND =
-  'Vermelho = chave (define o OVR) · Roxo = relevante (guia o foco de melhoria)'
+  'Vermelho = chave (destaque na cartinha) · Roxo = relevante (entra no OVR)'
 
 export type BuildRole = 'dps' | 'mdps' | 'suporte'
 
@@ -92,12 +102,11 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
   const [selectedClass, setSelectedClass] = useState('')
   const [selectedFunction, setSelectedFunction] = useState<BuildRole | ''>('')
 
-  // Per-(class, function) server views: keyStats = current ordered set
-  // (first 6 = keys, 7th+ = relevants), top5 = preview. KEYU: relevants are
-  // derived from the ordered set (positions 7+) — the legacy
-  // class_relevant_stats table is no longer read (0018 never re-keyed it,
-  // so a char_function filter there 400s).
-  const [keyStats, setKeyStats] = useState<string[] | null>(null)
+  // Per-(class, function) server views: keyStats = the ordered selection set
+  // with its real selection_order (1-6 = key, 7+ = relevant), top5 = preview.
+  // 0073: the order is read verbatim because key slots can be EMPTY while the
+  // config is incomplete — positional inference would mislabel relevants.
+  const [keyStats, setKeyStats] = useState<KeyStatSelection[] | null>(null)
   const [top5, setTop5] = useState<ClassTop5Row[] | null>(null)
   const [classError, setClassError] = useState<string | null>(null)
 
@@ -162,11 +171,43 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
     setToggling(true)
     setToggleError(null)
     try {
-      // set_key_stat_v2 returns the class's current key-stat count (order ≤ 6).
+      // set_key_stat_v2 returns the class's current key count (order <= 6).
       await setKeyStat(session, selectedClass, selectedFunction, statKey, enabled)
-      setKeyStats((keys) =>
-        enabled ? [...(keys ?? []), statKey] : (keys ?? []).filter((k) => k !== statKey),
-      )
+      // Optimistic local mirror of the server's slot rules; the authoritative
+      // re-read follows immediately.
+      setKeyStats((entries) => {
+        const current = entries ?? []
+        if (enabled) {
+          if (current.some((k) => k.stat_key === statKey)) return current
+          const keys = current.filter((k) => k.selection_order <= 6)
+          let nextOrder: number
+          if (keys.length < 6) {
+            // First free key slot (1-6).
+            nextOrder = 1
+            while (keys.some((k) => k.selection_order === nextOrder)) nextOrder += 1
+          } else {
+            nextOrder = Math.max(0, ...current.map((k) => k.selection_order)) + 1
+          }
+          return [...current, { stat_key: statKey, selection_order: nextOrder }]
+        }
+        const removed = current.find((k) => k.stat_key === statKey)
+        const remaining = current.filter((k) => k.stat_key !== statKey)
+        if (removed === undefined) return remaining
+        if (removed.selection_order <= 6) {
+          // Keys compact 1..n; relevants keep their 7+ slots.
+          return remaining.map((k) =>
+            k.selection_order <= 6 && k.selection_order > removed.selection_order
+              ? { ...k, selection_order: k.selection_order - 1 }
+              : k,
+          )
+        }
+        // A relevant removal compacts the relevants 7..n.
+        return remaining.map((k) =>
+          k.selection_order > removed.selection_order
+            ? { ...k, selection_order: k.selection_order - 1 }
+            : k,
+        )
+      })
       try {
         await loadClassData(selectedClass, selectedFunction)
       } catch {
@@ -180,8 +221,14 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
   }
 
   const busy = toggling
-  const keyCount = keyStats ? keyStats.filter((_, i) => i < 6).length : 0 // keys = first 6 of ordered set
-  const relevantCount = keyStats ? Math.max(0, keyStats.length - 6) : 0
+  const keyCount = keyStats
+    ? keyStats.filter((k) => k.selection_order <= 6).length
+    : 0
+  const relevantCount = keyStats
+    ? keyStats.filter((k) => k.selection_order > 6).length
+    : 0
+  const keysComplete = keyCount === 6
+  const hasRelevants = relevantCount > 0
 
   return (
     <section className="rounded-lg border border-line bg-surface p-6" aria-busy={busy}>
@@ -198,7 +245,8 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
         )}
       </div>
       <p className="mt-1 text-sm text-muted">
-        Escolha os 6 stats que definem o OVR de cada classe + função de build.
+        Escolha os 6 stats que ficam em evidência na cartinha. As chaves e os
+        relevantes entram no cálculo do OVR.
       </p>
       <p className="mt-1 text-sm text-muted">{TIER_LEGEND}</p>
 
@@ -294,6 +342,11 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                   {relevantCount} relevante{relevantCount !== 1 ? 's' : ''}
                 </span>
               </div>
+              {!keysComplete && hasRelevants && (
+                <p role="status" className="mt-2 text-sm font-semibold text-muted">
+                  {LOCKED_RELEVANT_TITLE}
+                </p>
+              )}
               {GROUP_ORDER.map((group) => (
                 <div key={group} className="mt-4">
                   <h3 className="text-sm font-semibold text-muted">
@@ -303,15 +356,20 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                     {catalog
                       .filter((entry) => entry.group_name === group)
                       .map((entry) => {
-                        const selected = keyStats.includes(entry.stat_key)
-                        const order = keyStats.indexOf(entry.stat_key) + 1
-                        const isKey = order <= 6
+                        const selection = keyStats.find((k) => k.stat_key === entry.stat_key)
+                        const selected = selection !== undefined
+                        const order = selection?.selection_order ?? 0
+                        const isKey = selected && order <= 6
+                        // 0073: a saved relevant cannot be edited while the
+                        // six keys are incomplete (it stays saved).
+                        const locked = selected && !isKey && !keysComplete
                         return renderStatChip({
                           entry,
                           selected,
                           order,
                           isKey,
                           busy,
+                          locked,
                           handleToggle,
                         })
                       })}
@@ -361,6 +419,7 @@ export function toggleErrorCopy(err: unknown): string {
     if (err.message.includes('forbidden')) return SESSION_ERROR
     if (err.message.includes('unknown_class') || err.message.includes('unknown_function'))
       return SAVE_ERROR
+    if (err.message.includes('key_set_incomplete')) return INCOMPLETE_KEYS_ERROR
     return SAVE_ERROR
   }
   return NETWORK_ERROR

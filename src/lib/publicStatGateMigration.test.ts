@@ -62,7 +62,9 @@ describe('migration 0063 — public showcase stat gate', () => {
   it('is the gate in the LATEST repo definition of get_promotion_public()', () => {
     const latest = latestPublicPromotionDefinition()
     expect(latest).not.toBeNull()
-    expect(latest?.file).toBe('0063_public_promotion_stat_gate.sql')
+    // 0073 re-creates the function for the OVR/relevant change; the 0063 gate
+    // must survive that supersession.
+    expect(latest?.file).toBe('0073_ovr_selected_stats_and_key_slots.sql')
     expect(latest?.body).toContain('v_show_values')
     expect(latest?.body).toContain(
       "'value', case when v_show_values then lt.value else null end",

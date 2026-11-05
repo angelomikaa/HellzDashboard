@@ -11,15 +11,13 @@
  *            never serialised), relevant_stat_keys present
  *   D-11     live catalog: label_short populated for all 57 rows, zero empty
  *   RELV-01  class_relevant_stats RLS: staff read OK, member read []
- *   D-05     server-side gating through set_key_stat_v2 (the 0018 ordered-set
- *            contract — the old 3-arg set_key_stat + set_relevant_stat were
- *            dropped by 0018, superseded by v2): member forbidden,
- *            unknown_class, 7th selection lands as a RELEVANT (no
- *            key_stat_limit), re-selecting a selected stat is idempotent,
- *            deselecting a key promotes the oldest relevant into the slot,
- *            deselecting with no relevant drops the count, and the my_card
- *            strip + OVR stay canonical through the whole churn (0028 owner
- *            rule: relevants never appear on the Painel strip)
+ *   D-05     server-side gating through set_key_stat_v2 (0073 key/relevant
+ *            contract): member forbidden, unknown_class, 7th selection lands
+ *            as a RELEVANT (no key_stat_limit), re-selecting a selected stat
+ *            is idempotent, deselecting a key leaves its slot EMPTY (no
+ *            relevant promotion) and freezes the relevants until the 6 keys
+ *            exist again, and the my_card strip + OVR stay canonical through
+ *            the whole churn (relevants never appear on the Painel strip)
  *   RANK-02  role_rank(): member forbidden, invalid_function whitelist,
  *            staff 200 — role-primary rows, server order ovr desc nulls
  *            last, 57-stat rows with label_short + class_average, class
@@ -437,10 +435,10 @@ async function main() {
       `HTTP ${unknownClassKey.status}`,
     )
 
-    // ---- Probe 5 (KEYU ordered-set rules via set_key_stat_v2) -------------
-    // 0018 D-11..D-14: p_enabled=true appends at the end (7+ = relevant, no
-    // block at 7); p_enabled=false removes and, for a removed key, promotes
-    // the oldest relevant into the vacated slot. Returns count(<=6).
+    // ---- Probe 5 (0073 key/relevant rules via set_key_stat_v2) ------------
+    // 0073: keys fill slots 1-6. A new selection becomes a relevant only once
+    // the 6-key set is complete. Removing a key leaves its slot EMPTY (no
+    // promotion) and relevants are frozen while the key set is incomplete.
     const seventhSel = await callRpc('set_key_stat_v2', ownerToken, {
       p_class: CLASS,
       p_function: 'dps',
@@ -477,31 +475,40 @@ async function main() {
       p_enabled: false,
     })
     check(
-      '5c. KEYU: deselecting a key promotes the oldest relevant into the slot -> returns 6',
-      deselectKey.ok && Number(deselectKey.json) === 6,
+      '5c. KEYU: deselecting a key -> returns 5 (no promotion — the slot stays empty)',
+      deselectKey.ok && Number(deselectKey.json) === 5,
       `HTTP ${deselectKey.status} body=${deselectKey.text}`,
     )
-    const promotedRows = await rest(`/class_key_stats?class_name=eq.${CLASS}&select=stat_key`, {
-      token: ownerToken,
-    })
-    const promotedKeys = Array.isArray(promotedRows.json) ? promotedRows.json.map((r) => r.stat_key).sort() : []
-    const EXPECTED_AFTER_PROMOTION = [...KEY_STATS.filter((k) => k !== 'sp'), RELEVANT_STATS[0]].sort()
-    check(
-      '5d. KEYU: promoted relevant is in the key set, deselected key is gone (ordered set read)',
-      promotedRows.ok &&
-        JSON.stringify(promotedKeys) === JSON.stringify(EXPECTED_AFTER_PROMOTION),
-      `rows=${JSON.stringify(promotedKeys)}`,
+    const afterRemovalRows = await rest(
+      `/class_key_stats?class_name=eq.${CLASS}&select=stat_key,selection_order&order=selection_order`,
+      { token: ownerToken },
     )
-    const deselectPromoted = await callRpc('set_key_stat_v2', ownerToken, {
+    const afterRemoval = Array.isArray(afterRemovalRows.json) ? afterRemovalRows.json : []
+    const afterRemovalKeys = afterRemoval
+      .filter((r) => Number(r.selection_order) <= 6)
+      .map((r) => r.stat_key)
+    const afterRemovalRelevants = afterRemoval
+      .filter((r) => Number(r.selection_order) > 6)
+      .map((r) => r.stat_key)
+    check(
+      '5d. KEYU: key count 5, deselected key gone, relevant stays at selection_order > 6 (NOT promoted)',
+      afterRemovalRows.ok &&
+        afterRemovalKeys.length === 5 &&
+        !afterRemovalKeys.includes('sp') &&
+        afterRemovalRelevants.includes(RELEVANT_STATS[0]) &&
+        !afterRemovalKeys.includes(RELEVANT_STATS[0]),
+      `keys=${JSON.stringify(afterRemovalKeys)} relevants=${JSON.stringify(afterRemovalRelevants)}`,
+    )
+    const frozenRelevant = await callRpc('set_key_stat_v2', ownerToken, {
       p_class: CLASS,
       p_function: 'dps',
       p_stat_key: RELEVANT_STATS[0],
       p_enabled: false,
     })
     check(
-      '5e. KEYU: deselecting a key with NO relevant left drops the count -> returns 5',
-      deselectPromoted.ok && Number(deselectPromoted.json) === 5,
-      `HTTP ${deselectPromoted.status} body=${deselectPromoted.text}`,
+      '5e. 0073: relevants are FROZEN while the key set is incomplete -> non-2xx key_set_incomplete',
+      !frozenRelevant.ok && frozenRelevant.text.includes('key_set_incomplete'),
+      `HTTP ${frozenRelevant.status} body=${frozenRelevant.text}`,
     )
     const restoreSp = await callRpc('set_key_stat_v2', ownerToken, {
       p_class: CLASS,
@@ -514,15 +521,33 @@ async function main() {
       restoreSp.ok && Number(restoreSp.json) === 6,
       `HTTP ${restoreSp.status}`,
     )
-    // The 0028 owner rule end-to-end: through the whole ordered-set churn the
-    // member card strip stays exactly the 6 canonical keys (relevants NEVER
-    // appear on it) and the OVR is unchanged (compute-on-read stability).
+    const removeRelevant = await callRpc('set_key_stat_v2', ownerToken, {
+      p_class: CLASS,
+      p_function: 'dps',
+      p_stat_key: RELEVANT_STATS[0],
+      p_enabled: false,
+    })
+    const finalRows = await rest(
+      `/class_key_stats?class_name=eq.${CLASS}&select=stat_key,selection_order&order=selection_order`,
+      { token: ownerToken },
+    )
+    const finalEntries = Array.isArray(finalRows.json) ? finalRows.json : []
+    check(
+      '5g. 0073: with 6 keys the relevant CAN be removed -> returns 6 and the relevant is gone',
+      removeRelevant.ok &&
+        Number(removeRelevant.json) === 6 &&
+        !finalEntries.some((r) => r.stat_key === RELEVANT_STATS[0]),
+      `HTTP ${removeRelevant.status} rows=${JSON.stringify(finalEntries.map((r) => r.stat_key))}`,
+    )
+    // The 0028 owner rule end-to-end: through the whole churn the member card
+    // strip stays exactly the 6 canonical keys (relevants NEVER appear on it)
+    // and the OVR returns to its canonical value (compute-on-read stability).
     const cardAfterChurn = await callRpc('my_card', memberToken, {})
     const churnKeys = Array.isArray(cardAfterChurn.json?.key_stats)
       ? cardAfterChurn.json.key_stats.map((s) => s.stat_key).sort()
       : []
     check(
-      '5g. 0028 owner rule: my_card key_stats stays the canonical 6 through the churn (relevants never on the strip) and ovr is unchanged',
+      '5h. 0028 owner rule: my_card key_stats stays the canonical 6 through the churn (relevants never on the strip) and ovr is unchanged',
       cardAfterChurn.ok &&
         JSON.stringify(churnKeys) === JSON.stringify([...KEY_STATS].sort()) &&
         Number(cardAfterChurn.json?.ovr?.value) === Number(card.ovr.value),
@@ -662,22 +687,20 @@ async function main() {
     )
 
     // ---- Probe 8: my_card relevant_stat_keys read path ----------------------
-    // 0018 kept class_relevant_stats as a vestigial table (no RPC writes it
-    // anymore — set_relevant_stat was dropped), and the my_card body still
-    // reads it for relevant_stat_keys (0028/0036 byte-preserved read). Seed
-    // one row service-level (mgmtQuery, cleaned by cleanup()) and prove the
-    // card mirrors the live tier — then that removal reflects too.
-    await mgmtQuery(
-      `insert into class_relevant_stats (class_name, stat_key) values ('${CLASS}', '${RELEVANT_STATS[0]}');`,
-    )
-    const seededRead = await rest(`/class_relevant_stats?class_name=eq.${CLASS}&select=stat_key`, {
-      token: ownerToken,
+    // 0073: relevant_stat_keys mirrors the LIVE ordered set (class_key_stats
+    // rows at selection_order > 6), not the retired class_relevant_stats table.
+    // Seed one relevant through the real RPC (6 keys exist at this point),
+    // prove the card mirrors it, then remove it and prove it empties again.
+    const seedRelevant = await callRpc('set_key_stat_v2', ownerToken, {
+      p_class: CLASS,
+      p_function: 'dps',
+      p_stat_key: RELEVANT_STATS[0],
+      p_enabled: true,
     })
-    const seededKeys = Array.isArray(seededRead.json) ? seededRead.json.map((r) => r.stat_key) : []
     check(
-      '8a. setup: class_relevant_stats row seeded service-level and staff-visible',
-      seededRead.ok && JSON.stringify(seededKeys) === JSON.stringify([RELEVANT_STATS[0]]),
-      `rows=${JSON.stringify(seededKeys)}`,
+      '8a. setup: seed a relevant through set_key_stat_v2 (6 keys present) -> returns 6',
+      seedRelevant.ok && Number(seedRelevant.json) === 6,
+      `HTTP ${seedRelevant.status} body=${seedRelevant.text}`,
     )
     const cardWithRelevant = await callRpc('my_card', memberToken, {})
     check(
@@ -686,12 +709,20 @@ async function main() {
         JSON.stringify(cardWithRelevant.json.relevant_stat_keys) === JSON.stringify([RELEVANT_STATS[0]].sort()),
       `relevant=${JSON.stringify(cardWithRelevant.json?.relevant_stat_keys)}`,
     )
-    await mgmtQuery(
-      `delete from class_relevant_stats where class_name = '${CLASS}' and stat_key = '${RELEVANT_STATS[0]}';`,
+    const dropRelevant = await callRpc('set_key_stat_v2', ownerToken, {
+      p_class: CLASS,
+      p_function: 'dps',
+      p_stat_key: RELEVANT_STATS[0],
+      p_enabled: false,
+    })
+    check(
+      '8c. setup: remove the seeded relevant -> returns 6',
+      dropRelevant.ok && Number(dropRelevant.json) === 6,
+      `HTTP ${dropRelevant.status} body=${dropRelevant.text}`,
     )
     const cardWithoutRelevant = await callRpc('my_card', memberToken, {})
     check(
-      '8c. my_card relevant_stat_keys back to [] after the row is removed',
+      '8d. my_card relevant_stat_keys back to [] after the relevant is removed',
       cardWithoutRelevant.ok &&
         JSON.stringify(cardWithoutRelevant.json.relevant_stat_keys) === JSON.stringify([]),
       `relevant=${JSON.stringify(cardWithoutRelevant.json?.relevant_stat_keys)}`,

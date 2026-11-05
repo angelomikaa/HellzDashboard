@@ -29,6 +29,12 @@ describe('toggleErrorCopy (enumeration-safe error mapping)', () => {
     )
   })
 
+  it('key_set_incomplete -> the locked-relevants copy (0073)', () => {
+    expect(toggleErrorCopy(new ApiError(400, 'server', 'key_set_incomplete'))).toBe(
+      'Selecione os 6 stats-chave antes de alterar os relevantes.',
+    )
+  })
+
   it('generic server error -> SAVE_ERROR', () => {
     expect(toggleErrorCopy(new ApiError(500, 'server', 'boom'))).toBe(
       'Não foi possível salvar. Tente novamente.',

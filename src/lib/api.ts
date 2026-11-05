@@ -216,32 +216,40 @@ export async function fetchMySubmissions(session: NeoFootSession): Promise<Submi
   return (await parseBody<SubmissionRow[]>(res)) ?? []
 }
 
+/** One row of a (class, build-role) ordered selection set. */
+export interface KeyStatSelection {
+  stat_key: string
+  /** 1-6 = key (card highlight), 7+ = relevant (feeds the OVR). */
+  selection_order: number
+}
+
 export async function fetchKeyStats(
   session: NeoFootSession,
   className: string,
   charFunction?: 'dps' | 'mdps' | 'suporte',
-): Promise<string[]> {
+): Promise<KeyStatSelection[]> {
   // RLS: staff-only read (staff_select_key_stats, 0009) — a member JWT gets
   // [] from the policy filter, which is NOT an error. Reads per
   // (class, char_function) when a function is supplied (Phase 9 KEYU ordered
   // set); single-arg className overload kept for backward-compat transition.
+  // 0073: selection_order is returned verbatim so the UI can tell a key
+  // (<= 6) from a relevant (> 6) even while the key set is incomplete.
   let path = `/class_key_stats?class_name=eq.${encodeURIComponent(className)}&select=stat_key,selection_order&order=selection_order`
   if (charFunction) {
     path += `&char_function=eq.${charFunction}`
   }
   const res = await restFetch(session, path)
-  const rows = await parseBody<{ stat_key: string }[]>(res)
-  return (rows ?? []).map((r) => r.stat_key)
+  const rows = await parseBody<KeyStatSelection[]>(res)
+  return rows ?? []
 }
 
 /**
- * Phase 9 (D-11): set_key_stat v2 — ONE ordered selection set per
- * (class, build-role): first 6 selected = keys, 7th+ = relevants.
- * p_enabled=true appends to the end of the ordered set; p_enabled=false
- * removes and, if the stat was a key, promotes the oldest relevant into
- * the vacated slot. Returns the class's current key-stat count (order ≤ 6).
- * Staff gate + advisory lock inside the RPC; errors: forbidden /
- * unknown_class / unknown_function. Replaces set_key_stat + set_relevant_stat.
+ * 0073 rules: keys fill slots 1-6 and never promote a relevant when removed;
+ * a new selection becomes a relevant only after the 6-key set is complete.
+ * p_enabled=false on a relevant while the key set is incomplete raises
+ * `key_set_incomplete` server-side (the UI locks those chips). Staff gate +
+ * advisory lock inside the RPC; errors: forbidden / unknown_class /
+ * unknown_function / key_set_incomplete.
  */
 export async function setKeyStat(
   session: NeoFootSession,
@@ -832,12 +840,12 @@ export async function fetchPromotionPublic(
 }
 
 // ---------------------------------------------------------------------------
-// Phase 7.2 surfaces (0013) — member card payload / staff officials rank /
-// relevant-tier governance / relevant-set read. my_card is member-invocable
-// SECURITY DEFINER (gate inside the function); role_rank and set_relevant_stat
-// are staff-only SECURITY DEFINER (gate inside the function); class_relevant_stats
-// is a staff-only RLS read. The client adds NO enforcement — payloads are
-// rendered verbatim by the 07.2-03/04 UI plans with guards as UX-only.
+// Phase 7.2 surfaces (0013) — member card payload / staff officials rank.
+// my_card is member-invocable SECURITY DEFINER (gate inside the function);
+// role_rank is staff-only SECURITY DEFINER (gate inside the function). 0073:
+// my_card.relevant_stat_keys reads the live ordered set (selection_order > 6).
+// The client adds NO enforcement — payloads are rendered verbatim by the
+// 07.2-03/04 UI plans with guards as UX-only.
 // Types below are CLOSED field lists pinning the 0013 payload censuses exactly
 // (compile-time leak block, T-06-05/T-072-05 discipline): no index signatures,
 // no optional config-shaped fields — key identity is the sanctioned D-03
