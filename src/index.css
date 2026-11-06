@@ -57,7 +57,11 @@
   --color-tier-bronze: #C97F3F;
   --color-tier-silver: #B8C0CC;
   --color-tier-gold: #E9B44C;         /* gold's ONLY surviving role (D-01) */
-  --color-tier-platinum: #D7E3F0;
+  /* Impecável (owner 2026-11-05): the top tier now wears the card's own
+     Magenta_to_Orange ramp — the SVG's colors ARE the tier colors. The token
+     is the ramp's magenta end (5.3:1 on #1E1E1E); gradients below carry the
+     full magenta → orange sweep. */
+  --color-tier-platinum: #FF12F7;
 
   /* 07.2 D-06 (SUPERSEDED 2026-10-23, owner): the relevant-tier signal is a
      PURPLE FILL on the Stats-Chave chips — replaces both the retired yellow
@@ -206,7 +210,7 @@
    static aura appears. Impecável cards participate via --card-surface —
    tier-impecavel-border's padding-box gradient consumes it, so the
    lighten shows through the gradient border without touching the
-   transparent border-color the rainbow depends on. */
+   transparent border-color the gradient depends on. */
 @utility hover-card {
   --card-surface: var(--color-surface);
   transition: background-color 150ms ease, box-shadow 150ms ease;
@@ -218,10 +222,11 @@
 }
 
 /* Impecável — the top tier, renamed per owner decision at the 07.1-02 gate
-   (platinum read too close to silver). Premium static rainbow treatment,
-   unmistakably distinct from bronze/silver/gold (D-02 revision). Static
-   only (D-05): gradients + shadows, nothing animates. Text color #FFFFFF
-   on #1E1E1E ≈ 16.7:1 (AAA); border/glow colors are decorative. */
+   (platinum read too close to silver). Owner 2026-11-05: its colors ARE the
+   card.svg's Magenta_to_Orange ramp (#ff12f7 → #ed7b00), so the UI frame and
+   the rendered card read as the same tier. Static only (D-05): gradients +
+   shadows, nothing animates. Text color #FFFFFF on #1E1E1E ≈ 16.7:1 (AAA);
+   border/glow colors are decorative. */
 @utility tier-impecavel-border {
   border-color: transparent;
   /* double-background gradient border (respects border-radius, unlike
@@ -234,12 +239,12 @@
      longhands instead, which accept comma lists per layer. */
   background-image:
     /* first layer reads --card-surface (set at rest by hover-card) so the
-       owner-gate round-5 hover lighten shows through the rainbow border */
+       owner-gate round-5 hover lighten shows through the gradient border */
     linear-gradient(var(--card-surface, var(--color-surface)), var(--card-surface, var(--color-surface))),
-    linear-gradient(120deg, #f26d6f, #e9b44c, #3fb950, #58a6ff, #b8c0cc);
+    linear-gradient(120deg, #ff12f7, #ed7b00);
   background-origin: padding-box, border-box;
   background-clip: padding-box, border-box;
-  /* The rainbow is only as thick as the border — pin 2px so the treatment
+  /* The gradient is only as thick as the border — pin 2px so the treatment
      reads unmistakably at every card scale (badges render with `border`,
      cards with `border-2`; same resolved value, no visible conflict). */
   border-width: 2px;
@@ -248,13 +253,12 @@
 @utility tier-impecavel-text {
   color: #ffffff;
   text-shadow:
-    0 0 18px rgb(242 109 111 / 0.45),
-    0 0 18px rgb(233 180 76 / 0.3),
-    0 0 18px rgb(88 166 255 / 0.3);
+    0 0 18px rgb(255 18 247 / 0.45),
+    0 0 18px rgb(237 123 0 / 0.3);
 }
 
 @utility tier-impecavel-dot {
-  background-image: linear-gradient(135deg, #f26d6f, #e9b44c, #3fb950, #58a6ff);
+  background-image: linear-gradient(135deg, #ff12f7, #ed7b00);
 }
 
 /* Destaques carousel (SHWC-01 rework, UAT round 1 2026-10-24; loop in round 2).

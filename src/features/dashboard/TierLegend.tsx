@@ -2,7 +2,8 @@
 // Tier meaning on cards is color-only, so this line directly under the OVR
 // hero makes the four-color code self-explanatory. Labels + dot fills come
 // from the render-layer display maps (tierDisplay.ts) — the top band shows
-// as "Impecável" with a rainbow gradient dot (owner decision, 07.1-02 gate).
+// as "Impecável" with a magenta→orange gradient dot (owner 2026-11-05: the
+// card's own tier ramp).
 // All class strings are literals or come from the literal maps in
 // tierDisplay.ts/presentation.ts (Tailwind v4 JIT-safe).
 import { TIER_DISPLAY_LABELS, TIER_DOT_DISPLAY } from './tierDisplay'
