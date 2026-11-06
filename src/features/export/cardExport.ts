@@ -14,8 +14,9 @@
 // (the backplate, the border ring) is painted from TIER_PALETTE — its
 // GEOMETRY comes from the file, its COLOR never does. Owner 2026-11-05: the
 // Impecável row of that palette IS the file's own Magenta_to_Orange ramp, so
-// the SVG's colors became the tier's colors; and the ring keeps the file's
-// 30% opacity (a translucent tier tint).
+// the SVG's colors became the tier's colors. The 2026-11-06 re-model also
+// brings back AUTHORED FADES (the photo light wash and the stats plate): their
+// offsets/opacities are the file's, their colors ride the same tier ramp.
 //
 // ROUND 7 (owner verdict on round 6: "the card is overflowing ... keep a
 // matching proportion and readability", then the new seeded card.svg):
@@ -75,6 +76,7 @@ import {
   resolveCardTextFill,
   scalePath,
   scaleRect,
+  tierFadeStops,
   type CardGeometry,
   type CardLogo,
   type CardPhotoTransform,
@@ -630,6 +632,46 @@ function resolveBorderSolid(palette: TierPalette): string {
 /** #rrggbb + alpha → rgba() — no longer used for a fade layer; kept out of the
  *  paint path. */
 
+/** #rrggbb + alpha → rgba(), for canvas gradients whose stops carry their own
+ *  opacity (the file's authored fades: stats plate + photo glow). Canvas has
+ *  no stop-opacity, so the alpha must ride the color. A non-hex color passes
+ *  through — only '#…' is normalized. */
+function rgbaWithAlpha(color: string, alpha: number): string {
+  const hex = color.trim()
+  const short = hex.match(/^#([0-9a-f]{3})$/i)
+  const long = hex.match(/^#([0-9a-f]{6})$/i)
+  if (short === null && long === null) return hex
+  const digits = (short === null ? hex.slice(1) : [...hex.slice(1)].map((c) => c + c).join(''))
+    .slice(0, 6)
+  const r = parseInt(digits.slice(0, 2), 16)
+  const g = parseInt(digits.slice(2, 4), 16)
+  const b = parseInt(digits.slice(4, 6), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+/** A fade the file authored, tinted by the tier (tierFadeStops) and mapped to
+ *  a canvas gradient along the file's own line. */
+function fadeGradient(
+  ctx: CanvasRenderingContext2D,
+  plan: CardPlan,
+  paint: { line: { x1: number; y1: number; x2: number; y2: number }; fades: { offset: number; opacity: number }[] },
+): CanvasGradient {
+  const s = plan.scale
+  const grad = ctx.createLinearGradient(
+    paint.line.x1 * s,
+    paint.line.y1 * s,
+    paint.line.x2 * s,
+    paint.line.y2 * s,
+  )
+  for (const stop of tierFadeStops(plan.palette, paint.fades)) {
+    grad.addColorStop(
+      Math.min(1, Math.max(0, stop.offset)),
+      stop.opacity >= 1 ? stop.color : rgbaWithAlpha(stop.color, stop.opacity),
+    )
+  }
+  return grad
+}
+
 /** The plate paint (round 10): a tier ramp when the palette declares one
  *  (Impecável = the file's Magenta_to_Orange), otherwise its solid plateFill.
  *  The SVG twin reads the same palette field, so the on-page card and the PNG
@@ -674,13 +716,13 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.fill(plate)
 
   // --- Photo: the member screenshot (or fallback) CLIPPED TO THE PHOTO AREA
-  // — the SAME path the on-page SVG clips with. The 2026-11-05 re-seed brought
-  // the crop path back (the shield's top portion); a file without one falls
-  // back to the whole shield and the plate fill stays behind it. The member's
-  // own framing (zoom + pan, cardAssets.applyPhotoTransform) rides on top of
-  // the measured cover fit, so the downloaded card is what the crop editor
-  // showed. The border paints AFTER the photo as a separate layer
-  // (plate → photo → scrim → border → texts).
+  // — the SAME path the on-page SVG clips with. The 2026-11-06 re-model draws
+  // it as the `mask` group's clip (the shield's top portion); a file without
+  // one falls back to the whole shield and the plate fill stays behind it. The
+  // member's own framing (zoom + pan, cardAssets.applyPhotoTransform) rides on
+  // top of the measured cover fit, so the downloaded card is what the crop
+  // editor showed. Paint order is the file's: photo → glow → scrim → border →
+  // stats plate → texts.
   const crop = new Path2D(scalePath(plan.card.cropPath, s))
   const b = plan.photoBBox
   ctx.save()
@@ -706,6 +748,21 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   } else {
     drawMonogramFill(ctx, plan)
   }
+  // The file's photo light wash (soft tier-tinted bokeh shapes over the
+  // photo), clipped to the photo area exactly as the file clips it.
+  for (const glow of plan.card.photoGlows ?? []) {
+    ctx.save()
+    ctx.globalAlpha = glow.opacity
+    ctx.fillStyle = fadeGradient(ctx, plan, glow)
+    if (glow.kind === 'circle') {
+      ctx.beginPath()
+      ctx.arc(glow.cx * s, glow.cy * s, glow.r * s, 0, Math.PI * 2)
+      ctx.fill()
+    } else {
+      ctx.fill(new Path2D(scalePath(glow.d, s)))
+    }
+    ctx.restore()
+  }
   // Top legibility scrim (backs the over-photo OVR block).
   const scrimGrad = ctx.createLinearGradient(0, plan.scrim.y1, 0, plan.scrim.y2)
   scrimGrad.addColorStop(0, `rgba(0,0,0,${plan.scrim.alpha})`)
@@ -717,7 +774,7 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   // --- Detached border, WHEN THE FILE DRAWS ONE: the stroke ON THE PLATE
   // SILHOUETTE — the border rings the WHOLE shield; the photo area itself
   // stays BORDERLESS — painted OVER the photo, covering the shield's edges.
-  // Owner 2026-11-05: the `tier-color-border` group carries `opacity="0.3"`,
+  // Owner 2026-11-06: the `tier-color-plate-2` group carries `opacity="0.7"`,
   // so the TIER's ramp paints as a translucent tint; the stroke is clipped to
   // the plate silhouette exactly as the file clips it. The layer is skipped
   // only when the file declares no border.
@@ -734,6 +791,18 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
         : resolveBorderSolid(plan.palette)
     ctx.lineWidth = border.width * s
     ctx.stroke(new Path2D(scalePath(border.strokePath, s)))
+    ctx.restore()
+  }
+
+  // --- STATS CONTRAST PLATE (owner 2026-11-06): the file's fade behind the
+  // six stat columns, painted AFTER the border (the file's own order) so it
+  // blends the photo edge into the plate. Geometry + fade from the file,
+  // colors from the tier.
+  const statsPlateLayer = plan.card.statsPlate
+  if (statsPlateLayer !== undefined) {
+    ctx.save()
+    ctx.fillStyle = fadeGradient(ctx, plan, statsPlateLayer)
+    ctx.fill(new Path2D(scalePath(statsPlateLayer.path, s)))
     ctx.restore()
   }
 
@@ -757,8 +826,8 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.fillStyle = plan.name.color
   paintFitted(ctx, plan.name.text, plan.name.x, plan.name.y, plan.fonts.name, 700, plan.name.size, plan.name.maxWidth, true)
 
-  // --- LAST_UPDATE line (owner 2026-11-05): the date + the file's own
-  // "• atualizado" segments, all in the plate's text fill.
+  // --- LAST_UPDATE line (owner 2026-11-05; nested in the OVR block since the
+  // 2026-11-06 re-model): "atualizado • DD-MM" in the plate's text fill.
   if (plan.lastUpdate !== null) {
     const lu = plan.lastUpdate
     ctx.fillStyle = lu.color

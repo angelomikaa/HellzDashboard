@@ -21,11 +21,11 @@
 //      is transparent around the shield, and the on-page card shows the
 //      page backdrop through it.
 //   2. The photo (member screenshot or class portrait) is CLIPPED TO THE
-//      parsed PHOTO AREA — the 2026-11-05 re-seed's `crop-path` (the shield's
-//      top portion). The member's own framing (zoom + pan, CardPhotoTransform)
-//      rides on the measured cover fit, so the card shows exactly what the
-//      crop editor showed. The plate fill stays behind it as the no-photo
-//      fallback.
+//      parsed PHOTO AREA — the 2026-11-06 re-model's `mask` group clip (the
+//      shield's top portion; earlier files used `crop-path`). The member's own
+//      framing (zoom + pan, CardPhotoTransform) rides on the measured cover
+//      fit, so the card shows exactly what the crop editor showed. The plate
+//      fill stays behind it as the no-photo fallback.
 //   3. The detached border is painted ON THE PLATE SILHOUETTE — the file's
 //      three-layer background (round 8): the border rings the whole shield,
 //      covering the photo's edges, while the photo area itself stays
@@ -59,6 +59,7 @@ import {
   measurePhotoSubject,
   photoDestRect,
   scopedLogo,
+  tierFadeStops,
   type CardRect,
   type PhotoSubjectBounds,
 } from '../export/cardAssets'
@@ -180,6 +181,8 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
   const borderGradId = `card-border-grad-${uid}`
   const plateGradId = `card-plate-grad-${uid}`
   const scrimId = `card-scrim-${uid}`
+  const statsPlateGradId = `card-stats-plate-${uid}`
+  const glowGradId = `card-glow-${uid}`
   const b = plan.photoBBox
   // The file's logo group, with its gradient ids scoped to THIS card instance
   // (the showcase mounts many cards; duplicate gradient ids would cross-wire).
@@ -243,11 +246,11 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
       focusable="false"
     >
       <defs>
-        {/* The border gradient (2026-11-05: the `tier-color-border` ring
-            paints the tier's ramp at the file's own opacity; legacy borders
-            fall back to the tier palette stops). A url() to a missing
-            gradient would paint black, so the def and the reference both
-            disappear when the file declares no border. */}
+        {/* The border gradient: the ring paints the TIER's ramp along the
+            file's own gradient line, at the file's own opacity (70% in the
+            2026-11-06 re-model). A url() to a missing gradient would paint
+            black, so the def and the reference both disappear when the file
+            declares no border. */}
         {plan.card.borderStroke?.line !== undefined && (
           <linearGradient
             id={borderGradId}
@@ -299,6 +302,39 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           <stop offset="0" stopColor="#000000" stopOpacity={plan.scrim.alpha} />
           <stop offset="1" stopColor="#000000" stopOpacity={0} />
         </linearGradient>
+        {/* The file's authored fades (owner 2026-11-06 re-model): the photo
+            light washes and the stats contrast plate keep their offsets and
+            opacities, while the COLOR rides the tier ramp (for Impecável that
+            IS the file's magenta→orange). */}
+        {(plan.card.photoGlows ?? []).map((glow, i) => (
+          <linearGradient
+            key={i}
+            id={`${glowGradId}-${i}`}
+            gradientUnits="userSpaceOnUse"
+            x1={glow.line.x1}
+            y1={glow.line.y1}
+            x2={glow.line.x2}
+            y2={glow.line.y2}
+          >
+            {tierFadeStops(plan.palette, glow.fades).map((stop, s) => (
+              <stop key={s} offset={stop.offset} stopColor={stop.color} stopOpacity={stop.opacity} />
+            ))}
+          </linearGradient>
+        ))}
+        {plan.card.statsPlate !== undefined && (
+          <linearGradient
+            id={statsPlateGradId}
+            gradientUnits="userSpaceOnUse"
+            x1={plan.card.statsPlate.line.x1}
+            y1={plan.card.statsPlate.line.y1}
+            x2={plan.card.statsPlate.line.x2}
+            y2={plan.card.statsPlate.line.y2}
+          >
+            {tierFadeStops(plan.palette, plan.card.statsPlate.fades).map((stop, i) => (
+              <stop key={i} offset={stop.offset} stopColor={stop.color} stopOpacity={stop.opacity} />
+            ))}
+          </linearGradient>
+        )}
       </defs>
 
       {/* Plate: shield-shaped tier fill — the tier's gradient ramp when the
@@ -317,10 +353,11 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           full-body placeholders, so round 7 top-anchored the fit ("hide the
           legs, never the head"); round 8 added the MEASURED subject frame
           (cardAssets.photoDestRect: the character's opaque bounds expanded by
-          margins, cover-fit — top-anchored when the short 2026-11-05 crop
-          window crops vertically). The MEMBER's own framing (zoom + pan,
+          margins, cover-fit — top-anchored when the short crop window crops
+          vertically). The MEMBER's own framing (zoom + pan,
           cardAssets.applyPhotoTransform) then rides on that base, so the card
-          matches the photo-positioning editor exactly. Measured rect →
+          matches the photo-positioning editor exactly. The file's light wash
+          paints over the photo inside the same clip. Measured rect →
           preserveAspectRatio "none" (the rect already matches the image
           aspect); fallback → round-7 "xMidYMin slice" until measurement
           lands. */}
@@ -351,24 +388,40 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
             </text>
           </>
         )}
+        {/* The file's photo light washes (soft tier-tinted bokeh shapes),
+            painted over the photo and clipped to the photo area — the file's
+            own order (image → washes). */}
+        {(plan.card.photoGlows ?? []).map((glow, i) =>
+          glow.kind === 'circle' ? (
+            <circle
+              key={i}
+              cx={glow.cx}
+              cy={glow.cy}
+              r={glow.r}
+              opacity={glow.opacity}
+              fill={`url(#${glowGradId}-${i})`}
+            />
+          ) : (
+            <path
+              key={i}
+              d={glow.d}
+              opacity={glow.opacity}
+              fill={`url(#${glowGradId}-${i})`}
+            />
+          ),
+        )}
         {/* Top legibility scrim over the photo (OVR block sits on it). */}
         <rect x={b.x} y={b.y} width={b.w} height={plan.scrim.y2 - plan.scrim.y1} fill={`url(#${scrimId})`} />
       </g>
 
-      {/* Stats live on the PLATE itself: since the 2026-11-05 re-seed the
-          backplate carries the contrast (the stats plate is gone), so nothing
-          extra paints between the photo and the border. */}
-
       {/* Detached border, WHEN THE FILE DRAWS ONE: the stroke ON THE PLATE
           SILHOUETTE — the border rings the WHOLE shield and covers the photo's
           edges; the photo area itself stays BORDERLESS (the owner's
-          three-layer background: plate → photo → border → text). Round-8 file:
-          the tier GRADIENT stroke, CLIPPED to the plate silhouette (clip-path-1)
-          — the stroke's outer half is cut, the inner ≈24px band paints over the
-          photo (top/sides) and the plate (bottom). The 2026-11-05 re-seed
-          (`tier-color-border`) keeps the clip, widens the ring to 32 and
-          declares `opacity="0.3"` — the TIER's ramp as a translucent tint. The
-          layer is skipped only when the file declares no border. */}
+          three-layer background: plate → photo → border → text). The
+          2026-11-06 re-model (`tier-color-plate-2`) draws a 48px TIER-ramp
+          stroke clipped to the plate silhouette at `opacity="0.7"` — a
+          translucent tier tint; earlier files used 24/32px rings. The layer is
+          skipped only when the file declares no border. */}
       {plan.card.borderStroke !== undefined && (
         <path
           d={plan.card.borderStroke.strokePath}
@@ -382,6 +435,14 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           strokeOpacity={plan.card.borderStroke.opacity}
           clipPath={plan.card.borderStroke.clipPath !== undefined ? `url(#${borderClipId})` : undefined}
         />
+      )}
+
+      {/* STATS CONTRAST PLATE (owner 2026-11-06): the file's fade behind the
+          six stat columns, painted AFTER the border (the file's own order) so
+          it blends the photo edge into the plate. Geometry + fade offsets from
+          the file; colors from the tier. */}
+      {plan.card.statsPlate !== undefined && (
+        <path d={plan.card.statsPlate.path} fill={`url(#${statsPlateGradId})`} />
       )}
 
       {/* OVR block — big number + JOB NAME below, NO "OVR" tag, at the

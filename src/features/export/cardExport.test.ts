@@ -56,6 +56,7 @@ import {
   IMPECAVEL_BORDER_STOPS,
   contrastRatio,
   resolveCardTextFill,
+  tierFadeStops,
 } from './cardAssets'
 
 const data: CardExportData = {
@@ -263,7 +264,7 @@ describe('buildCardPlan — round-5 palette contract (tier colors applied by cod
   it('round-10/2026-11-05 contrast rule: the Impecável plate is the file ramp and text flips to black', () => {
     const platinum = TIER_PALETTE.platinum
     // The plate carries the card.svg's Magenta_to_Orange ramp — the same
-    // stops as its (30% opacity) border.
+    // stops as its (70% opacity) border.
     expect(platinum.plateStops).toEqual(platinum.borderStops)
     expect(platinum.plateStops).toHaveLength(2)
     expect(platinum.plateStops?.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
@@ -290,7 +291,7 @@ describe('buildCardPlan — LAST_UPDATE line + member photo framing (owner 2026-
     expect(formatCardDate('not a date')).toBeNull()
   })
 
-  it('renders the date at the parsed slot with the file\'s "• atualizado" segments', () => {
+  it('renders the date at the parsed slot with the file\'s label segments', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     const slot = CARD_GEOMETRY.slots.lastUpdate
     expect(slot).toBeDefined()
@@ -302,9 +303,9 @@ describe('buildCardPlan — LAST_UPDATE line + member photo framing (owner 2026-
     expect(plan.lastUpdate.size).toBe(slot.date.size)
     expect(plan.lastUpdate.suffix.map((s) => s.text)).toEqual(['•', 'atualizado'])
     expect(plan.lastUpdate.suffix.map((s) => s.x)).toEqual(slot.suffix.map((s) => s.x))
-    // Below the name, above the stat labels — the file's own composition.
-    expect(plan.lastUpdate.y).toBeGreaterThan(plan.name.y)
-    expect(plan.lastUpdate.y).toBeLessThan(plan.stats[0].labelY)
+    // Over the photo, under the OVR block's job line (2026-11-06 re-model).
+    expect(plan.lastUpdate.y).toBeGreaterThan(plan.ovr.jobY)
+    expect(plan.lastUpdate.y).toBeLessThan(plan.name.y)
   })
 
   it('omits the line entirely when no date is supplied (never prints the placeholder)', () => {
@@ -341,23 +342,53 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     expect(backing.photoBBox.h).toBe(CARD_GEOMETRY.cropBBox.h * 2)
   })
 
-  // 2026-11-05 re-seed contract: the border is `tier-color-border` — a 32px
-  // stroke on the plate silhouette, clipped by clip-path-1, painted with the
-  // TIER ramp at the file's own 30% opacity.
-  it('draws the owner\'s current tier-color-border ring: tier ramp at 30% opacity', () => {
+  // 2026-11-06 re-model contract: the border is `tier-color-plate-2` — a 48px
+  // stroke on the plate silhouette, clipped by clip-path-2, painted with the
+  // TIER ramp at the file's own 70% opacity.
+  it('draws the owner\'s current tier-color-border ring: tier ramp at 70% opacity', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     expect(plan.card.borderStroke).toBeDefined()
-    expect(plan.card.borderStroke?.width).toBe(32)
+    expect(plan.card.borderStroke?.width).toBe(48)
     expect(plan.card.borderStroke?.strokePath).toBe(CARD_GEOMETRY.platePath)
     expect(plan.card.borderStroke?.line).toEqual(CARD_PLATE_GRADIENT_LINE)
-    expect(plan.card.borderStroke?.stops).toEqual(IMPECAVEL_BORDER_STOPS)
-    expect(plan.card.borderStroke?.opacity).toBeCloseTo(0.3, 6)
+    // Colors come from the palette (Impecável = the file's Magenta_to_Orange).
+    expect(plan.card.borderStroke?.stops).toBeUndefined()
+    expect(plan.palette.borderStops).toEqual(IMPECAVEL_BORDER_STOPS)
+    expect(plan.card.borderStroke?.opacity).toBeCloseTo(0.7, 6)
     expect(plan.card.borderStroke?.clipPath).toBe(CARD_GEOMETRY.platePath)
   })
 
-  it('carries NO stats contrast plate (the backplate does the contrast job)', () => {
+  it('carries the stats contrast plate + photo light washes through to the plan', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
-    expect('statsPlate' in plan.card).toBe(false)
+    const plate = plan.card.statsPlate
+    expect(plate).toBeDefined()
+    if (plate === undefined) return
+    expect(plate).toBe(CARD_GEOMETRY.statsPlate)
+    expect(plate.fades.length).toBeGreaterThanOrEqual(2)
+    for (const fade of plate.fades) {
+      expect(Object.keys(fade).sort()).toEqual(['offset', 'opacity'])
+    }
+    expect(plan.card.photoGlows).toBe(CARD_GEOMETRY.photoGlows)
+  })
+
+  it('tints the file fades with the TIER ramp (Impecável renders the file exactly)', () => {
+    const plate = CARD_GEOMETRY.statsPlate
+    if (plate === undefined) return
+    const platinum = tierFadeStops(TIER_PALETTE.platinum, plate.fades)
+    expect(platinum.map((s) => s.offset)).toEqual(plate.fades.map((f) => f.offset))
+    expect(platinum.map((s) => s.opacity)).toEqual(plate.fades.map((f) => f.opacity))
+    expect(platinum[0].color).toBe('#ff12f7')
+    expect(platinum[platinum.length - 1].color).toBe('#ed7b00')
+    // The metals render their own ramp — never a flat color and never the
+    // file's magenta.
+    for (const tier of ['bronze', 'silver', 'gold'] as const) {
+      const stops = tierFadeStops(TIER_PALETTE[tier], plate.fades)
+      expect(stops[0].color).toBe(TIER_PALETTE[tier].borderStops[0].color)
+      expect(stops[stops.length - 1].color).toBe(
+        TIER_PALETTE[tier].borderStops[TIER_PALETTE[tier].borderStops.length - 1].color,
+      )
+      expect(stops.map((s) => s.color)).not.toContain('#ff12f7')
+    }
   })
 
   it('backs the over-photo OVR block with a top legibility scrim inside the crop area', () => {
@@ -509,6 +540,8 @@ describe('downloadCard — round-7 PNG export contract (recorded paint sequence)
       restore: () => ops.push({ op: 'restore', args: [] }),
       translate: (...a: unknown[]) => ops.push({ op: 'translate', args: a }),
       scale: (...a: unknown[]) => ops.push({ op: 'scale', args: a }),
+      beginPath: () => ops.push({ op: 'beginPath', args: [] }),
+      arc: (...a: unknown[]) => ops.push({ op: 'arc', args: a }),
       fill: () => ops.push({ op: 'fill', args: [] }),
       stroke: () => ops.push({ op: 'stroke', args: [] }),
       clip: () => ops.push({ op: 'clip', args: [] }),
@@ -584,8 +617,8 @@ describe('downloadCard — round-7 PNG export contract (recorded paint sequence)
       expect(y + (r.args[3] as number)).toBeLessThanOrEqual(canvas.height)
     }
     // The plate path paints (tier fill), the border ring strokes the plate
-    // silhouette (2026-11-05 `tier-color-border`), and text draws. The border
-    // is the ONLY stroke — the stats plate is a fill, not a stroke.
+    // silhouette (2026-11-06 `tier-color-plate-2`), and text draws. The border
+    // is the ONLY stroke — the fades are fills, not strokes.
     expect(ops.some((o) => o.op === 'fill')).toBe(true)
     expect(ops.filter((o) => o.op === 'stroke')).toHaveLength(1)
     expect(ops.filter((o) => o.op === 'fillText').length).toBeGreaterThanOrEqual(2 + 6 * 3 + 1)

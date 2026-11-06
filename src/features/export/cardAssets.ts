@@ -7,42 +7,44 @@
 // TEXT SLOTS structurally and tolerates the export shapes the owner has
 // shipped (fail-fast when none matches):
 //
-//   A) CURRENT FILE (owner re-seed 2026-11-05 — "the crop path is back", the
-//      border carries opacity, the stats plate is gone) — INLINE attributes,
+//   A) CURRENT FILE (owner re-model 2026-11-06 — "remodelado para comportar o
+//      clip e os degradês que tínhamos anteriormente") — INLINE attributes,
 //      no <style>, no classes:
 //        <path id="tier-color-plate"> — recolorable backplate, full shield,
-//          painted with the tier's plate ramp (the file's Magenta_to_Orange
-//          IS the Impecável tier color since 2026-11-05).
-//        <path id="crop-path"> — THE PHOTO AREA IS BACK (the shield's top
-//          portion, closed at y≈903); the screenshot is clipped to it.
-//        <g id="tier-color-border" opacity="0.3"> wrapping the stroked
-//          silhouette (width 32, clipped by clipPath#clip-path-1). The ring
-//          is TIER colored at the FILE's opacity — a translucent tier tint,
-//          never the file's placeholder stroke.
-//        <g id="LAST_UPDATE"> — three hand-placed texts (date · bullet ·
-//          "atualizado"); the FIRST segment is the live date, the rest are
-//          static labels.
-//        NO stats contrast plate: the backplate itself carries the contrast.
+//          filled with the tier's plate ramp (the file's Magenta_to_Orange IS
+//          the Impecável tier color since 2026-11-05).
+//        <g id="mask" clip-path="url(#clip-path-1)"> — THE PHOTO AREA (the
+//          shield's top portion, closed at y≈963) + the soft magenta light
+//          wash the file paints over the photo (a gradient circle).
+//        <g id="tier-color-plate-2" data-name="tier-color-plate"
+//          opacity="0.7"> wrapping the silhouette stroked 48px with the tier
+//          ramp, clipped by clipPath#clip-path-2 — the translucent border.
+//        <path id="stats-plate"> — the stats contrast plate fades in from the
+//          photo edge to the shield tip (pink → orange), painted AFTER the
+//          border, its colors tinted by the tier.
+//        <g id="OVR"> — number + job line; the LAST_UPDATE line (24px,
+//          "atualizado • DD-MM") is nested inside it since this re-model.
 //        <text ... font-size="…"> per slot, transform="matrix(1 0 0 1 x y)"
-//   B) 2026-10-29 re-exports (retired, still parsed) — no crop path (photo =
-//      whole shield), a flat stats contrast plate and/or a solid per-tier
-//      `plate-border` ring.
-//   C) round-8 file (retired, still parsed) — <style> + cls-* classes,
-//      crop-path photo area + border-over gradient stroke clipped by
-//      clip-path-1.
+//   B) 2026-11-05 re-seed (retired, still parsed) — `id="crop-path"` photo
+//      area, `tier-color-border` opacity 0.3 ring, no stats plate.
+//   C) 2026-10-29 re-exports (retired) — no crop path (photo = whole shield),
+//      a flat stats plate and/or a solid `plate-border` ring.
+//   D) round-8 file (retired) — <style> + cls-* classes, crop-path photo area
+//      + border-over gradient stroke clipped by clip-path-1.
 //
-// PAINT ORDER: plate → photo → scrim → border → texts.
+// PAINT ORDER (the file's own): plate → photo (+ glow, scrim) → border →
+// stats plate → texts → logo.
 //   - Placeholder TEXT slots (Bebas Neue unless noted — family + fill are
 //     placeholders; code substitutes). Roles resolve from STRUCTURE, never
 //     exact id strings (the ids drift per export: OVR / OVR-2 + data-name,
 //     LABEL / LABEL-2 / KEYLABEL…):
 //       · <g id="OVR"> holds TWO texts — the BIGGEST is the OVR number, the
-//         other is the job-class line under it (re-export: 148.014px at
-//         (136.177, 412.59) over a 56px job line at (136.177, 473.794));
+//         other is the job-class line under it (current file: 164px at
+//         (124.765, 406.853) over a 42px job line at (124.765, 460.263));
 //       · the single ORBITRON text outside the OVR/KEY groups is PLAYERNAME
-//         (≈72px, (246.626, 1007.454)) — Orbitron ONLY here (round 7);
-//       · the LAST_UPDATE group's first text is the live date (36px); the
-//         following texts ("•", "atualizado") keep their parsed anchors;
+//         (≈72px, (246.626, 1051.454)) — Orbitron ONLY here (round 7);
+//       · the LAST_UPDATE group (nested inside OVR since 2026-11-06) holds
+//         three 24px texts: "atualizado" · "•" · the live date (rightmost);
 //       · SIX SEMANTIC STAT GROUPS <g id="KEY1">…<g id="KEY6">, each holding
 //         exactly three texts: the BIGGEST is the RATING/points (148px,
 //         y≈1261.703), the SMALLER-y of the other two the LABEL (56px,
@@ -114,21 +116,22 @@ export interface CardGradientLine {
 
 export interface CardBorderStroke {
   /** The gradient line (userSpaceOnUse geometry, scaled with everything).
-   *  PRESENT for the owner's 2026-11-05 re-seed: the `tier-color-border`
-   *  layer is painted with the tier's own ramp, not the file's placeholder
-   *  color. A legacy solid border declares no line (palette fallback). */
+   *  Parsed from the file's stroke gradient; the COLORS are the tier's own
+   *  ramp (owner: the svg's colors ARE the Impecável tier color). A legacy
+   *  solid border declares no line (palette fallback). */
   line?: CardGradientLine
-  /** Gradient stops for the ring. The 2026-11-05 `tier-color-border` carries
-   *  the tier's ramp stops (Impecável = the file's Magenta_to_Orange); legacy
-   *  borders omit it and fall back to the tier palette's `borderStops`. */
+  /** Explicit ring stops. The owner's files never carry them (the tier palette
+   *  supplies the colors via `borderStops`); the field remains for a future
+   *  export that pins its own stops. */
   stops?: { offset: number; color: string }[]
-  /** Paint opacity read from the file. Owner 2026-11-05: the border is now a
-   *  TRANSLUCENT tint (`opacity="0.3"` on the group) — the tier color is
+  /** Paint opacity read from the file. 2026-11-06 re-model: the ring is a
+   *  TRANSLUCENT tint (`opacity="0.7"` on the group); the tier color is
    *  applied at the file's own opacity on both surfaces. Defaults to 1 when
    *  the file declares none. */
   opacity: number
-  /** Stroke width — read from the file (48 in the round-8 file, 24 in the
-   *  2026-10-29 re-exports, 32 in the 2026-11-05 re-seed). */
+  /** Stroke width — read from the file (48 in the round-8 file and the
+   *  2026-11-06 re-model, 24 in the 2026-10-29 re-exports, 32 in the
+   *  2026-11-05 re-seed). */
   width: number
   /** The STROKED path — in the owner's files this IS the plate silhouette
    *  (three-layer semantics: the border rings the whole shield). Parsed
@@ -166,26 +169,63 @@ export interface CardLogo {
   gradients: string
 }
 
+/** One stop of an authored fade: the OFFSET and OPACITY are the file's; the
+ *  COLOR is supplied by the tier (the file's colors ARE the Impecável ramp). */
+export interface CardFade {
+  offset: number
+  opacity: number
+}
+
+/** A gradient the file paints: its userSpaceOnUse line + the authored fade.
+ *  The renderers tint it with the tier's own ramp (owner contract: the
+ *  `tier-color-*` naming means the fill follows the tier, and the file's
+ *  magenta/orange layers are the Impecável values of that ramp). */
+export interface CardGradientPaint {
+  /** The file's gradient id (kept so tooling can re-tint the same def). */
+  id: string
+  line: CardGradientLine
+  fades: CardFade[]
+}
+
+/** The STATS CONTRAST PLATE (owner 2026-11-06 re-model): the plate behind the
+ *  six stat columns, painted OVER the photo edge so the stat text reads
+ *  against any screenshot. Its geometry + fade come from the file, its color
+ *  from the tier. */
+export interface CardStatsPlate extends CardGradientPaint {
+  path: string
+}
+
+/** One shape of the photo-area light wash (owner 2026-11-06 re-model: the
+ *  "bokeh" circles the file paints inside the photo clip) — geometry and fade
+ *  from the file, color from the tier. */
+export type CardPhotoGlowShape =
+  | ({ kind: 'circle'; cx: number; cy: number; r: number; opacity: number } & CardGradientPaint)
+  | ({ kind: 'path'; d: string; opacity: number } & CardGradientPaint)
+
 export interface CardGeometry {
   /** The solid plate silhouette (cls-1 path) — full shield. Painted first
-   *  on both surfaces; nothing fills outside it (transparent design). This is
-   *  also the CONTRAST surface behind the stat text since the 2026-11-05
-   *  re-seed dropped the dedicated stats plate. */
+   *  on both surfaces; nothing fills outside it (transparent design). */
   platePath: string
   /** Bounding box of the plate path (the name's center derives from its
    *  horizontal midline — see CardGeometry.slots.name). */
   plateBBox: CardRect
   /** The PHOTO AREA path: the screenshot is clipped to this path on BOTH
-   *  surfaces. The 2026-11-05 re-seed brought `id="crop-path"` BACK (the
-   *  shield's top portion, closed at y≈903); the 2026-10-29 re-exports carried
-   *  none, so the photo then fell back to the WHOLE SHIELD. */
+   *  surfaces. The 2026-11-06 re-model draws it as `<g id="mask"
+   *  clip-path="url(#clip-path-1)">` (the group that masks the photo); the
+   *  earlier re-seed carried `id="crop-path"`. A file with neither falls back
+   *  to the WHOLE SHIELD. */
   cropPath: string
   /** Bounding box of the crop path (cover-fit drawing bounds). */
   cropBBox: CardRect
-  /** The detached border, when the file draws one. The 2026-11-05 re-seed
-   *  paints `tier-color-border` (32px, TIER colored) at the group's own
-   *  opacity (0.3), clipped to the plate silhouette. */
+  /** The detached border, when the file draws one. The 2026-11-06 re-model
+   *  wraps a 48px TIER-ramp stroke in `<g id="tier-color-plate-2"
+   *  opacity="0.7">`, clipped to the plate silhouette. */
   borderStroke?: CardBorderStroke
+  /** The stats contrast plate, when the file draws one (`stats-plate`). */
+  statsPlate?: CardStatsPlate
+  /** The photo-area light wash shapes (the file's bokeh circles) inside the
+   *  crop clip. */
+  photoGlows?: CardPhotoGlowShape[]
   /** The brand mark the file draws (`logo-hellz`), when present. */
   logo?: CardLogo
   slots: {
@@ -200,7 +240,8 @@ export interface CardGeometry {
      *  centered on the shield — same placeholder-centering pattern as the
      *  stat columns; recorded r5 decision, held r7). */
     name: CardTextSlot
-    /** The "05-11 • atualizado" line under the name (owner 2026-11-05). */
+    /** The "atualizado • 05-11" line under the OVR block (owner 2026-11-05;
+     *  nested inside <g id="OVR"> since the 2026-11-06 re-model). */
     lastUpdate?: CardLastUpdate
     /** The six positional stat slots, left → right. The COLUMN CENTER is
      *  derived by the renderer from the points anchor (+ width('99')/2 —
@@ -272,12 +313,74 @@ export const TIER_PALETTE: Record<Tier, TierPalette> = {
   },
   platinum: {
     plateFill: '#ff12f7',
-    // The card.svg's own Magenta_to_Orange ramp: the plate and the (30%
-    // opacity) border both paint the file's colors.
+    // The card.svg's own Magenta_to_Orange ramp: the plate and the border
+    // both paint the file's colors.
     plateStops: IMPECAVEL_BORDER_STOPS,
     borderStops: IMPECAVEL_BORDER_STOPS,
     textFill: '#ffffff',
   },
+}
+
+/** The tier's own ramp for the file's fade layers (stats plate + photo glow):
+ *  the owner's re-modeled gradients are authored in the Impecável colors, and
+ *  the tier rule ("as cores do svg serão a nova cor do tier", and before that
+ *  "the fills must follow tier colors") means each tier paints its own ramp at
+ *  the FILE's offsets/opacities. Impecável therefore renders the file exactly;
+ *  the metals render their own metal→metal fade. */
+export function tierFadeStops(
+  palette: TierPalette,
+  fades: CardFade[],
+): { offset: number; color: string; opacity: number }[] {
+  const ramp = palette.plateStops ?? palette.borderStops
+  return fades.map((fade) => ({
+    offset: fade.offset,
+    color: sampleRamp(ramp, fade.offset),
+    opacity: fade.opacity,
+  }))
+}
+
+/** Linear sample of a stop list at `offset` (sRGB lerp). Non-hex colors fall
+ *  back to the nearest stop, so a keyword in a future file never yields NaN. */
+function sampleRamp(stops: { offset: number; color: string }[], offset: number): string {
+  if (stops.length === 0) return '#000000'
+  const o = Math.min(1, Math.max(0, offset))
+  if (o <= stops[0].offset) return stops[0].color
+  const last = stops[stops.length - 1]
+  if (o >= last.offset) return last.color
+  for (let i = 1; i < stops.length; i += 1) {
+    const hi = stops[i]
+    const lo = stops[i - 1]
+    if (o <= hi.offset) {
+      const span = hi.offset - lo.offset
+      const t = span <= 0 ? 0 : (o - lo.offset) / span
+      return mixHex(lo.color, hi.color, t)
+    }
+  }
+  return last.color
+}
+
+function mixHex(a: string, b: string, t: number): string {
+  const ca = parseHex(a)
+  const cb = parseHex(b)
+  if (ca === null || cb === null) return t < 0.5 ? a : b
+  const ch = (i: number) => Math.round(ca[i] + (cb[i] - ca[i]) * t)
+  return `#${[ch(0), ch(1), ch(2)].map((v) => v.toString(16).padStart(2, '0')).join('')}`
+}
+
+function parseHex(color: string): [number, number, number] | null {
+  const hex = color.trim()
+  const short = hex.match(/^#([0-9a-f]{3})$/i)
+  if (short !== null) {
+    const [r, g, b] = short[1].split('').map((c) => parseInt(c + c, 16))
+    return [r, g, b]
+  }
+  const long = hex.match(/^#([0-9a-f]{6})$/i)
+  if (long === null) return null
+  return [
+    parseInt(long[1].slice(0, 2), 16),
+    parseInt(long[1].slice(2, 4), 16),
+    parseInt(long[1].slice(4, 6), 16),
+  ]
 }
 
 // ---------------------------------------------------------------------------
@@ -344,6 +447,62 @@ function styleFontSizes(svg: string): Map<string, number> {
     if (size) map.set(m[1], Number(size[1]))
   }
   return map
+}
+
+/** A `<g>` element with its BALANCED body (nested groups included) — the
+ *  owner's exports nest groups (LAST_UPDATE inside OVR, the placeholder image
+ *  inside the photo mask, the clip inside the border group), so a regex
+ *  cannot pair the tags. */
+interface SvgGroup {
+  attrs: Map<string, string>
+  attrsRaw: string
+  body: string
+  markup: string
+  parent: SvgGroup | null
+}
+
+/** Every `<g>` in the document, with balanced nesting resolved. */
+function svgGroups(svg: string): SvgGroup[] {
+  const groups: SvgGroup[] = []
+  const stack: { group: SvgGroup; bodyStart: number }[] = []
+  for (const m of svg.matchAll(/<g\b([^>]*)>|<\/g>/g)) {
+    if (m[0] === '</g>') {
+      const open = stack.pop()
+      if (open === undefined) continue
+      const closeAt = m.index ?? 0
+      open.group.body = svg.slice(open.bodyStart, closeAt)
+      open.group.markup = svg.slice(
+        open.bodyStart - open.group.attrsRaw.length - 3,
+        closeAt + 4,
+      )
+      groups.push(open.group)
+    } else {
+      const attrsRaw = m[1]
+      stack.push({
+        group: {
+          attrs: attributes(attrsRaw),
+          attrsRaw,
+          body: '',
+          markup: '',
+          parent: stack.length === 0 ? null : stack[stack.length - 1].group,
+        },
+        bodyStart: (m.index ?? 0) + m[0].length,
+      })
+    }
+  }
+  return groups
+}
+
+/** The group with the given id (balanced). */
+function findGroup(groups: SvgGroup[], id: string): SvgGroup | undefined {
+  return groups.find((g) => g.attrs.get('id') === id)
+}
+
+/** This group and its ancestors, innermost first. */
+function selfAndAncestors(group: SvgGroup): SvgGroup[] {
+  const chain: SvgGroup[] = []
+  for (let node: SvgGroup | null = group; node !== null; node = node.parent) chain.push(node)
+  return chain
 }
 
 /** A text slot's own font-size: the INLINE font-size attribute (re-export),
@@ -450,16 +609,29 @@ function pickPlatePath(svg: string): string {
   throw new Error('card.svg: no plate path found (id="tier-color-plate" / "base-plate" / class="cls-1")')
 }
 
-/** The PHOTO AREA. The 2026-11-05 re-seed brought `id="crop-path"` BACK (the
- *  top portion of the shield); the 2026-10-29 re-exports dropped it, and the
- *  owner then decided the photo occupies THE WHOLE SHIELD — so a file without
- *  a crop path falls back to the plate silhouette (the plate fill stays behind
- *  as the no-photo fallback, exactly as before). The round-8 file used
- *  class="cls-2". */
+/** The PHOTO AREA. The 2026-11-06 re-model draws it as the clip of the
+ *  `<g id="mask">` photo group (the clip lives on the group or on a nested
+ *  group); the 2026-11-05 re-seed carried `id="crop-path"`; the 2026-10-29
+ *  re-exports carried none, and the owner then decided the photo occupies THE
+ *  WHOLE SHIELD — so a file without a photo clip falls back to the plate
+ *  silhouette. The round-8 file used class="cls-2". */
 function pickCropPath(svg: string): string {
   for (const m of svg.matchAll(/<path\b([^>]*)>/g)) {
     const attrs = attributes(m[1])
     if (attrs.get('id') === 'crop-path' && attrs.get('d')) return attrs.get('d') as string
+  }
+  // The photo group: `<g id="mask" clip-path="url(#clip-path-3)">` (the clip
+  // may also sit on a nested group, e.g. the placeholder wrapper).
+  const mask = findGroup(svgGroups(svg), 'mask')
+  if (mask) {
+    const clipRef =
+      mask.attrs.get('clip-path')?.match(/url\(#([^)]+)\)/)?.[1] ??
+      mask.body.match(/clip-path="url\(#([^)]+)\)"/)?.[1]
+    if (clipRef !== undefined) {
+      const d = clipPathD(svg, clipRef)
+      if (d === undefined) throw new Error(`card.svg: the photo clip "${clipRef}" holds no path`)
+      return d
+    }
   }
   for (const m of svg.matchAll(/<path\b([^>]*)>/g)) {
     const attrs = attributes(m[1])
@@ -489,59 +661,157 @@ function clipPathD(svg: string, id: string): string | undefined {
   return clip[0].match(/<path\b[^>]*\bd="([^"]+)"/)?.[1]
 }
 
-/** The detached border layer, when the file draws one. THREE shapes:
- *   A) 2026-11-05 re-seed — `<g id="tier-color-border" opacity="0.3">`
- *      wrapping the stroked plate silhouette (stroke-width 32, clipped by
- *      clipPath#clip-path-1). The ring is TIER colored (the palette's ramp)
- *      at the FILE's opacity — a translucent tier tint.
- *   B) 2026-10-29 re-export — `<path id="plate-border">` with its own
- *      stroke-width: a solid per-tier ring, no gradient, no clip.
- *   C) round-8 file — .cls-3{stroke:url(#gradient);stroke-width:48} on the
- *      path inside <g id="border-over">, clipped by clipPath#clip-path-1.
+/** A gradient the file references: its userSpaceOnUse line + the authored
+ *  fade (offset + opacity). The COLORS are never read — the tier supplies
+ *  them (tierFadeStops / palette.borderStops). */
+function gradientPaint(svg: string, id: string): CardGradientPaint {
+  const grad = svg.match(
+    new RegExp('<linearGradient\\b[^>]*id="' + id + '"[^>]*>[\\s\\S]*?</linearGradient>'),
+  )
+  if (!grad) throw new Error(`card.svg: gradient "${id}" not found`)
+  const attrs = attributes(grad[0].slice(0, grad[0].indexOf('>') + 1))
+  const line = {
+    x1: Number(attrs.get('x1')),
+    y1: Number(attrs.get('y1')),
+    x2: Number(attrs.get('x2')),
+    y2: Number(attrs.get('y2')),
+  }
+  if ([line.x1, line.y1, line.x2, line.y2].some((v) => Number.isNaN(v))) {
+    throw new Error(`card.svg: gradient "${id}" needs a userSpaceOnUse line`)
+  }
+  const fades = [...grad[0].matchAll(/<stop\b([^>]*)\/>/g)].map((s) => {
+    const a = attributes(s[1])
+    const offset = Number(a.get('offset'))
+    if (Number.isNaN(offset)) {
+      throw new Error(`card.svg: gradient "${id}" has a stop with no offset`)
+    }
+    const opacity = a.get('stop-opacity')
+    return { offset, opacity: opacity === undefined ? 1 : Number(opacity) }
+  })
+  if (fades.length < 2) {
+    throw new Error(`card.svg: gradient "${id}" needs at least two stops`)
+  }
+  return { id, line, fades }
+}
+
+/** The STATS CONTRAST PLATE (`<path id="stats-plate">`, owner 2026-11-06): the
+ *  plate behind the six stat columns, painted after the border with the file's
+ *  geometry + fade and the tier's colors. */
+function statsPlate(svg: string): CardStatsPlate | undefined {
+  const plate = [...svg.matchAll(/<path\b([^>]*)>/g)]
+    .map((m) => attributes(m[1]))
+    .find(
+      (a) =>
+        ['stats-plate', 'tier-color-plate-stats', 'plate-stats'].includes(a.get('id') ?? '') &&
+        a.get('d'),
+    )
+  if (!plate) return undefined
+  const ref = plate.get('fill')?.match(/url\(#([^)]+)\)/)
+  if (!ref) throw new Error('card.svg: the stats plate must fill with url(#gradient)')
+  return { path: plate.get('d') as string, ...gradientPaint(svg, ref[1]) }
+}
+
+/** The photo-area light wash: every gradient-filled shape the file paints
+ *  INSIDE the photo clip (`<g id="mask">`) — today a group of soft bokeh
+ *  circles. Geometry, fade and the shape's own opacity come from the file; the
+ *  colors from the tier. The mask group is parsed with BALANCED nesting (the
+ *  placeholder image sits in its own nested group). */
+function photoGlows(svg: string): CardPhotoGlowShape[] | undefined {
+  const group = findGroup(svgGroups(svg), 'mask')
+  if (group === undefined) return undefined
+  const shapes: CardPhotoGlowShape[] = []
+  for (const m of group.body.matchAll(/<circle\b([^>]*)>|<path\b([^>]*)>/g)) {
+    const attrs = attributes(m[1] ?? m[2])
+    const ref = attrs.get('fill')?.match(/url\(#([^)]+)\)/)
+    if (ref === null || ref === undefined) continue
+    const rawOpacity = attrs.get('opacity') ?? '1'
+    const opacity = Number(rawOpacity)
+    if (Number.isNaN(opacity)) {
+      throw new Error(`card.svg: the photo glow declares an unparseable opacity "${rawOpacity}"`)
+    }
+    const paint = gradientPaint(svg, ref[1])
+    if (m[1] !== undefined) {
+      const [cx, cy, r] = ['cx', 'cy', 'r'].map((k) => Number(attrs.get(k)))
+      if ([cx, cy, r].some((v) => Number.isNaN(v))) {
+        throw new Error('card.svg: a photo glow circle needs cx/cy/r')
+      }
+      shapes.push({ kind: 'circle', cx, cy, r, opacity, ...paint })
+    } else {
+      const d = attrs.get('d')
+      if (d === undefined) continue
+      shapes.push({ kind: 'path', d, opacity, ...paint })
+    }
+  }
+  return shapes.length === 0 ? undefined : shapes
+}
+
+/** The detached border layer, when the file draws one. FOUR shapes:
+ *   A) 2026-11-06 re-model — `<g id="tier-color-plate-2"
+ *      data-name="tier-color-plate" opacity="0.7">` wrapping a nested
+ *      clip group around the plate silhouette stroked 48px with the tier-ramp
+ *      gradient.
+ *   B) 2026-11-05 re-seed — `<g id="tier-color-border" opacity="0.3">`
+ *      wrapping the stroked silhouette (stroke-width 32).
+ *   C) 2026-10-29 re-export — `<path id="plate-border">`: a solid ring.
+ *   D) round-8 file — .cls-3{stroke:url(#gradient);stroke-width:48} inside
+ *      <g id="border-over">.
  *  Either way only the GEOMETRY (+ the layer's opacity) is taken; the COLORS
- *  come from the tier palette — the file's placeholder colors never reach the
- *  render. */
+ *  come from the tier palette — the file's colors never reach the render. */
 function borderStroke(svg: string): CardBorderStroke | undefined {
-  // A) the owner's current group layer (opacity lives on the <g>).
-  const group = svg.match(/<g\b[^>]*id="(tier-color-border|plate-border)"[^>]*>([\s\S]*?)<\/g>/)
-  if (group) {
-    const groupAttrs = attributes(group[0].slice(0, group[0].indexOf('>') + 1))
-    const inner = group[2].match(/<path\b([^>]*)>/)
-    if (!inner) throw new Error('card.svg: the border group must wrap the stroked path')
+  // A/B) the owner's group layers: the innermost group wrapping a stroked
+  // (fill:none) path is the ring — the ids drift per export
+  // (tier-color-border, tier-color-plate-2), the clip may live on a nested
+  // group and the opacity on an ancestor.
+  const groups = svgGroups(svg)
+  const ringGroup = groups.find((group) => {
+    const inner = group.body.match(/<path\b([^>]*)>/)
+    if (!inner) return false
     const attrs = attributes(inner[1])
+    return (
+      attrs.get('fill') === 'none' &&
+      attrs.get('stroke') !== undefined &&
+      attrs.get('stroke-width') !== undefined
+    )
+  })
+  if (ringGroup !== undefined) {
+    const attrs = attributes(ringGroup.body.match(/<path\b([^>]*)>/)?.[1] ?? '')
     const width = attrs.get('stroke-width')?.match(/^([\d.]+)/)
     if (!width) throw new Error('card.svg: the border path must declare a stroke-width')
     const d = attrs.get('d')
     if (!d) throw new Error('card.svg: the border path must declare a d')
-    const clipRef = attrs.get('clip-path')?.match(/url\(#([^)]+)\)/)?.[1]
+    const clipRef =
+      attrs.get('clip-path')?.match(/url\(#([^)]+)\)/)?.[1] ??
+      selfAndAncestors(ringGroup)
+        .map((g) => g.attrs.get('clip-path')?.match(/url\(#([^)]+)\)/)?.[1])
+        .find((v) => v !== undefined)
     const clipD = clipRef === undefined ? undefined : clipPathD(svg, clipRef)
     if (clipRef !== undefined && clipD === undefined) {
       throw new Error(`card.svg: clipPath "${clipRef}" must contain the silhouette <path d>`)
     }
-    const rawOpacity = groupAttrs.get('opacity') ?? groupAttrs.get('fill-opacity') ?? '1'
-    const opacity = Number(rawOpacity)
-    if (Number.isNaN(opacity)) {
-      throw new Error(`card.svg: the border group declares an unparseable opacity "${rawOpacity}"`)
+    // The group's opacity (and any wrapping group's) — the file's own value.
+    let opacity = 1
+    for (const node of selfAndAncestors(ringGroup)) {
+      const raw = node.attrs.get('opacity')
+      if (raw === undefined) continue
+      const value = Number(raw)
+      if (Number.isNaN(value)) {
+        throw new Error(`card.svg: the border group declares an unparseable opacity "${raw}"`)
+      }
+      opacity *= value
     }
-    const base = {
+    // The stroke gradient's LINE is the file's; the COLORS stay tier-driven.
+    const strokeRef = attrs.get('stroke')?.match(/url\(#([^)]+)\)/)?.[1]
+    const line = strokeRef === undefined ? undefined : gradientPaint(svg, strokeRef).line
+    return {
       width: Number(width[1]),
       strokePath: d,
       opacity: Math.min(1, Math.max(0, opacity)),
       clipPath: clipD,
+      line,
     }
-    if (group[1] === 'tier-color-border') {
-      // Owner 2026-11-05: the file's placeholder `stroke="#1a1a1a"` is NOT the
-      // design color — the ring paints the TIER's ramp at the file's opacity.
-      return {
-        ...base,
-        line: CARD_PLATE_GRADIENT_LINE,
-        stops: IMPECAVEL_BORDER_STOPS,
-      }
-    }
-    return base
   }
 
-  // B) a bare path layer (the 2026-10-29 solid ring).
+  // C) a bare path layer (the 2026-10-29 solid ring).
   const byId = [...svg.matchAll(/<path\b([^>]*)>/g)]
     .map((m) => attributes(m[1]))
     .find((a) => a.get('id') === 'plate-border' && a.get('d'))
@@ -555,7 +825,7 @@ function borderStroke(svg: string): CardBorderStroke | undefined {
     }
   }
 
-  // C) the retired round-8 cls-3 gradient ring.
+  // D) the retired round-8 cls-3 gradient ring.
   const cls3 = svg.match(/\.cls-3\{([^}]*)\}/)
   if (!cls3) return undefined
   const strokeRef = cls3[1].match(/stroke:url\(#([^)]+)\)/)
@@ -595,9 +865,10 @@ function borderStroke(svg: string): CardBorderStroke | undefined {
 
 /** The brand mark group, verbatim, plus the gradients it references. Returns
  *  undefined for a file that draws no mark (the retired re-exports). */
-function cardLogo(svg: string): CardLogo | undefined {  const group = svg.match(/<g\b[^>]*id="logo-hellz"[^>]*>[\s\S]*?<\/g>/)
-  if (!group) return undefined
-  const markup = group[0].replace(/\s+/g, ' ')
+function cardLogo(svg: string): CardLogo | undefined {
+  const group = findGroup(svgGroups(svg), 'logo-hellz')
+  if (group === undefined) return undefined
+  const markup = group.markup.replace(/\s+/g, ' ')
   const ids = new Set([...markup.matchAll(/url\(#([^)]+)\)/g)].map((m) => m[1]))
   const gradients = [...ids]
     .map((id) => {
@@ -635,11 +906,11 @@ function lastUpdate(
   svg: string,
   sizes: Map<string, number>,
 ): { value: CardLastUpdate; indexes: number[] } | undefined {
-  const group = svg.match(/<g\b[^>]*id="LAST_UPDATE"[^>]*>([\s\S]*?)<\/g>/)
-  if (!group) return undefined
+  const group = findGroup(svgGroups(svg), 'LAST_UPDATE')
+  if (group === undefined) return undefined
   const indexes = textIndexes(svg)
   const texts: (CardTextSlot & { text: string; index: number })[] = []
-  for (const m of group[1].matchAll(/<text\b([^>]*)>([\s\S]*?)<\/text>/g)) {
+  for (const m of group.body.matchAll(/<text\b([^>]*)>([\s\S]*?)<\/text>/g)) {
     const attrs = attributes(m[1])
     const { x, y, scale } = matrixTransform(attrs.get('transform'))
     const text = m[2]
@@ -702,20 +973,25 @@ function keyGroups(svg: string, sizes: Map<string, number>): { id: string; texts
   return groups
 }
 
-/** Every <text> inside the first matching group tag, parsed as RawText. */
-function groupTexts(svg: string, marker: RegExp, sizes: Map<string, number>): RawText[] {
-  const group = svg.match(marker)
-  if (!group) throw new Error('card.svg: no <g id="OVR"> group (the OVR number + job line)')
-  const indexes = textIndexes(svg)
-  return [...group[1].matchAll(/<text\b([^>]*)>/g)].map((t) => readText(t[1], sizes, indexes))
-}
-
 function parseCard(svg: string): CardGeometry {
   const sizes = styleFontSizes(svg)
   const texts = textSlots(svg, sizes)
 
+  // The LAST_UPDATE line is parsed FIRST: since the 2026-11-06 re-model it is
+  // nested INSIDE <g id="OVR">, so the OVR group's DIRECT texts are read with
+  // the nested groups stripped (balanced groups keep the pairing honest).
+  const lastUpdateGroup = lastUpdate(svg, sizes)
+  const ovrGroup = findGroup(svgGroups(svg), 'OVR')
+  if (ovrGroup === undefined) {
+    throw new Error('card.svg: no <g id="OVR"> group (the OVR number + job line)')
+  }
+  const ovrDirectBody = ovrGroup.body.replace(/<g\b[^>]*>[\s\S]*?<\/g>/g, '')
+
   // --- <g id="OVR">: the big number + the job line under it ---------------
-  const ovrTexts = groupTexts(svg, /<g id="OVR"[^>]*>([\s\S]*?)<\/g>/, sizes)
+  const ovrIndexes = textIndexes(svg)
+  const ovrTexts = [...ovrDirectBody.matchAll(/<text\b([^>]*)>/g)].map((t) =>
+    readText(t[1], sizes, ovrIndexes),
+  )
   if (ovrTexts.length !== 2) {
     throw new Error(`card.svg: the OVR group must hold exactly 2 texts (number + job), found ${ovrTexts.length}`)
   }
@@ -732,9 +1008,6 @@ function parseCard(svg: string): CardGeometry {
 
   // --- PLAYERNAME: the ORBITRON text (the only one outside a group) -------
   const groups = keyGroups(svg, sizes)
-  // The LAST_UPDATE line (owner 2026-11-05): its texts sit outside the
-  // OVR/KEY groups, so they join the census before the stray check.
-  const lastUpdateGroup = lastUpdate(svg, sizes)
   // Census: EVERY text in the file must belong to a group (OVR, KEY,
   // LAST_UPDATE) or be the player name — a stray slot would silently fail to
   // render.
@@ -820,17 +1093,18 @@ function parseCard(svg: string): CardGeometry {
   const platePath = pickPlatePath(svg)
   const cropPath = pickCropPath(svg)
 
-  // The LAST_UPDATE line must sit below the name and above the stat labels
-  // (the file's own composition): a re-seed that breaks that order fails
-  // loudly instead of stacking text.
+  // The LAST_UPDATE line sits under the OVR block's job line (2026-11-06
+  // re-model: nested inside <g id="OVR">, over the photo) and above the player
+  // name/stat labels. A re-seed that breaks that order fails loudly instead of
+  // stacking text.
   const lastUpdateValue = lastUpdateGroup?.value
   if (lastUpdateValue !== undefined) {
     const date = lastUpdateValue.date
-    if (!(date.y > name.y)) {
-      throw new Error('card.svg: the LAST_UPDATE line must sit BELOW the player name')
+    if (!(date.y > job.y)) {
+      throw new Error('card.svg: the LAST_UPDATE line must sit BELOW the job line')
     }
-    if (!(date.y < stats[0].label.y)) {
-      throw new Error('card.svg: the LAST_UPDATE line must sit ABOVE the stat labels')
+    if (!(date.y < name.y)) {
+      throw new Error('card.svg: the LAST_UPDATE line must sit ABOVE the player name')
     }
   }
 
@@ -840,6 +1114,8 @@ function parseCard(svg: string): CardGeometry {
     cropPath,
     cropBBox: pathBBox(cropPath, 'crop-path'),
     borderStroke: borderStroke(svg),
+    statsPlate: statsPlate(svg),
+    photoGlows: photoGlows(svg),
     logo: cardLogo(svg),
     slots: { ovr, job, name, lastUpdate: lastUpdateValue, stats },
   }

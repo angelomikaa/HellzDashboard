@@ -58,85 +58,120 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(b.y + b.h).toBeLessThan(CARD_GEOMETRY.slots.name.y)
   })
 
-  it('draws the owner\'s current tier-color-border ring: tier ramp at the file\'s 30% opacity', () => {
-    // Owner 2026-11-05: `<g id="tier-color-border" opacity="0.3">` wraps the
-    // stroked silhouette (32px, clipped by clip-path-1). The ring paints the
-    // TIER's ramp (the file's dark stroke is a placeholder) at the FILE's
-    // opacity.
+  it('draws the owner\'s current tier-color-border ring: tier ramp at the file\'s 70% opacity', () => {
+    // Owner 2026-11-06: `<g id="tier-color-plate-2" opacity="0.7">` wraps the
+    // silhouette stroked 48px with the tier-ramp gradient, clipped by
+    // clip-path-2. The LINE is the file's; the COLORS are tier supplies.
     const border = CARD_GEOMETRY.borderStroke
     expect(border).toBeDefined()
-    expect(border?.width).toBe(32)
-    expect(border?.opacity).toBeCloseTo(0.3, 6)
+    expect(border?.width).toBe(48)
+    expect(border?.opacity).toBeCloseTo(0.7, 6)
     expect(border?.strokePath).toBe(CARD_GEOMETRY.platePath)
-    expect(border?.line).toBe(CARD_PLATE_GRADIENT_LINE)
-    expect(border?.stops).toBe(IMPECAVEL_BORDER_STOPS)
-    expect(border?.stops?.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
-    // The file clips the ring to the plate silhouette — parsed from
-    // clipPath#clip-path-1.
+    expect(border?.line).toEqual(CARD_PLATE_GRADIENT_LINE)
+    expect(border?.stops).toBeUndefined()
+    // The tier supplies the colors; Impecável's ring IS the file's ramp.
+    expect(TIER_PALETTE.platinum.borderStops).toBe(IMPECAVEL_BORDER_STOPS)
+    expect(IMPECAVEL_BORDER_STOPS.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
+    // The file clips the ring to the plate silhouette — clipPath#clip-path-2.
     expect(border?.clipPath).toBe(CARD_GEOMETRY.platePath)
   })
 
-  it('has NO stats contrast plate any more (the backplate carries the contrast)', () => {
-    // Owner 2026-11-05: "o stats plate sumiu (o back-plate agora faz o
-    // trabalho do contraste)" — the parser no longer models the layer at all.
-    expect('statsPlate' in CARD_GEOMETRY).toBe(false)
+  it('parses the stats contrast plate that is BACK in the 2026-11-06 re-model', () => {
+    // The owner re-modeled the file to carry the gradients again: the stats
+    // plate fades in from the photo edge to the shield tip. Geometry + fade
+    // offsets/opacities come from the file; the colors from the tier.
+    const plate = CARD_GEOMETRY.statsPlate
+    expect(plate).toBeDefined()
+    if (plate === undefined) return
+    expect(plate.path.startsWith('M')).toBe(true)
+    expect(plate.path).not.toBe(CARD_GEOMETRY.platePath)
+    expect(plate.id).toMatch(/^linear-gradient-/)
+    expect(plate.line.x1).toBeCloseTo(540, 1)
+    expect(plate.line.x2).toBeCloseTo(540.102, 1)
+    expect(plate.line.y1).toBeLessThan(plate.line.y2)
+    expect(plate.fades.length).toBeGreaterThanOrEqual(2)
+    for (const fade of plate.fades) {
+      expect(Object.keys(fade).sort()).toEqual(['offset', 'opacity'])
+    }
+    // Starts transparent (it blends the photo edge) and ends opaque.
+    expect(plate.fades[0].opacity).toBe(0)
+    expect(plate.fades[plate.fades.length - 1].opacity).toBe(1)
   })
 
-  it('parses the LAST_UPDATE line: the date slot + the static "• atualizado" segments', () => {    const lu = CARD_GEOMETRY.slots.lastUpdate
+  it('parses the photo light washes (bokeh) the file paints inside the photo clip', () => {
+    const glows = CARD_GEOMETRY.photoGlows
+    expect(glows).toBeDefined()
+    if (glows === undefined) return
+    expect(glows.length).toBeGreaterThanOrEqual(1)
+    for (const glow of glows) {
+      // The owner draws the washes as circles or soft paths — both render.
+      expect(['circle', 'path']).toContain(glow.kind)
+      expect(glow.opacity).toBeGreaterThan(0)
+      expect(glow.opacity).toBeLessThanOrEqual(1)
+      expect(glow.fades.length).toBeGreaterThanOrEqual(2)
+      expect(glow.fades[0].opacity).toBe(0)
+      expect(glow.id).toMatch(/^linear-gradient-/)
+      if (glow.kind === 'circle') expect(glow.r).toBeGreaterThan(100)
+      else expect(glow.d.startsWith('M')).toBe(true)
+    }
+  })
+
+  it('parses the LAST_UPDATE line: the live date + the static label segments', () => {
+    const lu = CARD_GEOMETRY.slots.lastUpdate
     expect(lu).toBeDefined()
     if (lu === undefined) return
-    // The first text of the group is the live date (36px), hand-placed under
-    // the player name.
-    expect(lu.date.x).toBeCloseTo(429.072, 1)
-    expect(lu.date.y).toBeCloseTo(1050.662, 1)
-    expect(lu.date.size).toBe(36)
-    expect(lu.date.y).toBeGreaterThan(CARD_GEOMETRY.slots.name.y)
-    expect(lu.date.y).toBeLessThan(CARD_GEOMETRY.slots.stats[0].label.y)
-    // The trailing segments keep the owner's literal strings and anchors.
+    // Nested inside <g id="OVR"> since this re-model — "atualizado • DD-MM"
+    // over the photo, under the job line.
+    expect(lu.date.x).toBeCloseTo(230.73, 1)
+    expect(lu.date.y).toBeCloseTo(491.142, 1)
+    expect(lu.date.size).toBe(24)
+    expect(lu.date.y).toBeGreaterThan(CARD_GEOMETRY.slots.job.y)
+    expect(lu.date.y).toBeLessThan(CARD_GEOMETRY.slots.name.y)
     expect(lu.suffix.map((s) => s.text)).toEqual(['•', 'atualizado'])
-    expect(lu.suffix[0].x).toBeCloseTo(503.01, 1)
-    expect(lu.suffix[1].x).toBeCloseTo(520.428, 1)
+    expect(lu.suffix[0].x).toBeCloseTo(217.21, 1)
+    expect(lu.suffix[1].x).toBeCloseTo(124.99, 1)
     for (const segment of lu.suffix) {
       expect(segment.y).toBeCloseTo(lu.date.y, 1)
-      expect(segment.size).toBe(36)
+      expect(segment.size).toBe(24)
     }
   })
 
   it('parses the brand mark the file draws and scopes its gradient ids per card', () => {
-    // Owner 2026-11-05 added `logo-hellz` to the file: the app paints THAT
-    // mark (the old bundled hellz-mark.svg overlay double-drew the logo).
+    // The file carries `logo-hellz`: the app paints THAT mark (the old bundled
+    // hellz-mark.svg overlay double-drew the logo).
     const logo = CARD_GEOMETRY.logo
     expect(logo).toBeDefined()
     if (logo === undefined) return
     expect(logo.markup).toContain('id="logo-hellz"')
     expect(logo.markup).toContain('polygon')
-    expect(logo.gradients).toContain('id="Magenta_to_Orange-2"')
+    expect(logo.gradients.length).toBeGreaterThan(0)
+    const firstGradientId = /id="([^"]+)"/.exec(logo.gradients)?.[1]
+    expect(firstGradientId).toBeDefined()
+    if (firstGradientId === undefined) return
     // Two cards on one page must not cross-wire gradients: the scope suffixes
     // both the defs' ids and every url(#…) reference.
     const scoped = scopedLogo(logo, 'abc')
-    expect(scoped.gradients).toContain('id="Magenta_to_Orange-2-abc"')
-    expect(scoped.markup).not.toContain('url(#Magenta_to_Orange-2)')
-    expect(scoped.markup).toContain('url(#Magenta_to_Orange-2-abc)')
+    expect(scoped.gradients).toContain(`id="${firstGradientId}-abc"`)
+    expect(scoped.markup).not.toContain(`url(#${firstGradientId})`)
+    expect(scoped.markup).toContain(`url(#${firstGradientId}-abc)`)
   })
 })
 
 describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes', () => {
-  it('resolves the OVR slot: the BIGGEST text in the OVR group, ≈148px at (112.481, 399.59)', () => {
+  it('resolves the OVR slot: the BIGGEST text in the OVR group, 164px at (124.99, 403.532)', () => {
     const ovr = CARD_GEOMETRY.slots.ovr
-    expect(ovr.x).toBeCloseTo(112.481, 1)
-    expect(ovr.y).toBeCloseTo(399.59, 1)
-    // The re-export states the effective size inline (148.014px; the round-8
-    // file reached the same 148px through its 6.992×21.169 matrix hack).
-    expect(ovr.size).toBeCloseTo(148.014, 1)
+    expect(ovr.x).toBeCloseTo(124.99, 1)
+    expect(ovr.y).toBeCloseTo(403.532, 1)
+    expect(ovr.size).toBe(164)
     expect(ovr.size).toBeGreaterThan(140) // the number must be BIG (readability rounds 3-8)
-    expect(ovr.size).toBeLessThan(160)
+    expect(ovr.size).toBeLessThan(180)
   })
 
-  it('resolves the job slot (the SMALLER OVR-group text, 48px Bebas) directly under the number', () => {
+  it('resolves the job slot (the SMALLER OVR-group text, 42px Bebas) directly under the number', () => {
     const job = CARD_GEOMETRY.slots.job
-    expect(job.x).toBeCloseTo(112.481, 1)
-    expect(job.y).toBeCloseTo(455.297, 1)
-    expect(job.size).toBe(48)
+    expect(job.x).toBeCloseTo(124.99, 1)
+    expect(job.y).toBeCloseTo(456.942, 1)
+    expect(job.size).toBe(42)
     expect(job.y).toBeGreaterThan(CARD_GEOMETRY.slots.ovr.y)
     // The job line must stay smaller than the number it sits under.
     expect(job.size).toBeLessThan(CARD_GEOMETRY.slots.ovr.size)
@@ -145,7 +180,7 @@ describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes'
   it('resolves the PLAYERNAME slot (the ONE Orbitron text, ≈72px) on the plate between photo and stats', () => {
     const name = CARD_GEOMETRY.slots.name
     expect(name.x).toBeCloseTo(246.626, 1)
-    expect(name.y).toBeCloseTo(1007.454, 1)
+    expect(name.y).toBeCloseTo(1051.454, 1)
     expect(name.size).toBeCloseTo(71.976, 1)
     expect(name.size).toBeGreaterThan(60)
     expect(name.size).toBeLessThan(80)
