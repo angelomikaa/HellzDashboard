@@ -361,8 +361,8 @@ export function CardPhotoCrop({
               d={CARD_GEOMETRY.cropPath}
               fill="none"
               stroke="#ffffff"
-              strokeOpacity={0.55}
-              strokeWidth={4}
+              strokeOpacity={0.8}
+              strokeWidth={6}
             />
           </svg>
         </div>
