@@ -1,10 +1,9 @@
 // CardSvg — the on-page card (07.2-05 checkpoint round 8, owner re-seed:
 // ONE card.svg is the source of truth — placeholder text slots filled by
-// code, photo clipped to the crop path (borderless), tier colors via
-// code-driven TIER_PALETTE, Bebas Neue everywhere except the player name
-// (Orbitron), the border stroking the PLATE silhouette over the photo,
-// central column alignment, transparent background outside the shield
-// plate).
+// code, photo clipped to the crop path, tier colors via code-driven
+// TIER_PALETTE, Bebas Neue everywhere except the player name (Orbitron), the
+// tier-colored border at the file's opacity, central column alignment,
+// transparent background outside the shield plate).
 //
 // REUSABLE BY DESIGN: this is the ONE card both surfaces consume —
 //   - PromotionCard (Destaques showcase) wraps it with the download button,
@@ -22,10 +21,11 @@
 //      is transparent around the shield, and the on-page card shows the
 //      page backdrop through it.
 //   2. The photo (member screenshot or class portrait) is CLIPPED TO THE
-//      parsed photo area — the round-8 crop path (the shield's top portion),
-//      or, in the 2026-10-29 re-export that carries no crop path at all, THE
-//      WHOLE SHIELD (owner decision 2026-10-29: "o escudo inteiro"). The plate
-//      fill stays behind it as the no-photo fallback either way.
+//      parsed PHOTO AREA — the 2026-11-05 re-seed's `crop-path` (the shield's
+//      top portion). The member's own framing (zoom + pan, CardPhotoTransform)
+//      rides on the measured cover fit, so the card shows exactly what the
+//      crop editor showed. The plate fill stays behind it as the no-photo
+//      fallback.
 //   3. The detached border is painted ON THE PLATE SILHOUETTE — the file's
 //      three-layer background (round 8): the border rings the whole shield,
 //      covering the photo's edges, while the photo area itself stays
@@ -55,9 +55,10 @@
 // composition scales with the card at any width.
 import { useEffect, useId, useMemo, useState } from 'react'
 import {
+  applyPhotoTransform,
   measurePhotoSubject,
   photoDestRect,
-  tierPlateFadeStops,
+  scopedLogo,
   type CardRect,
   type PhotoSubjectBounds,
 } from '../export/cardAssets'
@@ -179,8 +180,10 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
   const borderGradId = `card-border-grad-${uid}`
   const plateGradId = `card-plate-grad-${uid}`
   const scrimId = `card-scrim-${uid}`
-  const statsPlateGradId = `card-stats-plate-${uid}`
   const b = plan.photoBBox
+  // The file's logo group, with its gradient ids scoped to THIS card instance
+  // (the showcase mounts many cards; duplicate gradient ids would cross-wire).
+  const logo = plan.card.logo === undefined ? undefined : scopedLogo(plan.card.logo, uid)
 
   // Round-8 photo framing: the dest rect is computed from the image's own
   // measured opaque bounds (cardAssets.measurePhotoSubject +
@@ -218,14 +221,18 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
   const measuredFit = useMemo<CardRect | null>(
     () =>
       photoMeasure !== null && photoMeasure.src === photoSrc
-        ? photoDestRect(
-            photoMeasure.measure.width,
-            photoMeasure.measure.height,
-            photoMeasure.measure.subject,
+        ? applyPhotoTransform(
+            photoDestRect(
+              photoMeasure.measure.width,
+              photoMeasure.measure.height,
+              photoMeasure.measure.subject,
+              frame,
+            ),
             frame,
+            plan.photoTransform,
           )
         : null,
-    [photoMeasure, photoSrc, frame],
+    [photoMeasure, photoSrc, frame, plan.photoTransform],
   )
 
   return (
@@ -237,10 +244,10 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
     >
       <defs>
         {/* The border gradient (2026-11-05: the `tier-color-border` ring
-            paints the Impecável rank rainbow; legacy borders fall back to the
-            tier palette stops). A url() to a missing gradient would paint
-            black, so the def and the reference both disappear when the file
-            declares no border. */}
+            paints the tier's ramp at the file's own opacity; legacy borders
+            fall back to the tier palette stops). A url() to a missing
+            gradient would paint black, so the def and the reference both
+            disappear when the file declares no border. */}
         {plan.card.borderStroke?.line !== undefined && (
           <linearGradient
             id={borderGradId}
@@ -255,8 +262,9 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
             ))}
           </linearGradient>
         )}
-        {/* Plate gradient (round 10): pristine paints the UI rainbow across
-            the shield itself; other tiers keep the solid plateFill. */}
+        {/* Plate gradient (owner 2026-11-05): the Impecável tier paints the
+            card.svg's own Magenta_to_Orange ramp across the shield; other
+            tiers keep the solid plateFill. */}
         {plan.palette.plateStops !== undefined && (
           <linearGradient
             id={plateGradId}
@@ -271,40 +279,20 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
             ))}
           </linearGradient>
         )}
-        {/* Photo clip: the photo area from card.svg — the round-8 crop path or,
-            in the re-exports that carry none, the whole shield (the base
-            plate). */}
+        {/* Photo clip: the photo area from card.svg — the 2026-11-05 re-seed
+            brought the crop path back (the shield's top portion); a file
+            without one clips to the whole shield (the base plate). */}
         <clipPath id={cropClipId}>
           <path d={plan.card.cropPath} />
         </clipPath>
         {/* Border clip: the owner's clip-path-1 = the plate silhouette — the
-            border-over stroke's outer half is cut (round 7). A file whose
-            border declares no clip leaves the stroke unclipped, and the def is
-            omitted entirely. */}
+            border stroke's outer half is cut, so the ring reads as an inner
+            tint over the plate/photo edges. A file whose border declares no
+            clip leaves the stroke unclipped, and the def is omitted. */}
         {plan.card.borderStroke?.clipPath !== undefined && (
           <clipPath id={borderClipId}>
             <path d={plan.card.borderStroke.clipPath} />
           </clipPath>
-        )}
-        {/* Stats contrast plate gradient (owner 2026-10-29 "tier-color"): the
-            plate behind the six stat columns, painted over the photo so the
-            stat text reads against any screenshot. Geometry + FADE come from
-            the file; the COLOR is the TIER's own ramp, reduced to 3 points
-            (tierPlateFadeStops) — the SVG's ramp is the reference for how it
-            fades, never what it paints. */}
-        {plan.card.statsPlate !== undefined && (
-          <linearGradient
-            id={statsPlateGradId}
-            gradientUnits="userSpaceOnUse"
-            x1={plan.card.statsPlate.line.x1}
-            y1={plan.card.statsPlate.line.y1}
-            x2={plan.card.statsPlate.line.x2}
-            y2={plan.card.statsPlate.line.y2}
-          >
-            {tierPlateFadeStops(plan.palette, plan.card.statsPlate.fades).map((stop, i) => (
-              <stop key={i} offset={stop.offset} stopColor={stop.color} stopOpacity={stop.opacity} />
-            ))}
-          </linearGradient>
         )}
         {/* Top legibility scrim (backs the over-photo OVR block). */}
         <linearGradient id={scrimId} gradientUnits="userSpaceOnUse" x1="0" y1={plan.scrim.y1} x2="0" y2={plan.scrim.y2}>
@@ -313,10 +301,11 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         </linearGradient>
       </defs>
 
-      {/* Plate: shield-shaped tier fill — the pristine rainbow gradient when
-          the palette declares plateStops, else the solid tier color. NOTHING
-          fills outside it, so the card has no background: transparent PNG
-          download, and the page backdrop shows through the on-page card. */}
+      {/* Plate: shield-shaped tier fill — the tier's gradient ramp when the
+          palette declares plateStops (Impecável = the file's
+          Magenta_to_Orange), else the solid tier color. NOTHING fills outside
+          it, so the card has no background: transparent PNG download, and the
+          page backdrop shows through the on-page card. */}
       <path
         d={plan.card.platePath}
         fill={plan.palette.plateStops !== undefined ? `url(#${plateGradId})` : plan.palette.plateFill}
@@ -326,15 +315,15 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           — or the ASST-01 monogram (never an empty hole). HEAD-SAFE framing
           (owner, card rounds 7-8): vertical-center cover-fit beheaded the
           full-body placeholders, so round 7 top-anchored the fit ("hide the
-          legs, never the head"); round 8 goes further — subject art (class
-          portraits with real alpha margins) gets a MEASURED head-to-thigh
-          frame (cardAssets.photoDestRect: the character's opaque bounds
-          expanded by margins, cut at mid-thigh, cover-fit), so the head
-          keeps ~8-12% of window below the top border and the body fills the
-          frame against the info bands. Opaque member screenshots keep the
-          round-7 top-anchored cover. Measured rect → preserveAspectRatio
-          "none" (the rect already matches the image aspect); fallback →
-          round-7 "xMidYMin slice" until the measurement lands. */}
+          legs, never the head"); round 8 added the MEASURED subject frame
+          (cardAssets.photoDestRect: the character's opaque bounds expanded by
+          margins, cover-fit — top-anchored when the short 2026-11-05 crop
+          window crops vertically). The MEMBER's own framing (zoom + pan,
+          cardAssets.applyPhotoTransform) then rides on that base, so the card
+          matches the photo-positioning editor exactly. Measured rect →
+          preserveAspectRatio "none" (the rect already matches the image
+          aspect); fallback → round-7 "xMidYMin slice" until measurement
+          lands. */}
       <g clipPath={`url(#${cropClipId})`}>
         {plan.photo.kind === 'image' ? (
           <image
@@ -366,17 +355,9 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         <rect x={b.x} y={b.y} width={b.w} height={plan.scrim.y2 - plan.scrim.y1} fill={`url(#${scrimId})`} />
       </g>
 
-      {/* Stats contrast plate (owner re-export 2026-10-29 "tier-color"): the
-          plate behind the six stat columns, painted over the photo so the stat
-          text reads against any screenshot. Painted BEFORE the text, AFTER the
-          photo and its scrim; the round-8 files have no such layer. Its fill is
-          the TIER's color (see the gradient def above), not the SVG's. */}
-      {plan.card.statsPlate !== undefined && (
-        <path
-          d={plan.card.statsPlate.path}
-          fill={`url(#${statsPlateGradId})`}
-        />
-      )}
+      {/* Stats live on the PLATE itself: since the 2026-11-05 re-seed the
+          backplate carries the contrast (the stats plate is gone), so nothing
+          extra paints between the photo and the border. */}
 
       {/* Detached border, WHEN THE FILE DRAWS ONE: the stroke ON THE PLATE
           SILHOUETTE — the border rings the WHOLE shield and covers the photo's
@@ -384,11 +365,10 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           three-layer background: plate → photo → border → text). Round-8 file:
           the tier GRADIENT stroke, CLIPPED to the plate silhouette (clip-path-1)
           — the stroke's outer half is cut, the inner ≈24px band paints over the
-          photo (top/sides) and the plate (bottom). The owner's current files use
-          a SOLID per-tier ring (the palette's own first border stop — "largura
-          do arquivo, cor por tier") at the file's width, UNCLIPPED — the
-          2026-11-05 re-seed names it `tier-color-border`. The layer is skipped
-          only when the file declares no border. */}
+          photo (top/sides) and the plate (bottom). The 2026-11-05 re-seed
+          (`tier-color-border`) keeps the clip, widens the ring to 32 and
+          declares `opacity="0.3"` — the TIER's ramp as a translucent tint. The
+          layer is skipped only when the file declares no border. */}
       {plan.card.borderStroke !== undefined && (
         <path
           d={plan.card.borderStroke.strokePath}
@@ -399,6 +379,7 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
               : plan.palette.borderStops[0].color
           }
           strokeWidth={plan.card.borderStroke.width}
+          strokeOpacity={plan.card.borderStroke.opacity}
           clipPath={plan.card.borderStroke.clipPath !== undefined ? `url(#${borderClipId})` : undefined}
         />
       )}
@@ -457,6 +438,39 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         {plan.name.text}
       </text>
 
+      {/* "05-11 • atualizado" — the LAST_UPDATE line under the name (owner
+          re-seed 2026-11-05). The date is the member's own last update; the
+          bullet + word are the file's literals at their own anchors. The whole
+          line is omitted when the caller has no date (the placeholder is never
+          printed). */}
+      {plan.lastUpdate !== null && (
+        <g fontFamily={`${plan.fonts.slots}, ${plan.fonts.name}, sans-serif`} fill={plan.lastUpdate.color}>
+          <text
+            x={plan.lastUpdate.x}
+            y={plan.lastUpdate.y}
+            fontWeight="400"
+            fontSize={plan.lastUpdate.size}
+            textLength={textLengthOf(
+              fitCardText(
+                plan.lastUpdate.date,
+                400,
+                plan.lastUpdate.size,
+                plan.lastUpdate.maxWidth,
+                beb,
+              ),
+            )}
+            lengthAdjust="spacingAndGlyphs"
+          >
+            {plan.lastUpdate.date}
+          </text>
+          {plan.lastUpdate.suffix.map((segment, i) => (
+            <text key={i} x={segment.x} y={segment.y} fontWeight="400" fontSize={segment.size}>
+              {segment.text}
+            </text>
+          ))}
+        </g>
+      )}
+
       {/* The 6 key stats — one per parsed slot column (server order), each
           a label / big points number / small raw value stack, ALL THREE
           LINES CENTRALLY ALIGNED on the column center (round 7). Bebas
@@ -499,14 +513,17 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         </g>
       ))}
 
-      {/* Hellz mark — brand anchor in the plate tip below the stat slots. */}
-      <image
-        href={plan.mark.src}
-        x={plan.mark.x - plan.mark.size / 2}
-        y={plan.mark.y - plan.mark.size / 2}
-        width={plan.mark.size}
-        height={plan.mark.size}
-      />
+      {/* Hellz mark — the logo the FILE draws (`logo-hellz`, owner 2026-11-05):
+          vector paths + the file's own gradients, scoped per card so several
+          cards on one page cannot collide. This replaces the old additive
+          hellz-mark.svg overlay, which double-drew the logo. */}
+      {logo !== undefined && (
+        <g
+          // The markup comes from the bundled card.svg (trusted build asset,
+          // never user input) — the parser hands it over verbatim.
+          dangerouslySetInnerHTML={{ __html: `${logo.gradients}${logo.markup}` }}
+        />
+      )}
     </svg>
   )
 }

@@ -1,20 +1,21 @@
 // cardExport.ts — the card PNG export (plan 07.2-05, CARD-03 / D-09 /
 // D-10 / D-12; checkpoint round 8, owner re-seed: ONE card.svg
 // [src/assets/card.svg] remains the source of truth for card design —
-// placeholder TEXT slots filled by code, the photo clipped to the backplate,
-// the stats contrast plate, Bebas Neue everywhere except the player name
-// (Orbitron), central column alignment, PNG export with NO background (the
-// shield plate paints; everything outside it is transparent). Zero new npm
-// dependencies (v1.1 invariant): native Canvas 2D + Path2D + the self-hosted
-// Orbitron woff2 + Bebas Neue (Google Fonts @import in src/index.css —
-// graceful fallback to Orbitron if it cannot load) + brand mark.
+// placeholder TEXT slots filled by code, the photo clipped to the crop path,
+// Bebas Neue everywhere except the player name (Orbitron), central column
+// alignment, PNG export with NO background (the shield plate paints;
+// everything outside it is transparent). Zero new npm dependencies (v1.1
+// invariant): native Canvas 2D + Path2D + the self-hosted Orbitron woff2 +
+// Bebas Neue (Google Fonts @import in src/index.css — graceful fallback to
+// Orbitron if it cannot load) + brand mark.
 //
 // TIER-COLOR CONTRACT (owner 2026-10-29: "the fills must follow tier colors,
 // not the color in the svg"): every layer the owner names `tier-color-*`
-// (the backplate `tier-color-plate`, the stats plate `tier-color-plate-stats`)
-// is painted from TIER_PALETTE — its GEOMETRY and its fade structure come from
-// the file, its COLOR never does. The file's purple ramp is the reference for
-// how the plate fades, not what it paints.
+// (the backplate, the border ring) is painted from TIER_PALETTE — its
+// GEOMETRY comes from the file, its COLOR never does. Owner 2026-11-05: the
+// Impecável row of that palette IS the file's own Magenta_to_Orange ramp, so
+// the SVG's colors became the tier's colors; and the ring keeps the file's
+// 30% opacity (a translucent tier tint).
 //
 // ROUND 7 (owner verdict on round 6: "the card is overflowing ... keep a
 // matching proportion and readability", then the new seeded card.svg):
@@ -62,20 +63,21 @@
 // are fetched as blobs and passed as object URLs (the api.ts wrapper never
 // hands out cross-origin URLs), and the mark is the bundled hellz-mark.svg.
 import type { Tier } from '../dashboard/presentation'
-import markUrl from '../../assets/hellz-mark.svg'
 import {
   CARD_DESIGN_HEIGHT,
   CARD_DESIGN_WIDTH,
   CARD_GEOMETRY,
   CARD_PLATE_GRADIENT_LINE,
   TIER_PALETTE,
+  applyPhotoTransform,
   measurePhotoSubject,
   photoDestRect,
   resolveCardTextFill,
   scalePath,
   scaleRect,
-  tierPlateFadeStops,
   type CardGeometry,
+  type CardLogo,
+  type CardPhotoTransform,
   type CardRect,
   type TierPalette,
 } from './cardAssets'
@@ -102,6 +104,14 @@ export interface CardExportData {
   photoSrc: string | null
   /** Class initial for the monogram fallback (ASST-01). */
   monogramLetter: string
+  /** When the member's stats were last updated (owner 2026-11-05). Any
+   *  Date-parseable string ('YYYY-MM-DD' preferred) — rendered as 'DD-MM' on
+   *  the file's LAST_UPDATE line. Absent → the line is omitted (the file's
+   *  placeholder date is NEVER printed). */
+  lastUpdate?: string | null
+  /** The member's own framing inside the crop path (zoom + pan). Absent or a
+   *  no-op → the measured cover fit (cardAssets.photoDestRect). */
+  photoTransform?: CardPhotoTransform | null
 }
 
 const OVR_TEXT_COLOR = '#FFFFFF' // over the photo — white + shadow, every tier
@@ -123,14 +133,10 @@ export const CARD_FONTS = { slots: 'Bebas Neue', name: 'Orbitron' } as const
  *  render (an ADDITIVE legibility treatment, not part of the file). */
 export const SCRIM = { heightFraction: 0.65, alpha: 0.55 } as const
 
-/** The Hellz brand mark. OWNER RULING (card polish round 8): this is a
- *  PLANNED EXCEPTION to the card layout — its position and size are NOT
- *  derived from the parsed slots, the photo frame, or any layout rule, and
- *  no other element aligns to it. Keep it byte-identical across card
- *  layout changes (rounds 3-6 placement, centered in the plate tip below
- *  the stat slots; card.svg has no mark slot — this is an additive brand
- *  anchor, not part of the design-space contract). */
-const MARK = { y: 1408, size: 54 } as const
+// The Hellz brand mark is NO LONGER an app-side overlay: the owner's 2026-11-05
+// re-seed draws it in card.svg (`<g id="logo-hellz">`, vector paths + the
+// Magenta_to_Orange gradients). Both surfaces paint THAT markup — the bundled
+// hellz-mark.svg overlay would double-draw the logo on the page.
 
 // ---------------------------------------------------------------------------
 // Layout plan. The design space is card.svg's own 1080×1600 viewBox; every
@@ -218,11 +224,25 @@ export interface CardPlan {
    *  text fill, centered on the plate's horizontal midline (round 7 — the
    *  parsed x anchors the placeholder's left edge, not the center). */
   name: { text: string; x: number; y: number; size: number; color: string; maxWidth: number }
+  /** The "atualizado" line under the name (owner 2026-11-05): the live date at
+   *  the file's own anchor + the static segments at theirs. null when the
+   *  caller supplies no date — the line is then omitted entirely. */
+  lastUpdate: {
+    date: string
+    x: number
+    y: number
+    size: number
+    color: string
+    maxWidth: number
+    suffix: { text: string; x: number; y: number; size: number }[]
+  } | null
+  /** The member's framing inside the crop path (zoom + pan), resolved from the
+   *  data. null → the measured cover fit. */
+  photoTransform: CardPhotoTransform | null
   /** The 6 key stats in SERVER/highlight order, one per parsed slot
    *  column, each a self-contained label/points/value group — all three
    *  lines centrally aligned on the column center (round 7). */
   stats: CardPlanStatSlot[]
-  mark: { src: string; x: number; y: number; size: number }
   colors: {
     monogramTile: string
     monogramText: string
@@ -234,6 +254,22 @@ function tierOf(ovr: number): Tier {
   if (ovr < 75) return 'silver'
   if (ovr < 85) return 'gold'
   return 'platinum'
+}
+
+/** The card's date format: `DD-MM`, the file's LAST_UPDATE placeholder style
+ *  ("05-11"). A DATE-ONLY `YYYY-MM-DD` is formatted textually (no timezone
+ *  drift); a timestamp with a time part is rendered in the device's local day
+ *  (the moment the stats actually changed for the member). Returns null for a
+ *  missing/invalid value — the line is then omitted, never faked. */
+export function formatCardDate(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null
+  const trimmed = value.trim()
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed)
+  if (dateOnly !== null) return `${dateOnly[3]}-${dateOnly[2]}`
+  const date = new Date(trimmed)
+  if (Number.isNaN(date.getTime())) return null
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}`
 }
 
 /**
@@ -256,9 +292,9 @@ export function buildCardPlan(
   const tier = tierOf(data.ovr)
   const card = CARD_GEOMETRY
   const palette = TIER_PALETTE[tier]
-  // Round 10: the plate can carry a gradient (pristine rainbow), so the text
-  // fill is RESOLVED against the plate — one decision shared by both
-  // surfaces through the plan.
+  // Round 10: the plate can carry a gradient (today the Impecável
+  // Magenta_to_Orange ramp), so the text fill is RESOLVED against the plate —
+  // one decision shared by both surfaces through the plan.
   const textFill = resolveCardTextFill(palette)
   const scale = width / CARD_DESIGN_WIDTH
   const height = (width * CARD_DESIGN_HEIGHT) / CARD_DESIGN_WIDTH
@@ -319,6 +355,31 @@ export function buildCardPlan(
     maxWidth: 2 * Math.min(plateMidX - plateInnerL, plateInnerR - plateMidX),
   }
 
+  // LAST_UPDATE line (owner 2026-11-05): "05-11 • atualizado" under the name.
+  // The date is the caller's last-update value formatted DD-MM; the trailing
+  // segments (bullet + word) are the FILE's literals at their own anchors.
+  const lastUpdateDate = formatCardDate(data.lastUpdate)
+  const lastUpdateSlot = slots.lastUpdate
+  const lastUpdate =
+    lastUpdateDate === null || lastUpdateSlot === undefined
+      ? null
+      : {
+          date: lastUpdateDate,
+          x: lastUpdateSlot.date.x * scale,
+          y: lastUpdateSlot.date.y * scale,
+          size: lastUpdateSlot.date.size * scale,
+          color: textFill,
+          // The line never leaves the shield: bound it to the plate's inner
+          // span, measured from its own left anchor.
+          maxWidth: plateInnerR - lastUpdateSlot.date.x * scale,
+          suffix: lastUpdateSlot.suffix.map((s) => ({
+            text: s.text,
+            x: s.x * scale,
+            y: s.y * scale,
+            size: s.size * scale,
+          })),
+        }
+
   // Stat slots: parsed positions verbatim; every line centered on the
   // column centerX; fitText bound = column width minus gutter.
   const statSlots: CardPlanStatSlot[] = data.stats.map((stat, i) => {
@@ -366,8 +427,9 @@ export function buildCardPlan(
     },
     ovr,
     name,
+    lastUpdate,
+    photoTransform: data.photoTransform ?? null,
     stats: statSlots,
-    mark: { src: markUrl, x: width / 2, y: MARK.y * scale, size: MARK.size * scale },
     colors: {
       monogramTile: MONOGRAM_TILE,
       monogramText: MONOGRAM_TEXT,
@@ -565,26 +627,13 @@ function resolveBorderSolid(palette: TierPalette): string {
   return first.color
 }
 
-/** #rrggbb + alpha → rgba(), for canvas gradients whose stops carry their own
- *  opacity (the stats plate's fade to transparent). Canvas has no
- *  stop-opacity, so the alpha must ride the color. A non-hex color (the SVG
- *  export could carry a keyword) passes through — only '#…' is normalized. */
-function rgbaWithAlpha(color: string, alpha: number): string {
-  const hex = color.trim()
-  const short = hex.match(/^#([0-9a-f]{3})$/i)
-  const long = hex.match(/^#([0-9a-f]{6})$/i)
-  if (short === null && long === null) return hex
-  const digits = (short === null ? hex.slice(1) : [...hex.slice(1)].map((c) => c + c).join(''))
-    .slice(0, 6)
-  const r = parseInt(digits.slice(0, 2), 16)
-  const g = parseInt(digits.slice(2, 4), 16)
-  const b = parseInt(digits.slice(4, 6), 16)
-  return `rgba(${r},${g},${b},${alpha})`
-}
+/** #rrggbb + alpha → rgba() — no longer used for a fade layer; kept out of the
+ *  paint path. */
 
-/** The plate paint (round 10): pristine's prismatic gradient when the tier
- *  declares one, otherwise its solid plateFill. The SVG twin reads the same
- *  palette field, so the on-page card and the PNG cannot diverge. */
+/** The plate paint (round 10): a tier ramp when the palette declares one
+ *  (Impecável = the file's Magenta_to_Orange), otherwise its solid plateFill.
+ *  The SVG twin reads the same palette field, so the on-page card and the PNG
+ *  cannot diverge. */
 function platePaint(ctx: CanvasRenderingContext2D, plan: CardPlan): string | CanvasGradient {
   const stops = plan.palette.plateStops
   if (stops === undefined) return plan.palette.plateFill
@@ -625,11 +674,12 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.fill(plate)
 
   // --- Photo: the member screenshot (or fallback) CLIPPED TO THE PHOTO AREA
-  // — the SAME path the on-page SVG clips with. In the round-8 file that was
-  // the crop path (the shield's top portion, borderless); in the 2026-10-29
-  // re-export the file carries no crop path, so the photo fills the WHOLE
-  // SHIELD (owner decision 2026-10-29) and the plate fill stays behind it.
-  // The border paints AFTER the photo as a separate layer
+  // — the SAME path the on-page SVG clips with. The 2026-11-05 re-seed brought
+  // the crop path back (the shield's top portion); a file without one falls
+  // back to the whole shield and the plate fill stays behind it. The member's
+  // own framing (zoom + pan, cardAssets.applyPhotoTransform) rides on top of
+  // the measured cover fit, so the downloaded card is what the crop editor
+  // showed. The border paints AFTER the photo as a separate layer
   // (plate → photo → scrim → border → texts).
   const crop = new Path2D(scalePath(plan.card.cropPath, s))
   const b = plan.photoBBox
@@ -639,13 +689,16 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
     const img = await loadImage(plan.photo.src)
     if (img !== null && img.width > 0 && img.height > 0) {
       // Round-8 framing (cardAssets.photoDestRect): subject art (the class
-      // portraits — real alpha margins) gets the MEASURED head-to-thigh
+      // portraits — real alpha margins) gets the MEASURED head-to-feet
       // frame so the head keeps its distance from the top border and the
       // body fills the window; opaque screenshots keep the round-7
-      // head-safe top-anchored cover. The SAME pure function the on-page
-      // SVG and the harness reference use — the render-diff locks them.
+      // head-safe top-anchored cover. The member's transform then slides it.
       const subject = measurePhotoSubject(img)
-      const dest = photoDestRect(img.width, img.height, subject, b)
+      const dest = applyPhotoTransform(
+        photoDestRect(img.width, img.height, subject, b),
+        b,
+        plan.photoTransform,
+      )
       ctx.drawImage(img, dest.x, dest.y, dest.w, dest.h)
     } else {
       drawMonogramFill(ctx, plan)
@@ -661,45 +714,17 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.fillRect(b.x, b.y, b.w, plan.scrim.y2 - plan.scrim.y1)
   ctx.restore()
 
-  // --- STATS CONTRAST PLATE (owner re-export 2026-10-29): the plate behind
-  // the six stat columns, painted over the photo so the stat text reads
-  // against any screenshot. It is a LEGIBILITY layer, not a tier color, so
-  // its gradient is painted from THE FILE (the round-8 files have no such
-  // layer, and the first re-export had none either — the plate is optional).
-  const statsPlateLayer = plan.card.statsPlate
-  if (statsPlateLayer !== undefined) {
-    // TIER-COLOR CONTRACT (owner 2026-10-29): the plate's geometry and FADE
-    // come from the file, its COLOR comes from the tier — the SVG's purple ramp
-    // is the reference for how it fades, never the color it paints. The tier
-    // contributes a 3-point ramp (tierPlateFadeStops), so platinum carries the
-    // whole rainbow instead of collapsing to its green midpoint.
-    const platePath2D = new Path2D(scalePath(statsPlateLayer.path, s))
-    const grad = ctx.createLinearGradient(
-      statsPlateLayer.line.x1 * s, statsPlateLayer.line.y1 * s,
-      statsPlateLayer.line.x2 * s, statsPlateLayer.line.y2 * s,
-    )
-    for (const stop of tierPlateFadeStops(plan.palette, statsPlateLayer.fades)) {
-      grad.addColorStop(
-        Math.min(1, Math.max(0, stop.offset)),
-        stop.opacity >= 1 ? stop.color : rgbaWithAlpha(stop.color, stop.opacity),
-      )
-    }
-    ctx.save()
-    ctx.fillStyle = grad
-    ctx.fill(platePath2D)
-    ctx.restore()
-  }
-
   // --- Detached border, WHEN THE FILE DRAWS ONE: the stroke ON THE PLATE
   // SILHOUETTE — the border rings the WHOLE shield; the photo area itself
   // stays BORDERLESS — painted OVER the photo, covering the shield's edges.
-  // The 2026-11-05 `tier-color-border` layer carries NO clip: the ring paints
-  // UNCLIPPED at the file's width and uses the Impecável rank rainbow (the
-  // file's `stroke="#d4145a"` is a placeholder, never the design color). The
-  // layer is skipped only when the file declares no border.
+  // Owner 2026-11-05: the `tier-color-border` group carries `opacity="0.3"`,
+  // so the TIER's ramp paints as a translucent tint; the stroke is clipped to
+  // the plate silhouette exactly as the file clips it. The layer is skipped
+  // only when the file declares no border.
   const border = plan.card.borderStroke
   if (border !== undefined) {
     ctx.save()
+    ctx.globalAlpha = border.opacity
     if (border.clipPath !== undefined) {
       ctx.clip(new Path2D(scalePath(border.clipPath, s)))
     }
@@ -727,10 +752,21 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.shadowColor = 'transparent'
 
   // --- Player name: Orbitron on the plate, palette text fill, centered at
-  // its parsed slot x (round 7). The solid card color guarantees contrast
+  // its parsed slot x (round 7). The solid plate color guarantees contrast
   // (no shadow needed).
   ctx.fillStyle = plan.name.color
   paintFitted(ctx, plan.name.text, plan.name.x, plan.name.y, plan.fonts.name, 700, plan.name.size, plan.name.maxWidth, true)
+
+  // --- LAST_UPDATE line (owner 2026-11-05): the date + the file's own
+  // "• atualizado" segments, all in the plate's text fill.
+  if (plan.lastUpdate !== null) {
+    const lu = plan.lastUpdate
+    ctx.fillStyle = lu.color
+    paintFitted(ctx, lu.date, lu.x, lu.y, plan.fonts.slots, 400, lu.size, lu.maxWidth)
+    for (const segment of lu.suffix) {
+      paintFitted(ctx, segment.text, segment.x, segment.y, plan.fonts.slots, 400, segment.size, lu.maxWidth)
+    }
+  }
 
   // --- The 6 key stats — one per parsed slot column (server order), each
   // column a label / big points number / small raw value stack, ALL THREE
@@ -743,17 +779,33 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
     paintFitted(ctx, cell.value, cell.centerX, cell.valueY, plan.fonts.slots, 400, cell.valueSize, cell.valueMaxW, true)
   }
 
-  // Hellz mark (brand anchor in the plate tip below the stat slots).
-  const mark = await loadImage(plan.mark.src)
-  if (mark !== null) {
-    ctx.drawImage(
-      mark,
-      plan.mark.x - plan.mark.size / 2,
-      plan.mark.y - plan.mark.size / 2,
-      plan.mark.size,
-      plan.mark.size,
-    )
+  // Hellz mark — the logo the FILE draws (`logo-hellz`), painted as a vector
+  // group so the canvas and the on-page SVG carry the same artwork. The group
+  // is pure paths + the file's own gradients (no text, no external assets), so
+  // an inline-SVG image rasterizes it without tainting the canvas.
+  const logo = plan.card.logo
+  if (logo !== undefined) {
+    const img = await loadImage(logoImageUrl(logo))
+    if (img !== null) {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    }
   }
+}
+
+/** Logo image cache — the same data URL for every card/tier (the mark is
+ *  tier-independent: its gradients are the file's own). */
+let logoImageCache: string | null = null
+
+/** The file's logo group as a standalone SVG image covering the whole design
+ *  space (its geometry is in design coordinates). */
+function logoImageUrl(logo: CardLogo): string {
+  if (logoImageCache !== null) return logoImageCache
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_DESIGN_WIDTH}" height="${CARD_DESIGN_HEIGHT}" ` +
+    `viewBox="0 0 ${CARD_DESIGN_WIDTH} ${CARD_DESIGN_HEIGHT}">` +
+    `<defs>${logo.gradients}</defs>${logo.markup}</svg>`
+  logoImageCache = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+  return logoImageCache
 }
 
 function drawMonogramFill(ctx: CanvasRenderingContext2D, plan: CardPlan): void {

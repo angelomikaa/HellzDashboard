@@ -7,26 +7,31 @@
 // TEXT SLOTS structurally and tolerates the export shapes the owner has
 // shipped (fail-fast when none matches):
 //
-//   A) CURRENT FILE (owner re-export 2026-10-29, "no more border" + tier
-//      instructions) — INLINE attributes, no <style>, no classes:
-//        <path id="tier-color-plate"> — recolorable backplate, full shield;
-//          the photo stays CROPPED BY IT. The name says it paints the TIER's
-//          color, never the file's.
-//        <path id="tier-color-plate-stats" fill="url(#gradient)"> — the STATS
-//          CONTRAST PLATE behind the six stat columns: its GEOMETRY and FADE
-//          come from the file, its COLOR from the TIER (owner 2026-10-29:
-//          "the fills must follow tier colors, not the color in the svg")
-//        NO border layer at all
-//        no crop-path → the photo occupies the WHOLE SHIELD
+//   A) CURRENT FILE (owner re-seed 2026-11-05 — "the crop path is back", the
+//      border carries opacity, the stats plate is gone) — INLINE attributes,
+//      no <style>, no classes:
+//        <path id="tier-color-plate"> — recolorable backplate, full shield,
+//          painted with the tier's plate ramp (the file's Magenta_to_Orange
+//          IS the Impecável tier color since 2026-11-05).
+//        <path id="crop-path"> — THE PHOTO AREA IS BACK (the shield's top
+//          portion, closed at y≈903); the screenshot is clipped to it.
+//        <g id="tier-color-border" opacity="0.3"> wrapping the stroked
+//          silhouette (width 32, clipped by clipPath#clip-path-1). The ring
+//          is TIER colored at the FILE's opacity — a translucent tier tint,
+//          never the file's placeholder stroke.
+//        <g id="LAST_UPDATE"> — three hand-placed texts (date · bullet ·
+//          "atualizado"); the FIRST segment is the live date, the rest are
+//          static labels.
+//        NO stats contrast plate: the backplate itself carries the contrast.
 //        <text ... font-size="…"> per slot, transform="matrix(1 0 0 1 x y)"
-//   B) first re-export (2026-10-29, "largura do arquivo, cor por tier") —
-//      same as A but with <path id="plate-border">: a solid per-tier ring on
-//      the silhouette, no clip, width read from the file.
+//   B) 2026-10-29 re-exports (retired, still parsed) — no crop path (photo =
+//      whole shield), a flat stats contrast plate and/or a solid per-tier
+//      `plate-border` ring.
 //   C) round-8 file (retired, still parsed) — <style> + cls-* classes,
 //      crop-path photo area + border-over gradient stroke clipped by
 //      clip-path-1.
 //
-// PAINT ORDER: plate → photo → scrim → stats plate → border → texts.
+// PAINT ORDER: plate → photo → scrim → border → texts.
 //   - Placeholder TEXT slots (Bebas Neue unless noted — family + fill are
 //     placeholders; code substitutes). Roles resolve from STRUCTURE, never
 //     exact id strings (the ids drift per export: OVR / OVR-2 + data-name,
@@ -35,7 +40,9 @@
 //         other is the job-class line under it (re-export: 148.014px at
 //         (136.177, 412.59) over a 56px job line at (136.177, 473.794));
 //       · the single ORBITRON text outside the OVR/KEY groups is PLAYERNAME
-//         (≈72px, (246.528, 1044.007)) — Orbitron ONLY here (round 7);
+//         (≈72px, (246.626, 1007.454)) — Orbitron ONLY here (round 7);
+//       · the LAST_UPDATE group's first text is the live date (36px); the
+//         following texts ("•", "atualizado") keep their parsed anchors;
 //       · SIX SEMANTIC STAT GROUPS <g id="KEY1">…<g id="KEY6">, each holding
 //         exactly three texts: the BIGGEST is the RATING/points (148px,
 //         y≈1261.703), the SMALLER-y of the other two the LABEL (56px,
@@ -95,9 +102,9 @@ export interface CardStatSlot {
 }
 
 /** A linearGradient in the SAME design space (userSpaceOnUse line + stops)
- *  — the detached border stroke's GEOMETRY (line + width). Only the geometry
- *  is parsed; the COLORS come from the tier palette (the file's stops show
- *  the UI's Impecável rainbow as the top-tier reference). */
+ *  — the border/tier ramp's GEOMETRY (line). Only the geometry is parsed; the
+ *  COLORS come from the tier palette (since 2026-11-05 that palette IS the
+ *  card.svg's Magenta_to_Orange). */
 export interface CardGradientLine {
   x1: number
   y1: number
@@ -108,15 +115,20 @@ export interface CardGradientLine {
 export interface CardBorderStroke {
   /** The gradient line (userSpaceOnUse geometry, scaled with everything).
    *  PRESENT for the owner's 2026-11-05 re-seed: the `tier-color-border`
-   *  layer is painted with the Impecável rainbow, not the file's placeholder
+   *  layer is painted with the tier's own ramp, not the file's placeholder
    *  color. A legacy solid border declares no line (palette fallback). */
   line?: CardGradientLine
   /** Gradient stops for the ring. The 2026-11-05 `tier-color-border` carries
-   *  the UI's Impecável rainbow (5 stops); legacy borders omit it and fall
-   *  back to the tier palette's `borderStops`. */
+   *  the tier's ramp stops (Impecável = the file's Magenta_to_Orange); legacy
+   *  borders omit it and fall back to the tier palette's `borderStops`. */
   stops?: { offset: number; color: string }[]
+  /** Paint opacity read from the file. Owner 2026-11-05: the border is now a
+   *  TRANSLUCENT tint (`opacity="0.3"` on the group) — the tier color is
+   *  applied at the file's own opacity on both surfaces. Defaults to 1 when
+   *  the file declares none. */
+  opacity: number
   /** Stroke width — read from the file (48 in the round-8 file, 24 in the
-   *  2026-10-29 and 2026-11-05 re-exports). */
+   *  2026-10-29 re-exports, 32 in the 2026-11-05 re-seed). */
   width: number
   /** The STROKED path — in the owner's files this IS the plate silhouette
    *  (three-layer semantics: the border rings the whole shield). Parsed
@@ -124,138 +136,58 @@ export interface CardBorderStroke {
    *  faithful to the file. */
   strokePath: string
   /** The border's CLIP path (clipPath#clip-path-1 — the plate silhouette).
-   *  The owner's round-8 file clips the border-over stroke to the plate: its
-   *  outer half is cut, the inner half paints over the photo/plate edges
-   *  (deliberate). ABSENT in the 2026-10-29 re-export (no clipPath at all) —
-   *  when undefined, the stroke paints unclipped, which is what the file shows.
+   *  The 2026-11-05 file clips the stroke to the plate: its outer half is
+   *  cut, the inner half paints over the photo/plate edges (deliberate).
+   *  ABSENT in the 2026-10-29 re-export (no clipPath at all) — when
+   *  undefined, the stroke paints unclipped, which is what the file shows.
    *  Both surfaces apply the clip only when it exists. */
   clipPath?: string
 }
 
-/** The STATS CONTRAST PLATE: a path behind the six stat columns, painted over
- *  the photo so the stat text reads against any screenshot.
- *
- *  OWNER CONTRACT (2026-10-29, "tier instructions have been updated — the fills
- *  must follow tier colors, not the color in the svg"): the owner now names the
- *  layers `tier-color-plate` and `tier-color-plate-stats`, which is the signal
- *  that BOTH fills are TIER-DRIVEN. So the parse carries only the plate's
- *  GEOMETRY (path + gradient line) and its FADE structure (offsets + opacities
- *  as authored for contrast), and BOTH surfaces paint it in the tier's own
- *  color. The SVG's purple ramp is the owner's reference for HOW it fades,
- *  never the color it paints. */
-export interface CardStatsPlate {
-  path: string
-  line: CardGradientLine
-  /** The authored fade: each stop's OFFSET and OPACITY, in file order. The
-   *  COLOR is not parsed (see the tier-color contract above) — the renderers
-   *  supply the tier's own color at every stop. */
-  fades: { offset: number; opacity: number }[]
+/** The LAST_UPDATE line (owner re-seed 2026-11-05): the date the member's
+ *  stats were last updated. The file draws it as three hand-placed texts —
+ *  the FIRST is the live date, the rest ("•", "atualizado") are static.
+ *  Parsed verbatim so the render keeps the owner's spacing. */
+export interface CardLastUpdate {
+  /** The live date slot (design space, baseline + effective size). */
+  date: CardTextSlot
+  /** The static trailing segments, in file order, with their own anchors. */
+  suffix: { x: number; y: number; size: number; text: string }[]
 }
 
-/** The tier's plate ramp, REDUCED TO THREE POINTS. Owner 2026-10-29: "the
- *  platinum tier is using green, not rainbow — the rainbow doesn't necessarily
- *  have to be the 5-point we have on the project, it can be reduced to 3 to
- *  better fit the 3-point gradient of the stats plate."
- *
- *  So a tier that declares `plateStops` (platinum/pristine) samples its own
- *  ramp at 0 / 0.5 / 1 — a true rainbow, just coarser — and a solid tier
- *  collapses to its `plateFill` at every point. This is the ONLY place the
- *  stats plate takes its colors from, so the canvas export and the SVG twin
- *  can never disagree. */
-export function tierPlateRamp(palette: TierPalette): { offset: number; color: string }[] {
-  const stops = palette.plateStops
-  if (stops === undefined) return [{ offset: 0, color: palette.plateFill }]
-  return [0, 0.5, 1].map((offset) => ({ offset, color: sampleRamp(stops, offset) }))
-}
-
-/** The stats plate's paint stops: the FILE's fade (offsets + opacities, the
- *  contrast layer) tinted with the TIER's 3-point ramp. One stop per authored
- *  fade, so the plate keeps exactly the falloff the owner drew while the color
- *  rides the tier. */
-export function tierPlateFadeStops(
-  palette: TierPalette,
-  fades: { offset: number; opacity: number }[],
-): { offset: number; color: string; opacity: number }[] {
-  const ramp = tierPlateRamp(palette)
-  return fades.map((fade) => ({
-    offset: fade.offset,
-    color: sampleRamp(ramp, fade.offset),
-    opacity: fade.opacity,
-  }))
-}
-
-/** Linear sample of a stop list at `offset` (sRGB lerp). Non-hex colors fall
- *  back to the nearest stop, so a keyword in a future file never yields NaN. */
-function sampleRamp(stops: { offset: number; color: string }[], offset: number): string {
-  if (stops.length === 0) return '#000000'
-  const o = Math.min(1, Math.max(0, offset))
-  if (o <= stops[0].offset) return stops[0].color
-  const last = stops[stops.length - 1]
-  if (o >= last.offset) return last.color
-  for (let i = 1; i < stops.length; i += 1) {
-    const hi = stops[i]
-    const lo = stops[i - 1]
-    if (o <= hi.offset) {
-      const span = hi.offset - lo.offset
-      const t = span <= 0 ? 0 : (o - lo.offset) / span
-      return mixHex(lo.color, hi.color, t)
-    }
-  }
-  return last.color
-}
-
-function mixHex(a: string, b: string, t: number): string {
-  const ca = parseHex(a)
-  const cb = parseHex(b)
-  if (ca === null || cb === null) return t < 0.5 ? a : b
-  const ch = (i: number) => Math.round(ca[i] + (cb[i] - ca[i]) * t)
-  return `#${[ch(0), ch(1), ch(2)].map((v) => v.toString(16).padStart(2, '0')).join('')}`
-}
-
-function parseHex(color: string): [number, number, number] | null {
-  const hex = color.trim()
-  const short = hex.match(/^#([0-9a-f]{3})$/i)
-  if (short !== null) {
-    const [r, g, b] = short[1].split('').map((c) => parseInt(c + c, 16))
-    return [r, g, b]
-  }
-  const long = hex.match(/^#([0-9a-f]{6})$/i)
-  if (long === null) return null
-  return [
-    parseInt(long[1].slice(0, 2), 16),
-    parseInt(long[1].slice(2, 4), 16),
-    parseInt(long[1].slice(4, 6), 16),
-  ]
+/** The BRAND MARK the file draws (`<g id="logo-hellz">`, owner 2026-11-05):
+ *  vector paths + their gradients, in the card's own design space. Since the
+ *  file now carries the mark, the app paints IT — the old additive
+ *  hellz-mark.svg overlay is gone (it double-drew the logo). */
+export interface CardLogo {
+  /** The group markup, verbatim (paths/polygons + their fills). */
+  markup: string
+  /** The `<linearGradient>` defs the markup references, verbatim. */
+  gradients: string
 }
 
 export interface CardGeometry {
   /** The solid plate silhouette (cls-1 path) — full shield. Painted first
-   *  on both surfaces; nothing fills outside it (transparent design). */
+   *  on both surfaces; nothing fills outside it (transparent design). This is
+   *  also the CONTRAST surface behind the stat text since the 2026-11-05
+   *  re-seed dropped the dedicated stats plate. */
   platePath: string
   /** Bounding box of the plate path (the name's center derives from its
    *  horizontal midline — see CardGeometry.slots.name). */
   plateBBox: CardRect
   /** The PHOTO AREA path: the screenshot is clipped to this path on BOTH
-   *  surfaces. The round-8 file drew it as `id="crop-path"` (the shield's top
-   *  portion, closed at ~y=937); the 2026-10-29 re-exports carry no crop path,
-   *  so the photo falls back to the WHOLE SHIELD (owner decision
-   *  2026-10-29) — the backplate stays behind it as the no-photo fallback. */
+   *  surfaces. The 2026-11-05 re-seed brought `id="crop-path"` BACK (the
+   *  shield's top portion, closed at y≈903); the 2026-10-29 re-exports carried
+   *  none, so the photo then fell back to the WHOLE SHIELD. */
   cropPath: string
   /** Bounding box of the crop path (cover-fit drawing bounds). */
   cropBBox: CardRect
-  /** The detached border, when the file draws one. Round 8 painted a gradient
-   *  ring on the silhouette (clipped, width 48); the 2026-10-29 re-export
-   *  REPLACED IT with the stats contrast plate, so the owner's current file
-   *  declares NO border at all and this is undefined. Both surfaces skip the
-   *  border layer entirely in that case. */
+  /** The detached border, when the file draws one. The 2026-11-05 re-seed
+   *  paints `tier-color-border` (32px, TIER colored) at the group's own
+   *  opacity (0.3), clipped to the plate silhouette. */
   borderStroke?: CardBorderStroke
-  /** The STATS CONTRAST PLATE behind the six stat columns
-   *  (tier-color-plate-stats), painted over the photo so the stat text reads
-   *  against any screenshot. Its geometry + fade are the file's; its color is
-   *  the TIER's (owner 2026-10-29). Absent in the round-8 file (its stats sat
-   *  on the solid plate) and in the first re-export; present in the current
-   *  file. */
-  statsPlate?: CardStatsPlate
+  /** The brand mark the file draws (`logo-hellz`), when present. */
+  logo?: CardLogo
   slots: {
     /** Big OVR number — top-left, OVER the photo. */
     ovr: CardTextSlot
@@ -268,6 +200,8 @@ export interface CardGeometry {
      *  centered on the shield — same placeholder-centering pattern as the
      *  stat columns; recorded r5 decision, held r7). */
     name: CardTextSlot
+    /** The "05-11 • atualizado" line under the name (owner 2026-11-05). */
+    lastUpdate?: CardLastUpdate
     /** The six positional stat slots, left → right. The COLUMN CENTER is
      *  derived by the renderer from the points anchor (+ width('99')/2 —
      *  the owner centered the placeholder on the grid); label/value raw x's
@@ -280,34 +214,35 @@ export interface CardGeometry {
 // ---------------------------------------------------------------------------
 // Tier palettes — the CODE-DRIVEN colors (the per-tier SVGs are retired;
 // these palettes ARE their successors). Text fill follows the contrast
-// rule: dark on the light metals, white on the deep magenta. The platinum
-// border mirrors the UI's Impecável rainbow (tier-impecavel-border in
-// src/index.css) stop-for-stop, so the card and the tier-styled UI frame
-// never read as two different gradients.
+// rule: dark on the light metals, black on the Impecável ramp (resolved at
+// plan-build). Owner 2026-11-05: the Impecável palette IS the card.svg's own
+// Magenta_to_Orange ramp — the file's colors are now the tier's colors.
 export interface TierPalette {
   plateFill: string
-  /** Optional PLATE gradient (owner checkpoint round 10): the pristine top
-   *  tier paints the same rainbow as its border across the shield itself.
-   *  `plateFill` stays the solid fallback/base for every other tier. */
+  /** Optional PLATE gradient: a tier that declares it paints its ramp across
+   *  the shield itself (Impecável = Magenta_to_Orange). `plateFill` stays the
+   *  solid fallback/base for every other tier. */
   plateStops?: { offset: number; color: string }[]
   borderStops: { offset: number; color: string }[]
   textFill: string
 }
 
-/** The prismatic plate gradient line (design space, 1080×1600): the same
- *  120°-ish diagonal feel as the UI's tier-impecavel-border. */
-export const CARD_PLATE_GRADIENT_LINE = { x1: 0, y1: 0, x2: 1080, y2: 1600 } as const
+/** The plate gradient line — the card.svg's OWN `Magenta_to_Orange` line
+ *  (design space, 1080×1600): a near-vertical ramp from the crest's top
+ *  point down to the shield's bottom tip. */
+export const CARD_PLATE_GRADIENT_LINE = {
+  x1: 540.621,
+  y1: 81.129,
+  x2: 540.102,
+  y2: 1517.645,
+} as const
 
-/** The UI's Impecável rank rainbow — the SAME five stops as
- *  `--tier-impecavel-border` (linear-gradient(120deg, …)). Owner ruling
- *  2026-11-05: the card's `tier-color-border` ring paints THIS rainbow, not
- *  the file's placeholder color and not the card tier's own accent. */
+/** The Impecável ramp — the card.svg's `Magenta_to_Orange` stops, THE tier
+ *  color since the owner's 2026-11-05 ruling ("atualize as cores do tier
+ *  platina/impecável para as cores do svg, elas serão a nova cor do tier"). */
 export const IMPECAVEL_BORDER_STOPS: { offset: number; color: string }[] = [
-  { offset: 0, color: '#f26d6f' },
-  { offset: 0.25, color: '#e9b44c' },
-  { offset: 0.5, color: '#3fb950' },
-  { offset: 0.75, color: '#58a6ff' },
-  { offset: 1, color: '#b8c0cc' },
+  { offset: 0, color: '#ff12f7' },
+  { offset: 1, color: '#ed7b00' },
 ]
 
 export const TIER_PALETTE: Record<Tier, TierPalette> = {
@@ -336,10 +271,9 @@ export const TIER_PALETTE: Record<Tier, TierPalette> = {
     textFill: '#241a10',
   },
   platinum: {
-    plateFill: '#cf1a87',
-    // Same five stops as the UI's tier-impecavel-border gradient
-    // (linear-gradient(120deg, #f26d6f, #e9b44c, #3fb950, #58a6ff, #b8c0cc)):
-    // the plate mirrors the ring, and the ring mirrors the UI.
+    plateFill: '#ff12f7',
+    // The card.svg's own Magenta_to_Orange ramp: the plate and the (30%
+    // opacity) border both paint the file's colors.
     plateStops: IMPECAVEL_BORDER_STOPS,
     borderStops: IMPECAVEL_BORDER_STOPS,
     textFill: '#ffffff',
@@ -348,9 +282,9 @@ export const TIER_PALETTE: Record<Tier, TierPalette> = {
 
 // ---------------------------------------------------------------------------
 // Card text contrast (owner checkpoint round 10): white-on-plate fails once
-// the plate carries the light rainbow. Same palette, same decision on both
-// surfaces — the plan stores the RESOLVED fill so the SVG and the PNG export
-// can never disagree.
+// the plate carries a bright ramp (today: Impecável's Magenta_to_Orange).
+// Same palette, same decision on both surfaces — the plan stores the RESOLVED
+// fill so the SVG and the PNG export can never disagree.
 
 function channel(v: number): number {
   const c = v / 255
@@ -516,11 +450,12 @@ function pickPlatePath(svg: string): string {
   throw new Error('card.svg: no plate path found (id="tier-color-plate" / "base-plate" / class="cls-1")')
 }
 
-/** The PHOTO AREA. The round-8 file drew it as `id="crop-path"` (the top
- *  portion of the shield); the 2026-10-29 re-export dropped it, and the owner
- *  decided the photo then occupies THE WHOLE SHIELD — so the crop path falls
- *  back to the plate silhouette (the plate fill stays behind as the no-photo
- *  fallback, exactly as before). */
+/** The PHOTO AREA. The 2026-11-05 re-seed brought `id="crop-path"` BACK (the
+ *  top portion of the shield); the 2026-10-29 re-exports dropped it, and the
+ *  owner then decided the photo occupies THE WHOLE SHIELD — so a file without
+ *  a crop path falls back to the plate silhouette (the plate fill stays behind
+ *  as the no-photo fallback, exactly as before). The round-8 file used
+ *  class="cls-2". */
 function pickCropPath(svg: string): string {
   for (const m of svg.matchAll(/<path\b([^>]*)>/g)) {
     const attrs = attributes(m[1])
@@ -547,90 +482,56 @@ function pathBBox(d: string, what: string): CardRect {
   return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }
 }
 
-/** The border stroke, round 8: cls-3 = `fill:none;
- *  stroke:url(#<gradient>);stroke-width:48` on the path inside
- *  <g id="border-over">, which carries clip-path="url(#<clip>)" — the
- *  owner clips the stroke (whose d IS the plate silhouette) to the plate
- *  silhouette so the border rings the shield without spilling outside.
- *  The stroked path and the clip are parsed SEPARATELY (a re-seed may
- *  decouple them). Only the GEOMETRY is taken (stroke path + line + width +
- *  clip path d) — the file's placeholder gradient stops stay in the file
- *  (pristine's live on in TIER_PALETTE). */
-/** The border layer. TWO shapes:
- *   A) 2026-10-29 re-export — <path id="plate-border"> with its own
- *      stroke-width, stroking the plate silhouette, no gradient and no clip.
- *   B) round-8 file — .cls-3{stroke:url(#gradient);stroke-width:48} on the
- *      path inside <g id="border-over">, clipped by clipPath#clip-path-1.
- *  Either way only the GEOMETRY is taken (stroke path + width, plus the line
- *  and clip when the file declares them); the COLORS come from the tier
- *  palette — the file's placeholder colors never reach the render. */
-/** The STATS CONTRAST PLATE: `<path id="tier-color-plate-stats" fill="url(#g)">`
- *  plus that gradient's userSpaceOnUse LINE and the fade structure (offsets +
- *  opacities). Returns undefined when the file has no such layer (the round-8
- *  files and the first re-export). Colors are NOT read — the tier drives them. */
-function statsPlate(svg: string): CardStatsPlate | undefined {
-  const platePath = [...svg.matchAll(/<path\b([^>]*)>/g)]
-    .map((m) => attributes(m[1]))
-    // The owner's current name; `plate-stats` is the earlier spelling.
-    .find((a) => a.get('id') === 'tier-color-plate-stats' && a.get('d'))
-    ?? [...svg.matchAll(/<path\b([^>]*)>/g)]
-      .map((m) => attributes(m[1]))
-      .find((a) => a.get('id') === 'plate-stats' && a.get('d'))
-  if (!platePath) return undefined
-  const ref = platePath.get('fill')?.match(/url\(#([^)]+)\)/)
-  if (!ref) throw new Error('card.svg: the stats plate must fill with url(#gradient)')
-  const grad = svg.match(new RegExp('<linearGradient\\b[^>]*id="' + ref[1] + '"[^>]*>[\\s\\S]*?</linearGradient>'))
-  if (!grad) throw new Error(`card.svg: stats plate gradient "${ref[1]}" not found`)
-  const attrs = attributes(grad[0])
-  if (!attrs.get('x1') || !attrs.get('x2') || !attrs.get('y1') || !attrs.get('y2')) {
-    throw new Error(`card.svg: stats plate gradient "${ref[1]}" needs a userSpaceOnUse line`)
-  }
-  const fades = [...grad[0].matchAll(/<stop\b([^>]*)\/>/g)].map((s) => {
-    const a = attributes(s[1])
-    const offset = Number(a.get('offset'))
-    if (Number.isNaN(offset)) {
-      throw new Error(`card.svg: stats plate gradient "${ref[1]}" has a stop with no offset`)
-    }
-    const opacity = a.get('stop-opacity')
-    return { offset, opacity: opacity === undefined ? 1 : Number(opacity) }
-  })
-  if (fades.length < 2) {
-    throw new Error(`card.svg: stats plate gradient "${ref[1]}" needs at least two stops`)
-  }
-  return {
-    path: platePath.get('d') as string,
-    line: {
-      x1: Number(attrs.get('x1')),
-      y1: Number(attrs.get('y1')),
-      x2: Number(attrs.get('x2')),
-      y2: Number(attrs.get('y2')),
-    },
-    fades,
-  }
+/** The `d` of a `<clipPath id="…">`'s first <path>, or undefined. */
+function clipPathD(svg: string, id: string): string | undefined {
+  const clip = svg.match(new RegExp('<clipPath\\b[^>]*id="' + id + '"[^>]*>[\\s\\S]*?</clipPath>'))
+  if (!clip) return undefined
+  return clip[0].match(/<path\b[^>]*\bd="([^"]+)"/)?.[1]
 }
 
-/** The detached border layer, when the file draws one. The owner's current
- *  `tier-color-border` layer (2026-11-05 re-seed) paints the UI's Impecável
- *  rainbow on the plate silhouette; the earlier `plate-border` layer is a
- *  legacy solid ring. */
+/** The detached border layer, when the file draws one. THREE shapes:
+ *   A) 2026-11-05 re-seed — `<g id="tier-color-border" opacity="0.3">`
+ *      wrapping the stroked plate silhouette (stroke-width 32, clipped by
+ *      clipPath#clip-path-1). The ring is TIER colored (the palette's ramp)
+ *      at the FILE's opacity — a translucent tier tint.
+ *   B) 2026-10-29 re-export — `<path id="plate-border">` with its own
+ *      stroke-width: a solid per-tier ring, no gradient, no clip.
+ *   C) round-8 file — .cls-3{stroke:url(#gradient);stroke-width:48} on the
+ *      path inside <g id="border-over">, clipped by clipPath#clip-path-1.
+ *  Either way only the GEOMETRY (+ the layer's opacity) is taken; the COLORS
+ *  come from the tier palette — the file's placeholder colors never reach the
+ *  render. */
 function borderStroke(svg: string): CardBorderStroke | undefined {
-  const byId = [...svg.matchAll(/<path\b([^>]*)>/g)]
-    .map((m) => attributes(m[1]))
-    .find(
-      (a) =>
-        (a.get('id') === 'plate-border' || a.get('id') === 'tier-color-border') &&
-        a.get('d'),
-    )
-  if (byId) {
-    const width = byId.get('stroke-width')?.match(/^([\d.]+)/)
+  // A) the owner's current group layer (opacity lives on the <g>).
+  const group = svg.match(/<g\b[^>]*id="(tier-color-border|plate-border)"[^>]*>([\s\S]*?)<\/g>/)
+  if (group) {
+    const groupAttrs = attributes(group[0].slice(0, group[0].indexOf('>') + 1))
+    const inner = group[2].match(/<path\b([^>]*)>/)
+    if (!inner) throw new Error('card.svg: the border group must wrap the stroked path')
+    const attrs = attributes(inner[1])
+    const width = attrs.get('stroke-width')?.match(/^([\d.]+)/)
     if (!width) throw new Error('card.svg: the border path must declare a stroke-width')
+    const d = attrs.get('d')
+    if (!d) throw new Error('card.svg: the border path must declare a d')
+    const clipRef = attrs.get('clip-path')?.match(/url\(#([^)]+)\)/)?.[1]
+    const clipD = clipRef === undefined ? undefined : clipPathD(svg, clipRef)
+    if (clipRef !== undefined && clipD === undefined) {
+      throw new Error(`card.svg: clipPath "${clipRef}" must contain the silhouette <path d>`)
+    }
+    const rawOpacity = groupAttrs.get('opacity') ?? groupAttrs.get('fill-opacity') ?? '1'
+    const opacity = Number(rawOpacity)
+    if (Number.isNaN(opacity)) {
+      throw new Error(`card.svg: the border group declares an unparseable opacity "${rawOpacity}"`)
+    }
     const base = {
       width: Number(width[1]),
-      strokePath: byId.get('d') as string,
+      strokePath: d,
+      opacity: Math.min(1, Math.max(0, opacity)),
+      clipPath: clipD,
     }
-    if (byId.get('id') === 'tier-color-border') {
-      // Owner 2026-11-05: the placeholder `stroke="#d4145a"` is NOT the
-      // design color — the ring uses the Impecável rank rainbow.
+    if (group[1] === 'tier-color-border') {
+      // Owner 2026-11-05: the file's placeholder `stroke="#1a1a1a"` is NOT the
+      // design color — the ring paints the TIER's ramp at the file's opacity.
       return {
         ...base,
         line: CARD_PLATE_GRADIENT_LINE,
@@ -640,6 +541,21 @@ function borderStroke(svg: string): CardBorderStroke | undefined {
     return base
   }
 
+  // B) a bare path layer (the 2026-10-29 solid ring).
+  const byId = [...svg.matchAll(/<path\b([^>]*)>/g)]
+    .map((m) => attributes(m[1]))
+    .find((a) => a.get('id') === 'plate-border' && a.get('d'))
+  if (byId) {
+    const width = byId.get('stroke-width')?.match(/^([\d.]+)/)
+    if (!width) throw new Error('card.svg: the border path must declare a stroke-width')
+    return {
+      width: Number(width[1]),
+      strokePath: byId.get('d') as string,
+      opacity: 1,
+    }
+  }
+
+  // C) the retired round-8 cls-3 gradient ring.
   const cls3 = svg.match(/\.cls-3\{([^}]*)\}/)
   if (!cls3) return undefined
   const strokeRef = cls3[1].match(/stroke:url\(#([^)]+)\)/)
@@ -661,8 +577,7 @@ function borderStroke(svg: string): CardBorderStroke | undefined {
   }
   const clipRef = borderPath.get('clip-path')?.match(/url\(#([^)]+)\)/)?.[1]
   if (!clipRef) throw new Error('card.svg: the border-over path must clip to the plate silhouette')
-  const clip = svg.match(new RegExp('<clipPath\\b[^>]*id="' + clipRef + '"[^>]*>[\\s\\S]*?</clipPath>'))
-  const clipD = clip?.[0].match(/<path\b[^>]*\bd="([^"]+)"/)?.[1]
+  const clipD = clipPathD(svg, clipRef)
   if (!clipD) throw new Error(`card.svg: clipPath "${clipRef}" must contain the silhouette <path d>`)
   return {
     line: {
@@ -672,8 +587,89 @@ function borderStroke(svg: string): CardBorderStroke | undefined {
       y2: Number(attrs.get('y2')),
     },
     width: Number(width[1]),
+    opacity: 1,
     strokePath: borderPath.get('d') as string,
     clipPath: clipD,
+  }
+}
+
+/** The brand mark group, verbatim, plus the gradients it references. Returns
+ *  undefined for a file that draws no mark (the retired re-exports). */
+function cardLogo(svg: string): CardLogo | undefined {  const group = svg.match(/<g\b[^>]*id="logo-hellz"[^>]*>[\s\S]*?<\/g>/)
+  if (!group) return undefined
+  const markup = group[0].replace(/\s+/g, ' ')
+  const ids = new Set([...markup.matchAll(/url\(#([^)]+)\)/g)].map((m) => m[1]))
+  const gradients = [...ids]
+    .map((id) => {
+      const grad = svg.match(
+        new RegExp('<linearGradient\\b[^>]*id="' + id + '"[^>]*>[\\s\\S]*?</linearGradient>'),
+      )
+      if (!grad) throw new Error(`card.svg: the logo gradient "${id}" is missing`)
+      return grad[0]
+    })
+    .join('')
+  return { markup, gradients }
+}
+
+/** Scope the logo's gradient ids (one card per page must not collide with the
+ *  next — the showcase mounts many). Longest id first so a prefix can never
+ *  rewrite a longer id. */
+export function scopedLogo(logo: CardLogo, scope: string): CardLogo {
+  const ids = [...new Set([...logo.markup.matchAll(/url\(#([^)]+)\)/g)].map((m) => m[1]))].sort(
+    (a, b) => b.length - a.length,
+  )
+  const rewrite = (source: string): string =>
+    ids.reduce(
+      (acc, id) => acc.replaceAll(`#${id}`, `#${id}-${scope}`).replaceAll(`id="${id}"`, `id="${id}-${scope}"`),
+      source,
+    )
+  return { markup: rewrite(logo.markup), gradients: rewrite(logo.gradients) }
+}
+
+/** The LAST_UPDATE line (owner re-seed 2026-11-05): `<g id="LAST_UPDATE">`
+ *  holds the hand-placed texts date · bullet · "atualizado". The FIRST text is
+ *  the live date slot; the rest keep their own anchors and literal strings.
+ *  Returns undefined when the file carries no such group, plus the document
+ *  indexes of its texts so the stray-slot census ignores them. */
+function lastUpdate(
+  svg: string,
+  sizes: Map<string, number>,
+): { value: CardLastUpdate; indexes: number[] } | undefined {
+  const group = svg.match(/<g\b[^>]*id="LAST_UPDATE"[^>]*>([\s\S]*?)<\/g>/)
+  if (!group) return undefined
+  const indexes = textIndexes(svg)
+  const texts: (CardTextSlot & { text: string; index: number })[] = []
+  for (const m of group[1].matchAll(/<text\b([^>]*)>([\s\S]*?)<\/text>/g)) {
+    const attrs = attributes(m[1])
+    const { x, y, scale } = matrixTransform(attrs.get('transform'))
+    const text = m[2]
+      .replace(/<[^>]*>/g, '')
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, '&')
+      .trim()
+    texts.push({
+      x,
+      y,
+      size: ownFontSize(attrs, sizes) * scale,
+      text,
+      index: indexes.get(m[1]) ?? -1,
+    })
+  }
+  if (texts.length < 2) {
+    throw new Error('card.svg: the LAST_UPDATE group must hold the date plus its label texts')
+  }
+  const [date, ...rest] = texts
+  for (const segment of rest) {
+    if (Math.abs(segment.y - date.y) > 1) {
+      throw new Error('card.svg: the LAST_UPDATE segments must share one baseline')
+    }
+  }
+  return {
+    value: {
+      date: { x: date.x, y: date.y, size: date.size },
+      suffix: rest.map((s) => ({ x: s.x, y: s.y, size: s.size, text: s.text })),
+    },
+    indexes: texts.map((t) => t.index),
   }
 }
 
@@ -736,11 +732,16 @@ function parseCard(svg: string): CardGeometry {
 
   // --- PLAYERNAME: the ORBITRON text (the only one outside a group) -------
   const groups = keyGroups(svg, sizes)
-  // Census: EVERY text in the file must belong to a group (OVR or KEY) or be
-  // the player name — a stray slot would silently fail to render.
+  // The LAST_UPDATE line (owner 2026-11-05): its texts sit outside the
+  // OVR/KEY groups, so they join the census before the stray check.
+  const lastUpdateGroup = lastUpdate(svg, sizes)
+  // Census: EVERY text in the file must belong to a group (OVR, KEY,
+  // LAST_UPDATE) or be the player name — a stray slot would silently fail to
+  // render.
   const grouped = new Set<number>([
     ...groups.flatMap((g) => g.texts.map((t) => t.index)),
     ...ovrTexts.map((t) => t.index),
+    ...(lastUpdateGroup?.indexes ?? []),
   ])
   const nameRaw = texts.find((t) => !grouped.has(t.index) && t.family.includes('orbitron'))
   if (!nameRaw) throw new Error('card.svg: no ORBITRON text found for the player name slot')
@@ -819,6 +820,19 @@ function parseCard(svg: string): CardGeometry {
   const platePath = pickPlatePath(svg)
   const cropPath = pickCropPath(svg)
 
+  // The LAST_UPDATE line must sit below the name and above the stat labels
+  // (the file's own composition): a re-seed that breaks that order fails
+  // loudly instead of stacking text.
+  const lastUpdateValue = lastUpdateGroup?.value
+  if (lastUpdateValue !== undefined) {
+    const date = lastUpdateValue.date
+    if (!(date.y > name.y)) {
+      throw new Error('card.svg: the LAST_UPDATE line must sit BELOW the player name')
+    }
+    if (!(date.y < stats[0].label.y)) {
+      throw new Error('card.svg: the LAST_UPDATE line must sit ABOVE the stat labels')
+    }
+  }
 
   return {
     platePath,
@@ -826,8 +840,8 @@ function parseCard(svg: string): CardGeometry {
     cropPath,
     cropBBox: pathBBox(cropPath, 'crop-path'),
     borderStroke: borderStroke(svg),
-    statsPlate: statsPlate(svg),
-    slots: { ovr, job, name, stats },
+    logo: cardLogo(svg),
+    slots: { ovr, job, name, lastUpdate: lastUpdateValue, stats },
   }
 }
 
@@ -946,16 +960,80 @@ export function photoDestRect(
   const frameW = Math.max(1, frame.right - frame.left)
   const frameH = Math.max(1, frame.bottom - frame.top)
 
-  // Cover: the frame fills the window on BOTH axes; overflow centers, so
-  // the SUBJECT stays centered and its head margin survives.
+  // Cover: the frame fills the window on BOTH axes. When the framed figure is
+  // TALLER than the window (the usual case since the 2026-11-05 crop path is
+  // short and wide), anchor the frame's TOP to the window top — the head keeps
+  // its margin and only the legs are cropped ("hide the legs, never the head",
+  // the round-7 rule). A frame that fits vertically centers as before. The
+  // member can then pan/zoom the framing themselves (applyPhotoTransform).
   const scale = Math.max(win.w / frameW, win.h / frameH)
+  const drawnFrameH = frameH * scale
+  const y =
+    drawnFrameH > win.h + 0.5
+      ? win.y - frame.top * scale
+      : win.y + (win.h - drawnFrameH) / 2 - frame.top * scale
   return {
     x: win.x + (win.w - frameW * scale) / 2 - frame.left * scale,
-    y: win.y + (win.h - frameH * scale) / 2 - frame.top * scale,
+    y,
     w: imgW * scale,
     h: imgH * scale,
   }
 }
+
+/** The member's chosen framing inside the crop path (owner 2026-11-05: "dar
+ *  zoom e arrastar a foto como quiser"). Values are NORMALIZED so the same
+ *  transform renders identically at every scale:
+ *   - `zoom` multiplies the cover fit (>= 1 — the photo always covers the
+ *     crop window, never a gap);
+ *   - `x` / `y` are the pan in -1..1: ±1 puts the photo's edge exactly on the
+ *     window's edge, 0 keeps the cover fit's own anchor. */
+export interface CardPhotoTransform {
+  zoom: number
+  x: number
+  y: number
+}
+
+export const PHOTO_TRANSFORM_DEFAULT: CardPhotoTransform = { zoom: 1, x: 0, y: 0 }
+
+/** Is this transform a no-op (the cover fit is used verbatim)? */
+export function isPhotoTransformDefault(t: CardPhotoTransform | null | undefined): boolean {
+  return t === null || t === undefined || (t.zoom === 1 && t.x === 0 && t.y === 0)
+}
+
+/**
+ * Apply the member's framing to the cover-fit rect. PURE — the on-page card,
+ * the crop editor and the canvas export all call it, so the preview is the
+ * artifact by construction.
+ *
+ * The base rect always COVERS `win` (photoDestRect guarantees it). Zoom is
+ * applied about the window's center, then the pan slides the image inside its
+ * own overflow; because |x|, |y| ≤ 1 the photo keeps covering the window at
+ * every position (no empty corners).
+ */
+export function applyPhotoTransform(
+  base: CardRect,
+  win: CardRect,
+  t: CardPhotoTransform | null | undefined,
+): CardRect {
+  if (isPhotoTransformDefault(t) || t === null || t === undefined) return base
+  const zoom = Math.max(1, t.zoom)
+  const w = base.w * zoom
+  const h = base.h * zoom
+  let x = win.x + (win.w - w) / 2
+  let y = win.y + (win.h - h) / 2
+  const clamp = (v: number) => Math.min(1, Math.max(-1, v))
+  const px = clamp(t.x)
+  const py = clamp(t.y)
+  // Overflow on each side of the window (>= 0 because the image covers it).
+  const left = Math.max(0, win.x - x)
+  const right = Math.max(0, x + w - (win.x + win.w))
+  const top = Math.max(0, win.y - y)
+  const bottom = Math.max(0, y + h - (win.y + win.h))
+  x += px >= 0 ? px * left : px * right
+  y += py >= 0 ? py * top : py * bottom
+  return { x, y, w, h }
+}
+
 
 /**
  * Measure the opaque subject bounds of a loaded image (DOM glue — the

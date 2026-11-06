@@ -20,12 +20,13 @@ import {
   CARD_PLATE_GRADIENT_LINE,
   IMPECAVEL_BORDER_STOPS,
   PHOTO_FRAME,
+  PHOTO_TRANSFORM_DEFAULT,
   TIER_PALETTE,
+  applyPhotoTransform,
   photoDestRect,
   scalePath,
   scaleRect,
-  tierPlateFadeStops,
-  tierPlateRamp,
+  scopedLogo,
 } from './cardAssets'
 
 describe('cardAssets — card.svg parses completely (fail-fast contract)', () => {
@@ -42,94 +43,88 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(CARD_GEOMETRY.cropPath.length).toBeGreaterThan(100)
   })
 
-  it('resolves the photo area inside the design space (whole shield in the re-export)', () => {
+  it('resolves the photo area inside the design space (crop path is BACK)', () => {
     const b = CARD_GEOMETRY.cropBBox
     expect(b.x).toBeGreaterThanOrEqual(0)
     expect(b.y).toBeGreaterThanOrEqual(0)
     expect(b.x + b.w).toBeLessThanOrEqual(CARD_DESIGN_WIDTH + 1)
     expect(b.y + b.h).toBeLessThanOrEqual(CARD_DESIGN_HEIGHT)
-    // Owner decision 2026-10-29: the re-export carries no crop-path, so the
-    // photo occupies THE WHOLE SHIELD — the bbox IS the plate's bbox.
-    expect(CARD_GEOMETRY.cropPath).toBe(CARD_GEOMETRY.platePath)
-    expect(CARD_GEOMETRY.cropBBox).toEqual(CARD_GEOMETRY.plateBBox)
+    // Owner 2026-11-05: the re-seed brought `crop-path` back — the photo is
+    // the shield's TOP PORTION, not the whole shield.
+    expect(CARD_GEOMETRY.cropPath).not.toBe(CARD_GEOMETRY.platePath)
     expect(b.w).toBeGreaterThan(CARD_DESIGN_WIDTH * 0.85)
-    expect(b.h).toBeGreaterThan(CARD_DESIGN_HEIGHT * 0.85)
+    expect(b.h).toBeLessThan(CARD_DESIGN_HEIGHT * 0.6)
+    // The crop closes above the name/stat bands.
+    expect(b.y + b.h).toBeLessThan(CARD_GEOMETRY.slots.name.y)
   })
 
-  it('draws the owner\'s current tier-color-border ring with the Impecável rainbow', () => {
-    // Owner 2026-11-05: the border is `tier-color-border` — a 24px stroke on
-    // the plate silhouette, painted with the UI's Impecável gradient (the
-    // file's `stroke="#d4145a"` is a placeholder, never the design color).
+  it('draws the owner\'s current tier-color-border ring: tier ramp at the file\'s 30% opacity', () => {
+    // Owner 2026-11-05: `<g id="tier-color-border" opacity="0.3">` wraps the
+    // stroked silhouette (32px, clipped by clip-path-1). The ring paints the
+    // TIER's ramp (the file's dark stroke is a placeholder) at the FILE's
+    // opacity.
     const border = CARD_GEOMETRY.borderStroke
     expect(border).toBeDefined()
-    expect(border?.width).toBe(24)
+    expect(border?.width).toBe(32)
+    expect(border?.opacity).toBeCloseTo(0.3, 6)
     expect(border?.strokePath).toBe(CARD_GEOMETRY.platePath)
     expect(border?.line).toBe(CARD_PLATE_GRADIENT_LINE)
     expect(border?.stops).toBe(IMPECAVEL_BORDER_STOPS)
-    expect(border?.stops?.map((s) => s.color)).toEqual([
-      '#f26d6f',
-      '#e9b44c',
-      '#3fb950',
-      '#58a6ff',
-      '#b8c0cc',
-    ])
-    expect(border?.clipPath).toBeUndefined()
+    expect(border?.stops?.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
+    // The file clips the ring to the plate silhouette — parsed from
+    // clipPath#clip-path-1.
+    expect(border?.clipPath).toBe(CARD_GEOMETRY.platePath)
   })
 
-  it('extracts the STATS CONTRAST PLATE: its path, gradient line and FADE only', () => {
-    // Owner 2026-10-29: "the stats also have a plate that ensures contrast
-    // against the background", then: "the fills must follow tier colors, not
-    // the color in the svg". So the parse carries the plate's GEOMETRY (path +
-    // gradient line) and its FADE structure (offsets + opacities) — and NO
-    // color: the tier supplies that at paint time.
-    const plate = CARD_GEOMETRY.statsPlate
-    expect(plate).toBeDefined()
-    if (plate === undefined) return
-    expect(plate.path.startsWith('M')).toBe(true)
-    expect(plate.path).not.toBe(CARD_GEOMETRY.platePath)
-    expect(plate.line.x1).toBeCloseTo(540.102, 1)
-    expect(plate.line.x2).toBeCloseTo(536.666, 1)
-    expect(plate.line.y1).toBeCloseTo(1517.645, 1)
-    expect(plate.line.y2).toBeCloseTo(844.033, 1)
-    expect(plate.fades.length).toBeGreaterThanOrEqual(2)
-    for (const fade of plate.fades) {
-      expect(Object.keys(fade).sort()).toEqual(['offset', 'opacity'])
-      expect(fade.opacity).toBeGreaterThanOrEqual(0)
-      expect(fade.opacity).toBeLessThanOrEqual(1)
+  it('has NO stats contrast plate any more (the backplate carries the contrast)', () => {
+    // Owner 2026-11-05: "o stats plate sumiu (o back-plate agora faz o
+    // trabalho do contraste)" — the parser no longer models the layer at all.
+    expect('statsPlate' in CARD_GEOMETRY).toBe(false)
+  })
+
+  it('parses the LAST_UPDATE line: the date slot + the static "• atualizado" segments', () => {    const lu = CARD_GEOMETRY.slots.lastUpdate
+    expect(lu).toBeDefined()
+    if (lu === undefined) return
+    // The first text of the group is the live date (36px), hand-placed under
+    // the player name.
+    expect(lu.date.x).toBeCloseTo(429.072, 1)
+    expect(lu.date.y).toBeCloseTo(1050.662, 1)
+    expect(lu.date.size).toBe(36)
+    expect(lu.date.y).toBeGreaterThan(CARD_GEOMETRY.slots.name.y)
+    expect(lu.date.y).toBeLessThan(CARD_GEOMETRY.slots.stats[0].label.y)
+    // The trailing segments keep the owner's literal strings and anchors.
+    expect(lu.suffix.map((s) => s.text)).toEqual(['•', 'atualizado'])
+    expect(lu.suffix[0].x).toBeCloseTo(503.01, 1)
+    expect(lu.suffix[1].x).toBeCloseTo(520.428, 1)
+    for (const segment of lu.suffix) {
+      expect(segment.y).toBeCloseTo(lu.date.y, 1)
+      expect(segment.size).toBe(36)
     }
-    // The plate fades: opaque where the stats sit (bottom) and transparent
-    // toward the photo above them.
-    expect(plate.fades[0].opacity).toBeGreaterThan(plate.fades[plate.fades.length - 1].opacity)
   })
 
-  it('covers the whole stats band with the plate (the stats must stay legible)', () => {
-    const plate = CARD_GEOMETRY.statsPlate
-    if (plate === undefined) throw new Error('the current file must carry the stats plate')
-    const b = cardPlateBBox(plate.path)
-    const firstStat = CARD_GEOMETRY.slots.stats[0]
-    const lastStat = CARD_GEOMETRY.slots.stats[5]
-    // Below the player name, above nothing: the plate spans the stat columns.
-    expect(b.y).toBeLessThan(firstStat.label.y)
-    expect(b.y + b.h).toBeGreaterThan(lastStat.value.y)
-    expect(b.w).toBeGreaterThan(CARD_DESIGN_WIDTH * 0.85)
-    expect(b.y + b.h).toBeLessThanOrEqual(CARD_DESIGN_HEIGHT + 1)
+  it('parses the brand mark the file draws and scopes its gradient ids per card', () => {
+    // Owner 2026-11-05 added `logo-hellz` to the file: the app paints THAT
+    // mark (the old bundled hellz-mark.svg overlay double-drew the logo).
+    const logo = CARD_GEOMETRY.logo
+    expect(logo).toBeDefined()
+    if (logo === undefined) return
+    expect(logo.markup).toContain('id="logo-hellz"')
+    expect(logo.markup).toContain('polygon')
+    expect(logo.gradients).toContain('id="Magenta_to_Orange-2"')
+    // Two cards on one page must not cross-wire gradients: the scope suffixes
+    // both the defs' ids and every url(#…) reference.
+    const scoped = scopedLogo(logo, 'abc')
+    expect(scoped.gradients).toContain('id="Magenta_to_Orange-2-abc"')
+    expect(scoped.markup).not.toContain('url(#Magenta_to_Orange-2)')
+    expect(scoped.markup).toContain('url(#Magenta_to_Orange-2-abc)')
   })
 })
 
-/** Local bbox helper (pathBBox is not exported; the plate is a plain absolute
- *  M/C path, so the numeric tokens are the coordinates in order). */
-function cardPlateBBox(d: string) {
-  const nums = (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number)
-  const xs = nums.filter((_, i) => i % 2 === 0)
-  const ys = nums.filter((_, i) => i % 2 === 1)
-  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }
-}
-
 describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes', () => {
-  it('resolves the OVR slot: the BIGGEST text in the OVR group, ≈148px at (136.177, 412.59)', () => {
+  it('resolves the OVR slot: the BIGGEST text in the OVR group, ≈148px at (112.481, 399.59)', () => {
     const ovr = CARD_GEOMETRY.slots.ovr
-    expect(ovr.x).toBeCloseTo(136.177, 1)
-    expect(ovr.y).toBeCloseTo(412.59, 1)
+    expect(ovr.x).toBeCloseTo(112.481, 1)
+    expect(ovr.y).toBeCloseTo(399.59, 1)
     // The re-export states the effective size inline (148.014px; the round-8
     // file reached the same 148px through its 6.992×21.169 matrix hack).
     expect(ovr.size).toBeCloseTo(148.014, 1)
@@ -137,11 +132,11 @@ describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes'
     expect(ovr.size).toBeLessThan(160)
   })
 
-  it('resolves the job slot (the SMALLER OVR-group text, 56px Bebas) directly under the number', () => {
+  it('resolves the job slot (the SMALLER OVR-group text, 48px Bebas) directly under the number', () => {
     const job = CARD_GEOMETRY.slots.job
-    expect(job.x).toBeCloseTo(136.177, 1)
-    expect(job.y).toBeCloseTo(473.794, 1)
-    expect(job.size).toBe(56)
+    expect(job.x).toBeCloseTo(112.481, 1)
+    expect(job.y).toBeCloseTo(455.297, 1)
+    expect(job.size).toBe(48)
     expect(job.y).toBeGreaterThan(CARD_GEOMETRY.slots.ovr.y)
     // The job line must stay smaller than the number it sits under.
     expect(job.size).toBeLessThan(CARD_GEOMETRY.slots.ovr.size)
@@ -149,13 +144,13 @@ describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes'
 
   it('resolves the PLAYERNAME slot (the ONE Orbitron text, ≈72px) on the plate between photo and stats', () => {
     const name = CARD_GEOMETRY.slots.name
-    expect(name.x).toBeCloseTo(246.528, 1)
-    expect(name.y).toBeCloseTo(1044.007, 1)
+    expect(name.x).toBeCloseTo(246.626, 1)
+    expect(name.y).toBeCloseTo(1007.454, 1)
     expect(name.size).toBeCloseTo(71.976, 1)
     expect(name.size).toBeGreaterThan(60)
     expect(name.size).toBeLessThan(80)
-    // Above the stats labels (the photo area now IS the whole shield, so the
-    // name is checked against the first stat column instead of the crop bbox).
+    // Below the crop path (it sits on the plate), above the stat labels.
+    expect(name.y).toBeGreaterThan(CARD_GEOMETRY.cropBBox.y + CARD_GEOMETRY.cropBBox.h)
     expect(name.y).toBeLessThan(CARD_GEOMETRY.slots.stats[0].label.y)
     expect(name.y).toBeGreaterThan(CARD_GEOMETRY.slots.job.y)
   })
@@ -211,34 +206,31 @@ describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes'
   })
 })
 
-describe('cardAssets — tier palettes (the round-4 per-tier SVG colors, now code-driven)', () => {
-  it('carries a DISTINCT plate fill per tier with the round-4 hexes', () => {
+describe('cardAssets — tier palettes (the code-driven tier colors)', () => {
+  it('carries a DISTINCT plate fill per tier, the Impecável one from the file', () => {
     const fills = (['bronze', 'silver', 'gold', 'platinum'] as const).map((t) => TIER_PALETTE[t].plateFill)
     expect(new Set(fills).size).toBe(4)
     expect(TIER_PALETTE.bronze.plateFill).toBe('#d1a972')
     expect(TIER_PALETTE.silver.plateFill).toBe('#e6e6e6')
     expect(TIER_PALETTE.gold.plateFill).toBe('#f9b745')
-    expect(TIER_PALETTE.platinum.plateFill).toBe('#cf1a87')
+    // Owner 2026-11-05: "as cores do svg ... serão a nova cor do tier".
+    expect(TIER_PALETTE.platinum.plateFill).toBe('#ff12f7')
+    expect(TIER_PALETTE.platinum.plateStops?.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
   })
 
-  it('carries the retired round-4 border gradients per tier, with the platinum ring matching the UI Impecável rainbow', () => {
+  it('carries the border gradients per tier, with the Impecável ring on the card.svg ramp', () => {
     expect(TIER_PALETTE.bronze.borderStops.map((s) => s.color)).toEqual(['#ed7b00', '#b49f00'])
     expect(TIER_PALETTE.silver.borderStops.map((s) => s.color)).toEqual(['#7e888e', '#cbd2d6'])
     expect(TIER_PALETTE.gold.borderStops.map((s) => s.color)).toEqual(['#ff635f', '#d38f00'])
-    // The top tier reads the SAME five stops as tier-impecavel-border.
-    expect(TIER_PALETTE.platinum.borderStops.map((s) => s.color)).toEqual([
-      '#f26d6f',
-      '#e9b44c',
-      '#3fb950',
-      '#58a6ff',
-      '#b8c0cc',
-    ])
+    // The top tier ring is the SAME Magenta_to_Orange ramp as its plate.
+    expect(TIER_PALETTE.platinum.borderStops.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
+    expect(TIER_PALETTE.platinum.borderStops).toBe(TIER_PALETTE.platinum.plateStops)
     for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
       expect(TIER_PALETTE[tier].borderStops.length).toBeGreaterThanOrEqual(2)
     }
   })
 
-  it('follows the round-4 contrast rule: dark text on the light metals, white on the deep magenta', () => {
+  it('follows the contrast rule: dark text on the light metals, white on the deep magenta', () => {
     expect(TIER_PALETTE.bronze.textFill).toBe('#241a10')
     expect(TIER_PALETTE.silver.textFill).toBe('#241a10')
     expect(TIER_PALETTE.gold.textFill).toBe('#241a10')
@@ -254,50 +246,45 @@ describe('cardAssets — tier palettes (the round-4 per-tier SVG colors, now cod
   })
 })
 
-describe('cardAssets — 3-point tier ramp for the stats plate (owner 2026-10-29)', () => {
-  it('reduces the 5-point rainbow tier to 3 points, red at 0 and silver at 1', () => {
-    // "the rainbow doesn't necessarily have to be the 5-point we have on the
-    // project, it can reduced to 3 to better fit the 3 point gradient of the
-    // status plate".
-    const ramp = tierPlateRamp(TIER_PALETTE.platinum)
-    expect(ramp.map((s) => s.offset)).toEqual([0, 0.5, 1])
-    expect(ramp[0].color).toBe('#f26d6f')
-    expect(ramp[2].color).toBe('#b8c0cc')
-    // The middle point is sampled off the tier ramp (the 5-stop midpoint).
-    expect(ramp[1].color).toBe('#3fb950')
-    // Not the flat magenta plateFill — that was the bug.
-    expect(ramp.map((s) => s.color)).not.toContain('#cf1a87')
+describe('cardAssets — the member\'s photo framing inside the crop path (owner 2026-11-05)', () => {
+  const WIN = CARD_GEOMETRY.cropBBox
+  const screenshot = photoDestRect(1080, 2400, null, WIN)
+
+  it('is a no-op for the default transform (the measured cover fit renders untouched)', () => {
+    expect(applyPhotoTransform(screenshot, WIN, null)).toBe(screenshot)
+    expect(applyPhotoTransform(screenshot, WIN, PHOTO_TRANSFORM_DEFAULT)).toBe(screenshot)
   })
 
-  it('collapses a solid tier to its plateFill at every ramp point', () => {
-    for (const tier of ['bronze', 'silver', 'gold'] as const) {
-      const ramp = tierPlateRamp(TIER_PALETTE[tier])
-      expect(ramp).toEqual([{ offset: 0, color: TIER_PALETTE[tier].plateFill }])
+  it('zooms about the window center and keeps the photo covering the crop window', () => {
+    const zoomed = applyPhotoTransform(screenshot, WIN, { zoom: 2, x: 0, y: 0 })
+    expect(zoomed.w).toBeCloseTo(screenshot.w * 2, 6)
+    expect(zoomed.h).toBeCloseTo(screenshot.h * 2, 6)
+    // Aspect preserved, centered on the window.
+    expect(zoomed.w / zoomed.h).toBeCloseTo(screenshot.w / screenshot.h, 6)
+    expect(zoomed.x + zoomed.w / 2).toBeCloseTo(WIN.x + WIN.w / 2, 6)
+    expect(zoomed.y + zoomed.h / 2).toBeCloseTo(WIN.y + WIN.h / 2, 6)
+  })
+
+  it('pans within the overflow only — ±1 puts the image edge on the window edge', () => {
+    for (const x of [-1, -0.5, 0, 0.5, 1]) {
+      for (const y of [-1, -0.5, 0, 0.5, 1]) {
+        const dest = applyPhotoTransform(screenshot, WIN, { zoom: 1.5, x, y })
+        expect(dest.x).toBeLessThanOrEqual(WIN.x + 1e-6)
+        expect(dest.y).toBeLessThanOrEqual(WIN.y + 1e-6)
+        expect(dest.x + dest.w).toBeGreaterThanOrEqual(WIN.x + WIN.w - 1e-6)
+        expect(dest.y + dest.h).toBeGreaterThanOrEqual(WIN.y + WIN.h - 1e-6)
+      }
     }
+    const right = applyPhotoTransform(screenshot, WIN, { zoom: 1, x: 1, y: 0 })
+    expect(right.x).toBeCloseTo(WIN.x, 6)
+    const left = applyPhotoTransform(screenshot, WIN, { zoom: 1, x: -1, y: 0 })
+    expect(left.x + left.w).toBeCloseTo(WIN.x + WIN.w, 6)
   })
 
-  it('tints the FILE fade with the TIER ramp: offsets/opacities verbatim, one color per fade', () => {
-    const fades = [
-      { offset: 0, opacity: 1 },
-      { offset: 0.5, opacity: 1 },
-      { offset: 1, opacity: 0 },
-    ]
-    const stops = tierPlateFadeStops(TIER_PALETTE.platinum, fades)
-    expect(stops.map((s) => s.offset)).toEqual([0, 0.5, 1])
-    expect(stops.map((s) => s.opacity)).toEqual([1, 1, 0])
-    expect(stops.map((s) => s.color)).toEqual(['#f26d6f', '#3fb950', '#b8c0cc'])
-  })
-
-  it('samples between ramp points so no fade ever lands on a hard, unblended color', () => {
-    const stops = tierPlateFadeStops(TIER_PALETTE.platinum, [
-      { offset: 0.25, opacity: 1 },
-      { offset: 0.75, opacity: 1 },
-    ])
-    expect(stops[0].color).not.toBe('#f26d6f')
-    expect(stops[0].color).not.toBe('#3fb950')
-    expect(stops[1].color).not.toBe('#3fb950')
-    expect(stops[1].color).not.toBe('#b8c0cc')
-    for (const stop of stops) expect(stop.color).toMatch(/^#[0-9a-f]{6}$/)
+  it('clamps out-of-range pans (a corrupted store never opens a gap)', () => {
+    const dest = applyPhotoTransform(screenshot, WIN, { zoom: 1, x: 9, y: -9 })
+    expect(dest.x).toBeCloseTo(WIN.x, 6)
+    expect(dest.y + dest.h).toBeCloseTo(WIN.y + WIN.h, 6)
   })
 })
 
@@ -343,25 +330,27 @@ const HP_BOUNDS = { top: 88, bottom: 1250, left: 155, right: 1010 }
 describe('photoDestRect — subject art (the class-portrait framing, round 8)', () => {
   it('keeps the head off the top border: the subject top lands well inside the window', () => {
     const dest = photoDestRect(1197, 1309, HP_BOUNDS, WIN)
-    // The frame is height-constrained for this art, so the frame top == the
-    // window top; the subject's own headroom (88 image px) scaled into the
-    // window is the margin the owner asked for. The whole-figure framing
-    // (bodyFraction 1.0, 2026-10-30) scales the art down, so this margin is
-    // ~7% of the window: still clear of the top border, without the zoom.
+    // The 2026-11-05 crop window is short and wide, so the frame is
+    // width-constrained and anchored to the TOP: the subject's own headroom
+    // (88 art px) scaled into the window is the margin the owner asked for.
     const scale = dest.h / 1309
-    const subjectTopInWindow = 88 * scale
+    const subjectTopInWindow = dest.y - WIN.y + 88 * scale
     expect(subjectTopInWindow / WIN.h).toBeGreaterThan(0.05)
     expect(subjectTopInWindow / WIN.h).toBeLessThan(0.16)
+    expect(dest.y).toBeLessThanOrEqual(WIN.y + 0.5)
   })
 
-  it('ends the visible band at bodyFraction of the figure (no cut past the feet)', () => {
+  it('crops only BELOW the head (never the top of the figure)', () => {
     const dest = photoDestRect(1197, 1309, HP_BOUNDS, WIN)
     const scale = dest.h / 1309
     // Window bottom maps to this image row:
     const visibleBottomImageRow = (WIN.y + WIN.h - dest.y) / scale
     const figureH = HP_BOUNDS.bottom - HP_BOUNDS.top
     const visibleFigureFraction = (visibleBottomImageRow - HP_BOUNDS.top) / figureH
-    expect(visibleFigureFraction).toBeCloseTo(PHOTO_FRAME.bodyFraction, 2)
+    // The head + most of the body survive; only the lower part is cropped.
+    expect(visibleFigureFraction).toBeGreaterThan(0.55)
+    expect(visibleFigureFraction).toBeLessThan(1)
+    expect(visibleBottomImageRow).toBeLessThanOrEqual(HP_BOUNDS.bottom + 1)
   })
 
   it('COVERS the window with the frame on both axes and keeps the image aspect', () => {

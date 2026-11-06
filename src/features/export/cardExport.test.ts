@@ -43,6 +43,7 @@ import {
   estimateBebas,
   estimateOrbitron,
   fitCardText,
+  formatCardDate,
   measureBebas,
   measureOrbitron,
   TIER_PALETTE,
@@ -55,8 +56,6 @@ import {
   IMPECAVEL_BORDER_STOPS,
   contrastRatio,
   resolveCardTextFill,
-  tierPlateFadeStops,
-  tierPlateRamp,
 } from './cardAssets'
 
 const data: CardExportData = {
@@ -74,6 +73,7 @@ const data: CardExportData = {
   ],
   photoSrc: '/assets/classes/class-f-assassin-cross.webp',
   monogramLetter: 'A',
+  lastUpdate: '2026-11-05',
 }
 
 describe('buildCardPlan — card geometry (D-10, round-5 single-design edition)', () => {
@@ -260,11 +260,13 @@ describe('buildCardPlan — round-5 palette contract (tier colors applied by cod
     }
   })
 
-  it('round-10 contrast rule: pristine renders the plate rainbow and keeps text at AA (white → black)', () => {
+  it('round-10/2026-11-05 contrast rule: the Impecável plate is the file ramp and text flips to black', () => {
     const platinum = TIER_PALETTE.platinum
-    // The plate carries the same five UI stops as the border.
+    // The plate carries the card.svg's Magenta_to_Orange ramp — the same
+    // stops as its (30% opacity) border.
     expect(platinum.plateStops).toEqual(platinum.borderStops)
-    expect(platinum.plateStops).toHaveLength(5)
+    expect(platinum.plateStops).toHaveLength(2)
+    expect(platinum.plateStops?.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
     // White cannot hold AA anywhere on that plate; black can (the flip).
     for (const stop of platinum.plateStops ?? []) {
       expect(contrastRatio('#ffffff', stop.color)).toBeLessThan(4.5)
@@ -275,6 +277,51 @@ describe('buildCardPlan — round-5 palette contract (tier colors applied by cod
     for (const tier of ['bronze', 'silver', 'gold'] as const) {
       expect(resolveCardTextFill(TIER_PALETTE[tier])).toBe('#241a10')
     }
+  })
+})
+
+describe('buildCardPlan — LAST_UPDATE line + member photo framing (owner 2026-11-05)', () => {
+  it('formats the caller\'s date as DD-MM (the file\'s placeholder style), never faking one', () => {
+    expect(formatCardDate('2026-11-05')).toBe('05-11')
+    expect(formatCardDate('2026-11-05T13:45:00Z')).toBe('05-11')
+    expect(formatCardDate('2026-01-09')).toBe('09-01')
+    expect(formatCardDate(null)).toBeNull()
+    expect(formatCardDate(undefined)).toBeNull()
+    expect(formatCardDate('not a date')).toBeNull()
+  })
+
+  it('renders the date at the parsed slot with the file\'s "• atualizado" segments', () => {
+    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
+    const slot = CARD_GEOMETRY.slots.lastUpdate
+    expect(slot).toBeDefined()
+    expect(plan.lastUpdate).not.toBeNull()
+    if (plan.lastUpdate === null || slot === undefined) return
+    expect(plan.lastUpdate.date).toBe('05-11')
+    expect(plan.lastUpdate.x).toBe(slot.date.x)
+    expect(plan.lastUpdate.y).toBe(slot.date.y)
+    expect(plan.lastUpdate.size).toBe(slot.date.size)
+    expect(plan.lastUpdate.suffix.map((s) => s.text)).toEqual(['•', 'atualizado'])
+    expect(plan.lastUpdate.suffix.map((s) => s.x)).toEqual(slot.suffix.map((s) => s.x))
+    // Below the name, above the stat labels — the file's own composition.
+    expect(plan.lastUpdate.y).toBeGreaterThan(plan.name.y)
+    expect(plan.lastUpdate.y).toBeLessThan(plan.stats[0].labelY)
+  })
+
+  it('omits the line entirely when no date is supplied (never prints the placeholder)', () => {
+    for (const value of [null, undefined, '']) {
+      const plan = buildCardPlan({ ...data, lastUpdate: value }, CARD_DESIGN_WIDTH)
+      expect(plan.lastUpdate).toBeNull()
+    }
+  })
+
+  it('carries the member\'s framing through to the plan; absent → the measured cover fit', () => {
+    const framed = buildCardPlan(
+      { ...data, photoTransform: { zoom: 1.6, x: 0.4, y: -0.6 } },
+      CARD_DESIGN_WIDTH,
+    )
+    expect(framed.photoTransform).toEqual({ zoom: 1.6, x: 0.4, y: -0.6 })
+    const plain = buildCardPlan({ ...data, photoTransform: null }, CARD_DESIGN_WIDTH)
+    expect(plain.photoTransform).toBeNull()
   })
 })
 
@@ -294,76 +341,23 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     expect(backing.photoBBox.h).toBe(CARD_GEOMETRY.cropBBox.h * 2)
   })
 
-  // 2026-11-05 re-seed contract: the border is `tier-color-border` — a 24px
-  // stroke on the plate silhouette, unclipped, painted with the UI's
-  // Impecável rainbow (never the file's placeholder color).
-  it('draws the owner\'s current tier-color-border ring with the Impecável rainbow', () => {
+  // 2026-11-05 re-seed contract: the border is `tier-color-border` — a 32px
+  // stroke on the plate silhouette, clipped by clip-path-1, painted with the
+  // TIER ramp at the file's own 30% opacity.
+  it('draws the owner\'s current tier-color-border ring: tier ramp at 30% opacity', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     expect(plan.card.borderStroke).toBeDefined()
-    expect(plan.card.borderStroke?.width).toBe(24)
+    expect(plan.card.borderStroke?.width).toBe(32)
     expect(plan.card.borderStroke?.strokePath).toBe(CARD_GEOMETRY.platePath)
     expect(plan.card.borderStroke?.line).toEqual(CARD_PLATE_GRADIENT_LINE)
     expect(plan.card.borderStroke?.stops).toEqual(IMPECAVEL_BORDER_STOPS)
-    expect(plan.card.borderStroke?.clipPath).toBeUndefined()
+    expect(plan.card.borderStroke?.opacity).toBeCloseTo(0.3, 6)
+    expect(plan.card.borderStroke?.clipPath).toBe(CARD_GEOMETRY.platePath)
   })
 
-  it('carries the stats contrast plate through to the plan (geometry + fade from the file)', () => {
+  it('carries NO stats contrast plate (the backplate does the contrast job)', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
-    const plate = plan.card.statsPlate
-    expect(plate).toBeDefined()
-    if (plate === undefined) return
-    // Geometry and fade are the file's own; the COLOR is the tier's (owner
-    // 2026-10-29), so the fade carries no color at all.
-    expect(plate).toBe(CARD_GEOMETRY.statsPlate)
-    expect(plate.fades.length).toBeGreaterThanOrEqual(2)
-    for (const fade of plate.fades) {
-      expect(Object.keys(fade).sort()).toEqual(['offset', 'opacity'])
-    }
-  })
-
-  it('paints the plate in the TIER ramp, not the SVG ramp (owner tier-color contract)', () => {
-    // Owner 2026-10-29: "the fills must follow tier colors, not the color in
-    // the svg". Every tier resolves from its OWN palette, and the four tiers are
-    // distinguishable — the purple ramp in the file must never leak.
-    const colors = (['bronze', 'silver', 'gold', 'platinum'] as const).map(
-      (tier) => tierPlateRamp(TIER_PALETTE[tier])[0].color,
-    )
-    expect(new Set(colors).size).toBe(4)
-    for (const color of colors) {
-      expect(color).toMatch(/^#[0-9a-f]{6}$/i)
-      expect(color.toLowerCase()).not.toBe('#662d91')
-    }
-  })
-
-  it('rides the 3-point tier ramp on the plate, never a single flat color (platinum rainbow)', () => {
-    // Owner 2026-10-29: "the platinum tier is using green, not rainbow — the
-    // rainbow ... can be reduced to 3 to better fit the 3-point gradient of the
-    // status plate." Platinum therefore paints red → … → silver across the
-    // authored fades; a single flat green was the bug.
-    const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
-    const plate = plan.card.statsPlate
-    expect(plate).toBeDefined()
-    if (plate === undefined) return
-
-    const platinum = tierPlateFadeStops(TIER_PALETTE.platinum, plate.fades)
-    expect(platinum.map((s) => s.offset)).toEqual(plate.fades.map((f) => f.offset))
-    // The authored fade's opacities are preserved verbatim (contrast layer).
-    expect(platinum.map((s) => s.opacity)).toEqual(plate.fades.map((f) => f.opacity))
-
-    const colors = platinum.map((s) => s.color.toLowerCase())
-    // Not one flat fill (the reported bug), and the ramp's ends are the tier's
-    // own stops: red at 0, silver at 1.
-    expect(new Set(colors).size).toBeGreaterThan(1)
-    expect(colors[0]).toBe('#f26d6f')
-    expect(colors[colors.length - 1]).toBe('#b8c0cc')
-    // The file's purple must never leak into the plate.
-    expect(colors).not.toContain('#662d91')
-
-    // Solid tiers collapse to their plateFill, uniformly.
-    for (const tier of ['bronze', 'silver', 'gold'] as const) {
-      const stops = tierPlateFadeStops(TIER_PALETTE[tier], plate.fades)
-      expect(new Set(stops.map((s) => s.color))).toEqual(new Set([TIER_PALETTE[tier].plateFill]))
-    }
+    expect('statsPlate' in plan.card).toBe(false)
   })
 
   it('backs the over-photo OVR block with a top legibility scrim inside the crop area', () => {
@@ -625,8 +619,8 @@ describe('buildCardPlan — exact 2× scaling onto the download backing store', 
     expect(backing.ovr.jobY).toBe(base.ovr.jobY * 2)
     expect(backing.name.x).toBe(base.name.x * 2)
     expect(backing.name.y).toBe(base.name.y * 2)
-    expect(backing.mark.y).toBe(base.mark.y * 2)
-    expect(backing.mark.size).toBe(base.mark.size * 2)
+    expect(backing.lastUpdate?.x).toBe((base.lastUpdate?.x ?? 0) * 2)
+    expect(backing.lastUpdate?.size).toBe((base.lastUpdate?.size ?? 0) * 2)
     for (let i = 0; i < 6; i++) {
       expect(backing.stats[i].centerX).toBe(base.stats[i].centerX * 2)
       expect(backing.stats[i].labelMaxW).toBe(base.stats[i].labelMaxW * 2)
