@@ -913,6 +913,64 @@ export async function fetchMyCard(session: NeoFootSession): Promise<MyCard> {
   return card
 }
 
+// ---------------------------------------------------------------------------
+// 0074 stat progress trackers (owner request 2026-11-06): the Painel's
+// evidenced tiles carry a 3-point history and the detail modal compares the
+// value against THREE distinct references. Closed field list: own history +
+// aggregates only — never another member's value, never key-stat config.
+// ---------------------------------------------------------------------------
+
+/** One own-history point (last 3 submissions, newest first). */
+export interface StatProgressPoint {
+  value: number
+  submitted_at: string
+}
+
+export interface StatProgressRow {
+  stat_key: string
+  label: string
+  label_short: string
+  group_name: 'general' | 'quasi' | 'special'
+  value_type: 'flat' | 'percentual'
+  stat_direction: 'higher' | 'lower'
+  own_value: number | null
+  /** Last 3 own submissions, NEWEST FIRST (non-rejected/discarded). */
+  history: StatProgressPoint[]
+  /** Same merged class, ANY build role (n >= 3, else null). */
+  class_average: number | null
+  class_sample_size: number
+  /** Same build role, ANY class (n >= 3, else null). */
+  function_average: number | null
+  function_sample_size: number
+  /** Same merged class + build role — the my_report class_average basis. */
+  cohort_average: number | null
+  cohort_sample_size: number
+}
+
+export interface MyStatProgress {
+  char_class: string | null
+  char_function: 'dps' | 'mdps' | 'suporte'
+  stats: StatProgressRow[]
+}
+
+export async function fetchMyStatProgress(
+  session: NeoFootSession,
+  statKeys: readonly string[],
+): Promise<MyStatProgress> {
+  // SECURITY DEFINER RPC (0074): member-invocable — identity from the JWT only.
+  // The stat keys are an allow-list the server filters against stat_catalog;
+  // unknown keys are ignored server-side.
+  const res = await restFetch(session, '/rpc/my_stat_progress', {
+    method: 'POST',
+    body: JSON.stringify({ p_stat_keys: [...statKeys] }),
+  })
+  const progress = await parseBody<MyStatProgress>(res)
+  if (!progress || !Array.isArray(progress.stats)) {
+    throw new ApiError(0, 'server', 'malformed my_stat_progress response')
+  }
+  return progress
+}
+
 /** One member in the cross-cohort stat inspector (0047). */
 export interface StatOverviewRow {
   member_id: string
