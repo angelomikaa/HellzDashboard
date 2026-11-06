@@ -375,14 +375,22 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         <rect x={b.x} y={b.y} width={b.w} height={plan.scrim.y2 - plan.scrim.y1} fill={`url(#${scrimId})`} />
       </g>
 
+      {/* STATS CONTRAST PLATE (owner 2026-11-06): the file's fade behind the
+          six stat columns; it blends the photo edge into the plate. Geometry +
+          fade offsets from the file; colors from the tier. Painted BEFORE the
+          border (the file's own order: plate → photo → stats plate → border). */}
+      {plan.card.statsPlate !== undefined && (
+        <path d={plan.card.statsPlate.path} fill={`url(#${statsPlateGradId})`} />
+      )}
+
       {/* Detached border, WHEN THE FILE DRAWS ONE: the stroke ON THE PLATE
           SILHOUETTE — the border rings the WHOLE shield and covers the photo's
           edges; the photo area itself stays BORDERLESS (the owner's
-          three-layer background: plate → photo → border → text). The
-          2026-11-06 re-model (`tier-color-plate-2`) draws a 48px TIER-ramp
-          stroke clipped to the plate silhouette at `opacity="0.7"` — a
-          translucent tier tint; earlier files used 24/32px rings. The layer is
-          skipped only when the file declares no border. */}
+          background: plate → photo → stats plate → border → text). The current
+          file (`tier-color-border`) draws a 48px TIER-ramp stroke clipped to
+          the plate silhouette at full opacity; earlier files used 24/32px
+          rings and 0.3/0.7 opacity. The layer is skipped only when the file
+          declares no border. */}
       {plan.card.borderStroke !== undefined && (
         <path
           d={plan.card.borderStroke.strokePath}
@@ -396,14 +404,6 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           strokeOpacity={plan.card.borderStroke.opacity}
           clipPath={plan.card.borderStroke.clipPath !== undefined ? `url(#${borderClipId})` : undefined}
         />
-      )}
-
-      {/* STATS CONTRAST PLATE (owner 2026-11-06): the file's fade behind the
-          six stat columns, painted AFTER the border (the file's own order) so
-          it blends the photo edge into the plate. Geometry + fade offsets from
-          the file; colors from the tier. */}
-      {plan.card.statsPlate !== undefined && (
-        <path d={plan.card.statsPlate.path} fill={`url(#${statsPlateGradId})`} />
       )}
 
       {/* OVR block — big number + JOB NAME below, NO "OVR" tag, at the

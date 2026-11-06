@@ -4,7 +4,7 @@
 // spec module is never imported here and key-stat identity is never derived).
 import type { MyReportStat } from '../../lib/api'
 
-export type Tier = 'bronze' | 'silver' | 'gold' | 'platinum'
+export type Tier = 'bronze' | 'silver' | 'gold' | 'impecavel'
 
 /** D-01: stat-card tier from the 0–99 points scale (top-heavy bands). */
 export function tierForPoints(points: number | null): Tier | null {
@@ -12,7 +12,7 @@ export function tierForPoints(points: number | null): Tier | null {
   if (points < 35) return 'bronze'
   if (points < 60) return 'silver'
   if (points < 85) return 'gold'
-  return 'platinum'
+  return 'impecavel'
 }
 
 /** D-02: OVR hero tier from its own 51–99 scale (floor 51). */
@@ -21,7 +21,7 @@ export function tierForOvr(ovr: number | null): Tier | null {
   if (ovr < 65) return 'bronze'
   if (ovr < 75) return 'silver'
   if (ovr < 85) return 'gold'
-  return 'platinum'
+  return 'impecavel'
 }
 
 // 07.2 D-07: the three negative lower-is-better stats — a LOWER-than-average
@@ -83,19 +83,19 @@ export const TIER_BORDER: Record<Tier, string> = {
   bronze: 'border-tier-bronze',
   silver: 'border-tier-silver',
   gold: 'border-tier-gold',
-  platinum: 'border-tier-platinum',
+  impecavel: 'border-tier-impecavel',
 }
 
 export const TIER_TEXT: Record<Tier, string> = {
   bronze: 'text-tier-bronze',
   silver: 'text-tier-silver',
   gold: 'text-tier-gold',
-  platinum: 'text-tier-platinum',
+  impecavel: 'text-tier-impecavel',
 }
 
 export const TIER_BG: Record<Tier, string> = {
   bronze: 'bg-tier-bronze',
   silver: 'bg-tier-silver',
   gold: 'bg-tier-gold',
-  platinum: 'bg-tier-platinum',
+  impecavel: 'bg-tier-impecavel',
 }

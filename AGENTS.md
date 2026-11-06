@@ -2,7 +2,7 @@
 
 ## Project
 
-NeoFoot — a web panel for a single Ragnarok Origin guild. Players submit character stats via 3 screenshots per character (OCR auto-read + mandatory manual fix-up). The panel stores stats immutably, computes per-stat percentile ranks (EAFC Ultimate Team feel: rank-based points, top ≈ 99) and an overall rating (OVR) from 6 admin-tweakable key stats per class (floor of 51, hidden from members server-side), shows tiered stat cards (bronze/silver/gold/platinum), per-stat comparisons vs class average/best, and a promotion page for top players. Access is a per-player 4-digit PIN (hashed) with officer elevation.
+NeoFoot — a web panel for a single Ragnarok Origin guild. Players submit character stats via 3 screenshots per character (OCR auto-read + mandatory manual fix-up). The panel stores stats immutably, computes per-stat percentile ranks (EAFC Ultimate Team feel: rank-based points, top ≈ 99) and an overall rating (OVR) from 6 admin-tweakable key stats per class (floor of 51, hidden from members server-side), shows tiered stat cards (bronze/silver/gold/impecável), per-stat comparisons vs class average/best, and a promotion page for top players. Access is a per-player 4-digit PIN (hashed) with officer elevation.
 
 - **Core value:** each player sees where they stand vs same class/function and what to improve.
 - **Current focus:** Phase 1 — Foundation — Secure Access & Data Model.

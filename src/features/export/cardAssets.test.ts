@@ -71,8 +71,8 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(border?.line).toEqual(CARD_PLATE_GRADIENT_LINE)
     expect(border?.stops).toBeUndefined()
     // The tier supplies the colors; Impecável's ring IS the file's ramp.
-    expect(TIER_PALETTE.platinum.borderStops).toBe(IMPECAVEL_BORDER_STOPS)
-    expect(IMPECAVEL_BORDER_STOPS.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
+    expect(TIER_PALETTE.impecavel.borderStops).toBe(IMPECAVEL_BORDER_STOPS)
+    expect(IMPECAVEL_BORDER_STOPS.map((s) => s.color)).toEqual(['#990000', '#ed1c24'])
     // The file clips the ring to the plate silhouette.
     expect(border?.clipPath).toBe(CARD_GEOMETRY.platePath)
   })
@@ -87,7 +87,7 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(plate.path.startsWith('M')).toBe(true)
     expect(plate.path).not.toBe(CARD_GEOMETRY.platePath)
     expect(plate.id).toMatch(/^linear-gradient-/)
-    expect(plate.line.x1).toBeCloseTo(540, 1)
+    expect(plate.line.x1).toBeCloseTo(540.654, 1)
     expect(plate.line.x2).toBeCloseTo(540.102, 1)
     expect(plate.line.y1).toBeLessThan(plate.line.y2)
     expect(plate.fades.length).toBeGreaterThanOrEqual(2)
@@ -113,7 +113,7 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     // Nested inside <g id="OVR"> since this re-model — "atualizado • DD-MM"
     // over the photo, under the job line.
     expect(lu.date.x).toBeCloseTo(275.861, 1)
-    expect(lu.date.y).toBeCloseTo(502.519, 1)
+    expect(lu.date.y).toBeCloseTo(502.946, 1)
     expect(lu.date.size).toBe(36)
     expect(lu.date.y).toBeGreaterThan(CARD_GEOMETRY.slots.job.y)
     expect(lu.date.y).toBeLessThan(CARD_GEOMETRY.slots.name.y)
@@ -148,10 +148,10 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
 })
 
 describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes', () => {
-  it('resolves the OVR slot: the BIGGEST text in the OVR group, 164px at (124.99, 402.309)', () => {
+  it('resolves the OVR slot: the BIGGEST text in the OVR group, 164px at (123.219, 399.373)', () => {
     const ovr = CARD_GEOMETRY.slots.ovr
-    expect(ovr.x).toBeCloseTo(124.99, 1)
-    expect(ovr.y).toBeCloseTo(402.309, 1)
+    expect(ovr.x).toBeCloseTo(123.219, 1)
+    expect(ovr.y).toBeCloseTo(399.373, 1)
     expect(ovr.size).toBe(164)
     expect(ovr.size).toBeGreaterThan(140) // the number must be BIG (readability rounds 3-8)
     expect(ovr.size).toBeLessThan(180)
@@ -159,8 +159,8 @@ describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes'
 
   it('resolves the job slot (the SMALLER OVR-group text, 48px Bebas) directly under the number', () => {
     const job = CARD_GEOMETRY.slots.job
-    expect(job.x).toBeCloseTo(124.99, 1)
-    expect(job.y).toBeCloseTo(455.719, 1)
+    expect(job.x).toBeCloseTo(123.219, 1)
+    expect(job.y).toBeCloseTo(464.78, 1)
     expect(job.size).toBe(48)
     expect(job.y).toBeGreaterThan(CARD_GEOMETRY.slots.ovr.y)
     // The job line must stay smaller than the number it sits under.
@@ -233,39 +233,42 @@ describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes'
 
 describe('cardAssets — tier palettes (the code-driven tier colors)', () => {
   it('carries a DISTINCT plate fill per tier, the Impecável one from the file', () => {
-    const fills = (['bronze', 'silver', 'gold', 'platinum'] as const).map((t) => TIER_PALETTE[t].plateFill)
+    const fills = (['bronze', 'silver', 'gold', 'impecavel'] as const).map((t) => TIER_PALETTE[t].plateFill)
     expect(new Set(fills).size).toBe(4)
     expect(TIER_PALETTE.bronze.plateFill).toBe('#d1a972')
     expect(TIER_PALETTE.silver.plateFill).toBe('#e6e6e6')
     expect(TIER_PALETTE.gold.plateFill).toBe('#f9b745')
-    // Owner 2026-11-05: "as cores do svg ... serão a nova cor do tier".
-    expect(TIER_PALETTE.platinum.plateFill).toBe('#ff12f7')
-    expect(TIER_PALETTE.platinum.plateStops?.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
+    // Owner 2026-11-06: "a cor base dos cards impecáveis é um degradê
+    // vermelho" — the file's near-black → red ramp.
+    expect(TIER_PALETTE.impecavel.plateFill).toBe('#ed1c24')
+    expect(TIER_PALETTE.impecavel.plateStops?.map((s) => s.color)).toEqual(['#1a1a1a', '#ed1c24'])
   })
 
-  it('carries the border gradients per tier, with the Impecável ring on the card.svg ramp', () => {
+  it('carries the border gradients per tier, the Impecável one on the file\'s red ring', () => {
     expect(TIER_PALETTE.bronze.borderStops.map((s) => s.color)).toEqual(['#ed7b00', '#b49f00'])
     expect(TIER_PALETTE.silver.borderStops.map((s) => s.color)).toEqual(['#7e888e', '#cbd2d6'])
     expect(TIER_PALETTE.gold.borderStops.map((s) => s.color)).toEqual(['#ff635f', '#d38f00'])
-    // The top tier ring is the SAME Magenta_to_Orange ramp as its plate.
-    expect(TIER_PALETTE.platinum.borderStops.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
-    expect(TIER_PALETTE.platinum.borderStops).toBe(TIER_PALETTE.platinum.plateStops)
-    for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
+    // The top tier ring is the file's deep-red → red ramp (the plate ramp is
+    // the darker near-black → red one, so the two are NOT the same list).
+    expect(TIER_PALETTE.impecavel.borderStops.map((s) => s.color)).toEqual(['#990000', '#ed1c24'])
+    expect(TIER_PALETTE.impecavel.borderStops).toBe(IMPECAVEL_BORDER_STOPS)
+    expect(TIER_PALETTE.impecavel.plateStops).not.toBe(TIER_PALETTE.impecavel.borderStops)
+    for (const tier of ['bronze', 'silver', 'gold', 'impecavel'] as const) {
       expect(TIER_PALETTE[tier].borderStops.length).toBeGreaterThanOrEqual(2)
     }
   })
 
-  it('follows the contrast rule: dark text on the light metals, white on the deep magenta', () => {
+  it('follows the palette rule: dark text on the light metals, white on the red', () => {
     expect(TIER_PALETTE.bronze.textFill).toBe('#241a10')
     expect(TIER_PALETTE.silver.textFill).toBe('#241a10')
     expect(TIER_PALETTE.gold.textFill).toBe('#241a10')
-    expect(TIER_PALETTE.platinum.textFill).toBe('#ffffff')
+    expect(TIER_PALETTE.impecavel.textFill).toBe('#ffffff')
   })
 
   it('carries NO placeholder values: neither the file\'s #e6e6e6 slot fill nor Bebas Neue reaches the palettes', () => {
     // The parser deliberately ignores the placeholder font/fill — a future
     // edit must not reintroduce them through the palette either.
-    for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
+    for (const tier of ['bronze', 'silver', 'gold', 'impecavel'] as const) {
       expect(TIER_PALETTE[tier].textFill.toLowerCase()).not.toBe('#e6e6e6')
     }
   })

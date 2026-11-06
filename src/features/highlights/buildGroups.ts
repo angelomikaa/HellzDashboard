@@ -114,16 +114,16 @@ function cardBuildKey(card: PromotionCardRow): string {
   return String(card?.char_function ?? '').trim()
 }
 
-function isPlatinumCard(card: PromotionCardRow): boolean {
-  return tierForOvr(Math.round(card.ovr)) === 'platinum'
+function isImpecavelCard(card: PromotionCardRow): boolean {
+  return tierForOvr(Math.round(card.ovr)) === 'impecavel'
 }
 
 /**
  * Início card gate — per BUILD: hide smoke-only cohorts, then Impecável with a
- * non-platinum fallback.
+ * non-impecavel fallback.
  *
- * Owner 2026-11-01 (first ruling): "incluir os não platinas, caso não hajam
- * platinas habilitados na categoria" — a build with no platinum card shows its
+ * Owner 2026-11-01 (first ruling): "incluir os não impecáveis, caso não hajam
+ * impecáveis habilitados na categoria" — a build with no impecavel card shows its
  * server-ranked top 3 instead of vanishing.
  *
  * Owner 2026-11-01 (second ruling): "ocultar as coortes que até o momento estão
@@ -151,18 +151,18 @@ export function selectShowcaseCards(
   }
 
   const realBuilds = new Set<string>()
-  const platinumBuilds = new Set<string>()
+  const impecavelBuilds = new Set<string>()
   for (const [fn, group] of builds) {
     // Defensive: an older server payload without the 0055 flag is treated as
     // real, so a deploy-order slip can never blank the whole showcase.
     if (group.some((card) => card.placeholder !== true)) realBuilds.add(fn)
-    if (group.some(isPlatinumCard)) platinumBuilds.add(fn)
+    if (group.some(isImpecavelCard)) impecavelBuilds.add(fn)
   }
 
   return cards.filter((card) => {
     const fn = cardBuildKey(card)
     if (!realBuilds.has(fn)) return false
-    return isPlatinumCard(card) || !platinumBuilds.has(fn)
+    return isImpecavelCard(card) || !impecavelBuilds.has(fn)
   })
 }
 

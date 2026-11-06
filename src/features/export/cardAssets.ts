@@ -259,9 +259,9 @@ export interface TierPalette {
   textFill: string
 }
 
-/** The plate gradient line — the card.svg's OWN `Magenta_to_Orange` line
- *  (design space, 1080×1600): a near-vertical ramp from the crest's top
- *  point down to the shield's bottom tip. */
+/** The plate gradient line — the card.svg's own plate ramp line (design space,
+ *  1080×1600): a near-vertical ramp from the crest's top point down to the
+ *  shield's bottom tip. */
 export const CARD_PLATE_GRADIENT_LINE = {
   x1: 540.621,
   y1: 81.129,
@@ -269,12 +269,19 @@ export const CARD_PLATE_GRADIENT_LINE = {
   y2: 1517.645,
 } as const
 
-/** The Impecável ramp — the card.svg's `Magenta_to_Orange` stops, THE tier
- *  color since the owner's 2026-11-05 ruling ("atualize as cores do tier
- *  platina/impecável para as cores do svg, elas serão a nova cor do tier"). */
+/** The Impecável PLATE ramp — the card.svg's own gradient (owner 2026-11-06:
+ *  "a cor base dos cards impecáveis é um degradê vermelho"): near-black to
+ *  red. */
+export const IMPECAVEL_PLATE_STOPS: { offset: number; color: string }[] = [
+  { offset: 0, color: '#1a1a1a' },
+  { offset: 1, color: '#ed1c24' },
+]
+
+/** The Impecável RING/ACCENT ramp — the file's border + stats-plate gradient:
+ *  deep red to bright red. */
 export const IMPECAVEL_BORDER_STOPS: { offset: number; color: string }[] = [
-  { offset: 0, color: '#ff12f7' },
-  { offset: 1, color: '#ed7b00' },
+  { offset: 0, color: '#990000' },
+  { offset: 1, color: '#ed1c24' },
 ]
 
 export const TIER_PALETTE: Record<Tier, TierPalette> = {
@@ -302,27 +309,27 @@ export const TIER_PALETTE: Record<Tier, TierPalette> = {
     ],
     textFill: '#241a10',
   },
-  platinum: {
-    plateFill: '#ff12f7',
-    // The card.svg's own Magenta_to_Orange ramp: the plate and the border
-    // both paint the file's colors.
-    plateStops: IMPECAVEL_BORDER_STOPS,
+  impecavel: {
+    plateFill: '#ed1c24',
+    // The card.svg's own ramps: the shield fades near-black → red, the ring
+    // (and the stats-plate fade) deep red → bright red.
+    plateStops: IMPECAVEL_PLATE_STOPS,
     borderStops: IMPECAVEL_BORDER_STOPS,
     textFill: '#ffffff',
   },
 }
 
-/** The tier's own ramp for the file's fade layers (the stats plate):
- *  the owner's re-modeled gradients are authored in the Impecável colors, and
- *  the tier rule ("as cores do svg serão a nova cor do tier", and before that
- *  "the fills must follow tier colors") means each tier paints its own ramp at
- *  the FILE's offsets/opacities. Impecável therefore renders the file exactly;
- *  the metals render their own metal→metal fade. */
+/** The tier's own ramp for the file's fade layers (the stats plate): the
+ *  owner's re-modeled gradients are authored in the Impecável colors, and the
+ *  tier rule ("as cores do svg serão a nova cor do tier", and before that
+ *  "the fills must follow tier colors") means each tier paints its own ACCENT
+ *  ramp at the FILE's offsets/opacities. Impecável therefore renders the file
+ *  exactly (#990000 → #ed1c24); the metals render their own metal fade. */
 export function tierFadeStops(
   palette: TierPalette,
   fades: CardFade[],
 ): { offset: number; color: string; opacity: number }[] {
-  const ramp = palette.plateStops ?? palette.borderStops
+  const ramp = palette.borderStops
   return fades.map((fade) => ({
     offset: fade.offset,
     color: sampleRamp(ramp, fade.offset),

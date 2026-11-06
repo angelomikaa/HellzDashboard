@@ -9,7 +9,7 @@
 import { TIER_DISPLAY_LABELS, TIER_DOT_DISPLAY } from './tierDisplay'
 import type { Tier } from './presentation'
 
-const TIERS: Tier[] = ['bronze', 'silver', 'gold', 'platinum']
+const TIERS: Tier[] = ['bronze', 'silver', 'gold', 'impecavel']
 
 export function TierLegend() {
   return (

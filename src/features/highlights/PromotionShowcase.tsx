@@ -63,21 +63,21 @@
 // the number of its meta builds that currently have Impecáveis.
 //
 // Owner gate round 2 (07.1-02): the showcase is the premium register — only
-// Impecável (top-band) cards appear, with the per-build non-platinum fallback
+// Impecável (top-band) cards appear, with the per-build non-impecavel fallback
 // added by the owner on 2026-11-01 (below). Display-layer tier filter over the
 // fetched payload, server order preserved (filter, never sort), sections left
 // empty are dropped. tierForOvr is the unit-locked banding function. Because
 // the server takes the top 3 by OVR first, this filter yields exactly the top 3
-// platinum cards of each meta cohort (a cohort with fewer than 3 platinum shows
+// impecavel cards of each meta cohort (a cohort with fewer than 3 impecavel shows
 // what it has).
 //
-// Owner exceptions 2026-11-01: "incluir os não platinas, caso não hajam platinas
-// habilitados na categoria" — a build with no platinum card falls back to the
+// Owner exceptions 2026-11-01: "incluir os não impecáveis, caso não hajam impecáveis
+// habilitados na categoria" — a build with no impecavel card falls back to the
 // server-ranked top 3 instead of vanishing — and "ocultar as coortes que até o
 // momento estão compostas apenas por smokes" — a build whose cards are ALL
 // placeholders (card.placeholder, migration 0055) is hidden and returns by
 // itself once a real member joins. The gate is per BUILD (function): a build
-// never hides or suppresses a sibling (a platinum Summoner mdps cannot suppress
+// never hides or suppresses a sibling (a impecavel Summoner mdps cannot suppress
 // an all-gold suporte). selectShowcaseCards owns both rules.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { NeoFootSession } from '../auth/session'
@@ -211,7 +211,7 @@ export function PromotionShowcase({ session }: { session?: NeoFootSession }) {
   // that already answers one section per class this is a pass-through.
   const classSections = mergeCohortSections(sections)
 
-  // Per build: platinum cards when the build has any, else the server-ranked
+  // Per build: impecavel cards when the build has any, else the server-ranked
   // top 3 (owner 2026-11-01). A class survives when at least one build does.
   const showcaseSections = classSections.flatMap((section) => {
     const cards = selectShowcaseCards(section.cards)
@@ -343,7 +343,7 @@ function ClassRotation({
   const section = sections[clampedIndex]
   if (section === undefined) return null
   // 10.2: the class's showcase cards (Impecável, or the whole build when it has
-  // no platinum), split by META build (function). The
+  // no impecavel), split by META build (function). The
   // builds are the class's tokens; the carousel shows the pressed one (the
   // first by default). A build with no Impecáveis produces no token at all, and
   // groupCardsByBuild keeps every card in its exact server position.

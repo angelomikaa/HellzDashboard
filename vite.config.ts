@@ -1,6 +1,8 @@
 /// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 
 // The client reads import.meta.env.VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY,
@@ -17,6 +19,30 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 const SUPABASE_ENV_ALIASES: Record<string, string[]> = {
   VITE_SUPABASE_URL: ['SUPABASE_URL'],
   VITE_SUPABASE_ANON_KEY: ['SUPABASE_ANON_KEY', 'SUPABASE_PUBLISHABLE_KEY'],
+}
+
+// The owner's card.svg embeds a full class portrait as a base64 placeholder
+// (the design file is ~3.4 MB). The app ALWAYS paints the member's own photo
+// over that area and the parser never reads the image, so the payload is dead
+// weight in the bundle. Blank the data URI before the `?raw` import resolves:
+// same geometry, same layers, ~0.5% of the bytes. The source file stays
+// untouched (it is the owner's design artifact).
+function cardAssetSlim(): Plugin {
+  return {
+    name: 'neofoot:card-asset-slim',
+    enforce: 'pre',
+    load(id) {
+      if (!id.includes('card.svg?raw')) return null
+      const raw = id.slice(0, id.length - '?raw'.length)
+      // Vite passes an absolute path; vitest/vite-node can pass a file:// URL
+      // (and Windows paths may carry a leading slash).
+      let filePath = raw.startsWith('file:') ? fileURLToPath(raw) : raw
+      if (/^\/[A-Za-z]:/.test(filePath)) filePath = filePath.slice(1)
+      const svg = readFileSync(filePath, 'utf8')
+      const slim = svg.replaceAll(/xlink:href="data:[^"]*"/g, 'xlink:href=""')
+      return `export default ${JSON.stringify(slim)}`
+    },
+  }
 }
 
 function supabaseEnv(): Plugin {
@@ -58,7 +84,7 @@ function supabaseEnv(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [supabaseEnv(), react(), tailwindcss()],
+  plugins: [supabaseEnv(), cardAssetSlim(), react(), tailwindcss()],
   test: {
     // Two projects so the default loop stays fast: `npm test` runs the unit
     // suite (src + the credential smoke), while `npm run test:ocr` runs the

@@ -780,7 +780,7 @@ export interface PromotionSection {
   // with several meta cohorts (e.g. Assassin Cross dps + mdps) keeps ONE
   // section carrying up to 3 cards per cohort, ordered by OVR desc. Classes
   // with insufficient data are OMITTED server-side (D-13). Display gate
-  // (07.1-02 + owner 2026-11-01): per build, keep the platinum cards
+  // (07.1-02 + owner 2026-11-01): per build, keep the impecavel cards
   // (tierForOvr); a build with none falls back to its top 3, and a build made
   // only of placeholders (card.placeholder, migration 0055) is hidden.
   //

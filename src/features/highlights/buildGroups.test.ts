@@ -257,10 +257,10 @@ describe('merge + group — the showcase row count per class', () => {
   })
 })
 
-// --- Início gate: Impecável first, non-platinum fallback per build (2026-11-01) ---
+// --- Início gate: Impecável first, non-impecavel fallback per build (2026-11-01) ---
 
-describe('selectShowcaseCards — platinum, with a per-build fallback', () => {
-  it('keeps only the platinum cards when the build has any (>= 85)', () => {
+describe('selectShowcaseCards — impecavel, with a per-build fallback', () => {
+  it('keeps only the impecavel cards when the build has any (>= 85)', () => {
     const kept = selectShowcaseCards([
       card('real', 'dps', 99),
       card('primer-a', 'dps', 96.62),
@@ -270,8 +270,8 @@ describe('selectShowcaseCards — platinum, with a per-build fallback', () => {
     expect(kept.map((c) => c.display_name)).toEqual(['real', 'primer-a'])
   })
 
-  it('falls back to the whole ranked build when a real build has no platinum', () => {
-    // A real cohort whose best card is gold: none is platinum, so all three
+  it('falls back to the whole ranked build when a real build has no impecavel', () => {
+    // A real cohort whose best card is gold: none is impecavel, so all three
     // server-ranked cards stay and the carousel exists.
     const kept = selectShowcaseCards([
       card('Real Um', 'suporte', 83),
@@ -282,7 +282,7 @@ describe('selectShowcaseCards — platinum, with a per-build fallback', () => {
     expect(kept.map((c) => c.display_name)).toEqual(['Real Um', 'Real Dois', 'Real Tres'])
   })
 
-  it('decides per build: a platinum build never suppresses a non-platinum sibling', () => {
+  it('decides per build: a impecavel build never suppresses a non-impecavel sibling', () => {
     const kept = selectShowcaseCards([
       card('mdps-real', 'mdps', 97),
       card('mdps-primer', 'mdps', 84),
@@ -312,7 +312,7 @@ describe('selectShowcaseCards — platinum, with a per-build fallback', () => {
 // --- Início gate: smoke-only cohorts hidden (owner 2026-11-01, migration 0055) ---
 
 describe('selectShowcaseCards — hide builds made only of placeholders', () => {
-  it('drops a platinum build whose cards are ALL placeholders (Algoz dps)', () => {
+  it('drops a impecavel build whose cards are ALL placeholders (Algoz dps)', () => {
     const kept = selectShowcaseCards([
       card('Smoke Algoz Um', 'dps', 91, true),
       card('Smoke Algoz Dois', 'dps', 88.23, true),
@@ -346,7 +346,7 @@ describe('selectShowcaseCards — hide builds made only of placeholders', () => 
     expect(kept.map((c) => c.display_name)).toEqual(['Caladoh', 'Sylveon'])
   })
 
-  it('keeps a real non-platinum build with placeholder fillers (fallback still applies)', () => {
+  it('keeps a real non-impecavel build with placeholder fillers (fallback still applies)', () => {
     const kept = selectShowcaseCards([
       card('Real Gold', 'mdps', 80, false),
       card('Smoke Filler', 'mdps', 78, true),

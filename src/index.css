@@ -57,11 +57,10 @@
   --color-tier-bronze: #C97F3F;
   --color-tier-silver: #B8C0CC;
   --color-tier-gold: #E9B44C;         /* gold's ONLY surviving role (D-01) */
-  /* Impecável (owner 2026-11-05): the top tier now wears the card's own
-     Magenta_to_Orange ramp — the SVG's colors ARE the tier colors. The token
-     is the ramp's magenta end (5.3:1 on #1E1E1E); gradients below carry the
-     full magenta → orange sweep. */
-  --color-tier-platinum: #FF12F7;
+  /* Impecável (owner 2026-11-06): the top tier wears the card's RED ramp —
+     the SVG's colors ARE the tier colors. The token is the ramp's bright red
+     end; the gradients below carry the deep-red → red sweep. */
+  --color-tier-impecavel: #ED1C24;
 
   /* 07.2 D-06 (SUPERSEDED 2026-10-23, owner): the relevant-tier signal is a
      PURPLE FILL on the Stats-Chave chips — replaces both the retired yellow
@@ -221,12 +220,11 @@
   }
 }
 
-/* Impecável — the top tier, renamed per owner decision at the 07.1-02 gate
-   (platinum read too close to silver). Owner 2026-11-05: its colors ARE the
-   card.svg's Magenta_to_Orange ramp (#ff12f7 → #ed7b00), so the UI frame and
-   the rendered card read as the same tier. Static only (D-05): gradients +
-   shadows, nothing animates. Text color #FFFFFF on #1E1E1E ≈ 16.7:1 (AAA);
-   border/glow colors are decorative. */
+/* Impecável — the top tier. Owner 2026-11-06: its colors ARE the card.svg's
+   RED ramp (plate near-black → red, ring/accent deep red → red), so the UI
+   frame and the rendered card read as the same tier. Static only (D-05):
+   gradients + shadows, nothing animates. Text color #FFFFFF on #1E1E1E ≈
+   16.7:1 (AAA); border/glow colors are decorative. */
 @utility tier-impecavel-border {
   border-color: transparent;
   /* double-background gradient border (respects border-radius, unlike
@@ -241,7 +239,7 @@
     /* first layer reads --card-surface (set at rest by hover-card) so the
        owner-gate round-5 hover lighten shows through the gradient border */
     linear-gradient(var(--card-surface, var(--color-surface)), var(--card-surface, var(--color-surface))),
-    linear-gradient(120deg, #ff12f7, #ed7b00);
+    linear-gradient(120deg, #990000, #ed1c24);
   background-origin: padding-box, border-box;
   background-clip: padding-box, border-box;
   /* The gradient is only as thick as the border — pin 2px so the treatment
@@ -253,12 +251,12 @@
 @utility tier-impecavel-text {
   color: #ffffff;
   text-shadow:
-    0 0 18px rgb(255 18 247 / 0.45),
-    0 0 18px rgb(237 123 0 / 0.3);
+    0 0 18px rgb(237 28 36 / 0.45),
+    0 0 18px rgb(153 0 0 / 0.35);
 }
 
 @utility tier-impecavel-dot {
-  background-image: linear-gradient(135deg, #ff12f7, #ed7b00);
+  background-image: linear-gradient(135deg, #990000, #ed1c24);
 }
 
 /* Destaques carousel (SHWC-01 rework, UAT round 1 2026-10-24; loop in round 2).

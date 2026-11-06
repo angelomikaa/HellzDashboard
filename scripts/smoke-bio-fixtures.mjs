@@ -242,7 +242,7 @@ async function main() {
   }
 
   // The actual goal: get_promotion_public must carry a Biochemist section
-  // with at least one platinum card (>= 85, the landing's filter).
+  // with at least one impecável card (>= 85, the landing's filter).
   const sections = await fetchPublicPromotion()
   const bio = sections.find((s) => s.class_name === CHAR_CLASS)
   if (!bio) {
@@ -250,10 +250,10 @@ async function main() {
     process.exitCode = 1
   } else {
     const ovrs = bio.cards.map((c) => ({ name: c.display_name, ovr: Math.round(c.ovr) }))
-    const platinum = ovrs.filter((c) => c.ovr >= 85)
+    const impecavel = ovrs.filter((c) => c.ovr >= 85)
     console.log(`[smoke-bio-fixtures] public Biochemist cards: ${JSON.stringify(ovrs)}`)
-    console.log(`[smoke-bio-fixtures] platinum (>= 85, visible on landing): ${platinum.length} -> ${platinum.length ? 'ROTATION VISIBLE' : 'ROTATION STILL INVISIBLE'}`)
-    if (platinum.length === 0) process.exitCode = 1
+    console.log(`[smoke-bio-fixtures] impecável (>= 85, visible on landing): ${impecavel.length} -> ${impecavel.length ? 'ROTATION VISIBLE' : 'ROTATION STILL INVISIBLE'}`)
+    if (impecavel.length === 0) process.exitCode = 1
   }
 
   if (after.validated_submitters < 3) {

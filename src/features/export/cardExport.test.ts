@@ -224,8 +224,8 @@ describe('buildCardPlan — round-5 typography contract (Orbitron fit inside the
 
 describe('buildCardPlan — round-5 palette contract (tier colors applied by code)', () => {
   it('keys the palette by the OVR tier and carries THAT tier\'s plate fill + border stops + text fill', () => {
-    const ovrByTier = { bronze: 60, silver: 70, gold: 80, platinum: 87 } as const
-    for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
+    const ovrByTier = { bronze: 60, silver: 70, gold: 80, impecavel: 87 } as const
+    for (const tier of ['bronze', 'silver', 'gold', 'impecavel'] as const) {
       const plan = buildCardPlan({ ...data, ovr: ovrByTier[tier] }, CARD_DESIGN_WIDTH)
       expect(plan.tier).toBe(tier)
       expect(plan.palette).toBe(TIER_PALETTE[tier])
@@ -233,7 +233,7 @@ describe('buildCardPlan — round-5 palette contract (tier colors applied by cod
       // renders WHITE, the metals keep their dark brown. No AA flip.
       expect(plan.name.color).toBe(plan.textFill)
       expect(plan.textFill).toBe(TIER_PALETTE[tier].textFill)
-      if (tier === 'platinum') {
+      if (tier === 'impecavel') {
         expect(plan.name.color).toBe('#ffffff')
       } else {
         expect(plan.name.color).toBe('#241a10')
@@ -251,22 +251,22 @@ describe('buildCardPlan — round-5 palette contract (tier colors applied by cod
   })
 
   it('paints the over-photo OVR block white on EVERY tier (photo legibility is tier-independent)', () => {
-    const ovrByTier = { bronze: 60, silver: 70, gold: 80, platinum: 87 } as const
-    for (const tier of ['bronze', 'silver', 'gold', 'platinum'] as const) {
+    const ovrByTier = { bronze: 60, silver: 70, gold: 80, impecavel: 87 } as const
+    for (const tier of ['bronze', 'silver', 'gold', 'impecavel'] as const) {
       const plan = buildCardPlan({ ...data, ovr: ovrByTier[tier] }, CARD_DESIGN_WIDTH)
       expect(plan.ovr.color).toBe('#FFFFFF')
     }
   })
 
-  it('owner 2026-11-06: the Impecável text is WHITE (the AA flip is retired), metals keep dark', () => {
-    const platinum = TIER_PALETTE.platinum
-    // The plate carries the card.svg's Magenta_to_Orange ramp — the same
-    // stops as its (full-opacity) border.
-    expect(platinum.plateStops).toEqual(platinum.borderStops)
-    expect(platinum.plateStops).toHaveLength(2)
-    expect(platinum.plateStops?.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
+  it('owner 2026-11-06: the Impecável plate is the RED ramp and its text is WHITE', () => {
+    const impecavel = TIER_PALETTE.impecavel
+    // The plate carries the card.svg's near-black → red ramp; the ring/fade
+    // accent is the file's deep-red → red ramp (a different list).
+    expect(impecavel.plateStops?.map((s) => s.color)).toEqual(['#1a1a1a', '#ed1c24'])
+    expect(impecavel.plateStops).toHaveLength(2)
+    expect(impecavel.borderStops.map((s) => s.color)).toEqual(['#990000', '#ed1c24'])
     // The palette decides the fill — no contrast-driven flip.
-    expect(platinum.textFill).toBe('#ffffff')
+    expect(impecavel.textFill).toBe('#ffffff')
     const plan = buildCardPlan({ ...data, ovr: 87 }, CARD_DESIGN_WIDTH)
     expect(plan.textFill).toBe('#ffffff')
     expect(plan.name.color).toBe('#ffffff')
@@ -368,23 +368,23 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     expect('ovrBokeh' in plan.card).toBe(false)
   })
 
-  it('tints the file fades with the TIER ramp (Impecável renders the file exactly)', () => {
+  it('tints the file fades with the TIER accent ramp (Impecável renders the file exactly)', () => {
     const plate = CARD_GEOMETRY.statsPlate
     if (plate === undefined) return
-    const platinum = tierFadeStops(TIER_PALETTE.platinum, plate.fades)
-    expect(platinum.map((s) => s.offset)).toEqual(plate.fades.map((f) => f.offset))
-    expect(platinum.map((s) => s.opacity)).toEqual(plate.fades.map((f) => f.opacity))
-    expect(platinum[0].color).toBe('#ff12f7')
-    expect(platinum[platinum.length - 1].color).toBe('#ed7b00')
+    const impecavel = tierFadeStops(TIER_PALETTE.impecavel, plate.fades)
+    expect(impecavel.map((s) => s.offset)).toEqual(plate.fades.map((f) => f.offset))
+    expect(impecavel.map((s) => s.opacity)).toEqual(plate.fades.map((f) => f.opacity))
+    expect(impecavel[0].color).toBe('#990000')
+    expect(impecavel[impecavel.length - 1].color).toBe('#ed1c24')
     // The metals render their own ramp — never a flat color and never the
-    // file's magenta.
+    // file's red.
     for (const tier of ['bronze', 'silver', 'gold'] as const) {
       const stops = tierFadeStops(TIER_PALETTE[tier], plate.fades)
       expect(stops[0].color).toBe(TIER_PALETTE[tier].borderStops[0].color)
       expect(stops[stops.length - 1].color).toBe(
         TIER_PALETTE[tier].borderStops[TIER_PALETTE[tier].borderStops.length - 1].color,
       )
-      expect(stops.map((s) => s.color)).not.toContain('#ff12f7')
+      expect(stops.map((s) => s.color)).not.toContain('#990000')
     }
   })
 

@@ -68,7 +68,7 @@ const CASES: Array<{ tier: string; ovr: number; photo: string | null }> = [
   { tier: 'bronze', ovr: 60, photo: null }, // monogram fallback path
   { tier: 'silver', ovr: 70, photo: '/assets/classes/class-f-high-wizard.webp' },
   { tier: 'gold', ovr: 80, photo: '/assets/classes/class-f-assassin-cross.webp' },
-  { tier: 'platinum', ovr: 87, photo: '/assets/classes/class-f-lord-knight.webp' },
+  { tier: 'impecavel', ovr: 87, photo: '/assets/classes/class-f-lord-knight.webp' },
 ]
 
 function isWhiteish(d: Uint8ClampedArray): boolean {
@@ -385,20 +385,29 @@ function referenceCardSvg(
   let svg = cardRaw
   // Tier palette → the file's placeholder colors. ORDER MATTERS: the text
   // fill goes first (the file's #e6e6e6), THEN the plate.
-  // The file's gradients ship the Impecável ramp; every other tier rewrites
-  // their STOPS (offsets/opacities stay the file's).
+  // The file's gradients ship the Impecável ramps; every other tier rewrites
+  // their STOPS (offsets/opacities stay the file's). The plate fill and the
+  // ring stroke can use DIFFERENT gradients (the 2026-11-06b file does), so
+  // each is re-tinted from its own reference.
   const plateGradient = palette.plateStops
   const ringStops = palette.borderStops
-  const rampStops = plateGradient ?? ringStops
+  const stopsMarkup = (stops: { offset: number; color: string }[]): string =>
+    stops.map((s) => `<stop offset="${s.offset}" stop-color="${s.color}"/>`).join('')
   svg = svg.replaceAll('fill="#e6e6e6"', `fill="${plan.textFill}"`)
   svg = svg.replaceAll('fill:#e6e6e6', `fill:${plan.textFill}`)
-  // The tier ramp gradient the file uses for the plate fill + border stroke.
-  svg = svg.replace(
-    /(<linearGradient\b[^>]*id="linear-gradient-1"[^>]*>)[\s\S]*?(<\/linearGradient>)/,
-    `$1${rampStops
-      .map((s) => `<stop offset="${s.offset}" stop-color="${s.color}"/>`)
-      .join('')}$2`,
-  )
+  // Which gradient does the plate fill reference, and which one strokes the
+  // ring? (Read from the file so a re-export with new ids keeps working.)
+  const plateRef = /<path\b[^>]*id="tier-color-plate"[^>]*fill="url\(#([^)]+)\)"/.exec(svg)?.[1]
+  const ringRef = /<path\b[^>]*fill="none"[^>]*stroke="url\(#([^)]+)\)"/.exec(svg)?.[1]
+  const tintRamp = (id: string | undefined, stops: { offset: number; color: string }[]): void => {
+    if (id === undefined) return
+    svg = svg.replace(
+      new RegExp('(<linearGradient\\b[^>]*id="' + id + '"[^>]*>)[\\s\\S]*?(</linearGradient>)'),
+      `$1${stopsMarkup(stops)}$2`,
+    )
+  }
+  tintRamp(plateRef, plateGradient ?? ringStops)
+  tintRamp(ringRef, ringStops)
   // Authored fade (the stats plate): the file's offsets/opacities with the
   // tier's colors.
   const fadeStops = (id: string, paint: { fades: { offset: number; opacity: number }[] }): void => {
@@ -413,15 +422,22 @@ function referenceCardSvg(
   if (plan.card.statsPlate !== undefined) fadeStops(plan.card.statsPlate.id, plan.card.statsPlate)
   // Main plate: a gradient tier keeps the file's gradient fill; a solid tier
   // swaps it for the palette color.
-  const plateFill = plateGradient === undefined ? palette.plateFill : 'url(#linear-gradient-1)'
-  svg = svg.replace(
-    /(<path\b[^>]*id="tier-color-plate"[^>]*?)fill="url\(#linear-gradient-1\)"/,
-    `$1fill="${plateFill}"`,
-  )
+  const plateFill =
+    plateGradient === undefined || plateRef === undefined ? palette.plateFill : `url(#${plateRef})`
+  if (plateRef !== undefined) {
+    // Only the plate FILL references this gradient (the ring strokes its own),
+    // so a plain substring swap is safe and keeps the regex-free.
+    svg = svg.replaceAll(`fill="url(#${plateRef})"`, `fill="${plateFill}"`)
+  } else {
+    svg = svg.replace(
+      /(<path\b[^>]*id="tier-color-plate"[^>]*?)fill="url\(#[^)]+\)"/,
+      `$1fill="${plateFill}"`,
+    )
+  }
   if (plateGradient === undefined) {
     svg = svg.replace('.cls-1{fill:#cf1a87}', `.cls-1{fill:${palette.plateFill}}`)
-  } else {
-    svg = svg.replace('.cls-1{fill:#cf1a87}', '.cls-1{fill:url(#linear-gradient-1)}')
+  } else if (plateRef !== undefined) {
+    svg = svg.replace('.cls-1{fill:#cf1a87}', `.cls-1{fill:url(#${plateRef})}`)
   }
   // Legacy round-8 border gradient (older re-exports only).
   const gradStops = ringStops
@@ -431,10 +447,10 @@ function referenceCardSvg(
     /(<linearGradient\b[^>]*id="Blue_to_Magenta"[^>]*>)[\s\S]*?(<\/linearGradient>)/,
     `$1${gradStops}$2`,
   )
-  // The file no longer embeds a placeholder photo (and has no bokeh): the app
-  // injects its own framed photo layer below. The strip stays as a guard for a
-  // future export that reintroduces the placeholder.
-  svg = svg.replace(/<g\b[^>]*id="placeholder\.png"[^>]*>[\s\S]*?<\/g>/, '')
+  // The file's embedded placeholder photo (any <image>, whatever its id — the
+  // owner renames it per export) is REPLACED by the app's photo layer below:
+  // the app computes its own framing and the parser never reads that image.
+  svg = svg.replace(/<image\b[^>]*?\/>/g, '')
   // Extra defs: the photo clip (the crop path) + the shared scrim.
   const defs =
     `<clipPath id="rf-photo-clip"><path d="${plan.card.cropPath}"/></clipPath>` +
@@ -933,7 +949,7 @@ async function main(): Promise<void> {
       borderStrokesPlate: CARD_GEOMETRY.borderStroke.strokePath === CARD_GEOMETRY.platePath,
       borderClippedToPlate: CARD_GEOMETRY.borderStroke.clipPath === CARD_GEOMETRY.platePath,
       borderOpacity: CARD_GEOMETRY.borderStroke.opacity,
-      borderImpecavel: TIER_PALETTE.platinum.borderStops === IMPECAVEL_BORDER_STOPS,
+      borderImpecavel: TIER_PALETTE.impecavel.borderStops === IMPECAVEL_BORDER_STOPS,
       hasCropPath: CARD_GEOMETRY.cropPath !== CARD_GEOMETRY.platePath,
       hasStatsPlate: CARD_GEOMETRY.statsPlate !== undefined,
       hasLastUpdate: CARD_GEOMETRY.slots.lastUpdate !== undefined,

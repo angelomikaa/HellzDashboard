@@ -53,9 +53,9 @@ describe('tierForPoints (D-01 top-heavy bands on the 0-99 points scale)', () => 
     expect(tierForPoints(84.99)).toBe('gold')
   })
 
-  it('85 and 99 -> platinum (boundary: 85 enters platinum)', () => {
-    expect(tierForPoints(85)).toBe('platinum')
-    expect(tierForPoints(99)).toBe('platinum')
+  it('85 and 99 -> impecavel (boundary: 85 enters impecavel)', () => {
+    expect(tierForPoints(85)).toBe('impecavel')
+    expect(tierForPoints(99)).toBe('impecavel')
   })
 })
 
@@ -82,9 +82,9 @@ describe('tierForOvr (D-02 EAFC bands on the 51-99 OVR scale)', () => {
     expect(tierForOvr(84.4)).toBe('gold')
   })
 
-  it('85 and 99 -> platinum (boundary: 85 enters platinum)', () => {
-    expect(tierForOvr(85)).toBe('platinum')
-    expect(tierForOvr(99)).toBe('platinum')
+  it('85 and 99 -> impecavel (boundary: 85 enters impecavel)', () => {
+    expect(tierForOvr(85)).toBe('impecavel')
+    expect(tierForOvr(99)).toBe('impecavel')
   })
 })
 
@@ -218,19 +218,19 @@ describe('tier class maps (literal Tailwind names for v4 JIT)', () => {
       bronze: 'border-tier-bronze',
       silver: 'border-tier-silver',
       gold: 'border-tier-gold',
-      platinum: 'border-tier-platinum',
+      impecavel: 'border-tier-impecavel',
     })
     expect(TIER_TEXT).toEqual({
       bronze: 'text-tier-bronze',
       silver: 'text-tier-silver',
       gold: 'text-tier-gold',
-      platinum: 'text-tier-platinum',
+      impecavel: 'text-tier-impecavel',
     })
     expect(TIER_BG).toEqual({
       bronze: 'bg-tier-bronze',
       silver: 'bg-tier-silver',
       gold: 'bg-tier-gold',
-      platinum: 'bg-tier-platinum',
+      impecavel: 'bg-tier-impecavel',
     })
   })
 })

@@ -1,5 +1,5 @@
 // Render-layer TIER DISPLAY maps (owner decision at the 07.1-02 visual gate):
-// the top band — internally still 'platinum' in presentation.ts — is DISPLAYED
+// the top band — internally still 'impecavel' in presentation.ts — is DISPLAYED
 // as "Impecável" with a premium static Magenta_to_Orange treatment (the card's
 // own tier ramp since 2026-11-05), unmistakably distinct from
 // silver/gold/bronze (D-02 revision).
@@ -15,13 +15,13 @@ export const TIER_DISPLAY_LABELS: Record<Tier, string> = {
   bronze: 'Bronze',
   silver: 'Prata',
   gold: 'Ouro',
-  platinum: 'Impecável',
+  impecavel: 'Impecável',
 }
 
 /** Card/badge borders — top tier gets the Magenta_to_Orange gradient border. */
 export const TIER_BORDER_DISPLAY: Record<Tier, string> = {
   ...TIER_BORDER,
-  platinum: 'tier-impecavel-border',
+  impecavel: 'tier-impecavel-border',
 }
 
 /** Hero-number text WITH its static glow baked in: metallic tiers glow in
@@ -31,19 +31,19 @@ export const TIER_TEXT_GLOW: Record<Tier, string> = {
   bronze: `glow-text-current ${TIER_TEXT.bronze}`,
   silver: `glow-text-current ${TIER_TEXT.silver}`,
   gold: `glow-text-current ${TIER_TEXT.gold}`,
-  platinum: 'tier-impecavel-text',
+  impecavel: 'tier-impecavel-text',
 }
 
 /** Small-text display (badges, focus strip): color only — no glow on small
  *  sizes. Impecável renders white (16.7:1 on surface, AAA). */
 export const TIER_TEXT_DISPLAY: Record<Tier, string> = {
   ...TIER_TEXT,
-  platinum: 'text-white',
+  impecavel: 'text-white',
 }
 
 /** Legend dot fills — top tier gets the magenta→orange gradient dot. */
 export const TIER_DOT_DISPLAY: Record<Tier, string> = {
   ...TIER_BG,
-  platinum: 'tier-impecavel-dot',
+  impecavel: 'tier-impecavel-dot',
 }
 

@@ -256,7 +256,7 @@ function tierOf(ovr: number): Tier {
   if (ovr < 65) return 'bronze'
   if (ovr < 75) return 'silver'
   if (ovr < 85) return 'gold'
-  return 'platinum'
+  return 'impecavel'
 }
 
 /** The card's date format: `DD-MM`, the file's LAST_UPDATE placeholder style
@@ -758,13 +758,25 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   ctx.fillRect(b.x, b.y, b.w, plan.scrim.y2 - plan.scrim.y1)
   ctx.restore()
 
+  // --- STATS CONTRAST PLATE (owner 2026-11-06): the file's fade behind the
+  // six stat columns; it blends the photo edge into the plate. Painted BEFORE
+  // the border (the file's own order: plate → photo → stats plate → border).
+  // Geometry + fade from the file, colors from the tier.
+  const statsPlateLayer = plan.card.statsPlate
+  if (statsPlateLayer !== undefined) {
+    ctx.save()
+    ctx.fillStyle = fadeGradient(ctx, plan, statsPlateLayer)
+    ctx.fill(new Path2D(scalePath(statsPlateLayer.path, s)))
+    ctx.restore()
+  }
+
   // --- Detached border, WHEN THE FILE DRAWS ONE: the stroke ON THE PLATE
   // SILHOUETTE — the border rings the WHOLE shield; the photo area itself
   // stays BORDERLESS — painted OVER the photo, covering the shield's edges.
-  // Owner 2026-11-06: the `tier-color-plate-2` group carries `opacity="0.7"`,
-  // so the TIER's ramp paints as a translucent tint; the stroke is clipped to
-  // the plate silhouette exactly as the file clips it. The layer is skipped
-  // only when the file declares no border.
+  // The current file (`tier-color-border`) draws it at full opacity; earlier
+  // exports carried 0.3/0.7. The stroke is clipped to the plate silhouette
+  // exactly as the file clips it. The layer is skipped only when the file
+  // declares no border.
   const border = plan.card.borderStroke
   if (border !== undefined) {
     ctx.save()
@@ -778,18 +790,6 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
         : resolveBorderSolid(plan.palette)
     ctx.lineWidth = border.width * s
     ctx.stroke(new Path2D(scalePath(border.strokePath, s)))
-    ctx.restore()
-  }
-
-  // --- STATS CONTRAST PLATE (owner 2026-11-06): the file's fade behind the
-  // six stat columns, painted AFTER the border (the file's own order) so it
-  // blends the photo edge into the plate. Geometry + fade from the file,
-  // colors from the tier.
-  const statsPlateLayer = plan.card.statsPlate
-  if (statsPlateLayer !== undefined) {
-    ctx.save()
-    ctx.fillStyle = fadeGradient(ctx, plan, statsPlateLayer)
-    ctx.fill(new Path2D(scalePath(statsPlateLayer.path, s)))
     ctx.restore()
   }
 
