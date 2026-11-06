@@ -194,19 +194,6 @@ export function DashboardPage({
     setOpenGroups((prev) => ({ ...prev, [g]: !prev[g] }))
   }
 
-  // Focus jump (D-16): expand the target group first, then after the render
-  // commit (requestAnimationFrame) smooth-scroll to the card and focus it —
-  // the StatCard wrapper carries tabIndex={-1}, so this is programmatic
-  // focus only (cards are never in the tab order) and shows the accent ring.
-  function handleFocusJump(statKey: string, group: GroupKey) {
-    setOpenGroups((prev) => ({ ...prev, [group]: true }))
-    requestAnimationFrame(() => {
-      const el = document.getElementById(`stat-${statKey}`)
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el?.focus()
-    })
-  }
-
   // D-08 export assembly (07.2-05 export contract): the SAME closed
   // CardExportData the Destaques showcase and the CardPhotoUpload preview
   // build — identity + the 6 key stats (label_short + formatted own_value +
@@ -305,6 +292,15 @@ export function DashboardPage({
   const evidenceItems = useMemo(
     () => buildProgressEvidence(evidenceKeys, progress, myCard, report),
     [evidenceKeys, progress, myCard, report],
+  )
+  // Phase 10.13 (owner revision 2026-11-06): the modal opens ONLY the clicked
+  // stat — one chart, no scroll, one back button.
+  const progressItem = useMemo(
+    () =>
+      progressStatKey === null
+        ? null
+        : (evidenceItems.find((item) => item.stat_key === progressStatKey) ?? null),
+    [progressStatKey, evidenceItems],
   )
 
   // Owner checkpoint round 4 (LAYOUT): OVR + the key-stat mini cards are ONE
@@ -436,18 +432,13 @@ export function DashboardPage({
           {/* Phase 10.13: the progression modal (clicked tile). Rendered last so
               it overlays the whole Painel; "Ver no painel" closes it and jumps
               to the full stat card below. */}
-          {progressStatKey !== null && (
+          {progressItem !== null && (
             <ProgressDetailModal
-              items={evidenceItems}
-              initialStatKey={progressStatKey}
+              item={progressItem}
               displayName={ownName}
               charClass={report.char_class}
               charFunction={report.char_function}
               onClose={() => setProgressStatKey(null)}
-              onJump={(statKey, group) => {
-                setProgressStatKey(null)
-                handleFocusJump(statKey, group)
-              }}
             />
           )}
         </>

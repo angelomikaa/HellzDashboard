@@ -1,16 +1,16 @@
-// Phase 10.13 progression modal: every evidenced stat renders the own history
-// chart plus the three DISTINCT references (class / function / cohort) with
-// their sample sizes and the "Ver no painel" jump.
+// Phase 10.13 progression modal (owner revision 2026-11-06): it opens ONLY the
+// clicked stat — one chart with all lines, a comparison table and one back
+// button, no scrolling list.
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { ProgressDetailModal } from './ProgressDetailModal'
 import type { ProgressEvidenceItem } from './statProgress'
 
-function item(stat_key: string, overrides?: Partial<ProgressEvidenceItem>): ProgressEvidenceItem {
+function item(overrides?: Partial<ProgressEvidenceItem>): ProgressEvidenceItem {
   return {
-    stat_key,
-    label: `${stat_key} label`,
-    label_short: stat_key.toUpperCase(),
+    stat_key: 'matk',
+    label: 'Ataque Mágico',
+    label_short: 'MATK',
     group_name: 'general',
     value_type: 'flat',
     stat_direction: 'higher',
@@ -31,37 +31,35 @@ function item(stat_key: string, overrides?: Partial<ProgressEvidenceItem>): Prog
   }
 }
 
-function render(items: ProgressEvidenceItem[]): string {
+function render(overrides?: Partial<ProgressEvidenceItem>): string {
   return renderToStaticMarkup(
     <ProgressDetailModal
-      items={items}
-      initialStatKey={items[0]?.stat_key ?? null}
+      item={item(overrides)}
       displayName="Aryah"
       charClass="High Priest"
       charFunction="suporte"
       onClose={() => {}}
-      onJump={() => {}}
     />,
   )
 }
 
-describe('ProgressDetailModal', () => {
-  it('renders one section per evidenced stat with the three references', () => {
-    const html = render([item('matk'), item('patk')])
-    expect(html).toContain('matk label')
-    expect(html).toContain('patk label')
+describe('ProgressDetailModal — single clicked stat', () => {
+  it('renders only the clicked stat, with one chart and the three references', () => {
+    const html = render()
+    expect(html).toContain('Ataque Mágico')
+    expect(html).toContain('MATK')
     expect(html).toContain('Classe')
     expect(html).toContain('Função')
     expect(html).toContain('Coorte')
     expect(html).toContain('n=12')
     expect(html).toContain('n=30')
     expect(html).toContain('n=4')
-    expect(html).toContain('Ver no painel')
-    expect(html.match(/<svg/g)).toHaveLength(2)
+    expect(html.match(/<svg/g)).toHaveLength(1)
+    expect(html).toContain('Voltar')
   })
 
   it('shows the signed gap against each reference', () => {
-    const html = render([item('matk')])
+    const html = render()
     // 120 vs class 90 = +30, vs function 95 = +25, vs cohort 99 = +21.
     expect(html).toContain('+30')
     expect(html).toContain('+25')
@@ -69,18 +67,18 @@ describe('ProgressDetailModal', () => {
   })
 
   it('flags a missing reference instead of inventing a line', () => {
-    const html = render([item('matk', { class_average: null, class_sample_size: 2 })])
+    const html = render({ class_average: null, class_sample_size: 2 })
     expect(html).toContain('n=2')
     expect(html).toContain('—')
   })
 
   it('explains the empty history state', () => {
-    const html = render([item('matk', { history: [] })])
+    const html = render({ history: [] })
     expect(html).toContain('Sem histórico ainda')
   })
 
-  it('renders the empty state when no stat is in evidence', () => {
-    const html = render([])
-    expect(html).toContain('Nenhum stat em evidência ainda')
+  it('renders the lower-is-better hint', () => {
+    const html = render({ stat_direction: 'lower' })
+    expect(html).toContain('Menor é melhor')
   })
 })

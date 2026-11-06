@@ -109,7 +109,7 @@ export function StatTrendChart({
   ])
 
   return (
-    <div className={`relative h-36 w-full ${className ?? ''}`} aria-hidden="true">
+    <div className={`relative h-52 w-full ${className ?? ''}`} aria-hidden="true">
       <svg
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
