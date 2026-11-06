@@ -1,6 +1,6 @@
 // FocusStrip — the improvement-focus strip (07.2 D-07 rewire), the explicit
 // improvement loop: the 6 stats MOST BEHIND the class average among the
-// member's key ∪ relevant stats, as jump tiles.
+// member's key ∪ relevant stats, as progression tiles.
 //
 // Round 11: the strip lives INSIDE the hero's right column, under the
 // identity header and the key-stat tiles, so the column carries the whole
@@ -9,34 +9,30 @@
 // anatomy as the key stats above — label / value / points chip on a surface
 // tile — and the list grew from 3 to 6 so both rows read as one rhythm.
 //
-// 07.2-03: selection happens INSIDE via the unit-locked improvementFocus
-// rule (07.2-02) — eligible = points non-null AND stat_key ∈ priorityKeys
-// (key ∪ relevant, assembled by keyStatStrip.priorityKeySet from my_card).
-// This replaces the retired 3-lowest-points selection rule: "there's
-// no need for an assassin to improve his cura realizada stat" — the
-// priorityKeys filter IS the essence. The strip hides itself entirely when
-// nothing is eligible (an empty priorityKeys set yields [] — UI-SPEC edge
-// rule).
+// 07.2-03: selection happens in the PURE unit-locked improvementFocus rule
+// (07.2-02), computed ONCE by DashboardPage (the progression modal needs the
+// same list) and passed in as `focus`. "There's no need for an assassin to
+// improve his cura realizada stat" — the priorityKeys filter IS the essence.
+// The strip hides itself entirely when nothing is eligible.
+//
+// Phase 10.13 (owner 2026-11-06): each tile is a progression tracker — the
+// 3-point sparkline + hover read-out, and clicking opens the detail modal.
 // Points arrive opaque from the RPC — the tile only rounds the given number
 // for display; the color comes from tierForPoints via the literal TIER_TEXT
-// map. The accent-red heading is one of the four reserved accent uses
-// (interaction red #DC3538 — a different token from tier gold #E9B44C).
-import { useMemo } from 'react'
-import type { MyReportStat } from '../../lib/api'
-import type { GroupKey } from '../../lib/groups'
+// map. The accent-red heading is one of the four reserved accent uses.
+import type { MyReportStat, StatProgressPoint } from '../../lib/api'
 import { MiniStatTile } from './MiniStatTile'
-import { improvementFocus } from './presentation'
 
 export function FocusStrip({
-  stats,
-  priorityKeys,
-  onJump,
+  focus,
+  historyByKey,
+  onOpen,
 }: {
-  stats: MyReportStat[]
-  priorityKeys: ReadonlySet<string>
-  onJump: (statKey: string, group: GroupKey) => void
+  focus: readonly MyReportStat[]
+  /** stat_key -> own history (newest first) from the 0074 payload. */
+  historyByKey: ReadonlyMap<string, readonly StatProgressPoint[]>
+  onOpen: (statKey: string) => void
 }) {
-  const focus = useMemo(() => improvementFocus(stats, priorityKeys), [stats, priorityKeys])
   if (focus.length === 0) return null
 
   return (
@@ -51,7 +47,8 @@ export function FocusStrip({
             value={stat.own_value}
             valueType={stat.value_type}
             points={stat.points}
-            onSelect={() => onJump(stat.stat_key, stat.group_name)}
+            history={historyByKey.get(stat.stat_key) ?? []}
+            onOpen={() => onOpen(stat.stat_key)}
           />
         ))}
       </div>

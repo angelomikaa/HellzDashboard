@@ -13,14 +13,21 @@
 // color. Round 12: the anatomy moved to MiniStatTile so the improvement
 // focus below renders as the SAME tile.
 //
-// The `key-<stat_key>` anchor with tabIndex={-1} mirrors StatCard's
-// `stat-<stat_key>` anchor so programmatic foco jumps can target the strip
-// too (the grouped view below remains the jump target — anchors kept in
-// symmetry by construction).
-import type { CardKeyStat } from '../../lib/api'
+// Phase 10.13 (owner 2026-11-06): the tile carries the 3-point history
+// sparkline and opens the progression modal. The `key-<stat_key>` anchor is
+// kept on the button for programmatic jumps.
+import type { CardKeyStat, StatProgressPoint } from '../../lib/api'
 import { MiniStatTile } from './MiniStatTile'
 
-export function KeyStatCard({ stat }: { stat: CardKeyStat }) {
+export function KeyStatCard({
+  stat,
+  history = [],
+  onOpen,
+}: {
+  stat: CardKeyStat
+  history?: readonly StatProgressPoint[]
+  onOpen?: () => void
+}) {
   return (
     <MiniStatTile
       id={`key-${stat.stat_key}`}
@@ -28,6 +35,8 @@ export function KeyStatCard({ stat }: { stat: CardKeyStat }) {
       value={stat.own_value}
       valueType={stat.value_type}
       points={stat.points}
+      history={history}
+      onOpen={onOpen}
     />
   )
 }

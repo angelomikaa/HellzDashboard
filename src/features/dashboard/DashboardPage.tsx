@@ -30,9 +30,12 @@ import {
   fetchCardPhoto,
   fetchMyCard,
   fetchMyReport,
+  fetchMyStatProgress,
   fetchMySubmissions,
   type MyCard,
   type MyReport,
+  type MyStatProgress,
+  type StatProgressPoint,
   type SubmissionRow,
 } from '../../lib/api'
 import { GROUP_LABELS, GROUP_ORDER, type GroupKey } from '../../lib/groups'
@@ -46,6 +49,9 @@ import { FocusStrip } from './FocusStrip'
 import { CollapsibleGroup } from './CollapsibleGroup'
 import { CardPhotoUpload } from './CardPhotoUpload'
 import { FirstStepsCard } from './FirstStepsCard'
+import { ProgressDetailModal } from './ProgressDetailModal'
+import { improvementFocus } from './presentation'
+import { buildProgressEvidence, evidenceStatKeys } from './statProgress'
 import { keyStatStripModel, priorityKeySet } from './keyStatStrip'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { portraitSrcFor } from '../assets/ClassCrest'
@@ -81,6 +87,12 @@ export function DashboardPage({
   // the page owns this state so focus jumps can expand a target group.
   const [report, setReport] = useState<MyReport | null>(null)
   const [myCard, setMyCard] = useState<MyCard | null>(null)
+  // Phase 10.13: own-history + the three reference averages for the evidenced
+  // stats (0074). null = still loading OR the fetch failed — the strips render
+  // without sparklines and the modal without the extra lines.
+  const [progress, setProgress] = useState<MyStatProgress | null>(null)
+  // Open progression modal: the stat the member clicked (null = closed).
+  const [progressStatKey, setProgressStatKey] = useState<string | null>(null)
   // Own submission states for the empty-state copy: a pending row means
   // "waiting for an officer", a rejected one means "send again". Null while
   // the mount fetch is in flight (the empty state defaults to the first-visit
@@ -257,6 +269,44 @@ export function DashboardPage({
   const strip = keyStatStripModel(myCard)
   const priorityKeys = useMemo(() => priorityKeySet(myCard), [myCard])
 
+  // Phase 10.13: ONE progress fetch for the whole evidenced set (key ∪
+  // relevant covers both strips). Runs once per my_card payload; a failure
+  // degrades to null (no sparklines, no extra modal lines) and NEVER takes the
+  // Painel down.
+  useEffect(() => {
+    if (priorityKeys.size === 0) return
+    let cancelled = false
+    fetchMyStatProgress(session, [...priorityKeys])
+      .then((result) => {
+        if (!cancelled) setProgress(result)
+      })
+      .catch(() => {
+        if (!cancelled) setProgress(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [session, priorityKeys])
+
+  // The foco list is computed ONCE here: the strip and the progression modal
+  // must agree on the same six stats (07.2 D-07 pure rule).
+  const focus = useMemo(
+    () => improvementFocus(report?.stats ?? [], priorityKeys),
+    [report, priorityKeys],
+  )
+
+  const historyByKey = useMemo(() => {
+    const map = new Map<string, readonly StatProgressPoint[]>()
+    for (const row of progress?.stats ?? []) map.set(row.stat_key, row.history)
+    return map
+  }, [progress])
+
+  const evidenceKeys = useMemo(() => evidenceStatKeys(myCard, focus), [myCard, focus])
+  const evidenceItems = useMemo(
+    () => buildProgressEvidence(evidenceKeys, progress, myCard, report),
+    [evidenceKeys, progress, myCard, report],
+  )
+
   // Owner checkpoint round 4 (LAYOUT): OVR + the key-stat mini cards are ONE
   // wide strip, and the strip carries the OVR tier color. The tier helper is
   // shared with OvrHero so both halves can never diverge (D-02 bands).
@@ -337,7 +387,12 @@ export function DashboardPage({
                     {strip.kind === 'cards' ? (
                       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
                         {strip.stats.map((k) => (
-                          <KeyStatCard key={k.stat_key} stat={k} />
+                          <KeyStatCard
+                            key={k.stat_key}
+                            stat={k}
+                            history={historyByKey.get(k.stat_key) ?? []}
+                            onOpen={() => setProgressStatKey(k.stat_key)}
+                          />
                         ))}
                       </div>
                     ) : (
@@ -353,9 +408,9 @@ export function DashboardPage({
                     set when the my_card fetch failed — improvementFocus
                     returns [] and the strip self-hides). */}
                 <FocusStrip
-                  stats={report.stats}
-                  priorityKeys={priorityKeys}
-                  onJump={handleFocusJump}
+                  focus={focus}
+                  historyByKey={historyByKey}
+                  onOpen={(statKey) => setProgressStatKey(statKey)}
                 />
               </div>
             </div>
@@ -378,6 +433,23 @@ export function DashboardPage({
                 ))}
             </CollapsibleGroup>
           ))}
+          {/* Phase 10.13: the progression modal (clicked tile). Rendered last so
+              it overlays the whole Painel; "Ver no painel" closes it and jumps
+              to the full stat card below. */}
+          {progressStatKey !== null && (
+            <ProgressDetailModal
+              items={evidenceItems}
+              initialStatKey={progressStatKey}
+              displayName={ownName}
+              charClass={report.char_class}
+              charFunction={report.char_function}
+              onClose={() => setProgressStatKey(null)}
+              onJump={(statKey, group) => {
+                setProgressStatKey(null)
+                handleFocusJump(statKey, group)
+              }}
+            />
+          )}
         </>
       )}
     </section>
