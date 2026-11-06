@@ -287,7 +287,7 @@ describe('buildCardPlan — LAST_UPDATE line + member photo framing (owner 2026-
     expect(formatCardDate('not a date')).toBeNull()
   })
 
-  it('renders the date at the parsed slot with the file\'s label segments', () => {
+  it('renders the date at the parsed slot (label segments optional)', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     const slot = CARD_GEOMETRY.slots.lastUpdate
     expect(slot).toBeDefined()
@@ -297,9 +297,10 @@ describe('buildCardPlan — LAST_UPDATE line + member photo framing (owner 2026-
     expect(plan.lastUpdate.x).toBe(slot.date.x)
     expect(plan.lastUpdate.y).toBe(slot.date.y)
     expect(plan.lastUpdate.size).toBe(slot.date.size)
-    expect(plan.lastUpdate.suffix.map((s) => s.text)).toEqual(['•', 'atualizado'])
+    // The suffix mirrors the FILE (empty when the file carries the date alone).
+    expect(plan.lastUpdate.suffix.map((s) => s.text)).toEqual(slot.suffix.map((s) => s.text))
     expect(plan.lastUpdate.suffix.map((s) => s.x)).toEqual(slot.suffix.map((s) => s.x))
-    // Over the photo, under the OVR block's job line (2026-11-06 re-model).
+    // Over the photo, under the OVR block's job line.
     expect(plan.lastUpdate.y).toBeGreaterThan(plan.ovr.jobY)
     expect(plan.lastUpdate.y).toBeLessThan(plan.name.y)
   })

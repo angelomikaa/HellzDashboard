@@ -106,24 +106,18 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect('ovrBokeh' in CARD_GEOMETRY).toBe(false)
   })
 
-  it('parses the LAST_UPDATE line: the live date + the static label segments', () => {
+  it('parses the LAST_UPDATE date line (the suffix is optional)', () => {
     const lu = CARD_GEOMETRY.slots.lastUpdate
     expect(lu).toBeDefined()
     if (lu === undefined) return
-    // Nested inside <g id="OVR"> since this re-model — "atualizado • DD-MM"
-    // over the photo, under the job line.
-    expect(lu.date.x).toBeCloseTo(275.861, 1)
-    expect(lu.date.y).toBeCloseTo(502.946, 1)
+    // Nested inside <g id="OVR"> — a live date under the job line. The
+    // 2026-11-06c export carries the date alone (no "• atualizado" texts).
+    expect(lu.date.x).toBeCloseTo(123.219, 1)
+    expect(lu.date.y).toBeCloseTo(525.773, 1)
     expect(lu.date.size).toBe(36)
     expect(lu.date.y).toBeGreaterThan(CARD_GEOMETRY.slots.job.y)
     expect(lu.date.y).toBeLessThan(CARD_GEOMETRY.slots.name.y)
-    expect(lu.suffix.map((s) => s.text)).toEqual(['•', 'atualizado'])
-    expect(lu.suffix[0].x).toBeCloseTo(259.39, 1)
-    expect(lu.suffix[1].x).toBeCloseTo(123.219, 1)
-    for (const segment of lu.suffix) {
-      expect(segment.y).toBeCloseTo(lu.date.y, 1)
-      expect(segment.size).toBe(36)
-    }
+    expect(lu.suffix).toEqual([])
   })
 
   it('parses the brand mark the file draws and scopes its gradient ids per card', () => {
@@ -148,10 +142,10 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
 })
 
 describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes', () => {
-  it('resolves the OVR slot: the BIGGEST text in the OVR group, 164px at (123.219, 399.373)', () => {
+  it('resolves the OVR slot: the BIGGEST text in the OVR group, 164px at (123.219, 421.373)', () => {
     const ovr = CARD_GEOMETRY.slots.ovr
     expect(ovr.x).toBeCloseTo(123.219, 1)
-    expect(ovr.y).toBeCloseTo(399.373, 1)
+    expect(ovr.y).toBeCloseTo(421.373, 1)
     expect(ovr.size).toBe(164)
     expect(ovr.size).toBeGreaterThan(140) // the number must be BIG (readability rounds 3-8)
     expect(ovr.size).toBeLessThan(180)
@@ -160,7 +154,7 @@ describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes'
   it('resolves the job slot (the SMALLER OVR-group text, 48px Bebas) directly under the number', () => {
     const job = CARD_GEOMETRY.slots.job
     expect(job.x).toBeCloseTo(123.219, 1)
-    expect(job.y).toBeCloseTo(464.78, 1)
+    expect(job.y).toBeCloseTo(486.78, 1)
     expect(job.size).toBe(48)
     expect(job.y).toBeGreaterThan(CARD_GEOMETRY.slots.ovr.y)
     // The job line must stay smaller than the number it sits under.

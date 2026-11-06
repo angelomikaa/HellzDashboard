@@ -857,8 +857,8 @@ function lastUpdate(
       index: indexes.get(m[1]) ?? -1,
     })
   }
-  if (texts.length < 2) {
-    throw new Error('card.svg: the LAST_UPDATE group must hold the date plus its label texts')
+  if (texts.length < 1) {
+    throw new Error('card.svg: the LAST_UPDATE group must hold at least the date text')
   }
   const [date, ...rest] = texts
   for (const segment of rest) {
@@ -869,6 +869,8 @@ function lastUpdate(
   return {
     value: {
       date: { x: date.x, y: date.y, size: date.size },
+      // The suffix is OPTIONAL: the 2026-11-06c export carries the date alone
+      // ("05-11"), earlier ones added "• atualizado" as separate texts.
       suffix: rest.map((s) => ({ x: s.x, y: s.y, size: s.size, text: s.text })),
     },
     indexes: texts.map((t) => t.index),
