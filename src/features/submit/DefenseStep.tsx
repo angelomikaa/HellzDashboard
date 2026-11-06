@@ -186,7 +186,7 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled, averages }: D
                   </p>
                 </div>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <OcrCapture
                   capture={card.capture}
                   disabled={disabled || isRunning}
@@ -205,7 +205,7 @@ export function DefenseStep({ inputs, onEquipmentChange, disabled, averages }: D
                   }}
                   onRunStateChange={(runningNow) => handleRunState(card, runningNow)}
                 />
-                <label className="flex flex-col gap-1 text-sm font-semibold text-content">
+                <label className="flex flex-col gap-2 text-sm font-semibold text-content">
                   Equip. {card.label} (valor)
                   <input
                     type="text"

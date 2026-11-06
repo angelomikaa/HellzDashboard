@@ -6,7 +6,7 @@ import type { NeoFootSession } from '../auth/session'
 
 export function AnalysisSection({ session }: { session: NeoFootSession }) {
   return (
-    <div className="mt-4">
+    <div className="mt-6">
       <p className="text-sm text-muted">
         Análise exploratória dos envios validados: curvas por coorte, resíduos e a
         hipótese de buff de +35 p.p. em MATK%. O veredito é um sinal estatístico, nunca

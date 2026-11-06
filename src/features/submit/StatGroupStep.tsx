@@ -75,7 +75,7 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       {/* Capture strip (owner feedback, 07.2-06 checkpoint round 2): the
           example shot + the OCR upload box share ONE full-width strip at the
           top; the fields are ONLY below it (never beside the upload UI).
@@ -104,7 +104,7 @@ export function StatGroupStep({ group, entries, inputs, onChange, ocrRunning, fa
                 : '1.234.567'
               : statExample(averages, entry)
           return (
-            <div key={entry.stat_key} className="flex flex-col gap-1">
+            <div key={entry.stat_key} className="flex flex-col gap-2">
               <label htmlFor={fieldId(entry.stat_key)} className="text-sm font-semibold text-content">
                 {entry.label}
                 {example !== null && (

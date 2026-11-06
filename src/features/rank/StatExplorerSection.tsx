@@ -99,7 +99,7 @@ export function StatExplorerSection({
   const hasFilters = query !== '' || classGroup !== '' || charFunction !== ''
 
   return (
-    <div className="mt-4">
+    <div className="mt-6">
       <div className="flex flex-wrap items-center gap-2">
         <StatPicker
           entries={catalog}
@@ -244,34 +244,34 @@ export function StatExplorerSection({
         </p>
       ) : (
         <>
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-5 overflow-x-auto">
             <table className="w-full min-w-max text-left text-sm">
               <thead>
                 <tr className="border-b border-line">
                   <th
                     scope="col"
-                    className="px-2 py-2 font-semibold text-muted"
+                    className="px-3 py-3 font-semibold text-muted"
                     aria-label="Classe (ícone)"
                   />
-                  <th scope="col" className="px-2 py-2 font-semibold text-muted">
+                  <th scope="col" className="px-3 py-3 font-semibold text-muted">
                     Nome
                   </th>
-                  <th scope="col" className="px-2 py-2 font-semibold text-muted">
+                  <th scope="col" className="px-3 py-3 font-semibold text-muted">
                     Classe
                   </th>
-                  <th scope="col" className="px-2 py-2 font-semibold text-muted">
+                  <th scope="col" className="px-3 py-3 font-semibold text-muted">
                     Função
                   </th>
-                  <th scope="col" className="px-2 py-2 text-right font-semibold text-muted">
+                  <th scope="col" className="px-3 py-3 text-right font-semibold text-muted">
                     Valor
                   </th>
-                  <th scope="col" className="px-2 py-2 text-right font-semibold text-muted">
+                  <th scope="col" className="px-3 py-3 text-right font-semibold text-muted">
                     Mediana (n)
                   </th>
-                  <th scope="col" className="px-2 py-2 text-right font-semibold text-muted">
+                  <th scope="col" className="px-3 py-3 text-right font-semibold text-muted">
                     Nσ
                   </th>
-                  <th scope="col" className="px-2 py-2 font-semibold text-muted">
+                  <th scope="col" className="px-3 py-3 font-semibold text-muted">
                     Último envio
                   </th>
                 </tr>
@@ -279,10 +279,10 @@ export function StatExplorerSection({
               <tbody>
                 {orderedRows.map((row) => (
                   <tr key={row.member_id} className="border-b border-line">
-                    <td className="px-2 py-2">
+                    <td className="px-3 py-3">
                       <ClassCrest charClass={row.char_class} size="sm" />
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="px-3 py-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <PlayerCell name={row.display_name} charId={row.char_id} />
                         {row.class_sigma_outlier && (
@@ -292,20 +292,20 @@ export function StatExplorerSection({
                         )}
                       </div>
                     </td>
-                    <td className="px-2 py-2 text-muted">
+                    <td className="px-3 py-3 text-muted">
                       {row.char_class === null ? '—' : classLabel(row.char_class)}
                     </td>
-                    <td className="px-2 py-2 text-muted">
+                    <td className="px-3 py-3 text-muted">
                       {row.char_function === null
                         ? '—'
                         : FUNCTION_LABELS[row.char_function]}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-content">
+                    <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-content">
                       {row.value === null
                         ? '—'
                         : formatStatValue(row.value, overview.value_type)}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-muted">
+                    <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-muted">
                       {row.class_median === null
                         ? '—'
                         : `${formatStatValue(row.class_median, overview.value_type)}${
@@ -315,13 +315,13 @@ export function StatExplorerSection({
                           }`}
                     </td>
                     <td
-                      className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${
+                      className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${
                         row.class_sigma_outlier ? 'font-semibold text-error' : 'text-muted'
                       }`}
                     >
                       {row.class_z === null ? '—' : `${ratioFormatter.format(row.class_z)}σ`}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-2 text-muted">
+                    <td className="whitespace-nowrap px-3 py-3 text-muted">
                       {row.submitted_at === null
                         ? '—'
                         : submittedFormatter.format(new Date(row.submitted_at))}

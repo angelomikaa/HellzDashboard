@@ -110,7 +110,7 @@ export function IdentityReview({ session }: { session: NeoFootSession }) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {error !== null && (
         <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
           {error}

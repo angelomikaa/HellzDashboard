@@ -54,7 +54,7 @@ export function ReviewStep({
   onFixStat,
 }: ReviewStepProps) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       {WIZARD_GROUPS.map((group) => (
         <section key={group} aria-label={GROUP_LABELS[group]}>
           <h3 className="text-sm font-semibold text-muted">{GROUP_LABELS[group]}</h3>

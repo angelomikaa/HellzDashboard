@@ -65,7 +65,7 @@ export function HistoryList({ session, onNewSubmission }: HistoryListProps) {
       </h2>
 
       {rows !== null && rows.length > 3 && (
-        <div className="mt-4 flex flex-col gap-2">
+        <div className="mt-5 flex flex-col gap-3">
           <label htmlFor="history-filter" className="text-sm font-semibold text-content">
             Buscar nas entradas
           </label>
@@ -89,7 +89,7 @@ export function HistoryList({ session, onNewSubmission }: HistoryListProps) {
       ) : rows.length === 0 ? (
         <p className="mt-4 text-base text-muted">Você ainda não enviou status.</p>
       ) : (
-        <ul className="mt-4 flex flex-col gap-2">
+        <ul className="mt-5 flex flex-col gap-3">
           {rows
             .filter((row) => {
               const q = filter.trim().toLowerCase()

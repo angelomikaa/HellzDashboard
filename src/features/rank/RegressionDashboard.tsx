@@ -151,7 +151,7 @@ function ResidualHistogram({ stats }: { stats: ModelStats | null }) {
   const barW = plotW / bins
 
   return (
-    <figure className="rounded-lg border border-line bg-surface p-3">
+    <figure className="rounded-lg border border-line bg-surface p-4">
       <figcaption className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-sm font-semibold text-content">Distribuição dos resíduos</span>
         <span className="text-xs text-muted">{`escala robusta ${number.format(stats.scale)}`}</span>
@@ -322,8 +322,8 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
   const normal = classificationItems.filter((item) => item.verdict === 'NORMAL')
 
   return (
-    <div className="mt-5 flex flex-col gap-5">
-      <section className="rounded-lg border border-line bg-card p-4">
+    <div className="mt-6 flex flex-col gap-6">
+      <section className="rounded-lg border border-line bg-card p-5">
         <h3 className="text-sm font-semibold text-content">Dataset real e limitações</h3>
         <div className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
           <p className="text-muted">
@@ -360,7 +360,7 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
         </p>
       </section>
 
-      <section className="rounded-lg border border-line bg-surface p-4">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <label className="flex flex-col gap-1 text-sm font-semibold text-content">
             Modelo
@@ -482,7 +482,7 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
       <ResidualHistogram stats={classification?.stats ?? null} />
 
       {selected !== null && (
-        <section className="rounded-lg border border-line bg-card p-4">
+        <section className="rounded-lg border border-line bg-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-content">
               {`Detalhe: ${selected.member.display_name}`}
@@ -540,7 +540,7 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
         </section>
       )}
 
-      <section className="rounded-lg border border-line bg-surface p-4">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <h3 className="text-sm font-semibold text-content">Classificação por jogador</h3>
         <p className="mt-1 text-xs text-muted">
           Score é um sinal estatístico, não uma probabilidade de cheat. Inconclusivo = o
@@ -626,7 +626,7 @@ export function RegressionDashboard({ session }: { session: NeoFootSession }) {
         </div>
       </section>
 
-      <details className="rounded-lg border border-line bg-surface p-4">
+      <details className="rounded-lg border border-line bg-surface p-5">
         <summary className="cursor-pointer text-sm font-semibold text-content">
           Metodologia, premissas e validação do par de referência
         </summary>

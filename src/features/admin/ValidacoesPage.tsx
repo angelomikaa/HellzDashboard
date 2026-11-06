@@ -160,11 +160,11 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
   }
 
   return (
-    <section className="rounded-lg border border-line bg-surface p-6">
+    <section className="rounded-lg border border-line bg-surface p-6 lg:p-8">
       <h2 className="text-xl font-semibold text-content">Validações</h2>
       <p className="mt-1 text-sm text-muted">Revise e valide os envios pendentes da guilda.</p>
 
-      <div className="mt-4 flex gap-2" role="tablist" aria-label="Validações">
+      <div className="mt-5 flex gap-2" role="tablist" aria-label="Validações">
         {(['envios', 'solicitacoes', 'identidades', 'historico'] as ValidacoesTab[]).map((t) => {
           const label = validacoesTabLabel(t)
           return (
@@ -176,7 +176,7 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
               aria-selected={tab === t}
               aria-controls="validacoes-panel"
               onClick={() => setTab(t)}
-              className={`h-10 rounded-md px-4 text-sm font-semibold ${
+              className={`h-11 rounded-md px-4 text-sm font-semibold ${
                 tab === t
                   ? 'bg-accent text-accent-foreground'
                   : 'border border-line text-content hover-control'
@@ -188,15 +188,15 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
         })}
       </div>
 
-      <div id="validacoes-panel" role="tabpanel" aria-labelledby={`validacoes-tab-${tab}`} className="mt-6">
+      <div id="validacoes-panel" role="tabpanel" aria-labelledby={`validacoes-tab-${tab}`} className="mt-8">
       {tab === 'envios' && (
       <div role="none">
       {error !== null ? (
-        <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-error">
+        <p role="alert" aria-live="polite" className="mt-8 text-sm font-semibold text-error">
           {error}
         </p>
       ) : rows === null ? (
-        <p className="mt-6 text-base text-muted">Carregando…</p>
+        <p className="mt-8 text-base text-muted">Carregando…</p>
       ) : (
         <>
           {lastSuccess !== null && (
@@ -205,9 +205,9 @@ export function ValidacoesPage({ session }: { session: NeoFootSession }) {
             </p>
           )}
           {rows.length === 0 ? (
-            <p className="mt-6 text-center text-base text-muted">{EMPTY_MESSAGE}</p>
+            <p className="mt-8 text-center text-base text-muted">{EMPTY_MESSAGE}</p>
           ) : (
-            <div className="mt-6 flex flex-col gap-3">
+            <div className="mt-8 flex flex-col gap-4">
               {rows.map((row) => {
                 const isExpanded = expandedId === row.submission_id
                 const regionId = `queue-review-${row.submission_id}`

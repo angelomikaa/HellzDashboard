@@ -271,7 +271,7 @@ export function OcrCapture({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {/* The shared capture surface (extracted 2026-10-23): dropzone with
           drag-and-drop, clipboard-first click and the hidden picker — the
           exact same entry the identification proof uses. */}

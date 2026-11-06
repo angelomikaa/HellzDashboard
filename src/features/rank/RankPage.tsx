@@ -62,7 +62,7 @@ export function RankPage({ session }: { session: NeoFootSession }) {
     SECTIONS.find((option) => option.value === section)?.label ?? 'Ranking OVR'
 
   return (
-    <section className="rounded-lg border border-line bg-surface p-6">
+    <section className="rounded-lg border border-line bg-surface p-6 lg:p-8">
       <h2 className="text-xl font-semibold text-content">Ranking &amp; Análise</h2>
       <p className="mt-1 text-sm text-muted">
         Ranking por função, exploração de um stat e análise estatística — para oficiais.
@@ -71,7 +71,7 @@ export function RankPage({ session }: { session: NeoFootSession }) {
       <div
         role="tablist"
         aria-label="Seções do ranking"
-        className="mt-4 flex gap-1 overflow-x-auto pb-1"
+        className="mt-5 flex gap-1 overflow-x-auto pb-1"
       >
         {SECTIONS.map((option) => (
           <button

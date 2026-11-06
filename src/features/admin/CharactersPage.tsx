@@ -519,11 +519,11 @@ export function CharactersPage({
       <p className="mt-1 text-sm text-muted">Registre nome, classe e função de cada membro.</p>
 
       {error !== null ? (
-        <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-error">
+        <p role="alert" aria-live="polite" className="mt-8 text-sm font-semibold text-error">
           {error}
         </p>
       ) : data === null ? (
-        <p className="mt-6 text-base text-muted">Carregando…</p>
+        <p className="mt-8 text-base text-muted">Carregando…</p>
       ) : (
         <>
           {/* Add-class UI REMOVED (owner decision 2026-10-21): classes are
@@ -534,7 +534,7 @@ export function CharactersPage({
           <form
             onSubmit={handleAddMember}
             noValidate
-            className="mt-6 flex flex-col gap-3 rounded-lg border border-line bg-surface p-4 sm:flex-row sm:items-end"
+            className="mt-8 flex flex-col gap-3 rounded-lg border border-line bg-surface p-4 sm:flex-row sm:items-end"
           >
             <div className="flex flex-1 flex-col gap-2">
               <label htmlFor="add-handle" className="text-sm font-semibold text-content">
@@ -582,7 +582,7 @@ export function CharactersPage({
           )}
 
           {data.members.length === 0 ? (
-            <p className="mt-6 text-center text-base text-muted">
+            <p className="mt-8 text-center text-base text-muted">
               Nenhum membro na lista branca ainda.
             </p>
           ) : (
@@ -593,7 +593,7 @@ export function CharactersPage({
                   (collapsed by default; the header always shows the active
                   selection). Chips only narrow the already-loaded roster — no
                   data flow change, the D-08 matrix still renders per row. */}
-              <div className="mt-6 flex flex-col gap-2">
+              <div className="mt-8 flex flex-col gap-3">
                 <FilterDisclosure
                   id="pin"
                   label="PIN"
@@ -700,7 +700,7 @@ export function CharactersPage({
                 </FilterDisclosure>
               </div>
               {visibleMembers.length === 0 ? (
-                <p className="mt-6 text-center text-base text-muted">
+                <p className="mt-8 text-center text-base text-muted">
                   {pinFilter === 'pending' && pinFilteredMembers.length === 0
                     ? 'Nenhum membro com PIN pendente.'
                     : pinFilter === 'active' && pinFilteredMembers.length === 0
@@ -708,7 +708,7 @@ export function CharactersPage({
                       : NO_FILTER_MATCH}
                 </p>
               ) : (
-            <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="mt-8 grid grid-cols-1 gap-4 xl:grid-cols-2">
               {/* Owner gate round 4 (07.1-02): per-character card list. The
                   old 7-column table needed horizontal expansion (scroll or
                   negative-margin) to keep the edge controls' focus rings from

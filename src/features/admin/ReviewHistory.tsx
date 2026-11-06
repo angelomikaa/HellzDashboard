@@ -69,7 +69,7 @@ export function ReviewHistory({ session }: { session: NeoFootSession }) {
       <p className="text-sm text-muted">
         Últimas {rows.length} decisões — quem validou, o quê e quando.
       </p>
-      <ol className="mt-3 flex flex-col gap-2">
+      <ol className="mt-4 flex flex-col gap-3">
         {rows.map((row) => {
           const decision = DECISION_DISPLAY[row.decision]
           return (

@@ -102,8 +102,8 @@ export function OvrRankingSection({
   const closeModal = useCallback(() => setSelected(null), [])
 
   return (
-    <div className="mt-4">
-      <div className="flex flex-col gap-3">
+    <div className="mt-6">
+      <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <div role="group" aria-label="Função de build" className="flex gap-1">
             {BOARDS.map((value) => (
@@ -206,42 +206,42 @@ export function OvrRankingSection({
           {query.trim() === '' ? EMPTY_MESSAGE : NO_MATCH_MESSAGE}
         </p>
       ) : (
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-max text-left text-sm">
             <thead>
               <tr className="border-b border-line">
                 <th
                   scope="col"
-                  className="px-2 py-2 font-semibold text-muted"
+                  className="px-3 py-3 font-semibold text-muted"
                   aria-label="Classe (ícone)"
                 />
-                <th scope="col" className="px-2 py-2 font-semibold text-muted">
+                <th scope="col" className="px-3 py-3 font-semibold text-muted">
                   Nome
                 </th>
-                <th scope="col" className="px-2 py-2 font-semibold text-muted">
+                <th scope="col" className="px-3 py-3 font-semibold text-muted">
                   Classe
                 </th>
-                <th scope="col" className="px-2 py-2 text-right font-semibold text-muted">
+                <th scope="col" className="px-3 py-3 text-right font-semibold text-muted">
                   OVR
                 </th>
-                <th scope="col" className="px-2 py-2" aria-label="Detalhe" />
+                <th scope="col" className="px-3 py-3" aria-label="Detalhe" />
               </tr>
             </thead>
             <tbody>
               {displayRows.map((row) => (
                 <tr key={row.member_id} className="border-b border-line">
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-3">
                     <ClassCrest charClass={row.char_class} size="sm" />
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-3">
                     <PlayerCell name={row.display_name} charId={row.char_id} />
                   </td>
-                  <td className="px-2 py-2 text-muted">
+                  <td className="px-3 py-3 text-muted">
                     {isClassGroup(row.char_class)
                       ? groupLabel(row.char_class)
                       : classLabel(row.char_class)}
                   </td>
-                  <td className="px-2 py-2 text-right">
+                  <td className="px-3 py-3 text-right">
                     {row.ovr === null ? (
                       <span className="text-muted">— dados insuficientes</span>
                     ) : (
@@ -250,7 +250,7 @@ export function OvrRankingSection({
                       </span>
                     )}
                   </td>
-                  <td className="px-2 py-2 text-right">
+                  <td className="px-3 py-3 text-right">
                     <button
                       type="button"
                       onClick={() => setSelected(row)}

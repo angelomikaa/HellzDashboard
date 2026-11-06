@@ -231,7 +231,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
   const hasRelevants = relevantCount > 0
 
   return (
-    <section className="rounded-lg border border-line bg-surface p-6" aria-busy={busy}>
+    <section className="rounded-lg border border-line bg-surface p-6 lg:p-8" aria-busy={busy}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-xl font-semibold text-content">
           {selectedClass === '' ? 'Stats-Chave' : `Stats-Chave — ${selectedClass}`}
@@ -251,14 +251,14 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
       <p className="mt-1 text-sm text-muted">{TIER_LEGEND}</p>
 
       {loadError !== null ? (
-        <p role="alert" aria-live="polite" className="mt-6 text-sm font-semibold text-error">
+        <p role="alert" aria-live="polite" className="mt-8 text-sm font-semibold text-error">
           {loadError}
         </p>
       ) : classes === null || catalog === null ? (
-        <p className="mt-6 text-base text-muted">Carregando…</p>
+        <p className="mt-8 text-base text-muted">Carregando…</p>
       ) : (
         <>
-          <div className="mt-6 flex max-w-72 flex-col gap-2">
+          <div className="mt-8 flex max-w-72 flex-col gap-2">
             <label htmlFor="keystats-class" className="text-sm font-semibold text-content">
               Classe
             </label>
@@ -285,7 +285,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
           </div>
 
           {selectedClass !== '' && (
-            <div className="mt-6 flex max-w-72 flex-col gap-2">
+            <div className="mt-8 flex max-w-72 flex-col gap-2">
               <label htmlFor="keystats-function" className="text-sm font-semibold text-content">
                 Função de build
               </label>
@@ -307,21 +307,21 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
           )}
 
           {selectedClass === '' ? (
-            <p className="mt-6 text-center text-base text-muted">{SELECT_CLASS_PROMPT}</p>
+            <p className="mt-8 text-center text-base text-muted">{SELECT_CLASS_PROMPT}</p>
           ) : classError !== null ? (
             <p
               role="alert"
               aria-live="polite"
-              className="mt-6 text-sm font-semibold text-error"
+              className="mt-8 text-sm font-semibold text-error"
             >
               {classError}
             </p>
           ) : selectedFunction === '' ? (
-            <p className="mt-6 text-center text-base text-muted">
+            <p className="mt-8 text-center text-base text-muted">
               Selecione a função de build para ver os stats-chave.
             </p>
           ) : keyStats === null || top5 === null ? (
-            <p className="mt-6 text-base text-muted">Carregando…</p>
+            <p className="mt-8 text-base text-muted">Carregando…</p>
           ) : (
             <>
               {toggleError !== null && (
@@ -334,7 +334,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                 </p>
               )}
 
-              <div className="mt-6 flex flex-wrap items-baseline justify-between gap-2">
+              <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="text-sm font-semibold text-muted">
                   Stats-Chave ({keyCount}/6 configurados)
                 </h3>
@@ -352,7 +352,7 @@ export function KeyStatsPage({ session }: { session: NeoFootSession }) {
                   <h3 className="text-sm font-semibold text-muted">
                     {GROUP_LABELS[group]}
                   </h3>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-wrap gap-3">
                     {catalog
                       .filter((entry) => entry.group_name === group)
                       .map((entry) => {

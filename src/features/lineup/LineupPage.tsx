@@ -374,8 +374,8 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
   }
 
   return (
-    <section aria-labelledby="lineup-title" className="flex flex-col gap-4">
-      <header className="flex flex-col gap-3">
+    <section aria-labelledby="lineup-title" className="flex flex-col gap-6">
+      <header className="flex flex-col gap-4">
         <h1 id="lineup-title" className="font-display text-2xl font-bold text-content">
           Escalação — {modeMeta.title}
         </h1>
@@ -612,7 +612,7 @@ export function LineupPage({ session }: { session: NeoFootSession }) {
 
       {isStaff && (
         <>
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <RosterPanel
               title="Disponíveis"
               count={availableMembers.length}
@@ -853,7 +853,7 @@ function RosterPanel({
         event.preventDefault()
         onDrop()
       }}
-      className="flex min-w-0 flex-col gap-2 rounded-lg border border-line bg-surface p-3"
+      className="flex min-w-0 flex-col gap-2 rounded-lg border border-line bg-surface p-4"
     >
       <div className="flex flex-wrap items-baseline gap-2">
         <button
@@ -964,7 +964,7 @@ export function SlotOfferDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="slot-offer-title"
-        className="flex max-h-[85vh] w-full max-w-lg flex-col gap-3 rounded-lg border border-line bg-surface p-4 shadow-xl"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col gap-4 rounded-lg border border-line bg-surface p-5 shadow-xl"
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key === 'Escape') onClose()
@@ -1158,7 +1158,7 @@ function PartyCard({
           <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">Sua PT</span>
         )}
       </div>
-      <ol aria-label={`Slots da G${party.party_index}`} className="flex flex-col gap-1.5">
+      <ol aria-label={`Slots da G${party.party_index}`} className="flex flex-col gap-2">
         {party.slots.map((slot) => (
           <li key={slot.slot_index}>
             <SlotRow

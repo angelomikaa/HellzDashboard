@@ -533,7 +533,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
       // LAYT-01 (07.2 D-21/D-22): the wizard (and its states) stay a
       // scannable centered column on desktop — never stretched into the
       // wide shell.
-      <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6">
+      <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6 sm:p-8">
         <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
           {loadError}
         </p>
@@ -543,7 +543,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
 
   if (data === null) {
     return (
-      <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6">
+      <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6 sm:p-8">
         <p className="text-base text-muted">Carregando…</p>
       </section>
     )
@@ -561,7 +561,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
   // Blocked state: no registered character (no char_class) — UX gate only.
   if (me.char_class === null) {
     return (
-      <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6">
+      <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6 sm:p-8">
         <h2 className="text-xl font-semibold text-content">Enviar Status</h2>
         <p className="mt-4 text-base text-content">
           {isStaff ? BLOCKED_STAFF_COPY : BLOCKED_MEMBER_COPY}
@@ -635,7 +635,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
   )
 
   return (
-    <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6">
+    <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6 sm:p-8">
       {phase === 'submitted' ? (
         <>
           <div role="status">
@@ -679,7 +679,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
           </ol>
 
           {step === 1 && (
-            <div className="mt-6 flex flex-col gap-5">
+            <div className="mt-8 flex flex-col gap-6">
               <h2 className="text-xl font-semibold text-content">
                 {`${me.display_name} — ${classLabel(me.char_class)} (${FUNCTION_LABELS[me.char_function]})`}
               </h2>
@@ -709,7 +709,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     class selector is intentionally absent (owner decision
                     2026-10-21): char_class rides along as the registry row's
                     class, and char_function is NEVER OCR-derived (D-03/D-19). */}
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-2">
                   <label htmlFor="submit-char-id" className="text-sm font-semibold text-content">
                     ID do personagem
                   </label>
@@ -743,7 +743,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-2">
                   <label htmlFor="submit-nickname" className="text-sm font-semibold text-content">
                     Nick
                   </label>
@@ -774,7 +774,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-2">
                   <label
                     htmlFor="submit-char-function"
                     className="text-sm font-semibold text-content"
@@ -811,7 +811,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-2">
                   <label htmlFor="combat-power" className="text-sm font-semibold text-content">
                     Poder de Combate
                     {combatPowerExample !== null && (

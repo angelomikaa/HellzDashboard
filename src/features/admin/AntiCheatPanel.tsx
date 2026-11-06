@@ -135,7 +135,7 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
           <p className="text-xs font-semibold text-error">
             {`Defesa fora da curva (≥ ${ratio.format(DEFENSE_SIGMA_THRESHOLD)}σ da mediana, n ≥ 5)`}
           </p>
-          <ul className="mt-1 flex flex-col gap-1">
+          <ul className="mt-2 flex flex-col gap-2">
             {spikes.map((spike) => (
               <li
                 key={spike.stat_key}
@@ -285,7 +285,7 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
             Compara com o último envio validado; funciona mesmo quando a coorte tem menos de
             5 membros.
           </p>
-          <ul className="mt-1 flex flex-col gap-1">
+          <ul className="mt-2 flex flex-col gap-2">
             {history.map((entry) => (
               <li
                 key={entry.stat_key}
@@ -330,7 +330,7 @@ export function AntiCheatPanel({ flags }: { flags?: AntiCheatFlags | null }) {
           <p className="text-xs font-semibold text-content">
             {`Alterado após leitura OCR (${flags.ocr_edited_count} de ${flags.ocr_filled_count + flags.ocr_edited_count} campos lidos)`}
           </p>
-          <ul className="mt-1 flex flex-col gap-1">
+          <ul className="mt-2 flex flex-col gap-2">
             {overrides.map((override) => (
               <li
                 key={override.input_key}
