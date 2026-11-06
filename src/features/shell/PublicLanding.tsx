@@ -24,30 +24,32 @@ export function PublicLanding({
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-dominant backdrop-neon-grid text-content">
-      <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-        <div className="flex items-center gap-2">
-          <img src={hellzMark} alt="" aria-hidden="true" className="h-7 w-7 shrink-0" />
-          <span className="font-display text-base font-semibold text-content">Hellz</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onRequestAccess}
-            className="h-11 rounded-md border border-line px-3 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Solicitar acesso
-          </button>
-          <button
-            type="button"
-            onClick={onLogin}
-            className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Entrar
-          </button>
+      <header className="border-b border-line">
+        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2">
+            <img src={hellzMark} alt="" aria-hidden="true" className="h-7 w-7 shrink-0" />
+            <span className="truncate font-display text-base font-semibold text-content">Hellz</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={onRequestAccess}
+              className="h-11 rounded-md border border-line px-3 text-sm font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Solicitar acesso
+            </button>
+            <button
+              type="button"
+              onClick={onLogin}
+              className="h-11 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Entrar
+            </button>
+          </div>
         </div>
       </header>
       <main className="flex-1">
-        <div className="mx-auto w-full max-w-6xl px-4 py-6 xl:max-w-7xl">
+        <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
           {/* Same containment as the authenticated shell: a broken showcase
               must never blank the whole landing. */}
           <PageErrorBoundary>
