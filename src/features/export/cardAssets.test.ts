@@ -58,21 +58,22 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(b.y + b.h).toBeLessThan(CARD_GEOMETRY.slots.name.y)
   })
 
-  it('draws the owner\'s current tier-color-border ring: tier ramp at the file\'s 70% opacity', () => {
-    // Owner 2026-11-06: `<g id="tier-color-plate-2" opacity="0.7">` wraps the
-    // silhouette stroked 48px with the tier-ramp gradient, clipped by
-    // clip-path-2. The LINE is the file's; the COLORS are tier supplies.
+  it('draws the owner\'s current tier-color-border ring: tier ramp, full opacity', () => {
+    // Owner 2026-11-06b: `<g id="tier-color-border">` (no opacity attribute —
+    // fully opaque) wraps the silhouette stroked 48px with the tier-ramp
+    // gradient, clipped to the plate. The LINE is the file's; the COLORS are
+    // tier supplies.
     const border = CARD_GEOMETRY.borderStroke
     expect(border).toBeDefined()
     expect(border?.width).toBe(48)
-    expect(border?.opacity).toBeCloseTo(0.7, 6)
+    expect(border?.opacity).toBe(1)
     expect(border?.strokePath).toBe(CARD_GEOMETRY.platePath)
     expect(border?.line).toEqual(CARD_PLATE_GRADIENT_LINE)
     expect(border?.stops).toBeUndefined()
     // The tier supplies the colors; Impecável's ring IS the file's ramp.
     expect(TIER_PALETTE.platinum.borderStops).toBe(IMPECAVEL_BORDER_STOPS)
     expect(IMPECAVEL_BORDER_STOPS.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
-    // The file clips the ring to the plate silhouette — clipPath#clip-path-2.
+    // The file clips the ring to the plate silhouette.
     expect(border?.clipPath).toBe(CARD_GEOMETRY.platePath)
   })
 
@@ -98,27 +99,11 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(plate.fades[plate.fades.length - 1].opacity).toBe(1)
   })
 
-  it('parses the OVR bokeh backdrop, honoring each shape\'s authored opacity', () => {
-    const glows = CARD_GEOMETRY.ovrBokeh
-    expect(glows).toBeDefined()
-    if (glows === undefined) return
-    expect(glows.length).toBeGreaterThanOrEqual(1)
-    for (const glow of glows) {
-      // The owner draws the washes as circles or soft paths — both render.
-      expect(['circle', 'path']).toContain(glow.kind)
-      expect(glow.opacity).toBeGreaterThan(0)
-      expect(glow.opacity).toBeLessThanOrEqual(1)
-      expect(glow.fades.length).toBeGreaterThanOrEqual(2)
-      expect(glow.fades[0].opacity).toBe(0)
-      expect(glow.id).toMatch(/^linear-gradient-/)
-      if (glow.kind === 'circle') expect(glow.r).toBeGreaterThan(100)
-      else expect(glow.d.startsWith('M')).toBe(true)
-    }
-    // The file authors a DIFFERENT opacity per wash (and one with none, which
-    // means fully opaque): the parse keeps each value instead of flattening
-    // them to a single default.
-    expect(new Set(glows.map((g) => g.opacity)).size).toBeGreaterThan(1)
-    expect(glows.some((g) => g.opacity === 1)).toBe(true)
+  it('carries NO bokeh backdrop (owner 2026-11-06: "bokeh is gone")', () => {
+    // The owner dropped the bokeh: the photo mask is an empty clip group and
+    // the model has no bokeh layer — nothing paints between the photo and the
+    // scrim.
+    expect('ovrBokeh' in CARD_GEOMETRY).toBe(false)
   })
 
   it('parses the LAST_UPDATE line: the live date + the static label segments', () => {
@@ -127,17 +112,17 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     if (lu === undefined) return
     // Nested inside <g id="OVR"> since this re-model — "atualizado • DD-MM"
     // over the photo, under the job line.
-    expect(lu.date.x).toBeCloseTo(230.73, 1)
-    expect(lu.date.y).toBeCloseTo(491.142, 1)
-    expect(lu.date.size).toBe(24)
+    expect(lu.date.x).toBeCloseTo(275.861, 1)
+    expect(lu.date.y).toBeCloseTo(502.519, 1)
+    expect(lu.date.size).toBe(36)
     expect(lu.date.y).toBeGreaterThan(CARD_GEOMETRY.slots.job.y)
     expect(lu.date.y).toBeLessThan(CARD_GEOMETRY.slots.name.y)
     expect(lu.suffix.map((s) => s.text)).toEqual(['•', 'atualizado'])
-    expect(lu.suffix[0].x).toBeCloseTo(217.21, 1)
-    expect(lu.suffix[1].x).toBeCloseTo(124.99, 1)
+    expect(lu.suffix[0].x).toBeCloseTo(259.39, 1)
+    expect(lu.suffix[1].x).toBeCloseTo(123.219, 1)
     for (const segment of lu.suffix) {
       expect(segment.y).toBeCloseTo(lu.date.y, 1)
-      expect(segment.size).toBe(24)
+      expect(segment.size).toBe(36)
     }
   })
 
@@ -163,20 +148,20 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
 })
 
 describe('cardAssets — placeholder TEXT slots resolve to real positions/sizes', () => {
-  it('resolves the OVR slot: the BIGGEST text in the OVR group, 164px at (124.99, 403.532)', () => {
+  it('resolves the OVR slot: the BIGGEST text in the OVR group, 164px at (124.99, 402.309)', () => {
     const ovr = CARD_GEOMETRY.slots.ovr
     expect(ovr.x).toBeCloseTo(124.99, 1)
-    expect(ovr.y).toBeCloseTo(403.532, 1)
+    expect(ovr.y).toBeCloseTo(402.309, 1)
     expect(ovr.size).toBe(164)
     expect(ovr.size).toBeGreaterThan(140) // the number must be BIG (readability rounds 3-8)
     expect(ovr.size).toBeLessThan(180)
   })
 
-  it('resolves the job slot (the SMALLER OVR-group text, 42px Bebas) directly under the number', () => {
+  it('resolves the job slot (the SMALLER OVR-group text, 48px Bebas) directly under the number', () => {
     const job = CARD_GEOMETRY.slots.job
     expect(job.x).toBeCloseTo(124.99, 1)
-    expect(job.y).toBeCloseTo(456.942, 1)
-    expect(job.size).toBe(42)
+    expect(job.y).toBeCloseTo(455.719, 1)
+    expect(job.size).toBe(48)
     expect(job.y).toBeGreaterThan(CARD_GEOMETRY.slots.ovr.y)
     // The job line must stay smaller than the number it sits under.
     expect(job.size).toBeLessThan(CARD_GEOMETRY.slots.ovr.size)

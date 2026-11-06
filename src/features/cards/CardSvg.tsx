@@ -182,7 +182,6 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
   const plateGradId = `card-plate-grad-${uid}`
   const scrimId = `card-scrim-${uid}`
   const statsPlateGradId = `card-stats-plate-${uid}`
-  const glowGradId = `card-glow-${uid}`
   const b = plan.photoBBox
   // The file's logo group, with its gradient ids scoped to THIS card instance
   // (the showcase mounts many cards; duplicate gradient ids would cross-wire).
@@ -302,25 +301,9 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           <stop offset="0" stopColor="#000000" stopOpacity={plan.scrim.alpha} />
           <stop offset="1" stopColor="#000000" stopOpacity={0} />
         </linearGradient>
-        {/* The file's authored fades (owner 2026-11-06 re-model): the photo
-            light washes and the stats contrast plate keep their offsets and
-            opacities, while the COLOR rides the tier ramp (for Impecável that
-            IS the file's magenta→orange). */}
-        {(plan.card.ovrBokeh ?? []).map((glow, i) => (
-          <linearGradient
-            key={i}
-            id={`${glowGradId}-${i}`}
-            gradientUnits="userSpaceOnUse"
-            x1={glow.line.x1}
-            y1={glow.line.y1}
-            x2={glow.line.x2}
-            y2={glow.line.y2}
-          >
-            {tierFadeStops(plan.palette, glow.fades).map((stop, s) => (
-              <stop key={s} offset={stop.offset} stopColor={stop.color} stopOpacity={stop.opacity} />
-            ))}
-          </linearGradient>
-        ))}
+        {/* The file's authored stats-plate fade: its offsets and opacities
+            are the file's, while the COLOR rides the tier ramp (for Impecável
+            that IS the file's magenta→orange). */}
         {plan.card.statsPlate !== undefined && (
           <linearGradient
             id={statsPlateGradId}
@@ -387,28 +370,6 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
               {plan.photo.letter}
             </text>
           </>
-        )}
-        {/* The file's photo light washes (soft tier-tinted bokeh shapes),
-            painted over the photo and clipped to the photo area — the file's
-            own order (image → washes). */}
-        {(plan.card.ovrBokeh ?? []).map((glow, i) =>
-          glow.kind === 'circle' ? (
-            <circle
-              key={i}
-              cx={glow.cx}
-              cy={glow.cy}
-              r={glow.r}
-              opacity={glow.opacity}
-              fill={`url(#${glowGradId}-${i})`}
-            />
-          ) : (
-            <path
-              key={i}
-              d={glow.d}
-              opacity={glow.opacity}
-              fill={`url(#${glowGradId}-${i})`}
-            />
-          ),
         )}
         {/* Top legibility scrim over the photo (OVR block sits on it). */}
         <rect x={b.x} y={b.y} width={b.w} height={plan.scrim.y2 - plan.scrim.y1} fill={`url(#${scrimId})`} />

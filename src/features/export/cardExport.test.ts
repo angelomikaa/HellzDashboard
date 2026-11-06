@@ -54,8 +54,6 @@ import {
 import {
   CARD_PLATE_GRADIENT_LINE,
   IMPECAVEL_BORDER_STOPS,
-  contrastRatio,
-  resolveCardTextFill,
   tierFadeStops,
 } from './cardAssets'
 
@@ -231,13 +229,12 @@ describe('buildCardPlan — round-5 palette contract (tier colors applied by cod
       const plan = buildCardPlan({ ...data, ovr: ovrByTier[tier] }, CARD_DESIGN_WIDTH)
       expect(plan.tier).toBe(tier)
       expect(plan.palette).toBe(TIER_PALETTE[tier])
-      // Text contrast: dark on the light metals; the pristine plate carries
-      // the light rainbow, so its white fill fails AA and flips to black
-      // (round 10). The NAME and the stats carry the RESOLVED fill.
+      // Owner 2026-11-06: the palette's fill is authoritative — Impecável
+      // renders WHITE, the metals keep their dark brown. No AA flip.
       expect(plan.name.color).toBe(plan.textFill)
-      expect(plan.textFill).toBe(resolveCardTextFill(TIER_PALETTE[tier]))
+      expect(plan.textFill).toBe(TIER_PALETTE[tier].textFill)
       if (tier === 'platinum') {
-        expect(plan.name.color).toBe('#000000')
+        expect(plan.name.color).toBe('#ffffff')
       } else {
         expect(plan.name.color).toBe('#241a10')
       }
@@ -261,22 +258,21 @@ describe('buildCardPlan — round-5 palette contract (tier colors applied by cod
     }
   })
 
-  it('round-10/2026-11-05 contrast rule: the Impecável plate is the file ramp and text flips to black', () => {
+  it('owner 2026-11-06: the Impecável text is WHITE (the AA flip is retired), metals keep dark', () => {
     const platinum = TIER_PALETTE.platinum
     // The plate carries the card.svg's Magenta_to_Orange ramp — the same
-    // stops as its (70% opacity) border.
+    // stops as its (full-opacity) border.
     expect(platinum.plateStops).toEqual(platinum.borderStops)
     expect(platinum.plateStops).toHaveLength(2)
     expect(platinum.plateStops?.map((s) => s.color)).toEqual(['#ff12f7', '#ed7b00'])
-    // White cannot hold AA anywhere on that plate; black can (the flip).
-    for (const stop of platinum.plateStops ?? []) {
-      expect(contrastRatio('#ffffff', stop.color)).toBeLessThan(4.5)
-      expect(contrastRatio('#000000', stop.color)).toBeGreaterThanOrEqual(4.5)
-    }
-    expect(resolveCardTextFill(platinum)).toBe('#000000')
-    // Metals keep their dark brown — the rule never re-tints a passing fill.
+    // The palette decides the fill — no contrast-driven flip.
+    expect(platinum.textFill).toBe('#ffffff')
+    const plan = buildCardPlan({ ...data, ovr: 87 }, CARD_DESIGN_WIDTH)
+    expect(plan.textFill).toBe('#ffffff')
+    expect(plan.name.color).toBe('#ffffff')
+    // Metals keep their dark brown.
     for (const tier of ['bronze', 'silver', 'gold'] as const) {
-      expect(resolveCardTextFill(TIER_PALETTE[tier])).toBe('#241a10')
+      expect(TIER_PALETTE[tier].textFill).toBe('#241a10')
     }
   })
 })
@@ -342,10 +338,10 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     expect(backing.photoBBox.h).toBe(CARD_GEOMETRY.cropBBox.h * 2)
   })
 
-  // 2026-11-06 re-model contract: the border is `tier-color-plate-2` — a 48px
-  // stroke on the plate silhouette, clipped by clip-path-2, painted with the
-  // TIER ramp at the file's own 70% opacity.
-  it('draws the owner\'s current tier-color-border ring: tier ramp at 70% opacity', () => {
+  // 2026-11-06b contract: the border is `tier-color-border` — a 48px stroke on
+  // the plate silhouette, clipped to the plate, painted with the TIER ramp at
+  // full opacity (the file declares no opacity).
+  it('draws the owner\'s current tier-color-border ring: tier ramp, full opacity', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     expect(plan.card.borderStroke).toBeDefined()
     expect(plan.card.borderStroke?.width).toBe(48)
@@ -354,11 +350,11 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     // Colors come from the palette (Impecável = the file's Magenta_to_Orange).
     expect(plan.card.borderStroke?.stops).toBeUndefined()
     expect(plan.palette.borderStops).toEqual(IMPECAVEL_BORDER_STOPS)
-    expect(plan.card.borderStroke?.opacity).toBeCloseTo(0.7, 6)
+    expect(plan.card.borderStroke?.opacity).toBe(1)
     expect(plan.card.borderStroke?.clipPath).toBe(CARD_GEOMETRY.platePath)
   })
 
-  it('carries the stats contrast plate + photo light washes through to the plan', () => {
+  it('carries the stats contrast plate through to the plan', () => {
     const plan = buildCardPlan(data, CARD_DESIGN_WIDTH)
     const plate = plan.card.statsPlate
     expect(plate).toBeDefined()
@@ -368,7 +364,8 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     for (const fade of plate.fades) {
       expect(Object.keys(fade).sort()).toEqual(['offset', 'opacity'])
     }
-    expect(plan.card.ovrBokeh).toBe(CARD_GEOMETRY.ovrBokeh)
+    // The bokeh layer is gone (owner 2026-11-06).
+    expect('ovrBokeh' in plan.card).toBe(false)
   })
 
   it('tints the file fades with the TIER ramp (Impecável renders the file exactly)', () => {
@@ -675,3 +672,4 @@ describe('cardFilename — export slugification', () => {
     expect(cardFilename('  Ana   B  ')).toBe('hellz-ana-b.png')
   })
 })
+

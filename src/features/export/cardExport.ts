@@ -73,7 +73,6 @@ import {
   applyPhotoTransform,
   measurePhotoSubject,
   photoDestRect,
-  resolveCardTextFill,
   scalePath,
   scaleRect,
   tierFadeStops,
@@ -189,8 +188,10 @@ export interface CardPlan {
   /** The tier's CODE-DRIVEN palette (plate fill / border stops / text
    *  fill) applied over the one shared geometry. */
   palette: TierPalette
-  /** The RESOLVED plate text color: `resolveCardTextFill(palette)` — white
-   *  flips to black when the plate can no longer carry it (round 10). */
+  /** The card's text color — the PALETTE's own fill (owner 2026-11-06:
+   *  "the contrast is probably good now — make the text be white"; the
+   *  round-10 AA flip to black is retired). Impecável = white; the metals
+   *  keep their dark fill. */
   textFill: string
   /** The card's FONT SPLIT (round 7): Bebas Neue for every slot EXCEPT the
    *  player name (Orbitron). Both surfaces read the families from here so
@@ -294,10 +295,9 @@ export function buildCardPlan(
   const tier = tierOf(data.ovr)
   const card = CARD_GEOMETRY
   const palette = TIER_PALETTE[tier]
-  // Round 10: the plate can carry a gradient (today the Impecável
-  // Magenta_to_Orange ramp), so the text fill is RESOLVED against the plate —
-  // one decision shared by both surfaces through the plan.
-  const textFill = resolveCardTextFill(palette)
+  // Owner 2026-11-06: the palette's fill is authoritative (Impecável white);
+  // no AA flip. One value shared by both surfaces through the plan.
+  const textFill = palette.textFill
   const scale = width / CARD_DESIGN_WIDTH
   const height = (width * CARD_DESIGN_HEIGHT) / CARD_DESIGN_WIDTH
 
@@ -748,21 +748,8 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   } else {
     drawMonogramFill(ctx, plan)
   }
-  // The file's photo light wash (soft tier-tinted bokeh shapes over the
-  // photo), clipped to the photo area exactly as the file clips it.
-  for (const glow of plan.card.ovrBokeh ?? []) {
-    ctx.save()
-    ctx.globalAlpha = glow.opacity
-    ctx.fillStyle = fadeGradient(ctx, plan, glow)
-    if (glow.kind === 'circle') {
-      ctx.beginPath()
-      ctx.arc(glow.cx * s, glow.cy * s, glow.r * s, 0, Math.PI * 2)
-      ctx.fill()
-    } else {
-      ctx.fill(new Path2D(scalePath(glow.d, s)))
-    }
-    ctx.restore()
-  }
+  // The file's photo light wash was retired with the bokeh (owner 2026-11-06:
+  // "bokeh is gone, it was not producing the desired effect").
   // Top legibility scrim (backs the over-photo OVR block).
   const scrimGrad = ctx.createLinearGradient(0, plan.scrim.y1, 0, plan.scrim.y2)
   scrimGrad.addColorStop(0, `rgba(0,0,0,${plan.scrim.alpha})`)
@@ -930,3 +917,4 @@ export {
   TIER_PALETTE,
   type CardRect,
 }
+

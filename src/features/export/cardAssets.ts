@@ -8,14 +8,15 @@
 // shipped (fail-fast when none matches):
 //
 //   A) CURRENT FILE (owner re-model 2026-11-06 — "remodelado para comportar o
-//      clip e os degradês que tínhamos anteriormente") — INLINE attributes,
-//      no <style>, no classes:
+//      clip e os degradês que tínhamos anteriormente"; then the bokeh was
+//      dropped: "bokeh is gone, it was not producing the desired effect") —
+//      INLINE attributes, no <style>, no classes:
 //        <path id="tier-color-plate"> — recolorable backplate, full shield,
 //          filled with the tier's plate ramp (the file's Magenta_to_Orange IS
 //          the Impecável tier color since 2026-11-05).
 //        <g id="mask" clip-path="url(#clip-path-1)"> — THE PHOTO AREA (the
-//          shield's top portion, closed at y≈963) + the soft magenta light
-//          wash the file paints over the photo (a gradient circle).
+//          shield's top portion, closed at y≈963). It is an empty clip group
+//          now; the app paints the member's photo inside it.
 //        <g id="tier-color-plate-2" data-name="tier-color-plate"
 //          opacity="0.7"> wrapping the silhouette stroked 48px with the tier
 //          ramp, clipped by clipPath#clip-path-2 — the translucent border.
@@ -32,7 +33,7 @@
 //   D) round-8 file (retired) — <style> + cls-* classes, crop-path photo area
 //      + border-over gradient stroke clipped by clip-path-1.
 //
-// PAINT ORDER (the file's own): plate → photo (+ bokeh, scrim) → border →
+// PAINT ORDER (the file's own): plate → photo (+ scrim) → border →
 // stats plate → texts → logo.
 //   - Placeholder TEXT slots (Bebas Neue unless noted — family + fill are
 //     placeholders; code substitutes). Roles resolve from STRUCTURE, never
@@ -195,15 +196,6 @@ export interface CardStatsPlate extends CardGradientPaint {
   path: string
 }
 
-/** One shape of the OVR BOKEH backdrop (owner 2026-11-06: "card now has a
- *  bokeh effect as background for the OVR section") — the soft gradient
- *  circles/paths the file paints inside the photo clip behind the OVR block.
- *  Geometry, fade and the shape's own opacity come from the file, the color
- *  from the tier. */
-export type CardOvrBokehShape =
-  | ({ kind: 'circle'; cx: number; cy: number; r: number; opacity: number } & CardGradientPaint)
-  | ({ kind: 'path'; d: string; opacity: number } & CardGradientPaint)
-
 export interface CardGeometry {
   /** The solid plate silhouette (cls-1 path) — full shield. Painted first
    *  on both surfaces; nothing fills outside it (transparent design). */
@@ -225,9 +217,6 @@ export interface CardGeometry {
   borderStroke?: CardBorderStroke
   /** The stats contrast plate, when the file draws one (`stats-plate`). */
   statsPlate?: CardStatsPlate
-  /** The OVR bokeh backdrop (`<g id="OVR-BOKEH-BG">` inside the photo clip):
-   *  soft tier-tinted shapes behind the OVR number/job line. */
-  ovrBokeh?: CardOvrBokehShape[]
   /** The brand mark the file draws (`logo-hellz`), when present. */
   logo?: CardLogo
   slots: {
@@ -323,7 +312,7 @@ export const TIER_PALETTE: Record<Tier, TierPalette> = {
   },
 }
 
-/** The tier's own ramp for the file's fade layers (stats plate + OVR bokeh):
+/** The tier's own ramp for the file's fade layers (the stats plate):
  *  the owner's re-modeled gradients are authored in the Impecável colors, and
  *  the tier rule ("as cores do svg serão a nova cor do tier", and before that
  *  "the fills must follow tier colors") means each tier paints its own ramp at
@@ -386,46 +375,13 @@ function parseHex(color: string): [number, number, number] | null {
 }
 
 // ---------------------------------------------------------------------------
-// Card text contrast (owner checkpoint round 10): white-on-plate fails once
-// the plate carries a bright ramp (today: Impecável's Magenta_to_Orange).
-// Same palette, same decision on both surfaces — the plan stores the RESOLVED
-// fill so the SVG and the PNG export can never disagree.
+// Card text fill. OWNER RULING 2026-11-06: "the contrast is probably good now —
+// make the text be white". The palette's own `textFill` is authoritative again
+// (the round-10 AA flip to black is retired): Impecável renders WHITE stats /
+// name / last-update over the ramp + stats plate, while the metals keep the
+// dark fill their palettes declare (white on silver/gold would vanish). The
+// plan carries it, so the SVG and the PNG can never disagree.
 
-function channel(v: number): number {
-  const c = v / 255
-  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
-}
-
-function luminance(hex: string): number {
-  const m = /^#([0-9a-f]{6})$/i.exec(hex)
-  if (!m) throw new Error(`card palette: expected #rrggbb, got "${hex}"`)
-  const n = Number.parseInt(m[1], 16)
-  return (
-    0.2126 * channel((n >> 16) & 0xff) +
-    0.7152 * channel((n >> 8) & 0xff) +
-    0.0722 * channel(n & 0xff)
-  )
-}
-
-/** WCAG contrast ratio between two #rrggbb colors. */
-export function contrastRatio(a: string, b: string): number {
-  const la = luminance(a)
-  const lb = luminance(b)
-  const [hi, lo] = la >= lb ? [la, lb] : [lb, la]
-  return (hi + 0.05) / (lo + 0.05)
-}
-
-/** Resolves the card text fill: keep the palette's choice when it holds
- *  WCAG AA (4.5:1) on EVERY plate color; otherwise switch to black when
- *  black reads better than the light fill. Metals keep their dark brown —
- *  the rule only rescues light text that the plate can no longer carry. */
-export function resolveCardTextFill(palette: TierPalette): string {
-  const backgrounds = palette.plateStops?.map((s) => s.color) ?? [palette.plateFill]
-  const worst = (fill: string): number =>
-    Math.min(...backgrounds.map((bg) => contrastRatio(fill, bg)))
-  if (worst(palette.textFill) >= 4.5) return palette.textFill
-  return worst('#000000') > worst(palette.textFill) ? '#000000' : palette.textFill
-}
 
 // ---------------------------------------------------------------------------
 // Parsing (pure string work — card.svg is a tiny, hand-verified file).
@@ -711,46 +667,6 @@ function statsPlate(svg: string): CardStatsPlate | undefined {
   const ref = plate.get('fill')?.match(/url\(#([^)]+)\)/)
   if (!ref) throw new Error('card.svg: the stats plate must fill with url(#gradient)')
   return { path: plate.get('d') as string, ...gradientPaint(svg, ref[1]) }
-}
-
-/** The OVR bokeh backdrop (owner 2026-11-06): every gradient-filled shape the
- *  file paints INSIDE the photo clip (`<g id="mask">` → `<g id="OVR-BOKEH-BG">`)
- *  behind the OVR block. Geometry, fade and the shape's own opacity come from
- *  the file; the colors from the tier. The mask group is parsed with BALANCED
- *  nesting (the placeholder image sits in its own nested group). */
-function ovrBokeh(svg: string, groups: SvgGroup[]): CardOvrBokehShape[] | undefined {
-  const mask = findGroup(groups, 'mask')
-  if (mask === undefined) return undefined
-  // Prefer the explicit bokeh group (keeps a future non-bokeh gradient inside
-  // the photo area out of the backdrop), fall back to the whole mask. The id
-  // drifts per export (OVR-BOKEH / OVR-BOKEH-BG).
-  const bokehGroup =
-    findGroup(svgGroups(mask.body), 'OVR-BOKEH') ?? findGroup(svgGroups(mask.body), 'OVR-BOKEH-BG')
-  const source = bokehGroup?.body ?? mask.body
-  const shapes: CardOvrBokehShape[] = []
-  for (const m of source.matchAll(/<circle\b([^>]*)>|<path\b([^>]*)>/g)) {
-    const attrs = attributes(m[1] ?? m[2])
-    const ref = attrs.get('fill')?.match(/url\(#([^)]+)\)/)
-    if (ref === null || ref === undefined) continue
-    const rawOpacity = attrs.get('opacity') ?? '1'
-    const opacity = Number(rawOpacity)
-    if (Number.isNaN(opacity)) {
-      throw new Error(`card.svg: the OVR bokeh shape declares an unparseable opacity "${rawOpacity}"`)
-    }
-    const paint = gradientPaint(svg, ref[1])
-    if (m[1] !== undefined) {
-      const [cx, cy, r] = ['cx', 'cy', 'r'].map((k) => Number(attrs.get(k)))
-      if ([cx, cy, r].some((v) => Number.isNaN(v))) {
-        throw new Error('card.svg: an OVR bokeh circle needs cx/cy/r')
-      }
-      shapes.push({ kind: 'circle', cx, cy, r, opacity, ...paint })
-    } else {
-      const d = attrs.get('d')
-      if (d === undefined) continue
-      shapes.push({ kind: 'path', d, opacity, ...paint })
-    }
-  }
-  return shapes.length === 0 ? undefined : shapes
 }
 
 /** The detached border layer, when the file draws one. FOUR shapes:
@@ -1126,7 +1042,6 @@ function parseCard(svg: string): CardGeometry {
     cropBBox: pathBBox(cropPath, 'crop-path'),
     borderStroke: borderStroke(svg, svgNodes),
     statsPlate: statsPlate(svg),
-    ovrBokeh: ovrBokeh(svg, svgNodes),
     logo: cardLogo(svg, svgNodes),
     slots: { ovr, job, name, lastUpdate: lastUpdateValue, stats },
   }

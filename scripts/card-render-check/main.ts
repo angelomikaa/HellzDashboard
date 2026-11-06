@@ -186,18 +186,18 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
       }
     }
   } else {
-    // ASST-01 monogram tile (#1E1E1E) fills the crop path — probe where the
-    // light wash is transparent and the scrim has faded (y = 80% of the crop).
+    // ASST-01 monogram tile (#1E1E1E) fills the crop path — probe below the
+    // OVR block, where the scrim has faded (y = 80% of the crop).
     photo = near(px(b.x + b.w * 0.3, b.y + b.h * 0.8), plan.colors.monogramTile, 12)
   }
 
-  // Border (2026-11-06 `tier-color-plate-2`): a 48px TIER-ramp stroke on the
-  // PLATE silhouette at the file's opacity (0.7), clipped to the plate. The
-  // ring is visible over the PHOTO (its lower half is covered by the stats
-  // plate, exactly as the file paints it), so the probe is DIFFERENTIAL: a
-  // pixel inside the ring band vs one further inside the photo. The exact
-  // fidelity is locked by the file-vs-app diff (0 differing pixels); this
-  // probe only proves the stroke is still painted at all.
+  // Border (2026-11-06b `tier-color-border`): a 48px TIER-ramp stroke on the
+  // PLATE silhouette at full opacity (the file declares none), clipped to the
+  // plate. The ring is visible over the PHOTO (its lower half is covered by
+  // the stats plate, exactly as the file paints it), so the probe is
+  // DIFFERENTIAL: a pixel inside the ring band vs one further inside the
+  // photo. The exact fidelity is locked by the file-vs-app diff (0 differing
+  // pixels); this probe only proves the stroke is still painted at all.
   const ringDelta = (y: number): number => {
     const inside = px(80, y)
     const outside = px(160, y)
@@ -220,7 +220,7 @@ async function checkTier(canvas: HTMLCanvasElement, c: (typeof CASES)[number]): 
   const borderStructure =
     ring !== undefined &&
     ring.width === 48 &&
-    Math.abs(ring.opacity - 0.7) < 1e-6 &&
+    ring.opacity === 1 &&
     ring.strokePath === plan.card.platePath &&
     ring.clipPath === plan.card.platePath
   const borderVisible = Math.max(ringDelta(600), ringDelta(800), ringAtTop()) > 40
@@ -399,8 +399,8 @@ function referenceCardSvg(
       .map((s) => `<stop offset="${s.offset}" stop-color="${s.color}"/>`)
       .join('')}$2`,
   )
-  // Authored fades (stats plate + photo glow): the file's offsets/opacities
-  // with the tier's colors.
+  // Authored fade (the stats plate): the file's offsets/opacities with the
+  // tier's colors.
   const fadeStops = (id: string, paint: { fades: { offset: number; opacity: number }[] }): void => {
     const re = new RegExp(
       '(<linearGradient\\b[^>]*id="' + id + '"[^>]*>)[\\s\\S]*?(</linearGradient>)',
@@ -411,7 +411,6 @@ function referenceCardSvg(
     svg = svg.replace(re, `$1${stops}$2`)
   }
   if (plan.card.statsPlate !== undefined) fadeStops(plan.card.statsPlate.id, plan.card.statsPlate)
-  for (const glow of plan.card.ovrBokeh ?? []) fadeStops(glow.id, glow)
   // Main plate: a gradient tier keeps the file's gradient fill; a solid tier
   // swaps it for the palette color.
   const plateFill = plateGradient === undefined ? palette.plateFill : 'url(#linear-gradient-1)'
@@ -432,9 +431,9 @@ function referenceCardSvg(
     /(<linearGradient\b[^>]*id="Blue_to_Magenta"[^>]*>)[\s\S]*?(<\/linearGradient>)/,
     `$1${gradStops}$2`,
   )
-  // The file's embedded placeholder photo is REPLACED by the app's photo layer
-  // below (the app computes its own framing); the bokeh/lights group stays —
-  // its gradients were tinted above, exactly like the app paints them.
+  // The file no longer embeds a placeholder photo (and has no bokeh): the app
+  // injects its own framed photo layer below. The strip stays as a guard for a
+  // future export that reintroduces the placeholder.
   svg = svg.replace(/<g\b[^>]*id="placeholder\.png"[^>]*>[\s\S]*?<\/g>/, '')
   // Extra defs: the photo clip (the crop path) + the shared scrim.
   const defs =
@@ -460,12 +459,12 @@ function referenceCardSvg(
   if (plateEnd < 0) throw new Error('render-diff: backplate path not found in card.svg')
   const insertAt = svg.indexOf('/>', plateEnd) + 2
   svg = svg.slice(0, insertAt) + photoLayer + svg.slice(insertAt)
-  // The scrim sits over the photo AND the file's light washes (the app paints
-  // it after them), so it is inserted right before the border group.
+  // The scrim sits over the photo (the app paints it after the photo), so it
+  // is inserted right before the border group.
   const scrimLayer =
     `<g clip-path="url(#rf-photo-clip)">` +
     `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${plan.scrim.y2 - plan.scrim.y1}" fill="url(#rf-scrim)"/></g>`
-  const borderAt = svg.search(/<g\b[^>]*id="tier-color-plate-2"/)
+  const borderAt = svg.search(/<g\b[^>]*id="(?:tier-color-plate-2|tier-color-border)"/)
   if (borderAt < 0) throw new Error('render-diff: border group not found in card.svg')
   svg = svg.slice(0, borderAt) + scrimLayer + svg.slice(borderAt)
   return svg
@@ -926,7 +925,7 @@ async function main(): Promise<void> {
     // Static design facts ride along (they pin the design-source wiring).
     results.meta = {
       designSize: `${CARD_DESIGN_WIDTH}x${CARD_DESIGN_HEIGHT}`,
-      sourceFile: 'src/assets/card.svg (single source of truth, 2026-11-06 re-model — photo mask clip, 48px tier border at 70% opacity, stats plate + OVR bokeh gradients, LAST_UPDATE nested in OVR, no embedded placeholder)',
+      sourceFile: 'src/assets/card.svg (single source of truth, 2026-11-06b — empty photo mask clip, 48px tier border at full opacity, stats plate fade, LAST_UPDATE nested in OVR, white Impecável text, no bokeh, no embedded placeholder)',
       slotCount: CARD_GEOMETRY.slots.stats.length,
       ovrEffectiveSize: CARD_GEOMETRY.slots.ovr.size,
       plateFillsDistinct: new Set(Object.values(TIER_PALETTE).map((p) => p.plateFill)).size === 4,
@@ -937,7 +936,6 @@ async function main(): Promise<void> {
       borderImpecavel: TIER_PALETTE.platinum.borderStops === IMPECAVEL_BORDER_STOPS,
       hasCropPath: CARD_GEOMETRY.cropPath !== CARD_GEOMETRY.platePath,
       hasStatsPlate: CARD_GEOMETRY.statsPlate !== undefined,
-      hasOvrBokeh: (CARD_GEOMETRY.ovrBokeh?.length ?? 0) > 0,
       hasLastUpdate: CARD_GEOMETRY.slots.lastUpdate !== undefined,
       labelAboveRating: CARD_GEOMETRY.slots.stats.every((s) => s.label.y < s.points.y && s.points.y < s.value.y),
       fontsLoaded,
@@ -968,3 +966,7 @@ window.addEventListener('unhandledrejection', (e) => {
 })
 
 void main()
+
+
+
+
