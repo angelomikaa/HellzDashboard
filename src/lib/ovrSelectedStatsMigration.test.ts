@@ -37,23 +37,36 @@ function latestDefinition(name: string): { file: string; body: string } | null {
   return null
 }
 
+const OVR_FUNCTIONS = [
+  'my_report',
+  'my_card',
+  'class_top5',
+  'role_rank',
+  'get_promotion',
+  'get_promotion_public',
+  'staff_requests',
+  'ovr_projection',
+] as const
+
 describe('migration 0073 — OVR over keys + relevants', () => {
-  it('is the latest definition of every OVR RPC', () => {
-    for (const fn of [
-      'my_report',
-      'my_card',
-      'class_top5',
-      'role_rank',
-      'get_promotion',
-      'get_promotion_public',
-      'staff_requests',
-      'ovr_projection',
-      'set_key_stat_v2',
-    ]) {
+  it('keeps the 0073 OVR invariants in the latest definition of every OVR RPC', () => {
+    // Later migrations (0076 real-guild averages, 0077 real ranking rows) may
+    // supersede a body; the rating formula itself must survive verbatim.
+    for (const fn of OVR_FUNCTIONS) {
       const latest = latestDefinition(fn)
       expect(latest, fn).not.toBeNull()
-      expect(latest?.file, fn).toBe(FILE_NAME)
+      const body = latest?.body ?? ''
+      const where = `${fn} (${latest?.file})`
+      expect(body, where).not.toContain('count(*) = 6 and count(p) = 6')
+      expect(body, where).toContain('count(p) >= 1')
+      expect(body, where).toContain('and kk.selection_order <= 6) = 6')
+      expect(body, where).not.toMatch(/selection_order <= 6\n\s*\) kp/)
     }
+  })
+
+  it('keeps set_key_stat_v2 as the 0073 slot/freeze implementation', () => {
+    const latest = latestDefinition('set_key_stat_v2')
+    expect(latest?.file).toBe(FILE_NAME)
   })
 
   it('removes the old all-6-points gate and requires the 6-key config + one point', () => {

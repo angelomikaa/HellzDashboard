@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const sql = readFileSync('supabase/migrations/0074_stat_progress_trackers.sql', 'utf8')
+const sql0075 = readFileSync('supabase/migrations/0075_progress_real_references.sql', 'utf8')
+const sql0076 = readFileSync('supabase/migrations/0076_real_guild_averages.sql', 'utf8')
+const sql0077 = readFileSync('supabase/migrations/0077_ranking_real_rows.sql', 'utf8')
 const manifest = JSON.parse(
   readFileSync('supabase/migrations/manifest.json', 'utf8'),
 ) as { apply_order: string[] }
@@ -59,5 +62,65 @@ describe('migration 0074 — stat progress trackers', () => {
 
   it('is registered in the migration manifest', () => {
     expect(manifest.apply_order).toContain('0074_stat_progress_trackers.sql')
+    expect(manifest.apply_order).toContain('0075_progress_real_references.sql')
+    expect(manifest.apply_order).toContain('0076_real_guild_averages.sql')
+    expect(manifest.apply_order).toContain('0077_ranking_real_rows.sql')
+  })
+})
+
+describe('migration 0076 — real-guild displayed averages', () => {
+  it('adds a fixture-free display aggregate to my_report and role_rank', () => {
+    expect(sql0076).toContain('cohort_real as')
+    expect(sql0076).toContain('agg_real as')
+    expect(sql0076).toContain('left join agg_real ar on ar.stat_key = c.stat_key')
+    expect(sql0076).toContain('left join agg_real agr')
+    expect(sql0076).toContain("coalesce(m.discord_handle, '') not like 'smoke%'")
+    expect(sql0076).toContain("coalesce(m.discord_handle, '') not like 'dummy-%'")
+  })
+
+  it('keeps the rating basis on the all-active agg (no OVR change)', () => {
+    // The points/OVR subqueries still join the unfiltered agg.
+    expect(sql0076).toContain('left join agg a on a.stat_key = ks.stat_key')
+    expect(sql0076).toContain('left join agg ag on ag.stat_key = ks.stat_key and ag.char_class = rm.char_class')
+  })
+})
+
+describe('migration 0077 — fixture-free ranking lists', () => {
+  it('outputs real rows while keeping the all-active rating basis', () => {
+    expect(sql0077).toContain('role_members_real as')
+    expect(sql0077).toContain('class_members_real as')
+    expect(sql0077).toContain('from role_members_real rm')
+    expect(sql0077).toContain('from class_members_real cm')
+    // The OVR lateral still reads the unfiltered agg.
+    expect(sql0077).toContain('left join agg ag on ag.stat_key = ks.stat_key and ag.char_class = rm.char_class')
+  })
+})
+
+describe('migration 0075 — real-members-only progress references', () => {
+  it('supersedes the 0074 body without changing the payload shape', () => {
+    expect(sql0075).toContain('create or replace function public.my_stat_progress(p_stat_keys text[])')
+    expect(sql0075).toContain("'class_average'")
+    expect(sql0075).toContain("'function_average'")
+    expect(sql0075).toContain("'cohort_average'")
+    expect(sql0075).toContain('h.rn <= 3')
+  })
+
+  it('excludes smoke/dummy fixtures from the three aggregates', () => {
+    expect(sql0075).toContain("coalesce(m.discord_handle, '') not like 'smoke%'")
+    expect(sql0075).toContain("coalesce(m.discord_handle, '') not like 'dummy-%'")
+    // The caller's own history still reads every non-rejected/discarded row.
+    expect(sql0075).toContain('where sub.member_id = v_member')
+  })
+
+  it('keeps the member gate and the anon denial', () => {
+    expect(sql0075).toContain('SECURITY DEFINER')
+    expect(sql0075).toContain('no_member_claim')
+    expect(sql0075).toContain('revoke execute on function public.my_stat_progress(text[]) from anon')
+    expect(sql0075).toContain('grant execute on function public.my_stat_progress(text[]) to authenticated')
+  })
+
+  it('records its bookkeeping row and reloads PostgREST', () => {
+    expect(sql0075).toContain("values ('0075', 'progress_real_references', null)")
+    expect(sql0075).toContain("notify pgrst, 'reload schema'")
   })
 })
