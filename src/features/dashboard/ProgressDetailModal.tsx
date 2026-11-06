@@ -119,7 +119,7 @@ export function ProgressDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-6"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
@@ -129,61 +129,75 @@ export function ProgressDetailModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="progress-title"
-        className="flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-lg border border-line bg-surface sm:rounded-lg"
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-t-lg border border-line bg-surface sm:rounded-lg"
       >
-        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line p-4">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-5 sm:px-6 sm:py-6">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Progressão</p>
-            <h3 id="progress-title" className="truncate text-lg font-semibold text-content">
+            <h3 id="progress-title" className="mt-1 truncate text-xl font-semibold text-content">
               {item.label}
             </h3>
-            <p className="text-xs uppercase tracking-wide text-muted">
-              {item.label_short} · {item.stat_direction === 'lower' ? 'Menor é melhor' : 'Maior é melhor'}
+            <p className="mt-1 text-xs uppercase tracking-wide text-muted">
+              {item.label_short} ·{' '}
+              {item.stat_direction === 'lower' ? 'Menor é melhor' : 'Maior é melhor'}
             </p>
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-2 text-sm text-muted">
               {displayName} · {classLabel(charClass)} · {FUNCTION_LABELS[charFunction]}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="text-2xl font-semibold tabular-nums text-content">
-              {item.own_value === null ? '—' : formatStatValue(item.own_value, item.value_type)}
-            </span>
-            {item.points === null ? (
-              <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">
-                Dados insuficientes
-              </span>
-            ) : tier !== null ? (
-              <span
-                className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${TIER_BORDER_DISPLAY[tier]} ${TIER_TEXT_DISPLAY[tier]}`}
-              >
-                {Math.round(item.points)}
-              </span>
-            ) : null}
-            <button
-              type="button"
-              data-modal-close
-              onClick={onClose}
-              aria-label="Voltar"
-              className="h-11 w-11 rounded-md border border-line text-lg text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              ×
-            </button>
-          </div>
+          <button
+            type="button"
+            data-modal-close
+            onClick={onClose}
+            aria-label="Voltar"
+            className="h-11 w-11 shrink-0 rounded-md border border-line text-lg text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            ×
+          </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <StatTrendChart
-            history={item.history}
-            valueType={item.value_type}
-            references={references}
-          />
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-line bg-dominant px-4 py-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">Valor atual</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-content">
+                {item.own_value === null ? '—' : formatStatValue(item.own_value, item.value_type)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-wide text-muted">Pontos</p>
+              <div className="mt-1">
+                {item.points === null ? (
+                  <span className="rounded-full border border-line px-2.5 py-1 text-xs text-muted">
+                    Dados insuficientes
+                  </span>
+                ) : tier !== null ? (
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-sm font-semibold ${TIER_BORDER_DISPLAY[tier]} ${TIER_TEXT_DISPLAY[tier]}`}
+                  >
+                    {Math.round(item.points)}
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted">—</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <StatTrendChart
+              history={item.history}
+              valueType={item.value_type}
+              references={references}
+            />
+          </div>
 
           {item.history.length === 0 ? (
-            <p className="mt-2 text-xs text-muted">
+            <p className="mt-3 text-xs text-muted">
               Sem histórico ainda — envie mais um status para começar a linha do tempo.
             </p>
           ) : (
-            <p className="mt-2 text-xs text-muted">
+            <p className="mt-3 text-xs text-muted">
               Últimas submissões:{' '}
               {item.history
                 .map((point) => formatStatValue(point.value, item.value_type))
@@ -191,60 +205,60 @@ export function ProgressDetailModal({
             </p>
           )}
 
-          <table className="mt-3 w-full border-collapse text-sm">
+          <table className="mt-5 w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-line text-left text-muted">
-                <th scope="col" className="py-1 pr-2 font-medium">
+                <th scope="col" className="pb-2 pr-3 font-medium">
                   Referência
                 </th>
-                <th scope="col" className="py-1 pr-2 text-right font-medium">
+                <th scope="col" className="pb-2 pr-3 text-right font-medium">
                   Valor
                 </th>
-                <th scope="col" className="py-1 pr-2 text-right font-medium">
+                <th scope="col" className="pb-2 pr-3 text-right font-medium">
                   Diferença
                 </th>
-                <th scope="col" className="py-1 text-right font-medium">
+                <th scope="col" className="pb-2 text-right font-medium">
                   Amostra
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr className="border-b border-line">
-                <th scope="row" className="py-1 pr-2 text-left font-semibold text-content">
+                <th scope="row" className="py-2.5 pr-3 text-left font-semibold text-content">
                   <span
-                    className="mr-1.5 inline-block h-2 w-2 rounded-full"
+                    className="mr-2 inline-block h-2 w-2 rounded-full"
                     style={{ backgroundColor: OWN_COLOR }}
                   />
                   Seu valor
                 </th>
-                <td className="py-1 pr-2 text-right tabular-nums text-content">
+                <td className="py-2.5 pr-3 text-right tabular-nums text-content">
                   {item.own_value === null ? '—' : formatStatValue(item.own_value, item.value_type)}
                 </td>
-                <td className="py-1 pr-2 text-right text-muted">—</td>
-                <td className="py-1 text-right tabular-nums text-muted">—</td>
+                <td className="py-2.5 pr-3 text-right text-muted">—</td>
+                <td className="py-2.5 text-right tabular-nums text-muted">—</td>
               </tr>
               {references.map((reference) => {
                 const delta = signedDelta(item.own_value, reference.value)
                 return (
                   <tr key={reference.key} className="border-b border-line last:border-b-0">
-                    <th scope="row" className="py-1 pr-2 text-left font-semibold text-content">
+                    <th scope="row" className="py-2.5 pr-3 text-left font-semibold text-content">
                       <span
-                        className="mr-1.5 inline-block h-2 w-2 rounded-full"
+                        className="mr-2 inline-block h-2 w-2 rounded-full"
                         style={{ backgroundColor: REFERENCE_COLORS[reference.key] }}
                       />
                       {reference.label}
                     </th>
-                    <td className="py-1 pr-2 text-right tabular-nums text-content">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-content">
                       {reference.value === null
                         ? '—'
                         : formatStatValue(reference.value, item.value_type)}
                     </td>
                     <td
-                      className={`py-1 pr-2 text-right tabular-nums ${deltaTone(delta, item.stat_direction)}`}
+                      className={`py-2.5 pr-3 text-right tabular-nums ${deltaTone(delta, item.stat_direction)}`}
                     >
                       {formatDelta(delta, item.value_type)}
                     </td>
-                    <td className="py-1 text-right tabular-nums text-muted">
+                    <td className="py-2.5 text-right tabular-nums text-muted">
                       {reference.sampleSize > 0 ? `n=${reference.sampleSize}` : '—'}
                     </td>
                   </tr>
@@ -254,11 +268,11 @@ export function ProgressDetailModal({
           </table>
         </div>
 
-        <footer className="flex shrink-0 justify-end border-t border-line p-4">
+        <footer className="flex shrink-0 justify-end border-t border-line px-5 py-5 sm:px-6 sm:py-6">
           <button
             type="button"
             onClick={onClose}
-            className="h-11 rounded-md border border-line px-4 text-base font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="h-11 rounded-md border border-line px-6 text-base font-semibold text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             Voltar
           </button>
