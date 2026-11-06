@@ -52,6 +52,8 @@ import { portraitSrcFor } from '../assets/ClassCrest'
 import { classLabel } from '../../lib/classLabels'
 import { TIER_BORDER_DISPLAY } from './tierDisplay'
 import { cardFilename, downloadCard, type CardExportData } from '../export/cardExport'
+import { PHOTO_TRANSFORM_DEFAULT, type CardPhotoTransform } from '../export/cardAssets'
+import { loadPhotoTransform, savePhotoTransform } from './photoTransformStore'
 
 // Enumeration-safe pt-BR copy (KeyStatsPage pattern): raw server text is
 // never rendered — errors map to one of two fixed strings.
@@ -103,6 +105,27 @@ export function DashboardPage({
     photoUrlRef.current = next
     setPhotoUrl(next)
   }, [])
+
+  // The member's own crop framing (owner 2026-11-05): device-local, keyed by
+  // member id + the stored object key, so the preview AND the download show
+  // the photo exactly as the member positioned it.
+  const photoKey = 'card.jpg'
+  const [photoTransform, setPhotoTransform] = useState<CardPhotoTransform | null>(() =>
+    loadPhotoTransform(session.member_id, photoKey),
+  )
+  const handlePhotoTransformChange = useCallback(
+    (transform: CardPhotoTransform) => {
+      const next =
+        transform.zoom === PHOTO_TRANSFORM_DEFAULT.zoom &&
+        transform.x === PHOTO_TRANSFORM_DEFAULT.x &&
+        transform.y === PHOTO_TRANSFORM_DEFAULT.y
+          ? null
+          : transform
+      setPhotoTransform(next)
+      savePhotoTransform(session.member_id, photoKey, next)
+    },
+    [session.member_id],
+  )
 
   useEffect(() => {
     return () => {
@@ -184,6 +207,10 @@ export function DashboardPage({
     // decision 2026-10-23); the KEY keeps driving the asset lookups, and
     // the monogram follows the label so it always matches the print.
     const jobLabel = classLabel(myCard.char_class)
+    // LAST_UPDATE line (owner 2026-11-05): the member's most recent VALIDATED
+    // submission is the moment their stats last changed. fetchMySubmissions is
+    // already ordered newest-first; a pending/rejected row is not an update.
+    const lastValidated = submissions?.find((row) => row.status === 'validated')
     return {
       name: ownName,
       charClass: jobLabel,
@@ -196,8 +223,12 @@ export function DashboardPage({
       })),
       photoSrc: photoUrl ?? portraitSrcFor(myCard.char_class),
       monogramLetter: jobLabel.charAt(0).toUpperCase(),
+      lastUpdate: lastValidated?.submitted_at ?? null,
+      // The framing only applies to the member's OWN screenshot — the class
+      // portrait fallback keeps its measured frame.
+      photoTransform: photoUrl === null ? null : photoTransform,
     }
-  }, [myCard, photoUrl, ownName])
+  }, [myCard, photoUrl, ownName, submissions, photoTransform])
 
   // Same generating/failure affordances as the showcase download
   // (PromotionCard): disabled + 'Gerando…', inline enumeration-safe
@@ -272,7 +303,9 @@ export function DashboardPage({
                 preview={exportData}
                 photoUrl={photoUrl}
                 photoLoadFailed={photoLoadFailed}
+                photoTransform={photoTransform}
                 onPhotoChange={replacePhoto}
+                onPhotoTransformChange={handlePhotoTransformChange}
                 className="mx-auto w-40 shrink-0 sm:w-48 lg:mx-0 lg:w-64 xl:w-72"
                 onDownload={
                   exportData === null

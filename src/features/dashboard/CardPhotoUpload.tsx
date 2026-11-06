@@ -1,8 +1,15 @@
 // CardPhotoUpload — the member's character-screenshot area on the Painel
 // (07.2-05 checkpoint round 3, owner decision 1: member SELF-upload on their
 // own card area). The uploaded screenshot fills the card's crop-path photo
-// area (round 5: card.svg's <path id="crop-path">) — on the page and in the
-// JPEG export.
+// area — on the page and in the PNG export.
+//
+// POSITION CROP (owner 2026-11-05): picking a file opens CardPhotoCrop, the
+// positioning step — the real card preview (or the generic silhouette when the
+// member has no card yet) with the photo clipped to the crop path, where the
+// member drags/zooms until the face is clear of the text. Only on OK does the
+// photo upload; the framing is stored device-locally (photoTransformStore) and
+// rides the preview AND the download. The photo itself keeps its UPLOAD
+// DIMENSIONS — it is only clipped for display, never baked.
 //
 // Controlled surface (performance pass): DashboardPage owns the card payload,
 // the photo object URL and the export assembly, and passes the one preview
@@ -13,27 +20,26 @@
 // in Destaques display the photo). The client adds no enforcement — errors
 // surface as enumeration-safe pt-BR copy, never raw internals.
 //
-// Client-side compression (screenshots can be MBs): the file is decoded and
-// re-encoded as a ≤1200px JPEG (q≈0.85) BEFORE upload — the card's photo
-// area (the crop path, ~931×783 design-px bbox) renders at most at the
-// 2160×3200 export backing store, so this is lossless-in-practice at a
-// fraction of the bytes, and it keeps the bucket's 2 MB object cap
-// unreachable through the UI.
+// Encoding: the bucket accepts image/jpeg up to 2 MB. The original pixel
+// dimensions are kept and the quality ladder steps down until the encoded
+// JPEG fits the cap (a final downscale only as the last resort, so the upload
+// always lands).
 //
 // Preview: a live CardSvg fed by my_card + the current photo (or the
 // class-portrait fallback / ASST-01 monogram) — the exact component the
 // Destaques showcase uses and the member Painel's EAFC strip (07.2-03).
 //
-// Card actions (owner checkpoint round 6): alter photo / remove photo /
-// download card are THREE icon-only buttons shown inline over the card's
-// bottom edge on hover/focus (touch screens get the same row in normal
-// flow). Each icon carries an accessible label plus a tooltip, so the
-// strip stays free of button text.
-import { useRef, useState, type ReactNode } from 'react'
+// Card actions (owner checkpoint round 6; always visible since 2026-11-05 —
+// hover-only controls do not work on touch): alter photo / reposition photo /
+// remove photo / download card sit IN FLOW under the card, icon-only with an
+// accessible label plus a tooltip.
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { deleteCardPhoto, fetchCardPhoto, uploadCardPhoto } from '../../lib/api'
 import type { NeoFootSession } from '../auth/session'
 import { CardSvg } from '../cards/CardSvg'
 import type { CardExportData } from '../export/cardExport'
+import type { CardPhotoTransform } from '../export/cardAssets'
+import { CardPhotoCrop } from './CardPhotoCrop'
 
 // Enumeration-safe pt-BR copy (shared UI contract): never expose HTTP codes
 // or which check failed.
@@ -47,28 +53,58 @@ const INVALID_FILE = 'Escolha um arquivo de imagem (JPG ou PNG).'
  *  refused before decode. */
 const MAX_INPUT_BYTES = 25 * 1024 * 1024
 
-/** Decode + downscale + re-encode: ≤1200px on the long edge, JPEG q 0.85. */
-async function compressToJpeg(file: File, maxDim = 1200, quality = 0.85): Promise<Blob> {
+/** The card-photos bucket's cap (image/jpeg only, 2 MB). */
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+
+const JPEG_QUALITY_LADDER = [0.92, 0.86, 0.8, 0.72, 0.64, 0.56] as const
+
+function decodeImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('decode failed'))
+    img.src = url
+  })
+}
+
+function encodeJpeg(img: HTMLImageElement, width: number, height: number, quality: number): Promise<Blob> {
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(width))
+  canvas.height = Math.max(1, Math.round(height))
+  const ctx = canvas.getContext('2d')
+  if (ctx === null) throw new Error('canvas unavailable')
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob === null ? reject(new Error('encode failed')) : resolve(blob)),
+      'image/jpeg',
+      quality,
+    )
+  })
+}
+
+/** Re-encode the upload as JPEG at its OWN dimensions, stepping the quality
+ *  down until it fits the bucket cap; a downscale is the last resort. */
+async function encodeCardPhoto(file: File): Promise<Blob> {
   const srcUrl = URL.createObjectURL(file)
   try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image()
-      el.onload = () => resolve(el)
-      el.onerror = () => reject(new Error('decode failed'))
-      el.src = srcUrl
-    })
-    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight))
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
-    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
-    const ctx = canvas.getContext('2d')
-    if (ctx === null) throw new Error('canvas unavailable')
-    ctx.imageSmoothingEnabled = true
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
-    if (blob === null) throw new Error('encode failed')
-    return blob
+    const img = await decodeImage(srcUrl)
+    const w = img.naturalWidth
+    const h = img.naturalHeight
+    if (w <= 0 || h <= 0) throw new Error('empty image')
+    for (const quality of JPEG_QUALITY_LADDER) {
+      const blob = await encodeJpeg(img, w, h, quality)
+      if (blob.size <= MAX_UPLOAD_BYTES) return blob
+    }
+    let scale = Math.min(1, 1600 / Math.max(w, h))
+    while (scale > 0.05) {
+      const blob = await encodeJpeg(img, w * scale, h * scale, 0.82)
+      if (blob.size <= MAX_UPLOAD_BYTES) return blob
+      scale *= 0.75
+    }
+    throw new Error('cannot fit the upload cap')
   } finally {
     URL.revokeObjectURL(srcUrl)
   }
@@ -127,12 +163,21 @@ const iconProps = {
   'aria-hidden': true,
 } as const
 
+/** The photo waiting in the crop editor. `file` is null when the member is
+ *  repositioning the already-stored photo (the URL belongs to the parent). */
+interface PendingPhoto {
+  url: string
+  file: File | null
+}
+
 export function CardPhotoUpload({
   session,
   preview,
   photoUrl,
   photoLoadFailed = false,
+  photoTransform = null,
   onPhotoChange,
+  onPhotoTransformChange,
   onDownload,
   downloading = false,
   downloadError = null,
@@ -146,9 +191,14 @@ export function CardPhotoUpload({
    *  empty state). The owner revokes it when it is replaced. */
   photoUrl: string | null
   photoLoadFailed?: boolean
+  /** The member's stored framing (zoom + pan) for the current photo. */
+  photoTransform?: CardPhotoTransform | null
   /** Receives the stored screenshot after an upload (fresh blob) or null after
    *  a removal, so the owner keeps one photo URL for every surface. */
   onPhotoChange: (photo: Blob | null) => void
+  /** Receives the confirmed framing so the owner persists it and feeds the
+   *  preview/export. */
+  onPhotoTransformChange?: (transform: CardPhotoTransform) => void
   // Owner round 6: the own-card download joined the on-card action row
   // (icon-only). DashboardPage owns the export contract and passes the
   // handler/state down.
@@ -161,22 +211,59 @@ export function CardPhotoUpload({
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState<PendingPhoto | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const pendingUrlRef = useRef<string | null>(null)
 
-  async function handleFile(file: File | undefined): Promise<void> {
+  // A pending object URL created here must not leak when the card unmounts.
+  useEffect(() => {
+    return () => {
+      if (pendingUrlRef.current !== null) URL.revokeObjectURL(pendingUrlRef.current)
+    }
+  }, [])
+
+  function openCrop(file: File): void {
+    const url = URL.createObjectURL(file)
+    if (pendingUrlRef.current !== null) URL.revokeObjectURL(pendingUrlRef.current)
+    pendingUrlRef.current = url
+    setPending({ url, file })
+  }
+
+  function closeCrop(): void {
+    if (pendingUrlRef.current !== null) URL.revokeObjectURL(pendingUrlRef.current)
+    pendingUrlRef.current = null
+    setPending(null)
+  }
+
+  function handleFile(file: File | undefined): void {
     if (!file) return
     setError(null)
     if (!file.type.startsWith('image/') || file.size > MAX_INPUT_BYTES) {
       setError(INVALID_FILE)
       return
     }
+    openCrop(file)
+  }
+
+  async function handleConfirm(transform: CardPhotoTransform): Promise<void> {
+    const current = pending
+    if (current === null) return
+    setError(null)
+    // Repositioning an already-stored photo: no upload, just the framing.
+    if (current.file === null) {
+      onPhotoTransformChange?.(transform)
+      closeCrop()
+      return
+    }
     setBusy(true)
     try {
-      const jpeg = await compressToJpeg(file)
+      const jpeg = await encodeCardPhoto(current.file)
       await uploadCardPhoto(session, jpeg)
       // Refresh the preview from the STORED object (proves the write landed
       // — the preview is the round-trip proof, not the local file).
       onPhotoChange(await fetchCardPhoto(session))
+      onPhotoTransformChange?.(transform)
+      closeCrop()
     } catch {
       setError(UPLOAD_ERROR)
     } finally {
@@ -190,6 +277,7 @@ export function CardPhotoUpload({
     try {
       await deleteCardPhoto(session)
       onPhotoChange(null)
+      onPhotoTransformChange?.({ zoom: 1, x: 0, y: 0 })
     } catch {
       setError(REMOVE_ERROR)
     } finally {
@@ -197,10 +285,9 @@ export function CardPhotoUpload({
     }
   }
 
-  // Owner checkpoint round 6: ONE inline, icon-only action row — alter photo,
-  // remove photo, download card — with tooltips (excessive text would clutter
-  // the strip). Shown on hover/focus over the card at sm+, always in flow on
-  // touch/narrow screens.
+  // Owner 2026-11-05: ONE inline, icon-only action row — alter photo,
+  // reposition, remove photo, download card — ALWAYS visible in normal flow
+  // (hover-revealed controls are unusable on touch screens).
   const actionButtons = (
     <>
       <IconAction
@@ -215,6 +302,24 @@ export function CardPhotoUpload({
           <path d="M2 13h12" />
         </svg>
       </IconAction>
+      {photoUrl !== null && (
+        <IconAction
+          label="Reposicionar foto"
+          onClick={() => {
+            if (pendingUrlRef.current !== null) URL.revokeObjectURL(pendingUrlRef.current)
+            pendingUrlRef.current = null
+            setPending({ url: photoUrl, file: null })
+          }}
+          disabled={busy}
+        >
+          <svg {...iconProps}>
+            <path d="M2.5 5.5V2.5h3" />
+            <path d="M13.5 10.5v3h-3" />
+            <path d="M2.5 2.5l4 4" />
+            <path d="M13.5 13.5l-4-4" />
+          </svg>
+        </IconAction>
+      )}
       {photoUrl !== null && (
         <IconAction
           label="Remover foto"
@@ -258,25 +363,16 @@ export function CardPhotoUpload({
         accept="image/png,image/jpeg,image/webp"
         className="hidden"
         onChange={(e) => {
-          void handleFile(e.target.files?.[0]).then(() => {
-            // Allow re-selecting the same file.
-            if (inputRef.current) inputRef.current.value = ''
-          })
+          handleFile(e.target.files?.[0])
+          // Allow re-selecting the same file.
+          if (inputRef.current) inputRef.current.value = ''
         }}
       />
       {preview !== null ? (
-        <div
-          className="group relative"
-          role="group"
-          aria-label="Foto do personagem no seu card"
-        >
+        <div role="group" aria-label="Foto do personagem no seu card">
           <CardSvg data={preview} className="h-auto w-full" />
-          {/* Owner checkpoint round 9: the actions are a STRIP pinned across
-              the card's bottom edge; hover/focus reveals it, touch screens
-              get the row in flow. */}
-          <div className="mt-2 flex flex-wrap justify-center gap-1.5 sm:absolute sm:inset-x-0 sm:bottom-0 sm:mt-0 sm:border-t sm:border-line sm:bg-dominant/90 sm:p-1.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-            {actionButtons}
-          </div>
+          {/* Always-visible action strip under the card (owner 2026-11-05). */}
+          <div className="mt-2 flex flex-wrap justify-center gap-1.5">{actionButtons}</div>
         </div>
       ) : (
         <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line p-3 text-center">
@@ -288,6 +384,19 @@ export function CardPhotoUpload({
         <p role="alert" aria-live="polite" className="mt-2 text-center text-xs font-semibold text-error">
           {message}
         </p>
+      )}
+      {pending !== null && (
+        <CardPhotoCrop
+          imageUrl={pending.url}
+          preview={preview}
+          initial={pending.file === null ? photoTransform : null}
+          busy={busy}
+          errorText={error}
+          onCancel={closeCrop}
+          onConfirm={(transform) => {
+            void handleConfirm(transform)
+          }}
+        />
       )}
     </div>
   )

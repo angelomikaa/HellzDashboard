@@ -37,6 +37,7 @@
 // never raw errors.
 import { useEffect, useMemo, useState } from 'react'
 import { fetchCardPhotoByPathPublic, type PromotionCardRow } from '../../lib/api'
+import { loadPhotoTransform, memberIdFromPhotoPath } from '../dashboard/photoTransformStore'
 import { formatStatValue } from '../../lib/parseStatValue'
 import { portraitSrcFor } from '../assets/ClassCrest'
 import { classLabel } from '../../lib/classLabels'
@@ -154,6 +155,14 @@ export function PromotionCard({
       })),
       photoSrc: photoUrl ?? portraitSrcFor(ownClass),
       monogramLetter: jobLabel.charAt(0).toUpperCase(),
+      // The viewer's OWN crop framing (device-local): when this card belongs
+      // to the member browsing, their Destaques card shows the same framing
+      // they positioned on the Painel. Another member's card simply has no
+      // stored framing here (the measured cover fit).
+      photoTransform:
+        photoUrl === null
+          ? null
+          : loadPhotoTransform(memberIdFromPhotoPath(card.photo_path) ?? '', 'card.jpg'),
     }
   }, [card, ownClass, photoUrl, showRealStats])
 
