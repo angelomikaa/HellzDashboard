@@ -108,6 +108,20 @@ export function StatTrendChart({
     ...visibleReferences.map((reference) => reference.value),
   ])
 
+  // Equal references (class + cohort often share the same members) would
+  // overprint their labels — nudge them apart by a minimum gap.
+  const MIN_LABEL_GAP = 7
+  const labelY = new Map<string, number>()
+  let previousLabelY = Number.NEGATIVE_INFINITY
+  for (const reference of [...visibleReferences].sort(
+    (a, b) => yPercent(a.value, domain) - yPercent(b.value, domain),
+  )) {
+    const raw = yPercent(reference.value, domain)
+    const y = Math.min(94, Math.max(raw, previousLabelY + MIN_LABEL_GAP))
+    labelY.set(reference.key, y)
+    previousLabelY = y
+  }
+
   return (
     <div className={`relative h-52 w-full ${className ?? ''}`} aria-hidden="true">
       <svg
@@ -182,7 +196,7 @@ export function StatTrendChart({
           key={reference.key}
           className="absolute right-1 -translate-y-1/2 rounded bg-surface/85 px-1 text-[11px] font-semibold tabular-nums"
           style={{
-            top: `${yPercent(reference.value, domain)}%`,
+            top: `${labelY.get(reference.key) ?? yPercent(reference.value, domain)}%`,
             color: REFERENCE_COLORS[reference.key],
           }}
         >
