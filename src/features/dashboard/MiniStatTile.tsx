@@ -98,7 +98,7 @@ export function MiniStatTile({
     </>
   )
 
-  const rootClass = `relative group rounded-lg bg-surface p-3 hover-card${missing ? ' opacity-60' : ''}`
+  const rootClass = `relative group rounded-lg bg-surface p-4 hover-card${missing ? ' opacity-60' : ''}`
 
   if (onOpen !== undefined) {
     return (

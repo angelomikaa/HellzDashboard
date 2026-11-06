@@ -28,7 +28,7 @@ export function CollapsibleGroup({
   children: ReactNode
 }) {
   return (
-    <section className="mt-6">
+    <section className="mt-8">
       <button
         type="button"
         onClick={() => onToggle(groupName)}

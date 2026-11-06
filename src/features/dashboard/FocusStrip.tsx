@@ -36,9 +36,9 @@ export function FocusStrip({
   if (focus.length === 0) return null
 
   return (
-    <div className="border-t border-line pt-3">
+    <div className="border-t border-line pt-4">
       <h2 className="text-sm font-semibold text-accent">Foco de melhoria</h2>
-      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         {focus.map((stat) => (
           <MiniStatTile
             key={stat.stat_key}

@@ -335,11 +335,11 @@ export function DashboardPage({
               just under the strip. */}
           <section
             aria-label="Resumo do personagem"
-            className={`neon-ring mt-4 rounded-lg border-2 bg-dominant p-3 ${
+            className={`neon-ring mt-4 rounded-lg border-2 bg-dominant p-4 sm:p-5 ${
               ovrTier !== null ? TIER_BORDER_DISPLAY[ovrTier] : 'border-line'
             }`}
           >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-8">
               {/* Owner checkpoint round 7: the own-card preview is now sized
                   like a Destaques card (≈a third of the content column) and
                   the actions joined it as an icon strip over the photo area
@@ -366,7 +366,7 @@ export function DashboardPage({
               {/* Round 12 (owner checkpoint): the column is CENTERED, not
                   stretched — identity header, the 6 key-stat tiles and the
                   6 focus tiles read as one rhythm inside the tier frame. */}
-              <div className="flex min-w-0 flex-1 flex-col gap-4 lg:justify-center lg:py-1">
+              <div className="flex min-w-0 flex-1 flex-col gap-5 lg:justify-center lg:py-1">
                 <OvrHero
                   ovr={report.ovr}
                   displayName={ownName}
@@ -378,10 +378,10 @@ export function DashboardPage({
                     label per group, so the two rows read as sibling
                     sections and never as one mashed grid. */}
                 {strip.kind !== 'hidden' && (
-                  <div className="border-t border-line pt-3">
+                  <div className="border-t border-line pt-4">
                     <h2 className="text-sm font-semibold text-muted">Stats-Chave</h2>
                     {strip.kind === 'cards' ? (
-                      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+                      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
                         {strip.stats.map((k) => (
                           <KeyStatCard
                             key={k.stat_key}
@@ -411,7 +411,7 @@ export function DashboardPage({
               </div>
             </div>
           </section>
-          <div className="flex justify-end">
+          <div className="mt-4 flex justify-end">
             <TierLegend />
           </div>
           {GROUP_ORDER.map((group) => (

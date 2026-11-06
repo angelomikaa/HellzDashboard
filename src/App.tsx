@@ -144,24 +144,26 @@ function App() {
           <IdentityName key={session.access_token} session={session}>
             {(identityName) => (
               <div className="flex min-h-screen flex-col bg-dominant backdrop-neon-grid text-content">
-                <header className="flex items-center justify-between border-b border-line px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <img src={hellzMark} alt="" aria-hidden="true" className="h-7 w-7 shrink-0" />
-                    <span className="text-base text-content">Olá, {identityName}</span>
-                    <span className="rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
-                      {ROLE_LABELS[session.member_role]}
-                    </span>
+                <header className="border-b border-line">
+                  <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <img src={hellzMark} alt="" aria-hidden="true" className="h-7 w-7 shrink-0" />
+                      <span className="truncate text-base text-content">Olá, {identityName}</span>
+                      <span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-sm font-semibold text-muted">
+                        {ROLE_LABELS[session.member_role]}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleLogout(invalidate)}
+                      className="h-11 shrink-0 rounded-md border border-line px-4 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      Sair
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleLogout(invalidate)}
-                    className="h-11 rounded-md border border-line px-4 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    Sair
-                  </button>
                 </header>
                 <nav aria-label="Seções" className="border-b border-line">
-                  <div className="mx-auto flex w-full max-w-6xl gap-1 overflow-x-auto px-4 xl:max-w-7xl">
+                  <div className="mx-auto flex w-full max-w-[1600px] gap-2 overflow-x-auto px-4 sm:px-6 lg:px-8">
                     {/* Round 9: Início is the leftmost tab (owner), but the
                         landing tab after login is Painel — the second
                         button. */}
@@ -254,7 +256,7 @@ function App() {
                       widens for data views (max-w-6xl, xl:max-w-7xl). Pages that
                       need a scannable column (submit wizard, login) cap
                       themselves internally. */}
-                  <div className="mx-auto w-full max-w-6xl px-4 py-6 xl:max-w-7xl">
+                  <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
                     {/* Page errors stay inside the content region: without this
                         boundary a render throw in one page unmounted the whole
                         shell (blank screen, no nav). Keyed by tab so switching
