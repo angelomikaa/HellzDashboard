@@ -32,7 +32,7 @@
 //   D) round-8 file (retired) — <style> + cls-* classes, crop-path photo area
 //      + border-over gradient stroke clipped by clip-path-1.
 //
-// PAINT ORDER (the file's own): plate → photo (+ glow, scrim) → border →
+// PAINT ORDER (the file's own): plate → photo (+ bokeh, scrim) → border →
 // stats plate → texts → logo.
 //   - Placeholder TEXT slots (Bebas Neue unless noted — family + fill are
 //     placeholders; code substitutes). Roles resolve from STRUCTURE, never
@@ -195,10 +195,12 @@ export interface CardStatsPlate extends CardGradientPaint {
   path: string
 }
 
-/** One shape of the photo-area light wash (owner 2026-11-06 re-model: the
- *  "bokeh" circles the file paints inside the photo clip) — geometry and fade
- *  from the file, color from the tier. */
-export type CardPhotoGlowShape =
+/** One shape of the OVR BOKEH backdrop (owner 2026-11-06: "card now has a
+ *  bokeh effect as background for the OVR section") — the soft gradient
+ *  circles/paths the file paints inside the photo clip behind the OVR block.
+ *  Geometry, fade and the shape's own opacity come from the file, the color
+ *  from the tier. */
+export type CardOvrBokehShape =
   | ({ kind: 'circle'; cx: number; cy: number; r: number; opacity: number } & CardGradientPaint)
   | ({ kind: 'path'; d: string; opacity: number } & CardGradientPaint)
 
@@ -223,9 +225,9 @@ export interface CardGeometry {
   borderStroke?: CardBorderStroke
   /** The stats contrast plate, when the file draws one (`stats-plate`). */
   statsPlate?: CardStatsPlate
-  /** The photo-area light wash shapes (the file's bokeh circles) inside the
-   *  crop clip. */
-  photoGlows?: CardPhotoGlowShape[]
+  /** The OVR bokeh backdrop (`<g id="OVR-BOKEH-BG">` inside the photo clip):
+   *  soft tier-tinted shapes behind the OVR number/job line. */
+  ovrBokeh?: CardOvrBokehShape[]
   /** The brand mark the file draws (`logo-hellz`), when present. */
   logo?: CardLogo
   slots: {
@@ -321,7 +323,7 @@ export const TIER_PALETTE: Record<Tier, TierPalette> = {
   },
 }
 
-/** The tier's own ramp for the file's fade layers (stats plate + photo glow):
+/** The tier's own ramp for the file's fade layers (stats plate + OVR bokeh):
  *  the owner's re-modeled gradients are authored in the Impecável colors, and
  *  the tier rule ("as cores do svg serão a nova cor do tier", and before that
  *  "the fills must follow tier colors") means each tier paints its own ramp at
@@ -615,14 +617,14 @@ function pickPlatePath(svg: string): string {
  *  re-exports carried none, and the owner then decided the photo occupies THE
  *  WHOLE SHIELD — so a file without a photo clip falls back to the plate
  *  silhouette. The round-8 file used class="cls-2". */
-function pickCropPath(svg: string): string {
+function pickCropPath(svg: string, groups: SvgGroup[]): string {
   for (const m of svg.matchAll(/<path\b([^>]*)>/g)) {
     const attrs = attributes(m[1])
     if (attrs.get('id') === 'crop-path' && attrs.get('d')) return attrs.get('d') as string
   }
-  // The photo group: `<g id="mask" clip-path="url(#clip-path-3)">` (the clip
-  // may also sit on a nested group, e.g. the placeholder wrapper).
-  const mask = findGroup(svgGroups(svg), 'mask')
+  // The photo group: `<g id="mask" clip-path="url(#clip-path-1)">` (the clip
+  // may also sit on a nested group).
+  const mask = findGroup(groups, 'mask')
   if (mask) {
     const clipRef =
       mask.attrs.get('clip-path')?.match(/url\(#([^)]+)\)/)?.[1] ??
@@ -711,29 +713,35 @@ function statsPlate(svg: string): CardStatsPlate | undefined {
   return { path: plate.get('d') as string, ...gradientPaint(svg, ref[1]) }
 }
 
-/** The photo-area light wash: every gradient-filled shape the file paints
- *  INSIDE the photo clip (`<g id="mask">`) — today a group of soft bokeh
- *  circles. Geometry, fade and the shape's own opacity come from the file; the
- *  colors from the tier. The mask group is parsed with BALANCED nesting (the
- *  placeholder image sits in its own nested group). */
-function photoGlows(svg: string): CardPhotoGlowShape[] | undefined {
-  const group = findGroup(svgGroups(svg), 'mask')
-  if (group === undefined) return undefined
-  const shapes: CardPhotoGlowShape[] = []
-  for (const m of group.body.matchAll(/<circle\b([^>]*)>|<path\b([^>]*)>/g)) {
+/** The OVR bokeh backdrop (owner 2026-11-06): every gradient-filled shape the
+ *  file paints INSIDE the photo clip (`<g id="mask">` → `<g id="OVR-BOKEH-BG">`)
+ *  behind the OVR block. Geometry, fade and the shape's own opacity come from
+ *  the file; the colors from the tier. The mask group is parsed with BALANCED
+ *  nesting (the placeholder image sits in its own nested group). */
+function ovrBokeh(svg: string, groups: SvgGroup[]): CardOvrBokehShape[] | undefined {
+  const mask = findGroup(groups, 'mask')
+  if (mask === undefined) return undefined
+  // Prefer the explicit bokeh group (keeps a future non-bokeh gradient inside
+  // the photo area out of the backdrop), fall back to the whole mask. The id
+  // drifts per export (OVR-BOKEH / OVR-BOKEH-BG).
+  const bokehGroup =
+    findGroup(svgGroups(mask.body), 'OVR-BOKEH') ?? findGroup(svgGroups(mask.body), 'OVR-BOKEH-BG')
+  const source = bokehGroup?.body ?? mask.body
+  const shapes: CardOvrBokehShape[] = []
+  for (const m of source.matchAll(/<circle\b([^>]*)>|<path\b([^>]*)>/g)) {
     const attrs = attributes(m[1] ?? m[2])
     const ref = attrs.get('fill')?.match(/url\(#([^)]+)\)/)
     if (ref === null || ref === undefined) continue
     const rawOpacity = attrs.get('opacity') ?? '1'
     const opacity = Number(rawOpacity)
     if (Number.isNaN(opacity)) {
-      throw new Error(`card.svg: the photo glow declares an unparseable opacity "${rawOpacity}"`)
+      throw new Error(`card.svg: the OVR bokeh shape declares an unparseable opacity "${rawOpacity}"`)
     }
     const paint = gradientPaint(svg, ref[1])
     if (m[1] !== undefined) {
       const [cx, cy, r] = ['cx', 'cy', 'r'].map((k) => Number(attrs.get(k)))
       if ([cx, cy, r].some((v) => Number.isNaN(v))) {
-        throw new Error('card.svg: a photo glow circle needs cx/cy/r')
+        throw new Error('card.svg: an OVR bokeh circle needs cx/cy/r')
       }
       shapes.push({ kind: 'circle', cx, cy, r, opacity, ...paint })
     } else {
@@ -757,12 +765,11 @@ function photoGlows(svg: string): CardPhotoGlowShape[] | undefined {
  *      <g id="border-over">.
  *  Either way only the GEOMETRY (+ the layer's opacity) is taken; the COLORS
  *  come from the tier palette — the file's colors never reach the render. */
-function borderStroke(svg: string): CardBorderStroke | undefined {
+function borderStroke(svg: string, groups: SvgGroup[]): CardBorderStroke | undefined {
   // A/B) the owner's group layers: the innermost group wrapping a stroked
   // (fill:none) path is the ring — the ids drift per export
   // (tier-color-border, tier-color-plate-2), the clip may live on a nested
   // group and the opacity on an ancestor.
-  const groups = svgGroups(svg)
   const ringGroup = groups.find((group) => {
     const inner = group.body.match(/<path\b([^>]*)>/)
     if (!inner) return false
@@ -865,8 +872,8 @@ function borderStroke(svg: string): CardBorderStroke | undefined {
 
 /** The brand mark group, verbatim, plus the gradients it references. Returns
  *  undefined for a file that draws no mark (the retired re-exports). */
-function cardLogo(svg: string): CardLogo | undefined {
-  const group = findGroup(svgGroups(svg), 'logo-hellz')
+function cardLogo(svg: string, groups: SvgGroup[]): CardLogo | undefined {
+  const group = findGroup(groups, 'logo-hellz')
   if (group === undefined) return undefined
   const markup = group.markup.replace(/\s+/g, ' ')
   const ids = new Set([...markup.matchAll(/url\(#([^)]+)\)/g)].map((m) => m[1]))
@@ -905,8 +912,9 @@ export function scopedLogo(logo: CardLogo, scope: string): CardLogo {
 function lastUpdate(
   svg: string,
   sizes: Map<string, number>,
+  groups: SvgGroup[],
 ): { value: CardLastUpdate; indexes: number[] } | undefined {
-  const group = findGroup(svgGroups(svg), 'LAST_UPDATE')
+  const group = findGroup(groups, 'LAST_UPDATE')
   if (group === undefined) return undefined
   const indexes = textIndexes(svg)
   const texts: (CardTextSlot & { text: string; index: number })[] = []
@@ -976,12 +984,15 @@ function keyGroups(svg: string, sizes: Map<string, number>): { id: string; texts
 function parseCard(svg: string): CardGeometry {
   const sizes = styleFontSizes(svg)
   const texts = textSlots(svg, sizes)
+  // ONE balanced parse of the document feeds every group-based layer (the
+  // owner's exports nest groups, so a regex cannot pair the tags).
+  const svgNodes = svgGroups(svg)
 
   // The LAST_UPDATE line is parsed FIRST: since the 2026-11-06 re-model it is
   // nested INSIDE <g id="OVR">, so the OVR group's DIRECT texts are read with
   // the nested groups stripped (balanced groups keep the pairing honest).
-  const lastUpdateGroup = lastUpdate(svg, sizes)
-  const ovrGroup = findGroup(svgGroups(svg), 'OVR')
+  const lastUpdateGroup = lastUpdate(svg, sizes, svgNodes)
+  const ovrGroup = findGroup(svgNodes, 'OVR')
   if (ovrGroup === undefined) {
     throw new Error('card.svg: no <g id="OVR"> group (the OVR number + job line)')
   }
@@ -1007,12 +1018,12 @@ function parseCard(svg: string): CardGeometry {
   const job = slotOf(jobRaw)
 
   // --- PLAYERNAME: the ORBITRON text (the only one outside a group) -------
-  const groups = keyGroups(svg, sizes)
+  const statGroups = keyGroups(svg, sizes)
   // Census: EVERY text in the file must belong to a group (OVR, KEY,
   // LAST_UPDATE) or be the player name — a stray slot would silently fail to
   // render.
   const grouped = new Set<number>([
-    ...groups.flatMap((g) => g.texts.map((t) => t.index)),
+    ...statGroups.flatMap((g) => g.texts.map((t) => t.index)),
     ...ovrTexts.map((t) => t.index),
     ...(lastUpdateGroup?.indexes ?? []),
   ])
@@ -1027,7 +1038,7 @@ function parseCard(svg: string): CardGeometry {
   const name = slotOf(nameRaw)
 
   // --- THE SIX STAT COLUMNS (semantic groups), ordered left → right -------
-  const columns = groups.map((g) => {
+  const columns = statGroups.map((g) => {
     const rating = [...g.texts].sort((a, b) => b.size - a.size)[0]
     const pair = g.texts.filter((t) => t !== rating).sort((a, b) => a.y - b.y)
     if (pair.length !== 2) {
@@ -1091,7 +1102,7 @@ function parseCard(svg: string): CardGeometry {
   })
 
   const platePath = pickPlatePath(svg)
-  const cropPath = pickCropPath(svg)
+  const cropPath = pickCropPath(svg, svgNodes)
 
   // The LAST_UPDATE line sits under the OVR block's job line (2026-11-06
   // re-model: nested inside <g id="OVR">, over the photo) and above the player
@@ -1113,10 +1124,10 @@ function parseCard(svg: string): CardGeometry {
     plateBBox: pathBBox(platePath, 'base-plate'),
     cropPath,
     cropBBox: pathBBox(cropPath, 'crop-path'),
-    borderStroke: borderStroke(svg),
+    borderStroke: borderStroke(svg, svgNodes),
     statsPlate: statsPlate(svg),
-    photoGlows: photoGlows(svg),
-    logo: cardLogo(svg),
+    ovrBokeh: ovrBokeh(svg, svgNodes),
+    logo: cardLogo(svg, svgNodes),
     slots: { ovr, job, name, lastUpdate: lastUpdateValue, stats },
   }
 }

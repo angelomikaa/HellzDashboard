@@ -306,7 +306,7 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
             light washes and the stats contrast plate keep their offsets and
             opacities, while the COLOR rides the tier ramp (for Impecável that
             IS the file's magenta→orange). */}
-        {(plan.card.photoGlows ?? []).map((glow, i) => (
+        {(plan.card.ovrBokeh ?? []).map((glow, i) => (
           <linearGradient
             key={i}
             id={`${glowGradId}-${i}`}
@@ -391,7 +391,7 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
         {/* The file's photo light washes (soft tier-tinted bokeh shapes),
             painted over the photo and clipped to the photo area — the file's
             own order (image → washes). */}
-        {(plan.card.photoGlows ?? []).map((glow, i) =>
+        {(plan.card.ovrBokeh ?? []).map((glow, i) =>
           glow.kind === 'circle' ? (
             <circle
               key={i}

@@ -368,7 +368,7 @@ describe('buildCardPlan — round-5 photo contract (crop path + fallbacks)', () 
     for (const fade of plate.fades) {
       expect(Object.keys(fade).sort()).toEqual(['offset', 'opacity'])
     }
-    expect(plan.card.photoGlows).toBe(CARD_GEOMETRY.photoGlows)
+    expect(plan.card.ovrBokeh).toBe(CARD_GEOMETRY.ovrBokeh)
   })
 
   it('tints the file fades with the TIER ramp (Impecável renders the file exactly)', () => {

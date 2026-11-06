@@ -98,8 +98,8 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
     expect(plate.fades[plate.fades.length - 1].opacity).toBe(1)
   })
 
-  it('parses the photo light washes (bokeh) the file paints inside the photo clip', () => {
-    const glows = CARD_GEOMETRY.photoGlows
+  it('parses the OVR bokeh backdrop, honoring each shape\'s authored opacity', () => {
+    const glows = CARD_GEOMETRY.ovrBokeh
     expect(glows).toBeDefined()
     if (glows === undefined) return
     expect(glows.length).toBeGreaterThanOrEqual(1)
@@ -114,6 +114,11 @@ describe('cardAssets — card.svg parses completely (fail-fast contract)', () =>
       if (glow.kind === 'circle') expect(glow.r).toBeGreaterThan(100)
       else expect(glow.d.startsWith('M')).toBe(true)
     }
+    // The file authors a DIFFERENT opacity per wash (and one with none, which
+    // means fully opaque): the parse keeps each value instead of flattening
+    // them to a single default.
+    expect(new Set(glows.map((g) => g.opacity)).size).toBeGreaterThan(1)
+    expect(glows.some((g) => g.opacity === 1)).toBe(true)
   })
 
   it('parses the LAST_UPDATE line: the live date + the static label segments', () => {

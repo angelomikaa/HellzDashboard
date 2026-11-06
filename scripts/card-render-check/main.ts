@@ -411,7 +411,7 @@ function referenceCardSvg(
     svg = svg.replace(re, `$1${stops}$2`)
   }
   if (plan.card.statsPlate !== undefined) fadeStops(plan.card.statsPlate.id, plan.card.statsPlate)
-  for (const glow of plan.card.photoGlows ?? []) fadeStops(glow.id, glow)
+  for (const glow of plan.card.ovrBokeh ?? []) fadeStops(glow.id, glow)
   // Main plate: a gradient tier keeps the file's gradient fill; a solid tier
   // swaps it for the palette color.
   const plateFill = plateGradient === undefined ? palette.plateFill : 'url(#linear-gradient-1)'
@@ -926,7 +926,7 @@ async function main(): Promise<void> {
     // Static design facts ride along (they pin the design-source wiring).
     results.meta = {
       designSize: `${CARD_DESIGN_WIDTH}x${CARD_DESIGN_HEIGHT}`,
-      sourceFile: 'src/assets/card.svg (single source of truth, 2026-11-06 re-model — photo mask clip, 48px tier border at 70% opacity, stats plate + photo glow gradients, LAST_UPDATE nested in OVR)',
+      sourceFile: 'src/assets/card.svg (single source of truth, 2026-11-06 re-model — photo mask clip, 48px tier border at 70% opacity, stats plate + OVR bokeh gradients, LAST_UPDATE nested in OVR, no embedded placeholder)',
       slotCount: CARD_GEOMETRY.slots.stats.length,
       ovrEffectiveSize: CARD_GEOMETRY.slots.ovr.size,
       plateFillsDistinct: new Set(Object.values(TIER_PALETTE).map((p) => p.plateFill)).size === 4,
@@ -937,7 +937,7 @@ async function main(): Promise<void> {
       borderImpecavel: TIER_PALETTE.platinum.borderStops === IMPECAVEL_BORDER_STOPS,
       hasCropPath: CARD_GEOMETRY.cropPath !== CARD_GEOMETRY.platePath,
       hasStatsPlate: CARD_GEOMETRY.statsPlate !== undefined,
-      hasPhotoGlows: (CARD_GEOMETRY.photoGlows?.length ?? 0) > 0,
+      hasOvrBokeh: (CARD_GEOMETRY.ovrBokeh?.length ?? 0) > 0,
       hasLastUpdate: CARD_GEOMETRY.slots.lastUpdate !== undefined,
       labelAboveRating: CARD_GEOMETRY.slots.stats.every((s) => s.label.y < s.points.y && s.points.y < s.value.y),
       fontsLoaded,

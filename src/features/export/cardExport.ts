@@ -750,7 +750,7 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   }
   // The file's photo light wash (soft tier-tinted bokeh shapes over the
   // photo), clipped to the photo area exactly as the file clips it.
-  for (const glow of plan.card.photoGlows ?? []) {
+  for (const glow of plan.card.ovrBokeh ?? []) {
     ctx.save()
     ctx.globalAlpha = glow.opacity
     ctx.fillStyle = fadeGradient(ctx, plan, glow)
