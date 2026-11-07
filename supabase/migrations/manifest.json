@@ -77,7 +77,8 @@
     "0075_progress_real_references.sql",
     "0076_real_guild_averages.sql",
     "0077_ranking_real_rows.sql",
-    "0078_card_submission_date.sql"
+    "0078_card_submission_date.sql",
+    "0079_rating_real_cohort_fallback.sql"
   ],
   "retired": {
     "0024_device_binding_enforcement.sql": "STUB bodies (would turn the four staff RPCs into no-ops); superseded by 0064_staff_rpc_bodies_and_device_guard.sql",
