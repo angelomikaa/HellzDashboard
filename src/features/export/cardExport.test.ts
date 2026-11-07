@@ -297,6 +297,10 @@ describe('buildCardPlan — LAST_UPDATE line + member photo framing (owner 2026-
     expect(plan.lastUpdate.x).toBe(slot.date.x)
     expect(plan.lastUpdate.y).toBe(slot.date.y)
     expect(plan.lastUpdate.size).toBe(slot.date.size)
+    // Over-photo legibility: white, same as the OVR block — never the dark
+    // palette fill used on the solid plate bands (owner report 2026-11-07).
+    expect(plan.lastUpdate.color).toBe('#FFFFFF')
+    expect(plan.lastUpdate.color).toBe(plan.ovr.color)
     // The suffix mirrors the FILE (empty when the file carries the date alone).
     expect(plan.lastUpdate.suffix.map((s) => s.text)).toEqual(slot.suffix.map((s) => s.text))
     expect(plan.lastUpdate.suffix.map((s) => s.x)).toEqual(slot.suffix.map((s) => s.x))

@@ -61,6 +61,11 @@ describe('PromotionCard — credential-gated real stats', () => {
       />,
     )
     expect(html).toContain('>05-11<')
+    // Over the photo: the date carries the OVR block's legibility treatment
+    // (owner contrast report 2026-11-07), never a bare dark plate fill.
+    const dateText = /<text[^>]*>05-11<\/text>/.exec(html)?.[0] ?? ''
+    expect(dateText).toContain('stroke="#000000"')
+    expect(dateText).toContain('paint-order="stroke"')
   })
 
   it('omits the date line when the payload has no last_submitted_at', () => {

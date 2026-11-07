@@ -167,6 +167,10 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
       ovr: fitCardText(plan.ovr.text, 400, plan.ovr.size, plan.ovr.maxW, beb),
       job: fitCardText(plan.ovr.jobText, 400, plan.ovr.jobSize, plan.ovr.jobMaxW, beb),
       name: fitCardText(plan.name.text, 700, plan.name.size, plan.name.maxWidth, orb),
+      lastUpdate:
+        plan.lastUpdate === null
+          ? null
+          : fitCardText(plan.lastUpdate.date, 400, plan.lastUpdate.size, plan.lastUpdate.maxWidth, beb),
       stats: plan.stats.map((c) => ({
         label: fitCardText(c.label, 400, c.labelSize, c.labelMaxW, beb),
         points: fitCardText(c.points, 400, c.pointsSize, c.pointsMaxW, beb),
@@ -175,6 +179,7 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
     }),
     [plan, beb, orb],
   )
+  const lastUpdateFit = fits.lastUpdate
   const textLengthOf = (fit: CardTextFit): number | undefined => fit.squeezeTo
   const cropClipId = `card-crop-clip-${uid}`
   const borderClipId = `card-border-clip-${uid}`
@@ -464,29 +469,36 @@ export function CardSvg({ data, className }: { data: CardExportData; className?:
           re-seed 2026-11-05). The date is the member's own last update; the
           bullet + word are the file's literals at their own anchors. The whole
           line is omitted when the caller has no date (the placeholder is never
-          printed). */}
-      {plan.lastUpdate !== null && (
+          printed). It sits OVER the photo, so it uses the OVR block's
+          white + paint-order stroke (owner contrast report 2026-11-07). */}
+      {plan.lastUpdate !== null && lastUpdateFit !== null && (
         <g fontFamily={`${plan.fonts.slots}, ${plan.fonts.name}, sans-serif`} fill={plan.lastUpdate.color}>
           <text
             x={plan.lastUpdate.x}
             y={plan.lastUpdate.y}
             fontWeight="400"
-            fontSize={plan.lastUpdate.size}
-            textLength={textLengthOf(
-              fitCardText(
-                plan.lastUpdate.date,
-                400,
-                plan.lastUpdate.size,
-                plan.lastUpdate.maxWidth,
-                beb,
-              ),
-            )}
+            fontSize={lastUpdateFit.size}
+            stroke="#000000"
+            strokeOpacity="0.55"
+            strokeWidth={lastUpdateFit.size * 0.06}
+            paintOrder="stroke"
+            textLength={textLengthOf(lastUpdateFit)}
             lengthAdjust="spacingAndGlyphs"
           >
             {plan.lastUpdate.date}
           </text>
           {plan.lastUpdate.suffix.map((segment, i) => (
-            <text key={i} x={segment.x} y={segment.y} fontWeight="400" fontSize={segment.size}>
+            <text
+              key={i}
+              x={segment.x}
+              y={segment.y}
+              fontWeight="400"
+              fontSize={segment.size}
+              stroke="#000000"
+              strokeOpacity="0.55"
+              strokeWidth={segment.size * 0.06}
+              paintOrder="stroke"
+            >
               {segment.text}
             </text>
           ))}

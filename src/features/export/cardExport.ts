@@ -229,7 +229,9 @@ export interface CardPlan {
   name: { text: string; x: number; y: number; size: number; color: string; maxWidth: number }
   /** The "atualizado" line under the name (owner 2026-11-05): the live date at
    *  the file's own anchor + the static segments at theirs. null when the
-   *  caller supplies no date — the line is then omitted entirely. */
+   *  caller supplies no date — the line is then omitted entirely. Sits OVER the
+   *  photo (inside the OVR block), so it uses the over-photo legibility rule
+   *  (white + stroke/shadow), never the dark plate fill. */
   lastUpdate: {
     date: string
     x: number
@@ -370,7 +372,11 @@ export function buildCardPlan(
           x: lastUpdateSlot.date.x * scale,
           y: lastUpdateSlot.date.y * scale,
           size: lastUpdateSlot.date.size * scale,
-          color: textFill,
+          // Over the photo (inside the OVR block): white + stroke/shadow, the
+          // same legibility rule as the OVR number/job. The palette textFill is
+          // for the solid plate bands and goes dark on every metal tier — the
+          // date must never inherit it (owner report 2026-11-07: "sem contraste").
+          color: OVR_TEXT_COLOR,
           // The line never leaves the shield: bound it to the plate's inner
           // span, measured from its own left anchor.
           maxWidth: plateInnerR - lastUpdateSlot.date.x * scale,
@@ -814,14 +820,20 @@ export async function drawCard(canvas: HTMLCanvasElement, data: CardExportData):
   paintFitted(ctx, plan.name.text, plan.name.x, plan.name.y, plan.fonts.name, 700, plan.name.size, plan.name.maxWidth, true)
 
   // --- LAST_UPDATE line (owner 2026-11-05; nested in the OVR block since the
-  // 2026-11-06 re-model): "atualizado • DD-MM" in the plate's text fill.
+  // 2026-11-06 re-model): over the photo, so it gets the SAME white + shadow
+  // treatment as the OVR number/job (owner contrast report 2026-11-07). The
+  // dark palette fill is for the solid plate bands and is never used here.
   if (plan.lastUpdate !== null) {
     const lu = plan.lastUpdate
+    ctx.shadowColor = 'rgba(0,0,0,0.65)'
+    ctx.shadowBlur = 14 * s
     ctx.fillStyle = lu.color
     paintFitted(ctx, lu.date, lu.x, lu.y, plan.fonts.slots, 400, lu.size, lu.maxWidth)
     for (const segment of lu.suffix) {
       paintFitted(ctx, segment.text, segment.x, segment.y, plan.fonts.slots, 400, segment.size, lu.maxWidth)
     }
+    ctx.shadowBlur = 0
+    ctx.shadowColor = 'transparent'
   }
 
   // --- The 6 key stats — one per parsed slot column (server order), each
