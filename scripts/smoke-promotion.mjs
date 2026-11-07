@@ -40,8 +40,16 @@
  * Exits non-zero on any FAIL. Prints "PROMOTION SMOKE PASSED n/n" only if all pass.
  */
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { supabaseConfig, FIXTURE_PIN, assertFixtureRole } from './smoke-config.mjs'
+
+// The staff RPCs call assert_device_bound() (0064), so the smoke client must
+// send the SAME fingerprint the JWT carries: SHA-256 of the User-Agent used at
+// login (src/../supabase/functions/_shared/device.ts). The previous harness
+// sent no header at all and only surfaced the gap on set_member_active.
+const SMOKE_UA = 'neofoot-smoke/1.0'
+const DEVICE_FP = createHash('sha256').update(SMOKE_UA).digest('hex')
 
 // ---------------------------------------------------------------------------
 // Config (credentials from smoke-config.mjs: env or .env, never hardcoded)
@@ -127,6 +135,7 @@ async function login(handle) {
       apikey: ANON_KEY,
       Authorization: `Bearer ${ANON_KEY}`,
       'Content-Type': 'application/json',
+      'User-Agent': SMOKE_UA,
     },
     body: JSON.stringify({ discord_handle: handle, pin: FIXTURE_PIN }),
   })
@@ -142,8 +151,11 @@ async function login(handle) {
 
 /** PostgREST call. token === null means anon (apikey only). */
 async function rest(path, { method = 'GET', token = null, body = null } = {}) {
-  const headers = { apikey: ANON_KEY }
-  if (token) headers.Authorization = `Bearer ${token}`
+  const headers = { apikey: ANON_KEY, 'User-Agent': SMOKE_UA }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+    headers['x-device-fingerprint'] = DEVICE_FP
+  }
   if (body !== null) headers['Content-Type'] = 'application/json'
   const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
     method,

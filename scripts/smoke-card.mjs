@@ -29,12 +29,12 @@
  *            points + OVR for the same member, ALL 6 key stats (exact
  *            equality — the class+function cohort is the single source of
  *            truth on both paths)
- *            10d/10e (10.1-02 UNIF-04) extend the parity contract to the
- *            remaining surfaces: role_rank OVR ≡ my_card OVR (Ranking tab
- *            ≡ Painel card) and my_report OVR ≡ my_card OVR (Painel OVR hero
- *            ≡ card) — the 0036 unification locked in a runnable gate; a
- *            future partial rewrite (the 0018 failure mode) turns 10a-10e
- *            red the day it ships
+ *            10d/10e (10.1-02 UNIF-04) extend the contract to the remaining
+ *            surfaces: 0077 makes role_rank emit REAL rows only, so 10d locks
+ *            the real-only boundary (a fixture-only class is absent while
+ *            my_card still computes its OVR) and 10e locks my_report OVR ≡
+ *            my_card OVR (Painel OVR hero ≡ card) — a future partial rewrite
+ *            (the 0018 failure mode) turns 10a-10e red the day it ships
  *   Cleanup  fixture members/submissions/class/key/relevant/pin_login_
  *            attempts removed in finally; zero-residue census asserted
  *
@@ -613,23 +613,18 @@ async function main() {
     const fixtureRows = Array.isArray(fixtureRank.json) ? fixtureRank.json : []
     const fixtureNames = fixtureRows.map((r) => r.display_name)
     check(
-      "6g. role_rank('dps', fixtureClass) filters to the fixture class (3 rows, D-18 class filter)",
-      fixtureRank.ok &&
-        fixtureRows.length === 3 &&
-        fixtureRows.every((r) => r.char_class === CLASS),
+      "6g. 0077: role_rank('dps', fixtureClass) hides a fixture-only class (real rows only)",
+      fixtureRank.ok && fixtureRows.length === 0,
       `rows=${JSON.stringify(fixtureNames)}`,
     )
     check(
-      '6h. fixture board ordered by OVR desc: c(300s) > b(200s) > a(100s)',
-      fixtureRows.length === 3 &&
-        fixtureNames[0] === DISPLAY[HANDLES.c] &&
-        fixtureNames[1] === DISPLAY[HANDLES.b] &&
-        fixtureNames[2] === DISPLAY[HANDLES.a],
+      '6h. 0077: smoke fixture rows are absent from the Ranking board (my_card still computes them)',
+      fixtureRows.every((r) => r.char_class !== CLASS),
       `order=${JSON.stringify(fixtureNames)}`,
     )
     check(
-      '6i. fixture rows carry member_id (composite React keys, 07.2 research pitfall 11)',
-      fixtureRows.every((r) => typeof r.member_id === 'string' && r.member_id.length > 0),
+      '6i. real board rows carry member_id (composite React keys, 07.2 research pitfall 11)',
+      rankRows.every((r) => typeof r.member_id === 'string' && r.member_id.length > 0),
       'member_id present',
     )
 
@@ -781,9 +776,11 @@ async function main() {
 
     // ---- Probes 10d/10e (10.1-02 UNIF-04): the rest of the parity contract --
     // 0036 unified ALL six OVR surfaces onto the Phase 9 value-proportional
-    // formula; 10a-10c lock my_card ≡ get_promotion. 10d locks the Ranking
-    // tab basis (role_rank — the 0024 fork surface), 10e locks the Painel
-    // OVR hero basis (my_report). Exact number equality, same fixture member.
+    // formula; 10a-10c lock my_card ≡ get_promotion. 0077 made role_rank emit
+    // REAL rows only, so the fixture class is no longer observable there: 10d
+    // locks that real-only boundary (my_card still computes the fixture OVR),
+    // 10e locks the Painel OVR hero basis (my_report). Exact number equality
+    // across the six surfaces is also exercised live by the RPC parity audit.
     const unifyRank = await callRpc('role_rank', ownerToken, {
       p_function: ROLES[HANDLES.a][1],
       p_class: CLASS,
@@ -791,15 +788,12 @@ async function main() {
     const unifyRows = Array.isArray(unifyRank.json) ? unifyRank.json : []
     const unifyRowA = unifyRows.find((r) => r.display_name === DISPLAY[HANDLES.a])
     check(
-      '10d. role_rank ovr === my_card ovr.value for member a (Ranking tab ≡ Painel card — exact equality)',
+      '10d. 0077: fixture member a is hidden from role_rank while my_card still reports its OVR',
       unifyRank.ok &&
-        !!unifyRowA &&
-        unifyRowA.ovr !== null &&
-        unifyRowA.ovr !== undefined &&
-        Number(unifyRowA.ovr) === Number(pCard.ovr?.value),
-      unifyRowA
-        ? `rank=${unifyRowA.ovr} card=${pCard.ovr?.value}`
-        : `HTTP ${unifyRank.status}, member a row missing from the fixture board`,
+        !unifyRowA &&
+        pCard.ovr?.value !== null &&
+        pCard.ovr?.value !== undefined,
+      `HTTP ${unifyRank.status}, rows=${unifyRows.length}, card=${pCard.ovr?.value}`,
     )
     const unifyReport = await callRpc('my_report', memberToken, {})
     const unifyReportOvr = unifyReport.json?.ovr?.value

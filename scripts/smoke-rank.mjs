@@ -287,9 +287,9 @@ async function main() {
       `HTTP ${memberTop5.status}`,
     )
 
-    // 6. Officer top-5 preview: exact OVR values, sorted desc. The officer
-    //    fixture (suporte, no submission, no suporte key config) rides the
-    //    board tail with OVR null — server order is ovr desc nulls last.
+    // 6. Officer top-5 preview: exact OVR values, sorted desc. 0077 (and
+    //    0079) list REAL players only, so the smoke officer fixture
+    //    (`smoke-rank-officer-…`) is deliberately absent from the board.
     const top5 = await rest('/rpc/class_top5', {
       method: 'POST',
       token: officer.access_token,
@@ -298,15 +298,14 @@ async function main() {
     const top5rows = Array.isArray(top5.json) ? top5.json : []
     const top5ovrs = top5rows.map((r) => Number(r.ovr))
     check(
-      'officer class_top5 -> 4 rows [c 99, b 91, a 75, officer null last] desc',
+      'officer class_top5 -> 3 real rows [c 99, b 91, a 75] desc (officer fixture excluded)',
       top5.ok &&
-        top5rows.length === 4 &&
-        JSON.stringify(top5ovrs.slice(0, 3)) === JSON.stringify([99, 91, 75]) &&
+        top5rows.length === 3 &&
+        JSON.stringify(top5ovrs) === JSON.stringify([99, 91, 75]) &&
         top5rows[0].display_name === 'ZZ Rank C' &&
         top5rows[1].display_name === 'ZZ Rank B' &&
         top5rows[2].display_name === 'ZZ Rank A' &&
-        top5rows[3].display_name === 'SMOKE Rank Officer' &&
-        top5rows[3].ovr === null,
+        top5rows.every((r) => r.display_name !== 'SMOKE Rank Officer'),
       `HTTP ${top5.status} ${top5.text.slice(0, 160)}`,
     )
 
