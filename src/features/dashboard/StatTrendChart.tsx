@@ -5,8 +5,8 @@
 //  - StatSparkline : the 3-point micro chart inside a Stats-Chave / Foco tile
 //                    (polyline only — no axes, no labels).
 //  - StatTrendChart: the detail plot inside the progression modal — the own
-//                    history in accent red plus three DISTINCT reference lines
-//                    (class silver, function gold, cohort purple).
+//                    history in accent red plus four DISTINCT reference lines
+//                    (class silver, function gold, cohort purple, best green).
 //
 // Everything is drawn in percentages inside a 0..100 viewBox with
 // vector-effect="non-scaling-stroke", so the chart fills any container without

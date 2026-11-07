@@ -133,6 +133,17 @@ describe('buildProgressEvidence', () => {
     expect(item.function_average).toBe(95)
     expect(item.cohort_average).toBe(99)
     expect(item.class_sample_size).toBe(12)
+    expect(item.best).toBeNull()
+  })
+
+  it('joins my_report.best as the direction-aware cohort best', () => {
+    const [item] = buildProgressEvidence(
+      ['a'],
+      progress([progressRow('a')]),
+      card(),
+      report([reportStat('a', { best: 140 })]),
+    )
+    expect(item.best).toBe(140)
   })
 
   it('falls back to my_report (points + cohort average) when the progress fetch failed', () => {
@@ -149,6 +160,8 @@ describe('buildProgressEvidence', () => {
     expect(item.function_average).toBeNull()
     // my_report.class_average IS the cohort basis.
     expect(item.cohort_average).toBe(42)
+    // my_report.best backs the "Melhor da coorte" line even without progress.
+    expect(item.best).toBe(30)
   })
 
   it('keeps an unknown key addressable instead of crashing', () => {

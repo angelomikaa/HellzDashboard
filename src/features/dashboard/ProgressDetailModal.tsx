@@ -3,9 +3,15 @@
 //
 // One stat, one chart, one back button:
 //   - the own 3-submission history plotted in accent red;
-//   - three DISTINCT reference lines — class (silver), function (gold) and
-//     cohort (purple) — the CURRENT averages, each gated at n >= 3;
+//   - four DISTINCT reference lines — class (silver), function (gold), cohort
+//     (purple) and cohort BEST (green, owner revision 2026-11-07) — the CURRENT
+//     values, averages gated at n >= 3;
 //   - a compact comparison table with the signed gap against each reference.
+//
+// The BEST line exists because points are value-proportional to the cohort
+// best (`round(own / best * 99, 2)`), NOT to any average: a below-average
+// player can score high when the cohort is tightly packed. The "Pontos" box
+// therefore states the formula next to the number.
 //
 // No scrolling: the modal is sized for the single chart + table. Accessible
 // dialog following the PlayerStatsModal contract: focus moves to the back
@@ -67,16 +73,23 @@ export function ProgressDetailModal({
       value: item.cohort_average,
       sampleSize: item.cohort_sample_size,
     },
+    {
+      key: 'best',
+      label: 'Melhor da coorte',
+      value: item.best,
+      sampleSize: item.cohort_sample_size,
+    },
   ]
   const tier = item.points !== null ? tierForPoints(item.points) : null
   // Phase 10.13 (owner 2026-11-06): every reference row says exactly what it
   // compares against — the player's own class/function, never a generic label.
   const classText = classLabel(charClass)
   const functionText = FUNCTION_LABELS[charFunction]
-  const referenceHint: Record<'class' | 'function' | 'cohort', string> = {
+  const referenceHint: Record<'class' | 'function' | 'cohort' | 'best', string> = {
     class: `vs. ${classText}`,
     function: `vs. ${functionText}`,
     cohort: `vs. ${classText} · ${functionText}`,
+    best: `vs. ${classText} · ${functionText}`,
   }
 
   useEffect(() => {
@@ -182,6 +195,7 @@ export function ProgressDetailModal({
                   </span>
                 ) : tier !== null ? (
                   <span
+                    title="Pontos = seu valor ÷ melhor da coorte × 99"
                     className={`rounded-full border px-2.5 py-1 text-sm font-semibold ${TIER_BORDER_DISPLAY[tier]} ${TIER_TEXT_DISPLAY[tier]}`}
                   >
                     {Math.round(item.points)}
@@ -190,6 +204,11 @@ export function ProgressDetailModal({
                   <span className="text-sm text-muted">—</span>
                 )}
               </div>
+              {item.points !== null && (
+                <p className="mt-1 max-w-[15rem] text-[11px] leading-tight text-muted">
+                  seu valor ÷ melhor × 99
+                </p>
+              )}
             </div>
           </div>
 

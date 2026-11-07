@@ -36,6 +36,12 @@ export interface ProgressEvidenceItem {
   function_sample_size: number
   cohort_average: number | null
   cohort_sample_size: number
+  /**
+   * The cohort best (direction-aware) — the denominator of the 0..99 points:
+   * `round(own / best * 99, 2)`. Real members only (0076), so it also matches
+   * the 0079 rating cohort whenever that cohort has n >= 3 real members.
+   */
+  best: number | null
 }
 
 /**
@@ -106,6 +112,9 @@ export function buildProgressEvidence(
       // documented fallback when the progress fetch failed.
       cohort_average: row?.cohort_average ?? reportStat?.class_average ?? null,
       cohort_sample_size: row?.cohort_sample_size ?? (reportStat?.data_sufficient ? 3 : 0),
+      // Direction-aware cohort best: the points denominator. my_report's
+      // `best` is already real-members-only (0076).
+      best: reportStat?.best ?? null,
     }
   })
 }

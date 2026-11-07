@@ -27,6 +27,7 @@ function item(overrides?: Partial<ProgressEvidenceItem>): ProgressEvidenceItem {
     function_sample_size: 30,
     cohort_average: 99,
     cohort_sample_size: 4,
+    best: 130,
     ...overrides,
   }
 }
@@ -44,13 +45,14 @@ function render(overrides?: Partial<ProgressEvidenceItem>): string {
 }
 
 describe('ProgressDetailModal — single clicked stat', () => {
-  it('renders only the clicked stat, with one chart and the three references', () => {
+  it('renders only the clicked stat, with one chart and the four references', () => {
     const html = render()
     expect(html).toContain('Ataque Mágico')
     expect(html).toContain('MATK')
     expect(html).toContain('Classe')
     expect(html).toContain('Função')
     expect(html).toContain('Coorte')
+    expect(html).toContain('Melhor da coorte')
     expect(html).toContain('n=12')
     expect(html).toContain('n=30')
     expect(html).toContain('n=4')
@@ -67,10 +69,17 @@ describe('ProgressDetailModal — single clicked stat', () => {
 
   it('shows the signed gap against each reference', () => {
     const html = render()
-    // 120 vs class 90 = +30, vs function 95 = +25, vs cohort 99 = +21.
+    // 120 vs class 90 = +30, vs function 95 = +25, vs cohort 99 = +21,
+    // vs best 130 = −10.
     expect(html).toContain('+30')
     expect(html).toContain('+25')
     expect(html).toContain('+21')
+    expect(html).toContain('−10')
+  })
+
+  it('states the value-proportional points formula next to the badge', () => {
+    const html = render()
+    expect(html).toContain('seu valor ÷ melhor × 99')
   })
 
   it('flags a missing reference instead of inventing a line', () => {
