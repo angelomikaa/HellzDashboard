@@ -1,0 +1,5 @@
+/* Harness entry: the app's real stylesheet plus an explicit source scan of
+   src/ — this preview server's root is the script folder, so Tailwind's
+   automatic detection would otherwise miss every class used by the app. */
+@import "../../src/index.css";
+@source "../../src";

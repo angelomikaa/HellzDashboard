@@ -24,7 +24,8 @@
     "ocr:spike": "node scripts/ocr-spike.mjs",
     "ocr:spike:self-test": "node scripts/ocr-spike.mjs --self-test",
     "ocr:spike:info": "node scripts/ocr-spike.mjs --info",
-    "lineup:check": "npx vite build --config scripts/lineup-render-check/vite.config.mjs"
+    "lineup:check": "npx vite build --config scripts/lineup-render-check/vite.config.mjs",
+    "submit:preview": "vite --config scripts/submit-layout-check/vite.config.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
