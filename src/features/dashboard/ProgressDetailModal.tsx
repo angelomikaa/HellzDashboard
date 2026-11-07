@@ -69,6 +69,15 @@ export function ProgressDetailModal({
     },
   ]
   const tier = item.points !== null ? tierForPoints(item.points) : null
+  // Phase 10.13 (owner 2026-11-06): every reference row says exactly what it
+  // compares against — the player's own class/function, never a generic label.
+  const classText = classLabel(charClass)
+  const functionText = FUNCTION_LABELS[charFunction]
+  const referenceHint: Record<'class' | 'function' | 'cohort', string> = {
+    class: `vs. ${classText}`,
+    function: `vs. ${functionText}`,
+    cohort: `vs. ${classText} · ${functionText}`,
+  }
 
   useEffect(() => {
     const previous =
@@ -242,11 +251,16 @@ export function ProgressDetailModal({
                 return (
                   <tr key={reference.key} className="border-b border-line last:border-b-0">
                     <th scope="row" className="py-2.5 pr-3 text-left font-semibold text-content">
-                      <span
-                        className="mr-2 inline-block h-2 w-2 rounded-full"
-                        style={{ backgroundColor: REFERENCE_COLORS[reference.key] }}
-                      />
-                      {reference.label}
+                      <span className="flex items-center">
+                        <span
+                          className="mr-2 inline-block h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: REFERENCE_COLORS[reference.key] }}
+                        />
+                        {reference.label}
+                      </span>
+                      <span className="mt-0.5 block pl-4 text-xs font-normal text-muted">
+                        {referenceHint[reference.key]}
+                      </span>
                     </th>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-content">
                       {reference.value === null

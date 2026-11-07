@@ -58,6 +58,13 @@ describe('ProgressDetailModal — single clicked stat', () => {
     expect(html).toContain('Voltar')
   })
 
+  it('names the exact class/function each reference compares against', () => {
+    const html = render()
+    expect(html).toContain('vs. Sumo Sacerdote')
+    expect(html).toContain('vs. Suporte')
+    expect(html).toContain('vs. Sumo Sacerdote · Suporte')
+  })
+
   it('shows the signed gap against each reference', () => {
     const html = render()
     // 120 vs class 90 = +30, vs function 95 = +25, vs cohort 99 = +21.
