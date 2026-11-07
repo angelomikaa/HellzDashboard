@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import type { PromotionCardRow } from '../../lib/api'
 import { PromotionCard } from './PromotionCard'
 
-function card(value: number | null): PromotionCardRow {
+function card(value: number | null, overrides?: Partial<PromotionCardRow>): PromotionCardRow {
   return {
     display_name: 'Aryah',
     char_function: 'suporte',
@@ -25,6 +25,7 @@ function card(value: number | null): PromotionCardRow {
         points: 88,
       },
     ],
+    ...overrides,
   }
 }
 
@@ -50,5 +51,22 @@ describe('PromotionCard — credential-gated real stats', () => {
       <PromotionCard card={card(null)} charClass="Biochemist" showRealStats />,
     )
     expect(html).toContain('>—</text>')
+  })
+
+  it('renders the submission date (DD-MM) from last_submitted_at', () => {
+    const html = renderToStaticMarkup(
+      <PromotionCard
+        card={card(1234, { last_submitted_at: '2026-11-05T10:00:00Z' })}
+        charClass="Biochemist"
+      />,
+    )
+    expect(html).toContain('>05-11<')
+  })
+
+  it('omits the date line when the payload has no last_submitted_at', () => {
+    const html = renderToStaticMarkup(
+      <PromotionCard card={card(1234)} charClass="Biochemist" />,
+    )
+    expect(html).not.toContain('>05-11<')
   })
 })

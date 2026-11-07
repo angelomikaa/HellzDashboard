@@ -765,6 +765,11 @@ export interface PromotionCardRow {
   // and falls back to the class portrait when the object doesn't exist (no
   // upload yet → 404). No key-stat/config data rides this field.
   photo_path: string
+  // 0078 (owner 2026-11-06): the latest submission that feeds the card values
+  // (validated OR pending, never rejected/discarded) — rendered as the card's
+  // DD-MM LAST_UPDATE line. Optional so an older payload still renders (the
+  // line is omitted, never faked).
+  last_submitted_at?: string | null
 }
 
 export interface PromotionSection {

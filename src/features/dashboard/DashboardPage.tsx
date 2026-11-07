@@ -206,10 +206,12 @@ export function DashboardPage({
     // decision 2026-10-23); the KEY keeps driving the asset lookups, and
     // the monogram follows the label so it always matches the print.
     const jobLabel = classLabel(myCard.char_class)
-    // LAST_UPDATE line (owner 2026-11-05): the member's most recent VALIDATED
-    // submission is the moment their stats last changed. fetchMySubmissions is
-    // already ordered newest-first; a pending/rejected row is not an update.
-    const lastValidated = submissions?.find((row) => row.status === 'validated')
+    // Card date (owner 2026-11-06): the latest submission that feeds the
+    // values — validated OR pending, never rejected/discarded — so the date
+    // always matches the stats/OVR shown. fetchMySubmissions is newest-first.
+    const lastSubmitted = submissions?.find(
+      (row) => row.status !== 'rejected' && row.status !== 'discarded',
+    )
     return {
       name: ownName,
       charClass: jobLabel,
@@ -222,7 +224,7 @@ export function DashboardPage({
       })),
       photoSrc: photoUrl ?? portraitSrcFor(myCard.char_class),
       monogramLetter: jobLabel.charAt(0).toUpperCase(),
-      lastUpdate: lastValidated?.submitted_at ?? null,
+      lastUpdate: lastSubmitted?.submitted_at ?? null,
       // The framing only applies to the member's OWN screenshot — the class
       // portrait fallback keeps its measured frame.
       photoTransform: photoUrl === null ? null : photoTransform,

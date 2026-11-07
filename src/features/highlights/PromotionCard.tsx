@@ -155,6 +155,9 @@ export function PromotionCard({
       })),
       photoSrc: photoUrl ?? portraitSrcFor(ownClass),
       monogramLetter: jobLabel.charAt(0).toUpperCase(),
+      // 0078 (owner 2026-11-06): the card date is the latest submission that
+      // feeds the values (validated OR pending), matching the stats/OVR basis.
+      lastUpdate: card.last_submitted_at ?? null,
       // The viewer's OWN crop framing (device-local): when this card belongs
       // to the member browsing, their Destaques card shows the same framing
       // they positioned on the Painel. Another member's card simply has no
