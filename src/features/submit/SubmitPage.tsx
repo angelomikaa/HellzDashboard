@@ -34,9 +34,9 @@ import { FUNCTION_LABELS } from '../../lib/groups'
 import { classLabel } from '../../lib/classLabels'
 import { prefillIdentity } from '../request/requestFlow'
 import { HistoryList } from './HistoryList'
-import { ExampleShot } from './ExampleShot'
 import { OcrCapture } from './OcrCapture'
 import { ReviewStep } from './ReviewStep'
+import { StepLayout } from './StepLayout'
 import { OCR_FIELD_FAILURE, StatGroupStep } from './StatGroupStep'
 import { DefenseStep } from './DefenseStep'
 import { INVALID_HINT, statFieldFeedback } from './fieldValidation'
@@ -635,7 +635,11 @@ export function SubmitPage({ session }: SubmitPageProps) {
   )
 
   return (
-    <section className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-6 sm:p-8">
+    // LAYT-01 (07.2 D-21/D-22) + owner request 2026-11-07: the wizard was a
+    // max-w-2xl mobile column on every screen. It now takes the data-view
+    // width (max-w-6xl) so each capture step can run its desktop two-column
+    // layout — example + upload on a sticky rail, fields beside them.
+    <section className="mx-auto w-full max-w-6xl rounded-lg border border-line bg-surface p-6 sm:p-8 xl:max-w-7xl">
       {phase === 'submitted' ? (
         <>
           <div role="status">
@@ -683,15 +687,16 @@ export function SubmitPage({ session }: SubmitPageProps) {
               <h2 className="text-xl font-semibold text-content">
                 {`${me.display_name} — ${classLabel(me.char_class)} (${FUNCTION_LABELS[me.char_function]})`}
               </h2>
-              {/* Capture strip (owner feedback, 07.2-06 checkpoint round 2):
-                  the example shot + the OCR upload box occupy ONE full-width
-                  strip; the fields are ONLY below it. */}
-              <div className="flex w-full flex-col gap-4 rounded-lg border border-line bg-surface p-4 lg:flex-row lg:items-stretch">
-                <ExampleShot src="/examples/basic.png" alt="Exemplo da tela básica do personagem" />
-                <div className="min-w-0 flex-1">
-                  {/* OCR entry for the basic header capture (08-04: the same
-                      upload reads combat_power AND the identity profile;
-                      nickname/ID/class remain editable advisory prefill). */}
+              {/* Two-column desktop screen (owner request 2026-11-07): the
+                  basic-screen example + upload stay on the LEFT rail while
+                  the identity values are typed on the RIGHT, side by side. */}
+              <StepLayout
+                exampleSrc="/examples/basic.png"
+                exampleAlt="Exemplo da tela básica do personagem"
+                capture={
+                  /* OCR entry for the basic header capture (08-04: the same
+                     upload reads combat_power AND the identity profile;
+                     nickname/ID/class remain editable advisory prefill). */
                   <OcrCapture
                     capture="basic"
                     onOutcomes={(outcomes) => applyStepOcrOutcomes(1, outcomes)}
@@ -700,168 +705,172 @@ export function SubmitPage({ session }: SubmitPageProps) {
                     // One upload, two passes: identity profile + combat power.
                     onImage={readIdentityProfile}
                   />
-                </div>
-              </div>
-              <div className="flex max-w-md flex-col gap-4">
-                {/* Identity (08-04, IDEN-01/02): mandatory on every
-                    submission. The Basic read prefills the untouched fields
-                    (green hint) and every field stays human-editable. The
-                    class selector is intentionally absent (owner decision
-                    2026-10-21): char_class rides along as the registry row's
-                    class, and char_function is NEVER OCR-derived (D-03/D-19). */}
-                <div className="flex flex-col gap-2">
-                  <label htmlFor="submit-char-id" className="text-sm font-semibold text-content">
-                    ID do personagem
-                  </label>
-                  <input
-                    id="submit-char-id"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    maxLength={12}
-                    value={identity.char_id}
-                    onChange={(e) =>
-                      handleIdentityChange('char_id', e.target.value.replace(/\D/g, '').slice(0, 12))
-                    }
-                    aria-invalid={identityError?.field === 'char_id' || undefined}
-                    disabled={ocrRunningStep === 1}
-                    className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
-                      identityError?.field === 'char_id' ? 'border-error!' : 'border-line'
-                    }`}
-                  />
-                  {identityOcrFilled.has('char_id') && (
-                    <p className="text-sm font-semibold text-success">{IDENTITY_OCR_HINT}</p>
-                  )}
-                  {identityError?.field === 'char_id' && (
-                    <p
-                      role="alert"
-                      aria-live="polite"
-                      className="text-sm font-semibold text-error"
-                    >
-                      {identityError.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label htmlFor="submit-nickname" className="text-sm font-semibold text-content">
-                    Nick
-                  </label>
-                  <input
-                    id="submit-nickname"
-                    type="text"
-                    autoComplete="off"
-                    maxLength={80}
-                    value={identity.nickname}
-                    onChange={(e) => handleIdentityChange('nickname', e.target.value)}
-                    aria-invalid={identityError?.field === 'nickname' || undefined}
-                    disabled={ocrRunningStep === 1}
-                    className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
-                      identityError?.field === 'nickname' ? 'border-error!' : 'border-line'
-                    }`}
-                  />
-                  {identityOcrFilled.has('nickname') && (
-                    <p className="text-sm font-semibold text-success">{IDENTITY_OCR_HINT}</p>
-                  )}
-                  {identityError?.field === 'nickname' && (
-                    <p
-                      role="alert"
-                      aria-live="polite"
-                      className="text-sm font-semibold text-error"
-                    >
-                      {identityError.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label
-                    htmlFor="submit-char-function"
-                    className="text-sm font-semibold text-content"
-                  >
-                    Função
-                  </label>
-                  <select
-                    id="submit-char-function"
-                    value={identity.char_function}
-                    onChange={(e) => handleIdentityFunction(e.target.value as CharFunction)}
-                    aria-invalid={identityError?.field === 'char_function' || undefined}
-                    disabled={ocrRunningStep === 1}
-                    className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
-                      identityError?.field === 'char_function'
-                        ? 'border-error!'
-                        : 'border-line'
-                    }`}
-                  >
-                    <option value="">Selecione a função</option>
-                    {FUNCTION_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  {identityError?.field === 'char_function' && (
-                    <p
-                      role="alert"
-                      aria-live="polite"
-                      className="text-sm font-semibold text-error"
-                    >
-                      {identityError.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label htmlFor="combat-power" className="text-sm font-semibold text-content">
-                    Poder de Combate
-                    {combatPowerExample !== null && (
-                      <>
-                        {' '}
-                        <span className="font-normal text-muted">
-                          (ex.: {combatPowerExample})
-                        </span>
-                      </>
+                }
+              >
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {/* Identity (08-04, IDEN-01/02): mandatory on every
+                      submission. The Basic read prefills the untouched fields
+                      (green hint) and every field stays human-editable. The
+                      class selector is intentionally absent (owner decision
+                      2026-10-21): char_class rides along as the registry row's
+                      class, and char_function is NEVER OCR-derived (D-03/D-19). */}
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="submit-char-id" className="text-sm font-semibold text-content">
+                      ID do personagem
+                    </label>
+                    <input
+                      id="submit-char-id"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={12}
+                      value={identity.char_id}
+                      onChange={(e) =>
+                        handleIdentityChange('char_id', e.target.value.replace(/\D/g, '').slice(0, 12))
+                      }
+                      aria-invalid={identityError?.field === 'char_id' || undefined}
+                      disabled={ocrRunningStep === 1}
+                      className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+                        identityError?.field === 'char_id' ? 'border-error!' : 'border-line'
+                      }`}
+                    />
+                    {identityOcrFilled.has('char_id') && (
+                      <p className="text-sm font-semibold text-success">{IDENTITY_OCR_HINT}</p>
                     )}
-                  </label>
-                  <input
-                    id="combat-power"
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    value={combatPowerRaw}
-                    onChange={(e) => handleChange('combat_power', e.target.value)}
-                    onBlur={() => setCombatPowerBlurred(true)}
-                    aria-invalid={combatPowerFeedback.invalid || undefined}
-                    disabled={ocrRunningStep === 1}
-                    placeholder={ocrRunningStep === 1 ? OCR_READING_PLACEHOLDER : undefined}
-                    className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      // `!` keeps the hover border-brighten from masking the
-                      // validation border while an invalid value is hovered.
-                      combatPowerFeedback.invalid ? 'border-error!' : 'border-line'
-                    } ${ocrRunningStep === 1 ? 'animate-pulse' : ''}`}
-                  />
-                  {combatPowerFeedback.ok && (
-                    <p className="text-sm font-semibold text-success">
-                      {combatPowerFeedback.checkText}
-                    </p>
-                  )}
-                  {combatPowerFeedback.invalid && (
-                    <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
-                      {INVALID_HINT}
-                    </p>
-                  )}
-                  {!combatPowerFeedback.invalid && failedFields[1].has('combat_power') && (
-                    <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
-                      {OCR_FIELD_FAILURE}
-                    </p>
-                  )}
+                    {identityError?.field === 'char_id' && (
+                      <p
+                        role="alert"
+                        aria-live="polite"
+                        className="text-sm font-semibold text-error"
+                      >
+                        {identityError.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="submit-nickname" className="text-sm font-semibold text-content">
+                      Nick
+                    </label>
+                    <input
+                      id="submit-nickname"
+                      type="text"
+                      autoComplete="off"
+                      maxLength={80}
+                      value={identity.nickname}
+                      onChange={(e) => handleIdentityChange('nickname', e.target.value)}
+                      aria-invalid={identityError?.field === 'nickname' || undefined}
+                      disabled={ocrRunningStep === 1}
+                      className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+                        identityError?.field === 'nickname' ? 'border-error!' : 'border-line'
+                      }`}
+                    />
+                    {identityOcrFilled.has('nickname') && (
+                      <p className="text-sm font-semibold text-success">{IDENTITY_OCR_HINT}</p>
+                    )}
+                    {identityError?.field === 'nickname' && (
+                      <p
+                        role="alert"
+                        aria-live="polite"
+                        className="text-sm font-semibold text-error"
+                      >
+                        {identityError.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="submit-char-function"
+                      className="text-sm font-semibold text-content"
+                    >
+                      Função
+                    </label>
+                    <select
+                      id="submit-char-function"
+                      value={identity.char_function}
+                      onChange={(e) => handleIdentityFunction(e.target.value as CharFunction)}
+                      aria-invalid={identityError?.field === 'char_function' || undefined}
+                      disabled={ocrRunningStep === 1}
+                      className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+                        identityError?.field === 'char_function'
+                          ? 'border-error!'
+                          : 'border-line'
+                      }`}
+                    >
+                      <option value="">Selecione a função</option>
+                      {FUNCTION_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {identityError?.field === 'char_function' && (
+                      <p
+                        role="alert"
+                        aria-live="polite"
+                        className="text-sm font-semibold text-error"
+                      >
+                        {identityError.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="combat-power" className="text-sm font-semibold text-content">
+                      Poder de Combate
+                      {combatPowerExample !== null && (
+                        <>
+                          {' '}
+                          <span className="font-normal text-muted">
+                            (ex.: {combatPowerExample})
+                          </span>
+                        </>
+                      )}
+                    </label>
+                    <input
+                      id="combat-power"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={combatPowerRaw}
+                      onChange={(e) => handleChange('combat_power', e.target.value)}
+                      onBlur={() => setCombatPowerBlurred(true)}
+                      aria-invalid={combatPowerFeedback.invalid || undefined}
+                      disabled={ocrRunningStep === 1}
+                      placeholder={ocrRunningStep === 1 ? OCR_READING_PLACEHOLDER : undefined}
+                      className={`h-11 w-full rounded-md border bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                        // `!` keeps the hover border-brighten from masking the
+                        // validation border while an invalid value is hovered.
+                        combatPowerFeedback.invalid ? 'border-error!' : 'border-line'
+                      } ${ocrRunningStep === 1 ? 'animate-pulse' : ''}`}
+                    />
+                    {combatPowerFeedback.ok && (
+                      <p className="text-sm font-semibold text-success">
+                        {combatPowerFeedback.checkText}
+                      </p>
+                    )}
+                    {combatPowerFeedback.invalid && (
+                      <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
+                        {INVALID_HINT}
+                      </p>
+                    )}
+                    {!combatPowerFeedback.invalid && failedFields[1].has('combat_power') && (
+                      <p role="alert" aria-live="polite" className="text-sm font-semibold text-error">
+                        {OCR_FIELD_FAILURE}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <StepVerifyCheckbox
-                  stepNo={1}
-                  checked={stepVerified[1]}
-                  onChange={(checked) => setStepVerified((v) => ({ ...v, 1: checked }))}
-                />
-              </div>
+
+                <div className="mt-4">
+                  <StepVerifyCheckbox
+                    stepNo={1}
+                    checked={stepVerified[1]}
+                    onChange={(checked) => setStepVerified((v) => ({ ...v, 1: checked }))}
+                  />
+                </div>
+              </StepLayout>
             </div>
           )}
 
@@ -876,6 +885,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                 failedFields={failedFields[step]}
                 ocrFilledFields={ocrFilledFields[step]}
                 averages={averages}
+                layout="wide"
                 capture={
                   <OcrCapture
                     capture={STEP_GROUP[step]}
@@ -933,6 +943,7 @@ export function SubmitPage({ session }: SubmitPageProps) {
                 submitError={submitError}
                 onSubmit={() => void handleSubmit()}
                 onFixStat={handleFixStat}
+                layout="wide"
               />
             </div>
           )}

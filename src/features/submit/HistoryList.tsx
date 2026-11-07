@@ -75,7 +75,7 @@ export function HistoryList({ session, onNewSubmission }: HistoryListProps) {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Buscar por data ou status… ( / foca aqui )"
-            className="h-11 rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="h-11 w-full max-w-md rounded-md border border-line bg-surface px-3 text-base text-content hover-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           />
         </div>
       )}
@@ -89,7 +89,7 @@ export function HistoryList({ session, onNewSubmission }: HistoryListProps) {
       ) : rows.length === 0 ? (
         <p className="mt-4 text-base text-muted">Você ainda não enviou status.</p>
       ) : (
-        <ul className="mt-5 flex flex-col gap-3">
+        <ul className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {rows
             .filter((row) => {
               const q = filter.trim().toLowerCase()
@@ -100,7 +100,7 @@ export function HistoryList({ session, onNewSubmission }: HistoryListProps) {
             .map((row) => (
             <li
               key={row.id}
-              className="flex h-11 items-center justify-between gap-4 rounded-md border border-line bg-surface px-3"
+              className="flex min-h-11 items-center justify-between gap-4 rounded-md border border-line bg-surface px-3 py-2"
             >
               <span className="text-base text-content">
                 {`Envio de ${dateTimeFormatter.format(new Date(row.submitted_at))} — `}
